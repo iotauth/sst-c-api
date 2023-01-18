@@ -69,6 +69,9 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 # Compile
 
+For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
+
+
 ```
 $cd $SST_ROOT/entity/c/examples
 $mkdir build && cd build
