@@ -1,0 +1,4 @@
+/home/jake/project/sst-c-api/examples/build/CMakeFiles/entity_client.dir
+/home/jake/project/sst-c-api/examples/build/CMakeFiles/entity_server.dir
+/home/jake/project/sst-c-api/examples/build/CMakeFiles/edit_cache.dir
+/home/jake/project/sst-c-api/examples/build/CMakeFiles/rebuild_cache.dir
