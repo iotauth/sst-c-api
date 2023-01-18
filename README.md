@@ -78,9 +78,9 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 Execute
 
-`$./entity_client c_client.config`
+`$./entity_client ../c_client.config`
 
-`$./entity_server c_server.config`
+`$./entity_server ../c_server.config`
 
 on each terminal
 
