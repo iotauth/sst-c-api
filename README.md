@@ -69,18 +69,20 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 # Compile
 
-`$cd ~/entity/c`
+`$cd $SST_ROOT/entity/sst-c-api/examples`
+`$mkdir build && cd build`
+`$cmake ../`
 `$make`
 
 # Example
 
--   Turn on two different terminals at `$~/entity/c`, and turn on Auth ont the third terminal.
+-   Turn on two different terminals at `$SST_ROOT/entity/sst-c-api/examples/build`, and turn on Auth on the third terminal.
 
 Execute
 
-`$./entity_client c_client.config`
+`$./entity_client ../c_client.config`
 
-`$./entity_server c_server.config`
+`$./entity_server ../c_server.config`
 
 on each terminal
 

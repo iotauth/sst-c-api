@@ -1,4 +1,4 @@
-#include "c_api.h"
+#include "../c_api.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
