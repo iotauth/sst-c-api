@@ -71,14 +71,19 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 # Compile
 
-`$cd $SST_ROOT/entity/sst-c-api/examples`
-`$mkdir build && cd build`
-`$cmake ../`
-`$make`
+For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
+
+
+```
+$cd $SST_ROOT/entity/c/examples
+$mkdir build && cd build
+$cmake ../
+$make
+```
 
 # Example
 
--   Turn on two different terminals at `$SST_ROOT/entity/sst-c-api/examples/build`, and turn on Auth on the third terminal.
+-   Turn on two different terminals at `$SST_ROOT/entity/c/examples/build`, and turn on Auth on the third terminal.
 
 Execute
 
