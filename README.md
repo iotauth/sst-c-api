@@ -8,6 +8,8 @@
         -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
         -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
 
+    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation. 
+
 # Code Hiearchy
 
 c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
