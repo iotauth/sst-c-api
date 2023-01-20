@@ -56,6 +56,10 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 -   Enables receiving messages.
 
+**unsigned char * return_decrypted_buf()**
+
+-   Returns the buffer of the decrypted buffer.
+
 **void send_secure_message()**
 
 -   `secure send_secure_message()` is a function that send a message with secure communication to the server by encrypting it with the session key.

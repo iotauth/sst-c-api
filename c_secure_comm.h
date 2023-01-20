@@ -15,7 +15,7 @@
 #define IN_COMM 30
 #define SESSION_KEY_EXPIRATION_TIME_SIZE 6
 #define HANDSHAKE_1_LENGTH 74
-#define HANDSHAKE_3_LENGTH 82 
+#define HANDSHAKE_3_LENGTH 82
 
 #define MAX_SESSION_KEY 10
 
@@ -163,6 +163,15 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 // @param SST_session_ctx_t session ctx struct
 void print_recevied_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx);
+
+// Returns the pointer of the decrypted buffer.
+// @param data input data buffer
+// @param data_length length of data buffer
+// @param SST_session_ctx_t session ctx struct
+
+unsigned char *decrypt_received_message(unsigned char *data,
+                                        unsigned int data_length,
+                                        SST_session_ctx_t *session_ctx);
 
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity
