@@ -231,27 +231,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-void print_recevied_message(unsigned char *data, unsigned int data_length,
-                            SST_session_ctx_t *session_ctx) {
-    unsigned int decrypted_length;
-    unsigned char *decrypted = symmetric_decrypt_authenticate(
-        data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
-        session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE,
-        &decrypted_length);
-    unsigned int received_seq_num =
-        read_unsigned_int_BE(decrypted, SEQ_NUM_SIZE);
-    if (received_seq_num != session_ctx->received_seq_num) {
-        error_handling("Wrong sequence number expected.");
-    }
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        error_handling("Session key expired!\n");
-    }
-    session_ctx->received_seq_num++;
-    printf("Received seq_num: %d\n", received_seq_num);
-    printf("%s\n", decrypted + SEQ_NUM_SIZE);
-}
-
-void print_recevied_message(unsigned char *data, unsigned int data_length,
+void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
     unsigned char * decrypted = decrypt_received_message(data, data_length, session_ctx);                            
     printf("%s\n", decrypted + SEQ_NUM_SIZE);

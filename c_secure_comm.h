@@ -161,7 +161,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 // @param data input data buffer
 // @param data_length length of data buffer
 // @param SST_session_ctx_t session ctx struct
-void print_recevied_message(unsigned char *data, unsigned int data_length,
+void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx);
 
 // Returns the pointer of the decrypted buffer.

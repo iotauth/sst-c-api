@@ -47,21 +47,22 @@ void receive_message(unsigned char *received_buf,
                      SST_session_ctx_t *session_ctx);
 
 // Return the buffer pointer of the decrypted buffer.
-// If the user gives the read buffer as input, it will return the decrypted buffer.
+// If the user gives the read buffer as input, it will return the decrypted
+// buffer.
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf
 // @param SST_session_ctx_t session ctx struct
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
-                                    SST_session_ctx_t *session_ctx)
+                                    SST_session_ctx_t *session_ctx);
 
-    // Encrypt the message with session key and send the encrypted message to
-    // the socket.
-    // @param msg message to send
-    // @param msg_length length of message
-    // @param SST_session_ctx_t session ctx struct
-    void send_secure_message(char *msg, unsigned int msg_length,
-                             SST_session_ctx_t *session_ctx);
+// Encrypt the message with session key and send the encrypted message to
+// the socket.
+// @param msg message to send
+// @param msg_length length of message
+// @param SST_session_ctx_t session ctx struct
+void send_secure_message(char *msg, unsigned int msg_length,
+                         SST_session_ctx_t *session_ctx);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free

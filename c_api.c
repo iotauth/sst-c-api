@@ -248,7 +248,7 @@ void receive_message(unsigned char *received_buf,
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SECURE_COMM_MSG) {
-        print_recevied_message(data_buf, data_buf_length, session_ctx);
+        print_received_message(data_buf, data_buf_length, session_ctx);
     }
 }
 
