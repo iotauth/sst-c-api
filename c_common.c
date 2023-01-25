@@ -8,7 +8,7 @@ void error_handling(char *message) {
 
 void print_buf(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
-    for(size_t i = 0; i < size; i++) {
+    for (size_t i = 0; i < size; i++) {
         sprintf(hex + 3 * i, " %.2x", buf[i]);
     }
     printf("Hex:%s\n", hex);
@@ -36,8 +36,7 @@ unsigned int read_unsigned_int_BE(unsigned char *buf, int byte_length) {
     return num;
 }
 
-uint64_t read_unsigned_long_int_BE(unsigned char *buf,
-                                            int byte_length) {
+uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
     uint64_t num_valid = 1ULL;
     for (int i = 0; i < byte_length; i++) {
         uint64_t num = 1ULL << 8 * (byte_length - 1 - i);
@@ -47,8 +46,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf,
 }
 
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num,
-                           unsigned int *var_len_int_buf_size) {
+                           unsigned int *num, uint16_t *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (int i = 0; i < buf_length; i++) {
@@ -61,7 +59,7 @@ void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
 }
 
 void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
-                           unsigned int *var_len_int_buf_size) {
+                           uint16_t *var_len_int_buf_size) {
     *var_len_int_buf_size = 1;
     while (num > 127) {
         var_len_int_buf[*var_len_int_buf_size - 1] = 128 | num & 127;
@@ -76,11 +74,38 @@ unsigned char *parse_received_message(unsigned char *received_buf,
                                       unsigned char *message_type,
                                       unsigned int *data_buf_length) {
     *message_type = received_buf[0];
-    unsigned int payload_buf_length;
+    unsigned int var_length_buf_size;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, received_buf_length,
-                          data_buf_length, &payload_buf_length);
-    return received_buf + MESSAGE_TYPE_SIZE +
-           payload_buf_length;
+                          data_buf_length, &var_length_buf_size);
+    return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
+}
+
+uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
+    uint16_t length = 1;
+    read(socket, buf, 1);
+    if (buf[0] > 128) {
+        return length + read_variable_length_one_byte_each(socket, buf + 1);
+    } else {
+        return length;
+    }
+}
+
+void read_header_return_data_buf_pointer(int socket,
+                                         unsigned char *message_type,
+                                         unsigned char *ret,
+                                         unsigned int *ret_length) {
+    unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
+    read(socket, received_buf, MESSAGE_TYPE_SIZE);
+    *message_type = received_buf[0];
+    uint16_t var_length_buf_size = read_variable_length_one_byte_each(
+        socket, received_buf + MESSAGE_TYPE_SIZE);
+    uint16_t var_length_buf_size_checked;
+    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
+                          ret_length, &var_length_buf_size_checked);
+    if (var_length_buf_size != var_length_buf_size_checked) {
+        error_handling("Wrong header calculation... Exiting...");
+    }
+    read(socket, ret, *ret_length);
 }
 
 void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
