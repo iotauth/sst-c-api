@@ -38,6 +38,11 @@ SST_session_ctx_t *server_secure_comm_setup(
 // @param arguments struct including session key and socket number
 void *receive_thread(void *SST_session_ctx);
 
+// Creates a thread to receive messages, by reading one bytes each at the SST header.
+// Max buffer length is 1000 bytes currently.
+// @param arguments struct including session key and socket number
+void *receive_thread_read_one_each(void *SST_session_ctx);
+
 // Receive the message and print the message after decrypting with session key.
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf

@@ -90,12 +90,21 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     }
 }
 
-void read_header_return_data_buf_pointer(int socket,
+int read_header_return_data_buf_pointer(int socket,
                                          unsigned char *message_type,
                                          unsigned char *ret,
                                          unsigned int *ret_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
-    read(socket, received_buf, MESSAGE_TYPE_SIZE);
+    int socket_read = read(socket, received_buf, MESSAGE_TYPE_SIZE);
+    if (socket_read == 0) {
+        printf("Socket closed!\n");
+        close(socket);
+        return 0;
+    }
+    if (socket_read == -1) {
+        printf("Connection error!\n");
+        return 0;
+    }
     *message_type = received_buf[0];
     uint16_t var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
@@ -106,6 +115,7 @@ void read_header_return_data_buf_pointer(int socket,
         error_handling("Wrong header calculation... Exiting...");
     }
     read(socket, ret, *ret_length);
+    return 1;
 }
 
 void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
