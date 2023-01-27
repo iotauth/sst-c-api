@@ -246,7 +246,9 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         unsigned char message_type;
-        if(1 != read_header_return_data_buf_pointer(session_ctx->sock, &message_type, data_buf, &data_buf_length)){
+        if (1 != read_header_return_data_buf_pointer(session_ctx->sock,
+                                                     &message_type, data_buf,
+                                                     &data_buf_length)) {
             return 0;
         }
         if (message_type == SECURE_COMM_MSG) {

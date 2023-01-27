@@ -144,10 +144,9 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf);
 // @param message_type SST message type
 // @param ret Return buffer
 // @param ret_length Return buffer's length
-int read_header_return_data_buf_pointer(int socket,
-                                         unsigned char *message_type,
-                                         unsigned char *ret,
-                                         unsigned int *ret_length);
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length);
 
 // Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
 // The four functions num_to_var_length_int(), make_buffer_header(),

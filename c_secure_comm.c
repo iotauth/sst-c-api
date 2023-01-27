@@ -233,12 +233,14 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 
 void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
-    unsigned char * decrypted = decrypt_received_message(data, data_length, session_ctx);                            
+    unsigned char *decrypted =
+        decrypt_received_message(data, data_length, session_ctx);
     printf("%s\n", decrypted + SEQ_NUM_SIZE);
 }
 
-unsigned char * decrypt_received_message(unsigned char *data, unsigned int data_length,
-                              SST_session_ctx_t *session_ctx) {
+unsigned char *decrypt_received_message(unsigned char *data,
+                                        unsigned int data_length,
+                                        SST_session_ctx_t *session_ctx) {
     unsigned int decrypted_length;
     unsigned char *decrypted = symmetric_decrypt_authenticate(
         data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,

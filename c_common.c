@@ -90,10 +90,9 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     }
 }
 
-int read_header_return_data_buf_pointer(int socket,
-                                         unsigned char *message_type,
-                                         unsigned char *ret,
-                                         unsigned int *ret_length) {
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
     int socket_read = read(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (socket_read == 0) {
