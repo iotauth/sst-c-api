@@ -8,6 +8,8 @@
         -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
         -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
 
+    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation. 
+
 # Code Hiearchy
 
 c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
@@ -53,6 +55,10 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 **void receive_message()**
 
 -   Enables receiving messages.
+
+**unsigned char * return_decrypted_buf()**
+
+-   Returns the buffer of the decrypted buffer.
 
 **void send_secure_message()**
 
