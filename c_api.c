@@ -77,7 +77,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
-            printf(
+            error_handling(
                 "Comm init failed: wrong sequence of handshake, "
                 "disconnecting...\n");
         }
@@ -115,7 +115,8 @@ SST_session_ctx_t *server_secure_comm_setup(
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length = read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+        int received_buf_length =
+            read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -180,7 +181,8 @@ SST_session_ctx_t *server_secure_comm_setup(
     }
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length = read(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+        int received_buf_length =
+            read(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -238,6 +240,23 @@ void *receive_thread(void *SST_session_ctx) {
     }
 }
 
+void *receive_thread_read_one_each(void *SST_session_ctx) {
+    SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
+    unsigned char data_buf[MAX_PAYLOAD_LENGTH];
+    unsigned int data_buf_length = 0;
+    while (1) {
+        unsigned char message_type;
+        if (1 != read_header_return_data_buf_pointer(session_ctx->sock,
+                                                     &message_type, data_buf,
+                                                     &data_buf_length)) {
+            return 0;
+        }
+        if (message_type == SECURE_COMM_MSG) {
+            print_received_message(data_buf, data_buf_length, session_ctx);
+        }
+    }
+}
+
 void receive_message(unsigned char *received_buf,
                      unsigned int received_buf_length,
                      SST_session_ctx_t *session_ctx) {
@@ -246,7 +265,19 @@ void receive_message(unsigned char *received_buf,
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SECURE_COMM_MSG) {
-        print_recevied_message(data_buf, data_buf_length, session_ctx);
+        print_received_message(data_buf, data_buf_length, session_ctx);
+    }
+}
+
+unsigned char *return_decrypted_buf(unsigned char *received_buf,
+                                    unsigned int received_buf_length,
+                                    SST_session_ctx_t *session_ctx) {
+    unsigned char message_type;
+    unsigned int data_buf_length;
+    unsigned char *data_buf = parse_received_message(
+        received_buf, received_buf_length, &message_type, &data_buf_length);
+    if (message_type == SECURE_COMM_MSG) {
+        return decrypt_received_message(data_buf, data_buf_length, session_ctx);
     }
 }
 

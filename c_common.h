@@ -94,8 +94,7 @@ void write_in_n_bytes(uint64_t num, int n, unsigned char *buf);
 // @return total number of input buffer
 unsigned int read_unsigned_int_BE(unsigned char *buf, int byte_length);
 
-uint64_t read_unsigned_long_int_BE(unsigned char *buf,
-                                            int byte_length);
+uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length);
 
 // Extracts number value of variable length integer from given buffer.
 // When
@@ -109,8 +108,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf,
 //  @param var_len_int_buf_size size of the buffer containing the variable
 //  length integer
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num,
-                           unsigned int *var_len_int_buf_size);
+                           unsigned int *num, uint16_t *var_len_int_buf_size);
 
 // Make the data_length to a variable length.
 // @param num number to be converted into variable length integer.
@@ -118,7 +116,7 @@ void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
 // @param var_len_int_buf_size size of the buffer containing the variable
 // length integer.
 void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
-                           unsigned int *var_len_int_buf_size);
+                           uint16_t *var_len_int_buf_size);
 
 // Parses received message into 'message_type',
 // and data after msg_type+payload_buf to 'data_buf'.
@@ -133,6 +131,22 @@ unsigned char *parse_received_message(unsigned char *received_buf,
                                       unsigned int received_buf_length,
                                       unsigned char *message_type,
                                       unsigned int *data_buf_length);
+
+// Reads the variable length one byte each. The read() function reads one byte
+// each, and returns the variable length buffer's size.
+// @param socket socket to read
+// @param buf buffer to save the result of read() function.
+uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf);
+
+// Reads the SST header, and returns the message type, start pointer of the
+// SST's payload, and the payload's length.
+// @param socket socket to read
+// @param message_type SST message type
+// @param ret Return buffer
+// @param ret_length Return buffer's length
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length);
 
 // Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
 // The four functions num_to_var_length_int(), make_buffer_header(),

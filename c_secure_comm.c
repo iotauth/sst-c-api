@@ -231,8 +231,16 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-void print_recevied_message(unsigned char *data, unsigned int data_length,
+void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
+    unsigned char *decrypted =
+        decrypt_received_message(data, data_length, session_ctx);
+    printf("%s\n", decrypted + SEQ_NUM_SIZE);
+}
+
+unsigned char *decrypt_received_message(unsigned char *data,
+                                        unsigned int data_length,
+                                        SST_session_ctx_t *session_ctx) {
     unsigned int decrypted_length;
     unsigned char *decrypted = symmetric_decrypt_authenticate(
         data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
@@ -248,7 +256,7 @@ void print_recevied_message(unsigned char *data, unsigned int data_length,
     }
     session_ctx->received_seq_num++;
     printf("Received seq_num: %d\n", received_seq_num);
-    printf("%s\n", decrypted + SEQ_NUM_SIZE);
+    return decrypted;
 }
 
 int check_session_key_validity(session_key_t *session_key) {
