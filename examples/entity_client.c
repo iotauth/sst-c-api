@@ -32,6 +32,8 @@ int main(int argc, char *argv[]) {
     send_secure_message("Hello server 2 - second message", strlen("Hello server 2 - second message"), session_ctx);
     sleep(1);
     pthread_join(thread2, NULL);
+
+    
     free(session_ctx);
 
     free_session_key_list_t(s_key_list);
