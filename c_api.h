@@ -3,6 +3,10 @@
 
 #include "c_secure_comm.h"
 
+#define IV_SIZE 16
+#define MAX 1000000
+#define BUFF_SIZE 100
+
 // Load config file from path and save the information in ctx struct.
 // Also loads public and private key in EVP_PKEY struct.
 // Stores the distribution_key.
@@ -76,5 +80,11 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
+
+void ipfs_add_command_save_result();
+void file_encrypt_upload(SST_session_ctx_t *session_ctx);
+
+void file_download_decrypt(SST_session_ctx_t *session_ctx);
+
 
 #endif  // C_API_H
