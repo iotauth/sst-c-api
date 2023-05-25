@@ -32,6 +32,12 @@ int main(int argc, char *argv[]) {
     send_secure_message("Hello server 2 - second message", strlen("Hello server 2 - second message"), session_ctx);
     sleep(1);
     pthread_join(thread2, NULL);
+    // File encrypt with session key and ipfs add file.
+    // Make the function
+
+    // secure_file_encrypt(session_ctx);
+
+    secure_file_encrypt(session_ctx);
 
     
     free(session_ctx);

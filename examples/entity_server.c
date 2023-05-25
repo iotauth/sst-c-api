@@ -77,8 +77,13 @@ int main(int argc, char *argv[]) {
     sleep(1);
 
     sleep(3);
+
     close(clnt_sock2);
     pthread_cancel(thread2);
+    printf("cancle \n");
+    secure_file_download_decrypt(session_ctx2);
+    printf("cancle \n");
     close(serv_sock);
+    printf("cancle \n");
     free_SST_ctx_t(ctx);
 }
