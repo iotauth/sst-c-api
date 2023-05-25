@@ -37,9 +37,9 @@ int main(int argc, char *argv[]) {
 
     // secure_file_encrypt(session_ctx);
 
-    secure_file_encrypt(session_ctx);
+    file_encrypt_upload(session_ctx);
 
-    
+
     free(session_ctx);
 
     free_session_key_list_t(s_key_list);

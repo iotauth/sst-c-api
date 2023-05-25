@@ -76,14 +76,9 @@ int main(int argc, char *argv[]) {
     send_secure_message("Hello client 2 - second message", strlen("Hello client 2 - second message"), session_ctx2);
     sleep(1);
 
-    sleep(3);
-
     close(clnt_sock2);
     pthread_cancel(thread2);
-    printf("cancle \n");
-    secure_file_download_decrypt(session_ctx2);
-    printf("cancle \n");
+    file_download_decrypt(session_ctx2);
     close(serv_sock);
-    printf("cancle \n");
     free_SST_ctx_t(ctx);
 }
