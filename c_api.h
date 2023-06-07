@@ -11,10 +11,16 @@
 // distribution key.
 SST_ctx_t *init_SST(char *config_path);
 
+// Add the server's ip address and port number to the SST_ctx_t.
+// @param ctx Configuration struct obtained from init_SST().
+void get_server_ip_addr_and_port_num(SST_ctx_t *ctx,
+                                     struct sockaddr_in server_fd);
+
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
-// @param config_info config struct obtained from load_config()
-// @return secure session key
+// @param ctx Configuration struct obtained from init_SST()
+// @param existing_s_key_list The original session_key_list
+// @return session_key_list_t
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list);
 
@@ -26,7 +32,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
-// @param config config struct for information
+// @param ctx Configuration struct obtained from init_SST()
 // @param clnt_sock entity client socket number
 // @return session key struct
 SST_session_ctx_t *server_secure_comm_setup(
@@ -50,7 +56,7 @@ void receive_message(unsigned char *received_buf,
 // socket.
 // @param msg message to send
 // @param msg_length length of message
-// @param SST_session_ctx_t session ctx struct
+// @param ctx Configuration struct obtained from init_SST()
 void send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx);
 

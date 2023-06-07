@@ -19,6 +19,13 @@ SST_ctx_t *init_SST(char *config_path) {
     return ctx;
 }
 
+void get_server_ip_addr_and_port_num(SST_ctx_t *ctx,
+                                     struct sockaddr_in server_fd) {
+    inet_ntop(AF_INET, &(server_fd.sin_addr), ctx->config->entity_server_ip_addr, INET_ADDRSTRLEN);
+    int port = ntohs(server_fd.sin_port);
+    sprintf(ctx->config->entity_server_port_num, "%d", port);
+}
+
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list) {
     if (existing_s_key_list != NULL) {
@@ -115,7 +122,8 @@ SST_session_ctx_t *server_secure_comm_setup(
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length = read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+        int received_buf_length =
+            read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -180,7 +188,8 @@ SST_session_ctx_t *server_secure_comm_setup(
     }
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length = read(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+        int received_buf_length =
+            read(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
