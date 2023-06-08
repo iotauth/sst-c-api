@@ -21,7 +21,8 @@ SST_ctx_t *init_SST(char *config_path) {
 
 void get_server_ip_addr_and_port_num(SST_ctx_t *ctx,
                                      struct sockaddr_in server_fd) {
-    inet_ntop(AF_INET, &(server_fd.sin_addr), ctx->config->entity_server_ip_addr, INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &(server_fd.sin_addr),
+              ctx->config->entity_server_ip_addr, INET_ADDRSTRLEN);
     int port = ntohs(server_fd.sin_port);
     sprintf(ctx->config->entity_server_port_num, "%d", port);
 }
@@ -52,16 +53,14 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
     }
 }
 
-SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
-                                            SST_ctx_t *ctx) {
+SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
+                                                        SST_ctx_t *ctx,
+                                                        int sock) {
     // Initialize SST_session_ctx_t
     SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));
     session_ctx->received_seq_num = 0;
     session_ctx->sent_seq_num = 0;
 
-    int sock;
-    connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                      (const char *)ctx->config->entity_server_port_num, &sock);
     unsigned char entity_nonce[HS_NONCE_SIZE];
     unsigned int parsed_buf_length;
     unsigned char *parsed_buf =
@@ -103,6 +102,16 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     }
     memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
     session_ctx->sock = sock;
+    return session_ctx;
+}
+
+SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
+                                            SST_ctx_t *ctx) {
+    int sock;
+    connect_as_client((const char *)ctx->config->entity_server_ip_addr,
+                      (const char *)ctx->config->entity_server_port_num, &sock);
+    SST_session_ctx_t *session_ctx =
+        secure_connect_to_server_with_socket(s_key, ctx, sock);
     return session_ctx;
 }
 
