@@ -340,24 +340,25 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned int serialized_length;
             unsigned char *serialized = auth_hello_reply_message(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose, &serialized_length);
+                ctx->config->name, ctx->config->purpose[0][ctx->purpose_index], &serialized_length);
+            
             if (check_validity(
                     ctx->dist_key.abs_validity)) {  // when dist_key expired
                 printf(
                     "Current distribution key expired, requesting new "
                     "distribution key as well...\n");
+                sleep(1);
+                printf("");
                 unsigned int enc_length;
-                printf("오류\n");
                 unsigned char *enc = encrypt_and_sign(
                     serialized, serialized_length, ctx, &enc_length);
+                printf("");
                 free(serialized);
-                printf("오류\n");
                 unsigned char message[MAX_AUTH_COMM_LENGTH];
                 unsigned int message_length;
-                printf("오류\n");
+                printf("\n");
                 make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
                                 message, &message_length);
-                printf("오류\n");
                 write(sock, message, message_length);
                 free(enc);
             } else {

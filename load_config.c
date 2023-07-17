@@ -2,7 +2,8 @@
 #include "load_config.h"
 
 const char entity_info_name[] = "entityInfo.name";
-const char entity_info_purpose[] = "entityInfo.purpose";
+const char entity_info_purpose_ms[] = "entityInfo.purpose.ms";
+const char entity_info_purpose_fs[] = "entityInfo.purpose.fs";
 const char entity_info_numkey[] = "entityInfo.number_key";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
@@ -10,13 +11,17 @@ const char authInfo_ip_address[] = "auth.ip.address";
 const char authInfo_port[] = "auth.port.number";
 const char entity_serverInfo_ip_address[] = "entity.server.ip.address";
 const char entity_serverInfo_port_number[] = "entity.server.port.number";
+const char datamanagement_ip_address[] = "datamanagement.ip.address";
+const char datamanagement_port_number[] = "datamanagement.port.number";
 const char network_protocol[] = "network.protocol";
 
 int get_key_value(char *ptr) {
     if (strcmp(ptr, entity_info_name) == 0)
         return ENTITY_INFO_NAME;
-    else if (strcmp(ptr, entity_info_purpose) == 0)
-        return ENTITY_INFO_PURPOSE;
+    else if (strcmp(ptr, entity_info_purpose_ms) == 0)
+        return ENTITY_INFO_PURPOSE_MS;
+    else if (strcmp(ptr, entity_info_purpose_fs) == 0)
+        return ENTITY_INFO_PURPOSE_FS;
     else if (strcmp(ptr, entity_info_numkey) == 0)
         return ENTITY_INFO_NUMKEY;
     else if (strcmp(ptr, authinfo_pubkey_path) == 0)
@@ -33,6 +38,10 @@ int get_key_value(char *ptr) {
         return ENTITY_SERVER_INFO_PORT_NUMBER;
     else if (strcmp(ptr, network_protocol) == 0)
         return NETWORK_PROTOCOL;
+    else if (strcmp(ptr, datamanagement_ip_address) == 0)
+        return datamanagement_INFO_IP_ADDRESS;
+    else if (strcmp(ptr, datamanagement_port_number) == 0)
+        return datamanagement_INFO_PORT_NUMBER;
     else
         return -1;
 }
@@ -58,10 +67,17 @@ config_t *load_config(char *path) {
                     printf("name: %s\n", ptr);
                     strcpy(c->name, ptr);
                     break;
-                case ENTITY_INFO_PURPOSE:
+                case ENTITY_INFO_PURPOSE_MS:
                     ptr = strtok(NULL, delimiters);
-                    printf("purpose: %s\n", ptr);
-                    strcpy(c->purpose, ptr);
+                    printf("purpose_MS: %s\n", ptr);
+                    c->purpose[0][0] = malloc(strlen(ptr) + 1);
+                    strcpy(c->purpose[0][0], ptr);
+                    break;
+                case ENTITY_INFO_PURPOSE_FS:
+                    ptr = strtok(NULL, delimiters);
+                    printf("purpose_FS: %s\n", ptr);
+                    c->purpose[0][1] = malloc(strlen(ptr) + 1);
+                    strcpy(c->purpose[0][1], ptr);
                     break;
                 case ENTITY_INFO_NUMKEY:
                     ptr = strtok(NULL, delimiters);
@@ -104,7 +120,16 @@ config_t *load_config(char *path) {
                     printf("Network Protocol: %s\n", ptr);
                     strcpy(c->network_protocol, ptr);
                     break;
-            }
+                case datamanagement_INFO_IP_ADDRESS:
+                    ptr = strtok(NULL, delimiters);
+                    printf("IP address of datamanagement: %s\n", ptr);
+                    strcpy(c->datamanagement_ip_addr, ptr);
+                    break;
+                case datamanagement_INFO_PORT_NUMBER:
+                    ptr = strtok(NULL, delimiters);
+                    printf("Port number of datamanagement: %s\n", ptr);
+                    strcpy(c->datamanagement_port_num, ptr);
+                    break;            }
             break;
         }
     }

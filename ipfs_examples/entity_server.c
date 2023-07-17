@@ -43,42 +43,38 @@ int main(int argc, char *argv[]) {
     SST_ctx_t *ctx = init_SST(config_path);
 
     INIT_SESSION_KEY_LIST(s_key_list);
+    ctx->purpose_index = 0;
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
+    // pthread_t thread;
+    // pthread_create(&thread, NULL, &receive_thread, (void *)session_ctx);
+    // sleep(1);
 
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
-    sleep(1);
+    // send_secure_message("Hello client", strlen("Hello client"), session_ctx);
+    // sleep(1);
+    // send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
+    // sleep(2);
+    // close(clnt_sock);
+    // pthread_cancel(thread);
+    // printf("Finished first communication\n");
 
-    send_secure_message("Hello client", strlen("Hello client"), session_ctx);
-    sleep(1);
-    send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
-    sleep(2);
-    close(clnt_sock);
-    pthread_cancel(thread);
-    printf("Finished first communication\n");
 
-    // Second connection. session_key_list caches the session key.
-    clnt_sock2 =
-        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-    if (clnt_sock2 == -1) {
-        error_handling("accept() error");
-    }
-    SST_session_ctx_t *session_ctx2 =
-        server_secure_comm_setup(ctx, clnt_sock2, &s_key_list);
+    // clnt_sock2 =
+    //     accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+    // if (clnt_sock2 == -1) {
+    //     error_handling("accept() error");
+    // }
+    
+    // SST_session_ctx_t *session_ctx_1 =
+    //     server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
+    // request the hash information.
+    sleep(5);
+    download_from_datamanagement(session_ctx, ctx);
+    sleep(5);
+    file_download_decrypt(session_ctx);
 
-    pthread_t thread2;
-    pthread_create(&thread2, NULL, &receive_thread_read_one_each, (void *)session_ctx2);
-    sleep(1);
-
-    send_secure_message("Hello client 2", strlen("Hello client 2"), session_ctx2);
-    sleep(1);
-    send_secure_message("Hello client 2 - second message", strlen("Hello client 2 - second message"), session_ctx2);
-    sleep(1);
 
     close(clnt_sock2);
-    pthread_cancel(thread2);
-    file_download_decrypt(session_ctx2);
     close(serv_sock);
     free_SST_ctx_t(ctx);
 }

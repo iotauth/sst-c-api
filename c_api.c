@@ -7,7 +7,6 @@ SST_ctx_t *init_SST(char *config_path) {
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
     ctx->config = load_config(config_path);
     int numkey = ctx->config->numkey;
-
     ctx->pub_key = load_auth_public_key(ctx->config->auth_pubkey_path);
     ctx->priv_key = load_entity_private_key(ctx->config->entity_privkey_path);
     if (numkey > MAX_SESSION_KEY) {
@@ -134,7 +133,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             memcpy(expected_key_id, data_buf, SESSION_KEY_ID_SIZE);
             unsigned int expected_key_id_int =
                 read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
-
+            
             // If the entity_server already has the corresponding session key,
             // it does not have to request session key from Auth
             int session_key_found = -1;
@@ -148,7 +147,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                 s_key = &existing_s_key_list->s_key[session_key_found];
             } else if (session_key_found == -1) {
                 // WARNING: The following line overwrites the purpose.
-                sprintf(ctx->config->purpose, "{\"keyId\":%d}",
+                sprintf(ctx->config->purpose[0][ctx->purpose_index], "{\"keyId\":%d}",
                         expected_key_id_int);
 
                 session_key_list_t *s_key_list;
@@ -328,22 +327,16 @@ void ipfs_add_command_save_result()
     char buff[BUFF_SIZE];
     FILE *fp, *fout_0;
     char *file_name = "enc.txt";
-    if (0 == access(file_name,F_OK))
-    {
-        printf("%s 파일이 존재합니다.\n", file_name);
-        exit();
-    }
-    else
-    {
-        fp = popen("ipfs add enc.txt", "r");
-    }
+    fp = popen("ipfs add enc.txt", "r");
     if (NULL == fp)
     {
             perror("popen() failed");
     }
     while (fgets(buff, BUFF_SIZE, fp))
         printf("%s\n", buff);
-    
+    pclose(fp);
+    system("rm -rf enc.txt");
+    printf("Delete enc.txt\n");
     int first_order = 0;
     int second_order = 0;
     for (int i=0; i<BUFF_SIZE;i++)
@@ -365,16 +358,16 @@ void ipfs_add_command_save_result()
     // Hash value save
     fout_0 = fopen("hash_result.txt", "w");
     fwrite(buffer, 1, second_order-first_order+1, fout_0);
-    printf("Save the file for hash value");
-    pclose(fp);
+    printf("Save the file for hash value\n");
     fclose(fout_0);
 }
 
 
 void file_encrypt_upload(SST_session_ctx_t *session_ctx)
 {
-    FILE *fin, *fout, *fenc;
+    FILE *fgen,*fin, *fout, *fenc;
     unsigned int cipher_key_size = 16;
+    // fgen = popen()
     fin = fopen("/Users/yeongbin/Desktop/project/IPFS-with-SST/plain_text.txt","r");
     unsigned char *file_buf = NULL;
     unsigned long bufsize ;
@@ -396,33 +389,32 @@ void file_encrypt_upload(SST_session_ctx_t *session_ctx)
         }
     }
     fclose(fin);
-    printf("hello\n");
-    printf("File size: %ld\n", bufsize);
+    // printf("hello\n");
+    // printf("File size: %ld\n", bufsize);
     unsigned char iv[IV_SIZE];
     unsigned char prov_info[] = "yeongbin";
     int prov_info_len = sizeof(prov_info);
-    printf("%d %d,\n",prov_info_len, IV_SIZE);
+    // printf("%d %d,\n",prov_info_len, IV_SIZE);
     unsigned int encrypted_length = (((bufsize) / IV_SIZE) + 1) * IV_SIZE;
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
     generate_nonce(IV_SIZE, iv);
-    printf("IV:");
-    print_buf(iv, 16);
-    printf("File buffer:");
-    print_buf(file_buf,10);
+    // printf("IV:");
+    // print_buf(iv, 16);
+    // printf("File buffer:");
+    // print_buf(file_buf,10);
 
     //// encrypt ////
     AES_CBC_128_encrypt(file_buf, bufsize, session_ctx->s_key.cipher_key, cipher_key_size, iv,
                         IV_SIZE, encrypted, &encrypted_length);
-    printf("Encrypted length: %ld\n", encrypted_length);
-    printf("Enc_value:");
-    print_buf(encrypted, 10);
+    // printf("Encrypted length: %ld\n", encrypted_length);
+    // printf("Enc_value:");
+    // print_buf(encrypted, 10);
     
     //// encrypt save ////
     char *file_name = "enc.txt";
     if (0 == access(file_name,F_OK))
     {
-        printf("%s 파일이 존재합니다.\n", file_name);
-        exit();
+        printf("%s File already exists.\n", file_name);
     }
     else
     {
@@ -435,7 +427,7 @@ void file_encrypt_upload(SST_session_ctx_t *session_ctx)
     enc_save[prov_info_len+1] = IV_SIZE;
     memcpy(enc_save+1+prov_info_len+1,iv,IV_SIZE);
     memcpy(enc_save+1+prov_info_len+1+IV_SIZE,encrypted,encrypted_length);
-    printf("Total Length: %d\n",encrypted_length+1+IV_SIZE+1+prov_info_len);
+    // printf("Total Length: %d\n",encrypted_length+1+IV_SIZE+1+prov_info_len);
     fwrite(enc_save, 1, encrypted_length+1+IV_SIZE+1+prov_info_len, fenc);
     fclose(fenc);
     // if there is no delay, encrypted file is not generated.
@@ -444,23 +436,22 @@ void file_encrypt_upload(SST_session_ctx_t *session_ctx)
     ipfs_add_command_save_result();
 }
 
+///TODO: 만든 파일 나중에는 다 삭제하기!! 아직 구현안됨.
 void file_download_decrypt(SST_session_ctx_t *session_ctx)
 {
     unsigned int cipher_key_size = 16;
     FILE *fp, *fin, *fout;
-    char *file_name = "enc.txt";
-    if (0 == access(file_name,F_OK))
-    {
-        printf("%s 파일이 존재합니다.\n", file_name);
-        exit();
-    }
-    else
-    {
-        fp = popen("ipfs cat QmX5NKpskdhPeEBwVLztE3hKjYJF8mLi93qrM67orVfdAY > enc.txt", "r");
-        pclose(fp);
-    }
+    // char *file_name = "enc_server.txt";
+    // if (0 == access(file_name,F_OK))
+    // {
+    //     printf("%s file is found\n", file_name);
+    // }
+    // else
+    // {
+    //     printf("??\n");
+    // }
     
-    fin = fopen("enc.txt","r");
+    fin = fopen("enc_server.txt","r");
     unsigned char *file_buf = NULL;
     unsigned long bufsize ;
     if (fin != NULL) {
@@ -479,37 +470,143 @@ void file_download_decrypt(SST_session_ctx_t *session_ctx)
                 file_buf[newLen++] = '\0'; 
             }
         }
+    //need the file delete code.
     fclose(fin);
     }    
 
-    printf("File size: %ld\n", bufsize);
+    // printf("File size: %ld\n", bufsize);
 
     unsigned int prov_info_num = file_buf[0];
     unsigned int iv_size = file_buf[1+prov_info_num];
 
-    printf("%d, %d \n", prov_info_num,iv_size);
+    // printf("%d, %d \n", prov_info_num,iv_size);
     unsigned char prov_info[prov_info_num];
     memcpy(prov_info,file_buf+1,prov_info_num);
-    print_buf(prov_info,prov_info_num);
+    // print_buf(prov_info,prov_info_num);
     unsigned char iv[iv_size];
     memcpy(iv,file_buf+1+prov_info_num+1,iv_size);
-    print_buf(iv,iv_size);
+    // print_buf(iv,iv_size);
 
-    print_buf(file_buf,1+IV_SIZE+1+prov_info_num);
+    // print_buf(file_buf,1+IV_SIZE+1+prov_info_num);
 
     unsigned long int enc_length = bufsize - (1+IV_SIZE+1+prov_info_num);
 
     unsigned int ret_length = (enc_length + iv_size) / iv_size * iv_size;
     unsigned char *ret = (unsigned char *)malloc(ret_length);
+    sleep(1);
     AES_CBC_128_decrypt(file_buf+1+IV_SIZE+1+prov_info_num, enc_length, session_ctx->s_key.cipher_key, cipher_key_size, iv,
                         iv_size, ret, &ret_length);
-    printf("decrypted length: %ld\n", ret_length);
+    // printf("decrypted length: %ld\n", ret_length);
 
-    printf("dec_value:");
-    print_buf(ret, 10);
+    // printf("dec_value:");
+    // print_buf(ret, 10);
 
     fout = fopen("rpi_result.txt", "w");
+    printf("Complete decryption and save the file as rpi_result.txt \n");
     fwrite(ret, 1,ret_length, fout);
     free(ret);
     fclose(fout);
+
+}
+// transfer the information including hash value, request info, response info, sessionkey id.
+void upload_to_datamanagement(SST_session_ctx_t *session_ctx, SST_ctx_t *ctx)
+{
+    int sock;
+    connect_as_client((const char *)ctx->config->datamanagement_ip_addr,
+                      (const char *)ctx->config->datamanagement_port_num, &sock);
+    int key_id_size, name_size, purpose_size;
+    key_id_size = sizeof(session_ctx->s_key.key_id);
+    name_size = sizeof(ctx->config->name);
+    purpose_size = strlen(ctx->config->purpose[0][ctx->purpose_index]);
+
+    int DATA_UPLOAD = 0;
+    char buff[BUFF_SIZE];
+    FILE *fin;
+    char *file_name = "hash_result.txt";
+    fin = fopen(file_name,"r");
+    unsigned char *file_buf = NULL;
+    unsigned long bufsize ;
+    if (fin != NULL) {
+        if (fseek(fin, 0L, SEEK_END) == 0) {
+            bufsize = ftell(fin);
+            file_buf = malloc(sizeof(char) * (bufsize + 1));
+
+            // 이 내용이 없으면 제대로 동작하지 않음!!!
+            if (fseek(fin, 0L, SEEK_SET) != 0) { /* Error */ }
+
+            size_t newLen = fread(file_buf, sizeof(char), bufsize, fin);
+            if ( ferror( fin ) != 0 ) {
+                fputs("Error reading file", stderr);
+            } else {
+                file_buf[newLen++] = '\0'; 
+            }
+        }
+    }
+    fclose(fin);
+    unsigned char data[MAX_PAYLOAD_LENGTH];
+    data[0] = DATA_UPLOAD;
+    data[1] = name_size;
+    memcpy(data+2,ctx->config->name, name_size);
+    data[2+name_size] = purpose_size;
+    memcpy(data+3+name_size,ctx->config->purpose[0][ctx->purpose_index],purpose_size);
+    data[3+name_size+purpose_size] = key_id_size;
+    memcpy(data+4+name_size+purpose_size,session_ctx->s_key.key_id,key_id_size);
+    data[4+name_size+purpose_size+key_id_size] = bufsize;
+    memcpy(data+5+name_size+purpose_size+key_id_size, file_buf , bufsize);
+    write(sock,data,5+name_size+purpose_size+key_id_size+bufsize);
+    printf("Send the data such as sessionkey id, purpose.\n");
+
+}
+
+void download_from_datamanagement(SST_session_ctx_t *session_ctx, SST_ctx_t *ctx)
+{
+    int sock;
+    connect_as_client((const char *)ctx->config->datamanagement_ip_addr,
+                      (const char *)ctx->config->datamanagement_port_num, &sock);
+    int DATA_DOWNLOAD = 1;
+    int name_size;
+    name_size = sizeof(ctx->config->name);
+    unsigned char data[MAX_PAYLOAD_LENGTH];
+    data[0] = DATA_DOWNLOAD;
+    data[1] = name_size;
+    memcpy(data+2,ctx->config->name, name_size);
+
+    write(sock, data, 2 + name_size);
+    sleep(3);
+    unsigned char received_buf[128];
+    unsigned int received_buf_length =
+        read(sock, received_buf, sizeof(received_buf));
+
+    printf("Receive the information.\n");
+    // print_buf(received_buf,received_buf_length);
+    unsigned char *key_id = NULL;
+    // unsigned char *command = NULL;
+    
+    int key_id_size, command_size;
+    key_id_size = received_buf[1];
+    command_size = received_buf[2+key_id_size];
+    // printf("%d, %d\n", key_id_size,command_size);
+
+    key_id = malloc(sizeof(char) * (key_id_size + 1));
+    memcpy(key_id,received_buf+2,key_id_size);
+    // command = malloc(sizeof(char) * (command_size + 1));
+    unsigned char command[100];
+    memcpy(command,received_buf+3+key_id_size,command_size);
+    // printf("Command size: %d \n", command_size);
+    printf("Command: %s \n", command);
+
+    unsigned int cipher_key_size = 16;
+    FILE *fp, *fin, *fout;
+    char *file_name = "enc_server.txt";
+    // print_buf(command,strlen(command));
+    if (0 == access(file_name,F_OK))
+    {
+        printf("%s file already exists. \n", file_name);        
+        // printf("%s file is deleted. \n", file_name);        
+        fp = popen("rm enc_server.txt","r");
+        pclose(fp);
+    }
+    fin = popen(command, "r");
+    printf("Download the enc_server.txt file\n");
+    pclose(fin);
 }
