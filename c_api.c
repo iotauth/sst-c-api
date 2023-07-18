@@ -368,7 +368,7 @@ void file_encrypt_upload(SST_session_ctx_t *session_ctx)
     FILE *fgen,*fin, *fout, *fenc;
     unsigned int cipher_key_size = 16;
     // fgen = popen()
-    fin = fopen("/Users/yeongbin/Desktop/project/IPFS-with-SST/plain_text.txt","r");
+    fin = fopen("../plain_text.txt","r");
     unsigned char *file_buf = NULL;
     unsigned long bufsize ;
     if (fin != NULL) {
