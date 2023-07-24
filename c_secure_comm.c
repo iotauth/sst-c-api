@@ -340,8 +340,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned int serialized_length;
             unsigned char *serialized = auth_hello_reply_message(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose[0][ctx->purpose_index], &serialized_length);
-            
+                ctx->config->name, ctx->config->purpose, &serialized_length);
             if (check_validity(
                     ctx->dist_key.abs_validity)) {  // when dist_key expired
                 printf(

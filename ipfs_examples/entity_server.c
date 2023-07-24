@@ -46,28 +46,6 @@ int main(int argc, char *argv[]) {
     ctx->purpose_index = 0;
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
-    // pthread_t thread;
-    // pthread_create(&thread, NULL, &receive_thread, (void *)session_ctx);
-    // sleep(1);
-
-    // send_secure_message("Hello client", strlen("Hello client"), session_ctx);
-    // sleep(1);
-    // send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
-    // sleep(2);
-    // close(clnt_sock);
-    // pthread_cancel(thread);
-    // printf("Finished first communication\n");
-
-
-    // clnt_sock2 =
-    //     accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-    // if (clnt_sock2 == -1) {
-    //     error_handling("accept() error");
-    // }
-    
-    // SST_session_ctx_t *session_ctx_1 =
-    //     server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
-    // request the hash information.
     sleep(5);
     download_from_datamanagement(session_ctx, ctx);
     sleep(5);
