@@ -336,11 +336,10 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
-
             unsigned int serialized_length;
             unsigned char *serialized = auth_hello_reply_message(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose, &serialized_length);
+                ctx->config->name, ctx->config->purpose[0][ctx->purpose_index], &serialized_length);
             if (check_validity(
                     ctx->dist_key.abs_validity)) {  // when dist_key expired
                 printf(
