@@ -48,6 +48,14 @@ int main(int argc, char *argv[]) {
         server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
     sleep(5);
     download_from_datamanagement(session_ctx, ctx);
+    // TODO:
+    // (Complete) Scenario 1: When downloader entity already have sessionkey for file decrypt
+    // Scenario 2: When downloader entity does not have sessionkey, downloader entity request the sessionkey using key id received from datamanagement entity.
+    // char file_key_id;
+    // file_key_id = download_from_datamanagement(ctx);
+    // if (strcmp(session_ctx->s_key.key_id, file_key_id) == 0){
+    //     sessionkey_request(file_key_id,ctx);
+    // }
     sleep(5);
     file_download_decrypt(session_ctx);
 

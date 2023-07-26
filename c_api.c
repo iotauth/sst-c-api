@@ -500,14 +500,12 @@ void upload_to_datamanagement(SST_session_ctx_t *session_ctx, SST_ctx_t *ctx)
     data[0] = DATA_UPLOAD;
     data[1] = name_size;
     memcpy(data+2,ctx->config->name, name_size);
-    data[2+name_size] = purpose_size;
-    memcpy(data+3+name_size,ctx->config->purpose[0][ctx->purpose_index],purpose_size);
-    data[3+name_size+purpose_size] = key_id_size;
-    memcpy(data+4+name_size+purpose_size,session_ctx->s_key.key_id,key_id_size);
-    data[4+name_size+purpose_size+key_id_size] = bufsize;
-    memcpy(data+5+name_size+purpose_size+key_id_size, file_buf , bufsize);
-    write(sock,data,5+name_size+purpose_size+key_id_size+bufsize);
-    printf("Send the data such as sessionkey id, purpose.\n");
+    data[2+name_size] = key_id_size;
+    memcpy(data+3+name_size,session_ctx->s_key.key_id,key_id_size);
+    data[3+name_size+key_id_size] = bufsize;
+    memcpy(data+4+name_size+key_id_size, file_buf , bufsize);
+    write(sock,data,4 + name_size + key_id_size + bufsize);
+    printf("Send the data such as sessionkey id, name.\n");
 
 }
 
