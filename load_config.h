@@ -7,22 +7,21 @@
 
 #define MAX 256
 #define ENTITY_INFO_NAME 1
-#define ENTITY_INFO_PURPOSE_MS 2
-#define ENTITY_INFO_PURPOSE_FS 3
-#define ENTITY_INFO_NUMKEY 4
-#define AUTH_INFO_PUBKEY_PATH 5
-#define ENTITY_INFO_PRIVKEY_PATH 6
-#define AUTH_INFO_IP_ADDRESS 7
-#define AUTH_INFO_PORT 8
-#define ENTITY_SERVER_INFO_IP_ADDRESS 9
-#define ENTITY_SERVER_INFO_PORT_NUMBER 10
-#define datamanagement_INFO_IP_ADDRESS 11
-#define datamanagement_INFO_PORT_NUMBER 12
-#define NETWORK_PROTOCOL 13
+#define ENTITY_INFO_PURPOSE 2
+#define ENTITY_INFO_NUMKEY 3
+#define AUTH_INFO_PUBKEY_PATH 4
+#define ENTITY_INFO_PRIVKEY_PATH 5
+#define AUTH_INFO_IP_ADDRESS 6
+#define AUTH_INFO_PORT 7
+#define ENTITY_SERVER_INFO_IP_ADDRESS 8
+#define ENTITY_SERVER_INFO_PORT_NUMBER 9
+#define datamanagement_INFO_IP_ADDRESS 10
+#define datamanagement_INFO_PORT_NUMBER 11
+#define NETWORK_PROTOCOL 12
 
 typedef struct {
     char name[32];
-    char * purpose[1][2];
+    char purpose[2][36];
     int numkey;
     char *auth_pubkey_path;
     char *entity_privkey_path;

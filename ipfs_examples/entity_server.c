@@ -1,4 +1,4 @@
-#include "../c_api.h"
+#include "../ipfs.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -6,7 +6,7 @@ int main(int argc, char *argv[]) {
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
-    const char *PORT_NUM = "21100";
+    const int *PORT_NUM = 21100;
 
     struct sockaddr_in serv_addr, clnt_addr;
     socklen_t clnt_addr_size;
@@ -22,7 +22,7 @@ int main(int argc, char *argv[]) {
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(atoi(PORT_NUM));
+    serv_addr.sin_port = htons(PORT_NUM);
 
     if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {

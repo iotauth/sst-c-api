@@ -2,8 +2,7 @@
 #include "load_config.h"
 
 const char entity_info_name[] = "entityInfo.name";
-const char entity_info_purpose_ms[] = "entityInfo.purpose.ms";
-const char entity_info_purpose_fs[] = "entityInfo.purpose.fs";
+const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
@@ -18,10 +17,8 @@ const char network_protocol[] = "network.protocol";
 int get_key_value(char *ptr) {
     if (strcmp(ptr, entity_info_name) == 0)
         return ENTITY_INFO_NAME;
-    else if (strcmp(ptr, entity_info_purpose_ms) == 0)
-        return ENTITY_INFO_PURPOSE_MS;
-    else if (strcmp(ptr, entity_info_purpose_fs) == 0)
-        return ENTITY_INFO_PURPOSE_FS;
+    else if (strcmp(ptr, entity_info_purpose) == 0)
+        return ENTITY_INFO_PURPOSE;
     else if (strcmp(ptr, entity_info_numkey) == 0)
         return ENTITY_INFO_NUMKEY;
     else if (strcmp(ptr, authinfo_pubkey_path) == 0)
@@ -54,30 +51,29 @@ config_t *load_config(char *path) {
     };
     char *pline;
     static const char delimiters[] = " \n";
-
+    int purpose_index = 0;
     printf("--config--\n");
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);
         char *ptr = strtok(pline, "=");
-        int a;
         while (ptr != NULL) {
             switch (get_key_value(ptr)) {
                 case ENTITY_INFO_NAME:
                     ptr = strtok(NULL, delimiters);
-                    printf("name: %s\n", ptr);
+                    printf("Name: %s\n", ptr);
                     strcpy(c->name, ptr);
                     break;
-                case ENTITY_INFO_PURPOSE_MS:
+                case ENTITY_INFO_PURPOSE:
                     ptr = strtok(NULL, delimiters);
-                    printf("purpose_MS: %s\n", ptr);
-                    c->purpose[0][0] = malloc(strlen(ptr) + 1);
-                    strcpy(c->purpose[0][0], ptr);
-                    break;
-                case ENTITY_INFO_PURPOSE_FS:
-                    ptr = strtok(NULL, delimiters);
-                    printf("purpose_FS: %s\n", ptr);
-                    c->purpose[0][1] = malloc(strlen(ptr) + 1);
-                    strcpy(c->purpose[0][1], ptr);
+                    if (purpose_index == 0){
+                        printf("First purpose: %s\n", ptr);
+                        strcpy(c->purpose[purpose_index], ptr);
+                        purpose_index += 1;
+                    }
+                    else {
+                        printf("Second purpose: %s\n", ptr);
+                        strcpy(c->purpose[purpose_index], ptr);
+                    }
                     break;
                 case ENTITY_INFO_NUMKEY:
                     ptr = strtok(NULL, delimiters);
