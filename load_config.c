@@ -51,6 +51,7 @@ config_t *load_config(char *path) {
     };
     char *pline;
     static const char delimiters[] = " \n";
+    
     int purpose_index = 0;
     printf("--config--\n");
     while (!feof(fp)) {
