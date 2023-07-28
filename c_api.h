@@ -3,8 +3,6 @@
 
 #include "c_secure_comm.h"
 
-#define MAX 1000000
-
 // Load config file from path and save the information in ctx struct.
 // Also loads public and private key in EVP_PKEY struct.
 // Stores the distribution_key.

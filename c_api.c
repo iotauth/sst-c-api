@@ -134,7 +134,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             memcpy(expected_key_id, data_buf, SESSION_KEY_ID_SIZE);
             unsigned int expected_key_id_int =
                 read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
-            
+
             // If the entity_server already has the corresponding session key,
             // it does not have to request session key from Auth
             int session_key_found = -1;

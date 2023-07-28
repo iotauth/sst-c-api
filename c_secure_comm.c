@@ -336,6 +336,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
+
             unsigned int serialized_length;
             unsigned char *serialized = auth_hello_reply_message(
                 entity_nonce, auth_nonce, ctx->config->numkey,
@@ -345,16 +346,12 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                 printf(
                     "Current distribution key expired, requesting new "
                     "distribution key as well...\n");
-                sleep(1);
-                printf("");
                 unsigned int enc_length;
                 unsigned char *enc = encrypt_and_sign(
                     serialized, serialized_length, ctx, &enc_length);
-                printf("");
                 free(serialized);
                 unsigned char message[MAX_AUTH_COMM_LENGTH];
                 unsigned int message_length;
-                printf("\n");
                 make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
                                 message, &message_length);
                 write(sock, message, message_length);

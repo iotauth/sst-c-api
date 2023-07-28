@@ -65,7 +65,7 @@ config_t *load_config(char *path) {
                     break;
                 case ENTITY_INFO_PURPOSE:
                     ptr = strtok(NULL, delimiters);
-                    if (purpose_index == 0){
+                    if (purpose_index == 0) {
                         printf("First purpose: %s\n", ptr);
                         strcpy(c->purpose[purpose_index], ptr);
                         purpose_index += 1;
@@ -125,7 +125,8 @@ config_t *load_config(char *path) {
                     ptr = strtok(NULL, delimiters);
                     printf("Port number of datamanagement: %s\n", ptr);
                     strcpy(c->datamanagement_port_num, ptr);
-                    break;            }
+                    break;
+            }
             break;
         }
     }
