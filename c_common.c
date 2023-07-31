@@ -1,12 +1,12 @@
 #include "c_common.h"
 
-void error_handling(char* message) {
+void error_handling(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     exit(1);
 }
 
-void print_buf(unsigned char* buf, size_t size) {
+void print_buf(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
         sprintf(hex + 3 * i, " %.2x", buf[i]);
@@ -14,7 +14,7 @@ void print_buf(unsigned char* buf, size_t size) {
     printf("Hex:%s\n", hex);
 }
 
-void generate_nonce(int length, unsigned char* buf) {
+void generate_nonce(int length, unsigned char *buf) {
     int x = RAND_bytes(buf, length);
     if (x == -1) {
         printf("Failed to create Random Nonce");
@@ -22,13 +22,13 @@ void generate_nonce(int length, unsigned char* buf) {
     }
 }
 
-void write_in_n_bytes(uint64_t num, int n, unsigned char* buf) {
+void write_in_n_bytes(uint64_t num, int n, unsigned char *buf) {
     for (int i = 0; i < n; i++) {
         buf[i] |= num >> 8 * (n - 1 - i);
     }
 }
 
-unsigned int read_unsigned_int_BE(unsigned char* buf, int byte_length) {
+unsigned int read_unsigned_int_BE(unsigned char *buf, int byte_length) {
     int num = 0;
     for (int i = 0; i < byte_length; i++) {
         num |= buf[i] << 8 * (byte_length - 1 - i);
@@ -36,7 +36,7 @@ unsigned int read_unsigned_int_BE(unsigned char* buf, int byte_length) {
     return num;
 }
 
-uint64_t read_unsigned_long_int_BE(unsigned char* buf, int byte_length) {
+uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
     uint64_t num_valid = 1ULL;
     for (int i = 0; i < byte_length; i++) {
         uint64_t num = 1ULL << 8 * (byte_length - 1 - i);
@@ -45,8 +45,8 @@ uint64_t read_unsigned_long_int_BE(unsigned char* buf, int byte_length) {
     return num_valid;
 }
 
-void var_length_int_to_num(unsigned char* buf, unsigned int buf_length,
-    unsigned int* num, uint16_t* var_len_int_buf_size) {
+void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
+                           unsigned int *num, uint16_t *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (int i = 0; i < buf_length; i++) {
@@ -58,8 +58,8 @@ void var_length_int_to_num(unsigned char* buf, unsigned int buf_length,
     }
 }
 
-void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
-    uint16_t* var_len_int_buf_size) {
+void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
+                           uint16_t *var_len_int_buf_size) {
     *var_len_int_buf_size = 1;
     while (num > 127) {
         var_len_int_buf[*var_len_int_buf_size - 1] = 128 | num & 127;
@@ -69,31 +69,30 @@ void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
     var_len_int_buf[*var_len_int_buf_size - 1] = num;
 }
 
-unsigned char* parse_received_message(unsigned char* received_buf,
-    unsigned int received_buf_length,
-    unsigned char* message_type,
-    unsigned int* data_buf_length) {
+unsigned char *parse_received_message(unsigned char *received_buf,
+                                      unsigned int received_buf_length,
+                                      unsigned char *message_type,
+                                      unsigned int *data_buf_length) {
     *message_type = received_buf[0];
     unsigned int var_length_buf_size;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, received_buf_length,
-        data_buf_length, &var_length_buf_size);
+                          data_buf_length, &var_length_buf_size);
     return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
 }
 
-uint16_t read_variable_length_one_byte_each(int socket, unsigned char* buf) {
+uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
     read(socket, buf, 1);
     if (buf[0] > 128) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
-    }
-    else {
+    } else {
         return length;
     }
 }
 
-int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
-    unsigned char* ret,
-    unsigned int* ret_length) {
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
     int socket_read = read(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (socket_read == 0) {
@@ -110,7 +109,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         socket, received_buf + MESSAGE_TYPE_SIZE);
     uint16_t var_length_buf_size_checked;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
-        ret_length, &var_length_buf_size_checked);
+                          ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
         error_handling("Wrong header calculation... Exiting...");
     }
@@ -119,7 +118,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
 }
 
 void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
-    unsigned char* header, unsigned int* header_length) {
+                        unsigned char *header, unsigned int *header_length) {
     unsigned char payload_buf[MAX_PAYLOAD_BUF_SIZE];
     unsigned int payload_buf_len;
     num_to_var_length_int(data_length, payload_buf, &payload_buf_len);
@@ -129,24 +128,24 @@ void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
 }
 
 void concat_buffer_header_and_payload(
-    unsigned char* header, unsigned int header_length, unsigned char* payload,
-    unsigned int payload_length, unsigned char* ret, unsigned int* ret_length) {
+    unsigned char *header, unsigned int header_length, unsigned char *payload,
+    unsigned int payload_length, unsigned char *ret, unsigned int *ret_length) {
     memcpy(ret, header, header_length);
     memcpy(ret + header_length, payload, payload_length);
     *ret_length = header_length + payload_length;
 }
 
-void make_sender_buf(unsigned char* payload, unsigned int payload_length,
-    unsigned char MESSAGE_TYPE, unsigned char* sender,
-    unsigned int* sender_length) {
+void make_sender_buf(unsigned char *payload, unsigned int payload_length,
+                     unsigned char MESSAGE_TYPE, unsigned char *sender,
+                     unsigned int *sender_length) {
     unsigned char header[MAX_PAYLOAD_BUF_SIZE + 1];
     unsigned int header_length;
     make_buffer_header(payload_length, MESSAGE_TYPE, header, &header_length);
     concat_buffer_header_and_payload(header, header_length, payload,
-        payload_length, sender, sender_length);
+                                     payload_length, sender, sender_length);
 }
 
-void connect_as_client(const char* ip_addr, const char* port_num, int* sock) {
+void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     struct sockaddr_in serv_addr;
     int str_len;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -158,15 +157,15 @@ void connect_as_client(const char* ip_addr, const char* port_num, int* sock) {
     serv_addr.sin_addr.s_addr =
         inet_addr(ip_addr);  // the ip_address to connect to
     serv_addr.sin_port = htons(atoi(port_num));
-    if (connect(*sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) ==
+    if (connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
         error_handling("connect() error!");
     }
     printf("\n\n------------Connected-------------\n");
 }
 
-void serialize_handshake(unsigned char* nonce, unsigned char* reply_nonce,
-    unsigned char* ret) {
+void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
+                         unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
         error_handling("Error: handshake should include at least on nonce.");
     }
@@ -183,7 +182,7 @@ void serialize_handshake(unsigned char* nonce, unsigned char* reply_nonce,
     ret[0] = indicator;
 }
 
-void parse_handshake(unsigned char* buf, HS_nonce_t* ret) {
+void parse_handshake(unsigned char *buf, HS_nonce_t *ret) {
     if ((buf[0] & 1) != 0) {
         memcpy(ret->nonce, buf + 1, HS_NONCE_SIZE);
     }

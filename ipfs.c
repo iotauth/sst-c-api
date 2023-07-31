@@ -10,27 +10,26 @@ const char DOWNLOAD_NAME[] = "download";
 
 void file_duplication_check(unsigned char* file_name, unsigned char* file_extension, unsigned char* file_buf)
 {
-    int reply_num = 0;
+    int suffix_num = 0;
     int file_check_index = DEFAULT_CHECK_INDEX;
-    char reply_cnum[10];
-    sprintf(reply_cnum, "%d", reply_num);
     memcpy(file_buf, file_name, strlen(file_name));
-    memcpy(file_buf + strlen(file_name), reply_cnum, strlen(reply_cnum));
-    memcpy(file_buf + strlen(file_name) + strlen(reply_cnum), file_extension, sizeof(file_extension));
+    memcpy(file_buf + strlen(file_name), file_extension, sizeof(file_extension));
     while (file_check_index) {
-        if (reply_num == MAX_REPLY_NUM) {
+        if (suffix_num == MAX_REPLY_NUM) {
             printf("Cannot save the file. \n");
             exit(1);
         }
         if (0 == access(file_buf, F_OK)) {
             printf("File already exists: %s\n", file_buf);
-            reply_num += 1;
-            sprintf(reply_cnum, "%d", reply_num);
-            memcpy(file_buf + sizeof(file_name), reply_cnum, strlen(reply_cnum));
-            memcpy(file_buf + sizeof(file_name) + strlen(reply_cnum), file_extension, sizeof(file_extension));
+            char suffix_cnum[10];
+            sprintf(suffix_cnum, "%d", suffix_num);
+            memcpy(file_buf + sizeof(file_name), suffix_cnum, strlen(suffix_cnum));
+            memcpy(file_buf + sizeof(file_name) + strlen(suffix_cnum), file_extension, sizeof(file_extension));
+            suffix_num += 1;
         }
         else {
             file_check_index = CHECK_PASS;
+            break;
         }
     }
 }
