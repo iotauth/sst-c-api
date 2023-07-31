@@ -146,13 +146,13 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_n
     free(file_buf);
 
     int reply_num = 0;
-    unsigned char result_name[20];
-    file_duplication_check(RESULT_NAME, TXT_NAME, result_name);
-    fout = fopen(result_name, "w");
+    char result_file_name[20];
+    file_duplication_check(RESULT_NAME, TXT_NAME, result_file_name);
+    fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
-    printf("Completed decryption and saved the file: %s\n", result_name);
+    printf("Completed decryption and saved the file: %s\n", result_file_name);
 }
 
 void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value) {

@@ -32,7 +32,6 @@ typedef struct {
     char network_protocol[4];
     char filesystem_manager_ip_addr[17];
     char filesystem_manager_port_num[6];
-
 } config_t;
 
 // Get a value by comparing a string of conditional statement with a variable.
