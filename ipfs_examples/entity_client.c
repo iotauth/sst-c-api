@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     file_encrypt_upload(session_ctx, ctx, my_file_path, &hash_value);
 
     sleep(1);
-    upload_to_datamanagement(session_ctx, ctx, &hash_value);
+    upload_to_filesystem_manager(session_ctx, ctx, &hash_value);
 
     free(session_ctx);
 
