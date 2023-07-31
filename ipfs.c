@@ -101,24 +101,24 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     free(file_buf);
     printf("Success file encryption.\n\n");
 
-    unsigned char file_buffer[20];
-    file_duplication_check(ENCRYPTED_NAME, TXT_NAME, &file_buffer);
+    char file_name_buffer[20];
+    file_duplication_check(ENCRYPTED_NAME, TXT_NAME, &file_name_buffer);
 
     // File descriptor for the encrypted file.
-    fenc = fopen(file_buffer, "w");
+    fenc = fopen(file_name_buffer, "w");
     unsigned char* enc_save = (unsigned char*)malloc(encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
     memcpy(enc_save + 1, ctx->config->name, provider_len);
     enc_save[provider_len + 1] = AES_CBC_128_IV_SIZE;
     memcpy(enc_save + 1 + provider_len + 1, iv, AES_CBC_128_IV_SIZE);
     memcpy(enc_save + 1 + provider_len + 1 + AES_CBC_128_IV_SIZE, encrypted, encrypted_length);
+    free(encrypted);
     fwrite(enc_save, 1, encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len, fenc);
     free(enc_save);
-    printf("File is saved: %s.\n", file_buffer);
+    printf("File is saved: %s.\n", file_name_buffer);
     fclose(fenc);
-    free(encrypted);
     sleep(1);
-    command_excute_and_save_result(&file_buffer, hash_value);
+    command_excute_and_save_result(&file_name_buffer, hash_value);
 }
 
 void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_name) {
