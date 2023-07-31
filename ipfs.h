@@ -8,6 +8,10 @@
 #define CHECK_PASS 0
 #define UPLOAD_DATA 0
 #define DOWNLOAD_DATA 1
+#define MAX_REPLY_NUM 100
+
+
+void file_check(unsigned char *file_name, unsigned char *file_extension, unsigned char *file_buf);
 
 // Do command "ipfs add command" and save the hash value.
 void ipfs_add_command_save_result(char* file_name, unsigned char* hash_value);
