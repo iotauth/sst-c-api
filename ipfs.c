@@ -157,8 +157,8 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_n
 
 void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value) {
     int sock;
-    connect_as_client((const char*)ctx->config->datamanagement_ip_addr,
-        (const char*)ctx->config->datamanagement_port_num, &sock);
+    connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,
+        (const char*)ctx->config->filesystem_manager_port_num, &sock);
     int key_id_size, name_size, purpose_size;
     key_id_size = sizeof(session_ctx->s_key.key_id);
     name_size = sizeof(ctx->config->name);
@@ -177,8 +177,8 @@ void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx
 void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* file_name) {
     FILE* fin;
     int sock;
-    connect_as_client((const char*)ctx->config->datamanagement_ip_addr,
-        (const char*)ctx->config->datamanagement_port_num, &sock);
+    connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,
+        (const char*)ctx->config->filesystem_manager_port_num, &sock);
     int name_size;
     name_size = sizeof(ctx->config->name);
     unsigned char data[BUFF_SIZE];
