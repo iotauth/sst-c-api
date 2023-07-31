@@ -35,12 +35,13 @@ int get_key_value(char *ptr) {
         return ENTITY_SERVER_INFO_PORT_NUMBER;
     else if (strcmp(ptr, network_protocol) == 0)
         return NETWORK_PROTOCOL;
-    else if (strcmp(ptr, filesystem_manager_ip_address) == 0)
+    } else if (strcmp(ptr, filesystem_manager_ip_address) == 0) {
         return FILESYSTEM_MANAGER_INFO_IP_ADDRESS;
-    else if (strcmp(ptr, filesystem_manager_port_number) == 0)
+    } else if (strcmp(ptr, filesystem_manager_port_number) == 0) {
         return FILESYSTEM_MANAGER_INFO_PORT_NUMBER;
-    else
+    } else {
         return -1;
+    }
 }
 
 config_t *load_config(char *path) {
