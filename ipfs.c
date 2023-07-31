@@ -196,8 +196,9 @@ void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t*
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(key_id, received_buf + 2, KEY_ID_SIZE);
 
-    if (strcmp((const char*)session_ctx->s_key.key_id, key_id) == 0)
+    if (strcmp((const char*)session_ctx->s_key.key_id, key_id) == 0) {
         printf("Already have sessionkey: %x\n", key_id);
+    }
     // TODO: Sessionkey request to Auth.
     // else
     unsigned char command[BUFF_SIZE];
