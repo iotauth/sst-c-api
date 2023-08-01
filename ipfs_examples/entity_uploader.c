@@ -13,7 +13,7 @@ int main(int argc, char* argv[]) {
     int hash_value_len = file_encrypt_upload(session_ctx, ctx, my_file_path, &hash_value[0]);
 
     sleep(1);
-    upload_to_filesystem_manager(session_ctx, ctx, &hash_value[0], hash_value_len);
+    upload_to_file_system_manager(session_ctx, ctx, &hash_value[0], hash_value_len);
 
     free(session_ctx);
 

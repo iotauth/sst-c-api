@@ -59,7 +59,7 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     }
 }
 
-int command_excute_and_save_result(char* file_name, unsigned char* hash_value) {
+int execute_command_and_save_result(char* file_name, unsigned char* hash_value) {
     char buff[BUFF_SIZE];
     FILE* fp;
     char command[BUFF_SIZE];
@@ -118,7 +118,7 @@ int file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my
     printf("File is saved: %s.\n", file_name_buffer);
     fclose(fenc);
     sleep(1);
-    return command_excute_and_save_result(&file_name_buffer[0], hash_value);
+    return execute_command_and_save_result(&file_name_buffer[0], hash_value);
 }
 
 void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
@@ -155,7 +155,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
     printf("Completed decryption and saved the file: %s\n", result_file_name);
 }
 
-void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len) {
+void upload_to_file_system_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len) {
     int sock;
     connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,
         (const char*)ctx->config->filesystem_manager_port_num, &sock);
@@ -174,7 +174,7 @@ void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name) {
+void download_from_file_system_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name) {
     FILE* fin;
     int sock;
     connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,

@@ -51,12 +51,12 @@ int main(int argc, char *argv[]) {
     sleep(5);
     
     char file_name[BUFF_SIZE];
-    download_from_filesystem_manager(session_ctx, ctx, &file_name[0]);
+    download_from_file_system_manager(session_ctx, ctx, &file_name[0]);
     // TODO:
     // (Complete) Scenario 1: When downloader entity already have sessionkey for file decrypt
     // Scenario 2: When downloader entity does not have sessionkey, downloader entity request the sessionkey using key id received from filesystem_manager entity.
     // char file_key_id;
-    // file_key_id = download_from_filesystem_manager(ctx);
+    // file_key_id = download_from_file_system_manager(ctx);
     // if (strcmp(session_ctx->s_key.key_id, file_key_id) == 0){
     //     sessionkey_request(file_key_id,ctx);
     // }

@@ -28,14 +28,14 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
 // Return length of the hash value received from uploading the file.
 // @param file_name file name to upload in IPFS environment.
 // @param hash_value result value for command "ipfs add <file_name>".
-int command_excute_and_save_result(char* file_name, unsigned char* hash_value);
+int execute_command_and_save_result(char* file_name, unsigned char* hash_value);
 
 // Encrypt the file with sessionkey and upload the file in IPFS environment.
-// Return length of the hash value receieved from 'command_excute_and_save_result' function.
+// Return length of the hash value receieved from 'execute_command_and_save_result' function.
 // @param session_ctx session key to encrypt the file.
 // @param ctx information to be included in encryption.
 // @param my_file_path path of the file to encrypt.
-// @param hash_value value to send to filesystem manager.
+// @param hash_value value to send to file system manager.
 int file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value);
 
 // Download the file in IPFS environment and decrypt the file with sessionkey.
@@ -43,17 +43,17 @@ int file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my
 // @param file_name file name to save in my repository.
 void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name);
 
-// Request the data to filesystem manager.
-// @param session_ctx session key information to send to filesystem manager.
-// @param ctx owner information to send to filesystem manager.
-// @param hash_value value to send to filesystem manager.
-// @param hash_value_len length of value to send to filesystem manager.
-void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
+// Request the data to file system manager.
+// @param session_ctx session key information to send to file system manager.
+// @param ctx owner information to send to file system manager.
+// @param hash_value value to send to file system manager.
+// @param hash_value_len length of value to send to file system manager.
+void upload_to_file_system_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
-// Receive the data from filesystem manager.
-// @param session_ctx session key information to compare with session key received from filesystem manager.
-// @param ctx information to access the filesystem manager.
+// Receive the data from file system manager.
+// @param session_ctx session key information to compare with session key received from file system manager.
+// @param ctx information to access the file system manager.
 // @param file_name file name to save the file.
-void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name);
+void download_from_file_system_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name);
 
 #endif
