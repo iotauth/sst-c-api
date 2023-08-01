@@ -27,7 +27,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
 // Returns the session context for the secure communication if it succeeds,
-// and returns NULL otherwise.
+// or returns NULL otherwise.
 // @param config config struct for information
 // @param clnt_sock entity client socket number
 // @return session key struct
