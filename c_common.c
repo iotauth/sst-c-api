@@ -46,7 +46,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
 }
 
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num, uint16_t *var_len_int_buf_size) {
+                           unsigned int *num, unsigned int *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (int i = 0; i < buf_length; i++) {
@@ -59,7 +59,7 @@ void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
 }
 
 void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
-                           uint16_t *var_len_int_buf_size) {
+                           unsigned int *var_len_int_buf_size) {
     *var_len_int_buf_size = 1;
     while (num > 127) {
         var_len_int_buf[*var_len_int_buf_size - 1] = 128 | num & 127;
@@ -105,9 +105,9 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         return 0;
     }
     *message_type = received_buf[0];
-    uint16_t var_length_buf_size = read_variable_length_one_byte_each(
+    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
-    uint16_t var_length_buf_size_checked;
+    unsigned int var_length_buf_size_checked;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {

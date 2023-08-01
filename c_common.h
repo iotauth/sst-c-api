@@ -108,7 +108,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length);
 //  @param var_len_int_buf_size size of the buffer containing the variable
 //  length integer
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num, uint16_t *var_len_int_buf_size);
+                           unsigned int *num, unsigned int *var_len_int_buf_size);
 
 // Make the data_length to a variable length.
 // @param num number to be converted into variable length integer.
@@ -116,7 +116,7 @@ void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
 // @param var_len_int_buf_size size of the buffer containing the variable
 // length integer.
 void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
-                           uint16_t *var_len_int_buf_size);
+                           unsigned int *var_len_int_buf_size);
 
 // Parses received message into 'message_type',
 // and data after msg_type+payload_buf to 'data_buf'.

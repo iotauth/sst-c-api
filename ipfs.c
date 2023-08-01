@@ -35,7 +35,7 @@ unsigned long file_size_return(FILE* fin) {
     return bufsize;
 }
 
-void file_duplication_check(char* file_name, char* file_extension, char* file_name_buf) {
+void file_duplication_check(const char* file_name, const char* file_extension, char* file_name_buf) {
     int suffix_num = 0;
     // Copy file name.
     memcpy(file_name_buf, file_name, strlen(file_name));

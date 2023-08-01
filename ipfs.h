@@ -22,7 +22,7 @@ unsigned long file_size_return(FILE* fin);
 // @param file_name name of the file.
 // @param file_extension name of the file extension.
 // @param file_buf buffer including total file name.
-void file_duplication_check(char* file_name, char* file_extension, char* file_name_buf);
+void file_duplication_check(const char* file_name, const char* file_extension, char* file_name_buf);
 
 // Do command "ipfs add command" and save the hash value.
 // @param file_name file name to upload in IPFS environment.
