@@ -27,14 +27,14 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
 // Do command "ipfs add command" and save the hash value.
 // @param file_name file name to upload in IPFS environment.
 // @param hash_value result value for command "ipfs add <file_name>".
-void command_excute_and_save_result(char* file_name, unsigned char* hash_value);
+int command_excute_and_save_result(char* file_name, unsigned char* hash_value);
 
 // Encrypt the file with sessionkey and upload the file in IPFS environment.
 // @param session_ctx session key to encrypt the file.
 // @param ctx information to be included in encryption.
 // @param my_file_path path of the file to encrypt.
 // @param hash_value value to send to filesystem manager.
-void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value);
+int file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value);
 
 // Download the file in IPFS environment and decrypt the file with sessionkey.
 // @param session_ctx session key to decrypt the file.
@@ -45,7 +45,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name);
 // @param session_ctx session key information to send to filesystem manager.
 // @param ctx owner information to send to filesystem manager.
 // @param hash_value value to send to filesystem manager.
-void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value);
+void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
 // Receive the data from filesystem manager.
 // @param session_ctx session key information to compare with session key received from filesystem manager.

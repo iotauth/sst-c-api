@@ -60,7 +60,7 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     }
 }
 
-void command_excute_and_save_result(char* file_name, unsigned char* hash_value) {
+int command_excute_and_save_result(char* file_name, unsigned char* hash_value) {
     char buff[BUFF_SIZE];
     FILE* fp;
     char command[BUFF_SIZE];
@@ -79,9 +79,10 @@ void command_excute_and_save_result(char* file_name, unsigned char* hash_value) 
     strtok(buff, " ");
     result = strtok(NULL, " ");
     memcpy(hash_value, result, strlen(result));
+    return strlen(result);
 }
 
-void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value) {
+int file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value) {
     FILE* fgen, * fin, * fout, * fenc;
     fin = fopen(my_file_path, "r");
     unsigned long bufsize;
@@ -118,7 +119,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     printf("File is saved: %s.\n", file_name_buffer);
     fclose(fenc);
     sleep(1);
-    command_excute_and_save_result(&file_name_buffer[0], hash_value);
+    return command_excute_and_save_result(&file_name_buffer[0], hash_value);
 }
 
 void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
@@ -155,7 +156,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
     printf("Completed decryption and saved the file: %s\n", result_file_name);
 }
 
-void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value) {
+void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len) {
     int sock;
     connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,
         (const char*)ctx->config->filesystem_manager_port_num, &sock);
@@ -168,9 +169,9 @@ void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx
     memcpy(data + 2, ctx->config->name, name_size);
     data[2 + name_size] = key_id_size;
     memcpy(data + 3 + name_size, session_ctx->s_key.key_id, key_id_size);
-    data[3 + name_size + key_id_size] = strlen(hash_value);
-    memcpy(data + 4 + name_size + key_id_size, hash_value, strlen(hash_value));
-    write(sock, data, 4 + name_size + key_id_size + strlen(hash_value));
+    data[3 + name_size + key_id_size] = hash_value_len;
+    memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
+    write(sock, data, 4 + name_size + key_id_size + hash_value_len);
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
