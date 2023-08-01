@@ -7,7 +7,6 @@ const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
 const char DOWNLOAD_FILE_NAME[] = "download";
 
-
 void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
         error_handling("Start point is not zero.\n");
@@ -39,7 +38,8 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     int suffix_num = 0;
     // Copy file name.
     memcpy(file_name_buf, file_name, strlen(file_name));
-    memcpy(file_name_buf + strlen(file_name), file_extension, sizeof(file_extension));
+    memcpy(file_name_buf + strlen(file_name), file_extension, strlen(file_name));
+    file_name_buf[strlen(file_name) + strlen(file_name)] = 0;
     for (;;) {
         if (suffix_num == MAX_REPLY_NUM) {
             printf("Cannot save the file. \n");
@@ -48,10 +48,10 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
         if (0 == access(file_name_buf, F_OK)) {
             printf("File already exists: %s\n", file_name_buf);
             // Copy suffix and file extension.
-            char suffix_in_string[10];
+            char suffix_in_string[5];
             sprintf(suffix_in_string, "%d", suffix_num);
-            memcpy(file_name_buf + sizeof(file_name), suffix_in_string, strlen(suffix_in_string));
-            memcpy(file_name_buf + sizeof(file_name) + strlen(suffix_in_string), file_extension, sizeof(file_extension));
+            memcpy(file_name_buf + strlen(file_name), suffix_in_string, strlen(suffix_in_string));
+            memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string), file_extension, strlen(file_extension));
             suffix_num += 1;
         }
         else {
@@ -102,7 +102,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     printf("Success file encryption.\n\n");
 
     char file_name_buffer[20];
-    file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer);
+    file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer[0]);
 
     // File descriptor for the encrypted file.
     fenc = fopen(file_name_buffer, "w");
@@ -118,7 +118,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     printf("File is saved: %s.\n", file_name_buffer);
     fclose(fenc);
     sleep(1);
-    command_excute_and_save_result(&file_name_buffer, hash_value);
+    command_excute_and_save_result(&file_name_buffer[0], hash_value);
 }
 
 void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
@@ -147,7 +147,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
 
     int reply_num = 0;
     char result_file_name[20];
-    file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION, result_file_name);
+    file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION, &result_file_name[0]);
     fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
@@ -196,12 +196,13 @@ void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t*
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(key_id, received_buf + 2, KEY_ID_SIZE);
 
-    if (strcmp((const char*)session_ctx->s_key.key_id, key_id) == 0) {
-        printf("Already have sessionkey: %x\n", key_id);
+    if (strcmp((const char*)session_ctx->s_key.key_id, (const char*)key_id) == 0) {
+        printf("Already have sessionkey:\n");
+        print_buf(key_id, KEY_ID_SIZE);
     }
     // TODO: Sessionkey request to Auth.
     // else
-    unsigned char command[BUFF_SIZE];
+    char command[BUFF_SIZE];
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     memcpy(command + command_size - 1, file_name, strlen(file_name));

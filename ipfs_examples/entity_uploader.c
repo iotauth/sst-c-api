@@ -10,10 +10,10 @@ int main(int argc, char* argv[]) {
     sleep(1);
     char* my_file_path = argv[2];
     unsigned char hash_value[BUFF_SIZE];
-    file_encrypt_upload(session_ctx, ctx, my_file_path, &hash_value);
+    file_encrypt_upload(session_ctx, ctx, my_file_path, &hash_value[0]);
 
     sleep(1);
-    upload_to_filesystem_manager(session_ctx, ctx, &hash_value);
+    upload_to_filesystem_manager(session_ctx, ctx, &hash_value[0]);
 
     free(session_ctx);
 
