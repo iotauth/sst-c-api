@@ -25,11 +25,13 @@ unsigned long file_size_return(FILE* fin);
 void file_duplication_check(const char* file_name, const char* file_extension, char* file_name_buf);
 
 // Do command "ipfs add command" and save the hash value.
+// Return length of the hash value received from uploading the file.
 // @param file_name file name to upload in IPFS environment.
 // @param hash_value result value for command "ipfs add <file_name>".
 int command_excute_and_save_result(char* file_name, unsigned char* hash_value);
 
 // Encrypt the file with sessionkey and upload the file in IPFS environment.
+// Return length of the hash value receieved from 'command_excute_and_save_result' function.
 // @param session_ctx session key to encrypt the file.
 // @param ctx information to be included in encryption.
 // @param my_file_path path of the file to encrypt.
@@ -45,6 +47,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name);
 // @param session_ctx session key information to send to filesystem manager.
 // @param ctx owner information to send to filesystem manager.
 // @param hash_value value to send to filesystem manager.
+// @param hash_value_len length of value to send to filesystem manager.
 void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
 // Receive the data from filesystem manager.
