@@ -15,8 +15,8 @@
 #define AUTH_INFO_PORT 7
 #define ENTITY_SERVER_INFO_IP_ADDRESS 8
 #define ENTITY_SERVER_INFO_PORT_NUMBER 9
-#define FILESYSTEM_MANAGER_INFO_IP_ADDRESS 10
-#define FILESYSTEM_MANAGER_INFO_PORT_NUMBER 11
+#define FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS 10
+#define FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER 11
 #define NETWORK_PROTOCOL 12
 
 typedef struct {
@@ -31,8 +31,8 @@ typedef struct {
     char entity_server_ip_addr[17];
     char entity_server_port_num[6];
     char network_protocol[4];
-    char filesystem_manager_ip_addr[17];
-    char filesystem_manager_port_num[6];
+    char file_system_manager_ip_addr[17];
+    char file_system_manager_port_num[6];
 } config_t;
 
 // Get a value by comparing a string of conditional statement with a variable.

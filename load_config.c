@@ -10,8 +10,8 @@ const char authInfo_ip_address[] = "auth.ip.address";
 const char authInfo_port[] = "auth.port.number";
 const char entity_serverInfo_ip_address[] = "entity.server.ip.address";
 const char entity_serverInfo_port_number[] = "entity.server.port.number";
-const char filesystem_manager_ip_address[] = "filesystemManager.ip.address";
-const char filesystem_manager_port_number[] = "filesystemManager.port.number";
+const char file_system_manager_ip_address[] = "fileSystemManager.ip.address";
+const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
 
 int get_key_value(char *ptr) {
@@ -36,10 +36,10 @@ int get_key_value(char *ptr) {
         return ENTITY_SERVER_INFO_PORT_NUMBER;
     } else if (strcmp(ptr, network_protocol) == 0) {
         return NETWORK_PROTOCOL;
-    } else if (strcmp(ptr, filesystem_manager_ip_address) == 0) {
-        return FILESYSTEM_MANAGER_INFO_IP_ADDRESS;
-    } else if (strcmp(ptr, filesystem_manager_port_number) == 0) {
-        return FILESYSTEM_MANAGER_INFO_PORT_NUMBER;
+    } else if (strcmp(ptr, file_system_manager_ip_address) == 0) {
+        return FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS;
+    } else if (strcmp(ptr, file_system_manager_port_number) == 0) {
+        return FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER;
     } else {
         return -1;
     }
@@ -118,15 +118,15 @@ config_t *load_config(char *path) {
                     printf("Network Protocol: %s\n", ptr);
                     strcpy(c->network_protocol, ptr);
                     break;
-                case FILESYSTEM_MANAGER_INFO_IP_ADDRESS:
+                case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
                     ptr = strtok(NULL, delimiters);
-                    printf("IP address of filesystem_manager: %s\n", ptr);
-                    strcpy(c->filesystem_manager_ip_addr, ptr);
+                    printf("IP address of file system manager: %s\n", ptr);
+                    strcpy(c->file_system_manager_ip_addr, ptr);
                     break;
-                case FILESYSTEM_MANAGER_INFO_PORT_NUMBER:
+                case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
                     ptr = strtok(NULL, delimiters);
-                    printf("Port number of filesystem_manager: %s\n", ptr);
-                    strcpy(c->filesystem_manager_port_num, ptr);
+                    printf("Port number of file system manager: %s\n", ptr);
+                    strcpy(c->file_system_manager_port_num, ptr);
                     break;
             }
             break;
