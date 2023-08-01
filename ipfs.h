@@ -22,7 +22,7 @@ unsigned long file_size_return(FILE* fin);
 // @param file_name name of the file.
 // @param file_extension name of the file extension.
 // @param file_buf buffer including total file name.
-void file_duplication_check(unsigned char* file_name, unsigned char* file_extension, unsigned char* file_buf);
+void file_duplication_check(char* file_name, char* file_extension, char* file_name_buf);
 
 // Do command "ipfs add command" and save the hash value.
 // @param file_name file name to upload in IPFS environment.
@@ -39,7 +39,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
 // Download the file in IPFS environment and decrypt the file with sessionkey.
 // @param session_ctx session key to decrypt the file.
 // @param file_name file name to save in my repository.
-void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_name);
+void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name);
 
 // Request the data to filesystem manager.
 // @param session_ctx session key information to send to filesystem manager.
@@ -51,6 +51,6 @@ void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx
 // @param session_ctx session key information to compare with session key received from filesystem manager.
 // @param ctx information to access the filesystem manager.
 // @param file_name file name to save the file.
-void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* file_name);
+void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name);
 
 #endif

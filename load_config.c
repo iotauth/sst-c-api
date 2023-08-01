@@ -15,25 +15,26 @@ const char filesystem_manager_port_number[] = "filesystemManager.port.number";
 const char network_protocol[] = "network.protocol";
 
 int get_key_value(char *ptr) {
-    if (strcmp(ptr, entity_info_name) == 0)
+    if (strcmp(ptr, entity_info_name) == 0) {
         return ENTITY_INFO_NAME;
-    else if (strcmp(ptr, entity_info_purpose) == 0)
+    } else if (strcmp(ptr, entity_info_purpose) == 0) {
         return ENTITY_INFO_PURPOSE;
-    else if (strcmp(ptr, entity_info_numkey) == 0)
+    } else if (strcmp(ptr, entity_info_numkey) == 0) {
         return ENTITY_INFO_NUMKEY;
-    else if (strcmp(ptr, authinfo_pubkey_path) == 0)
+    } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
         return AUTH_INFO_PUBKEY_PATH;
-    else if (strcmp(ptr, entity_info_privkey_path) == 0)
+    } else if (strcmp(ptr, entity_info_privkey_path) == 0) {
         return ENTITY_INFO_PRIVKEY_PATH;
-    else if (strcmp(ptr, authInfo_ip_address) == 0)
+    } else if (strcmp(ptr, authInfo_ip_address) == 0) {
         return AUTH_INFO_IP_ADDRESS;
-    else if (strcmp(ptr, authInfo_port) == 0)
+    } else if (strcmp(ptr, authInfo_port) == 0) {
         return AUTH_INFO_PORT;
-    else if (strcmp(ptr, entity_serverInfo_ip_address) == 0)
+    } else if (strcmp(ptr, entity_serverInfo_ip_address) == 0) {
         return ENTITY_SERVER_INFO_IP_ADDRESS;
-    else if (strcmp(ptr, entity_serverInfo_port_number) == 0)
+    }
+    else if (strcmp(ptr, entity_serverInfo_port_number) == 0) {
         return ENTITY_SERVER_INFO_PORT_NUMBER;
-    else if (strcmp(ptr, network_protocol) == 0)
+    } else if (strcmp(ptr, network_protocol) == 0) {
         return NETWORK_PROTOCOL;
     } else if (strcmp(ptr, filesystem_manager_ip_address) == 0) {
         return FILESYSTEM_MANAGER_INFO_IP_ADDRESS;

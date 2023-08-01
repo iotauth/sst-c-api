@@ -2,10 +2,10 @@
 #include "ipfs.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
-const char TXT_NAME[] = ".txt";
-const char ENCRYPTED_NAME[] = "encrypted";
-const char RESULT_NAME[] = "result";
-const char DOWNLOAD_NAME[] = "download";
+const char TXT_FILE_EXTENSION[] = ".txt";
+const char ENCRYPTED_FILE_NAME[] = "encrypted";
+const char RESULT_FILE_NAME[] = "result";
+const char DOWNLOAD_FILE_NAME[] = "download";
 
 
 void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize) {
@@ -38,20 +38,20 @@ unsigned long file_size_return(FILE* fin) {
 void file_duplication_check(char* file_name, char* file_extension, char* file_name_buf) {
     int suffix_num = 0;
     // Copy file name.
-    memcpy(file_buf, file_name, strlen(file_name));
-    memcpy(file_buf + strlen(file_name), file_extension, sizeof(file_extension));
+    memcpy(file_name_buf, file_name, strlen(file_name));
+    memcpy(file_name_buf + strlen(file_name), file_extension, sizeof(file_extension));
     for (;;) {
         if (suffix_num == MAX_REPLY_NUM) {
             printf("Cannot save the file. \n");
             exit(1);
         }
-        if (0 == access(file_buf, F_OK)) {
-            printf("File already exists: %s\n", file_buf);
+        if (0 == access(file_name_buf, F_OK)) {
+            printf("File already exists: %s\n", file_name_buf);
             // Copy suffix and file extension.
             char suffix_in_string[10];
             sprintf(suffix_in_string, "%d", suffix_num);
-            memcpy(file_buf + sizeof(file_name), suffix_in_string, strlen(suffix_in_string));
-            memcpy(file_buf + sizeof(file_name) + strlen(suffix_in_string), file_extension, sizeof(file_extension));
+            memcpy(file_name_buf + sizeof(file_name), suffix_in_string, strlen(suffix_in_string));
+            memcpy(file_name_buf + sizeof(file_name) + strlen(suffix_in_string), file_extension, sizeof(file_extension));
             suffix_num += 1;
         }
         else {
@@ -102,7 +102,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     printf("Success file encryption.\n\n");
 
     char file_name_buffer[20];
-    file_duplication_check(ENCRYPTED_NAME, TXT_NAME, &file_name_buffer);
+    file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer);
 
     // File descriptor for the encrypted file.
     fenc = fopen(file_name_buffer, "w");
@@ -121,7 +121,7 @@ void file_encrypt_upload(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* m
     command_excute_and_save_result(&file_name_buffer, hash_value);
 }
 
-void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_name) {
+void file_download_decrypt(SST_session_ctx_t* session_ctx, char* file_name) {
     FILE* fp, * fin, * fout;
     fin = fopen(file_name, "r");
     unsigned long bufsize;
@@ -147,7 +147,7 @@ void file_download_decrypt(SST_session_ctx_t* session_ctx, unsigned char* file_n
 
     int reply_num = 0;
     char result_file_name[20];
-    file_duplication_check(RESULT_NAME, TXT_NAME, result_file_name);
+    file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION, result_file_name);
     fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
@@ -174,7 +174,7 @@ void upload_to_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, unsigned char* file_name) {
+void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t* ctx, char* file_name) {
     FILE* fin;
     int sock;
     connect_as_client((const char*)ctx->config->filesystem_manager_ip_addr,
@@ -203,7 +203,7 @@ void download_from_filesystem_manager(SST_session_ctx_t* session_ctx, SST_ctx_t*
     // else
     unsigned char command[BUFF_SIZE];
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
-    file_duplication_check(DOWNLOAD_NAME, TXT_NAME, file_name);
+    file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     memcpy(command + command_size - 1, file_name, strlen(file_name));
     printf("Command: %s \n", command);
     fin = popen(command, "r");
