@@ -58,7 +58,7 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 **unsigned char * return_decrypted_buf()**
 
--   Returns the buffer of the decrypted buffer.
+-   Returns the buffer of the decrypted message and returns NULL when an error occurs.
 
 **void send_secure_message()**
 

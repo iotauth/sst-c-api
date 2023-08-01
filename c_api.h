@@ -26,6 +26,8 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
+// Returns the session context for the secure communication if it succeeds,
+// and returns NULL otherwise.
 // @param config config struct for information
 // @param clnt_sock entity client socket number
 // @return session key struct
@@ -53,7 +55,7 @@ void receive_message(unsigned char *received_buf,
 
 // Return the buffer pointer of the decrypted buffer.
 // If the user gives the read buffer as input, it will return the decrypted
-// buffer.
+// buffer. If an error occurs, returns NULL.
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf
 // @param SST_session_ctx_t session ctx struct
