@@ -1,4 +1,3 @@
-
 #include "ipfs.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
