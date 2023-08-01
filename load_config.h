@@ -21,6 +21,7 @@
 
 typedef struct {
     char name[32];
+    // Currently, the config struct can hold up to two purposes.
     char purpose[2][36];
     int numkey;
     char *auth_pubkey_path;
