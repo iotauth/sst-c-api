@@ -51,7 +51,7 @@ int main(int argc, char *argv[]) {
     sleep(5);
     
     char file_name[BUFF_SIZE];
-    download_from_file_system_manager(session_ctx, ctx, &file_name[0]);
+    download_from_file_system_manager(&session_ctx->s_key, ctx, &file_name[0]);
     // TODO:
     // (Complete) Scenario 1: When downloader entity already have sessionkey for file decrypt
     // Scenario 2: When downloader entity does not have sessionkey, downloader entity request the sessionkey using key id received from file system manager entity.
@@ -61,7 +61,7 @@ int main(int argc, char *argv[]) {
     //     sessionkey_request(file_key_id,ctx);
     // }
     sleep(5);
-    file_download_decrypt(session_ctx, &file_name[0]);
+    file_download_decrypt(&session_ctx->s_key, &file_name[0]);
 
 
     close(clnt_sock2);
