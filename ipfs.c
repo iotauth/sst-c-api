@@ -121,7 +121,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     return execute_command_and_save_result(&file_name_buffer[0], hash_value);
 }
 
-void file_download_decrypt(session_key_t* s_key, char* file_name) {
+void file_download_decrypt(session_key_t s_key, char* file_name) {
     FILE* fp, * fin, * fout;
     fin = fopen(file_name, "r");
     unsigned long bufsize;
@@ -130,7 +130,6 @@ void file_download_decrypt(session_key_t* s_key, char* file_name) {
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     get_file_content(fin, file_buf, bufsize);
     fclose(fin);
-
     unsigned int owner_name_len = file_buf[0];
     unsigned char owner_name[owner_name_len];
     memcpy(owner_name, file_buf + 1, owner_name_len);
@@ -141,7 +140,7 @@ void file_download_decrypt(session_key_t* s_key, char* file_name) {
     unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) / AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
     unsigned char* ret = (unsigned char*)malloc(ret_length);
     sleep(1);
-    AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
+    AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key.cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, ret, &ret_length);
     free(file_buf);
 
@@ -174,7 +173,7 @@ void upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, unsigne
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-void download_from_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, char* file_name) {
+void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name) {
     FILE* fin;
     int sock;
     connect_as_client((const char*)ctx->config->file_system_manager_ip_addr,
@@ -192,16 +191,8 @@ void download_from_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, cha
         read(sock, received_buf, sizeof(received_buf));
     printf("Receive the information for file.\n");
     int command_size;
-    unsigned char key_id[KEY_ID_SIZE];
     command_size = received_buf[2 + KEY_ID_SIZE];
-    memcpy(key_id, received_buf + 2, KEY_ID_SIZE);
-
-    if (strcmp((const char*)s_key->key_id, (const char*)key_id) == 0) {
-        printf("Already have sessionkey:\n");
-        print_buf(key_id, KEY_ID_SIZE);
-    }
-    // TODO: Sessionkey request to Auth.
-    // else
+    memcpy(skey_id, received_buf + 2, KEY_ID_SIZE);
     char command[BUFF_SIZE];
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
@@ -210,4 +201,37 @@ void download_from_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, cha
     fin = popen(command, "r");
     pclose(fin);
     printf("Download the file: %s\n", file_name);
+}
+
+session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
+    
+    session_key_t *s_key;
+    unsigned int expected_key_id_int =
+        read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
+
+    // If the entity_server already has the corresponding session key,
+    // it does not have to request session key from Auth
+    int session_key_found = -1;
+    if (existing_s_key_list != NULL) {
+        for (int i = 0; i < existing_s_key_list->num_key; i++) {
+            session_key_found = check_session_key(
+                expected_key_id_int, existing_s_key_list, i);
+        }
+    }
+    if (session_key_found >= 0) {
+        s_key = &existing_s_key_list->s_key[session_key_found];
+    } else if (session_key_found == -1) {
+        // WARNING: The following line overwrites the purpose.
+        sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
+                expected_key_id_int);
+
+        session_key_list_t *s_key_list;
+        s_key_list = send_session_key_request_check_protocol(
+            ctx, expected_key_id);
+        s_key = s_key_list->s_key;
+        if (existing_s_key_list != NULL) {
+            add_session_key_to_list(s_key, existing_s_key_list);
+        }
+    }
+    return s_key;
 }

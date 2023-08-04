@@ -41,7 +41,7 @@ int file_encrypt_upload(session_key_t* session_ctx, SST_ctx_t* ctx, char* my_fil
 // Download the file in IPFS environment and decrypt the file with sessionkey.
 // @param session_ctx session key to decrypt the file.
 // @param file_name file name to save in my repository.
-void file_download_decrypt(session_key_t* session_ctx, char* file_name);
+void file_download_decrypt(session_key_t session_ctx, char* file_name);
 
 // Request the data to file system manager.
 // @param session_ctx session key information to send to file system manager.
@@ -54,6 +54,10 @@ void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, u
 // @param session_ctx session key information to compare with session key received from file system manager.
 // @param ctx information to access the file system manager.
 // @param file_name file name to save the file.
-void download_from_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, char* file_name);
+void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name);
+
+
+session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+
 
 #endif
