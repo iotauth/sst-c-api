@@ -15,11 +15,14 @@
 #define AUTH_INFO_PORT 7
 #define ENTITY_SERVER_INFO_IP_ADDRESS 8
 #define ENTITY_SERVER_INFO_PORT_NUMBER 9
-#define NETWORK_PROTOCOL 10
+#define FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS 10
+#define FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER 11
+#define NETWORK_PROTOCOL 12
 
 typedef struct {
     char name[32];
-    char purpose[32];
+    // Currently, the config struct can hold up to two purposes.
+    char purpose[2][36];
     int numkey;
     char *auth_pubkey_path;
     char *entity_privkey_path;
@@ -28,6 +31,8 @@ typedef struct {
     char entity_server_ip_addr[17];
     char entity_server_port_num[6];
     char network_protocol[4];
+    char file_system_manager_ip_addr[17];
+    char file_system_manager_port_num[6];
 } config_t;
 
 // Get a value by comparing a string of conditional statement with a variable.

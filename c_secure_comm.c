@@ -231,8 +231,16 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-void print_recevied_message(unsigned char *data, unsigned int data_length,
+void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
+    unsigned char *decrypted =
+        decrypt_received_message(data, data_length, session_ctx);
+    printf("%s\n", decrypted + SEQ_NUM_SIZE);
+}
+
+unsigned char *decrypt_received_message(unsigned char *data,
+                                        unsigned int data_length,
+                                        SST_session_ctx_t *session_ctx) {
     unsigned int decrypted_length;
     unsigned char *decrypted = symmetric_decrypt_authenticate(
         data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
@@ -248,7 +256,7 @@ void print_recevied_message(unsigned char *data, unsigned int data_length,
     }
     session_ctx->received_seq_num++;
     printf("Received seq_num: %d\n", received_seq_num);
-    printf("%s\n", decrypted + SEQ_NUM_SIZE);
+    return decrypted;
 }
 
 int check_session_key_validity(session_key_t *session_key) {
@@ -332,7 +340,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned int serialized_length;
             unsigned char *serialized = auth_hello_reply_message(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose, &serialized_length);
+                ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
             if (check_validity(
                     ctx->dist_key.abs_validity)) {  // when dist_key expired
                 printf(
@@ -422,7 +430,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    IV_SIZE, &decrypted_session_key_response_length);
+                    AES_CBC_128_IV_SIZE, &decrypted_session_key_response_length);
 
             // parse decrypted_session_key_response for nonce comparison &
             // session_key.

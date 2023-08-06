@@ -83,7 +83,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
-            printf(
+            error_handling(
                 "Comm init failed: wrong sequence of handshake, "
                 "disconnecting...\n");
         }
@@ -164,7 +164,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                 s_key = &existing_s_key_list->s_key[session_key_found];
             } else if (session_key_found == -1) {
                 // WARNING: The following line overwrites the purpose.
-                sprintf(ctx->config->purpose, "{\"keyId\":%d}",
+                sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
                         expected_key_id_int);
 
                 session_key_list_t *s_key_list;
@@ -234,6 +234,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
+    error_handling("Unrecognized or invalid state for server.\n");
+    return NULL;
 }
 
 void *receive_thread(void *SST_session_ctx) {
@@ -256,6 +258,23 @@ void *receive_thread(void *SST_session_ctx) {
     }
 }
 
+void *receive_thread_read_one_each(void *SST_session_ctx) {
+    SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
+    unsigned char data_buf[MAX_PAYLOAD_LENGTH];
+    unsigned int data_buf_length = 0;
+    while (1) {
+        unsigned char message_type;
+        if (1 != read_header_return_data_buf_pointer(session_ctx->sock,
+                                                     &message_type, data_buf,
+                                                     &data_buf_length)) {
+            return 0;
+        }
+        if (message_type == SECURE_COMM_MSG) {
+            print_received_message(data_buf, data_buf_length, session_ctx);
+        }
+    }
+}
+
 void receive_message(unsigned char *received_buf,
                      unsigned int received_buf_length,
                      SST_session_ctx_t *session_ctx) {
@@ -264,8 +283,22 @@ void receive_message(unsigned char *received_buf,
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SECURE_COMM_MSG) {
-        print_recevied_message(data_buf, data_buf_length, session_ctx);
+        print_received_message(data_buf, data_buf_length, session_ctx);
     }
+}
+
+unsigned char *return_decrypted_buf(unsigned char *received_buf,
+                                    unsigned int received_buf_length,
+                                    SST_session_ctx_t *session_ctx) {
+    unsigned char message_type;
+    unsigned int data_buf_length;
+    unsigned char *data_buf = parse_received_message(
+        received_buf, received_buf_length, &message_type, &data_buf_length);
+    if (message_type == SECURE_COMM_MSG) {
+        return decrypt_received_message(data_buf, data_buf_length, session_ctx);
+    }
+    error_handling("Invalid message type while in secure communication.\n");
+    return NULL;
 }
 
 void send_secure_message(char *msg, unsigned int msg_length,

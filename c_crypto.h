@@ -28,7 +28,6 @@
 #define MAX_CIPHER_KEY_SIZE 32
 #define RSA_KEY_SIZE 256
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
-#define IV_SIZE 16
 #define SHA256_DIGEST_LENGTH 32
 
 // Struct for digital signature

@@ -1,4 +1,4 @@
-#include "../c_api.h"
+#include "../ipfs.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
@@ -6,8 +6,7 @@ int main(int argc, char *argv[]) {
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
-    const char *PORT_NUM = "21100";
-
+    const int PORT_NUM = 21100;
     struct sockaddr_in serv_addr, clnt_addr;
     socklen_t clnt_addr_size;
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -22,7 +21,7 @@ int main(int argc, char *argv[]) {
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(atoi(PORT_NUM));
+    serv_addr.sin_port = htons(PORT_NUM);
 
     if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
@@ -46,42 +45,26 @@ int main(int argc, char *argv[]) {
     SST_ctx_t *ctx = init_SST(config_path);
 
     INIT_SESSION_KEY_LIST(s_key_list);
+    ctx->purpose_index = 0;
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
+    sleep(5);
+    
+    char file_name[BUFF_SIZE];
+    download_from_file_system_manager(session_ctx, ctx, &file_name[0]);
+    // TODO:
+    // (Complete) Scenario 1: When downloader entity already have sessionkey for file decrypt
+    // Scenario 2: When downloader entity does not have sessionkey, downloader entity request the sessionkey using key id received from file system manager entity.
+    // char file_key_id;
+    // file_key_id = download_from_file_system_manager(ctx);
+    // if (strcmp(session_ctx->s_key.key_id, file_key_id) == 0){
+    //     sessionkey_request(file_key_id,ctx);
+    // }
+    sleep(5);
+    file_download_decrypt(session_ctx, &file_name[0]);
 
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
-    sleep(1);
 
-    send_secure_message("Hello client", strlen("Hello client"), session_ctx);
-    sleep(1);
-    send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
-    sleep(2);
-    close(clnt_sock);
-    pthread_cancel(thread);
-    printf("Finished first communication\n");
-
-    // Second connection. session_key_list caches the session key.
-    clnt_sock2 =
-        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-    if (clnt_sock2 == -1) {
-        error_handling("accept() error");
-    }
-    SST_session_ctx_t *session_ctx2 =
-        server_secure_comm_setup(ctx, clnt_sock2, &s_key_list);
-
-    pthread_t thread2;
-    pthread_create(&thread2, NULL, &receive_thread_read_one_each, (void *)session_ctx2);
-    sleep(1);
-
-    send_secure_message("Hello client 2", strlen("Hello client 2"), session_ctx2);
-    sleep(1);
-    send_secure_message("Hello client 2 - second message", strlen("Hello client 2 - second message"), session_ctx2);
-    sleep(1);
-
-    sleep(3);
     close(clnt_sock2);
-    pthread_cancel(thread2);
     close(serv_sock);
     free_SST_ctx_t(ctx);
 }

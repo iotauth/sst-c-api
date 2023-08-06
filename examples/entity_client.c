@@ -10,7 +10,7 @@ int main(int argc, char *argv[]) {
     printf("finished\n");
     sleep(1); 
     pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread, (void *)session_ctx);
+    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
     send_secure_message("Hello server", strlen("Hello server"), session_ctx);
     sleep(1);
     send_secure_message("Hello server - second message", strlen("Hello server - second message"), session_ctx);
@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
     pthread_t thread2;
     session_ctx =
         secure_connect_to_server(&s_key_list->s_key[1], ctx);
-    pthread_create(&thread2, NULL, &receive_thread, (void *)session_ctx);
+    pthread_create(&thread2, NULL, &receive_thread_read_one_each, (void *)session_ctx);
     send_secure_message("Hello server 2", strlen("Hello server 2"), session_ctx);
     sleep(1);
     send_secure_message("Hello server 2 - second message", strlen("Hello server 2 - second message"), session_ctx);

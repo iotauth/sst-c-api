@@ -8,6 +8,8 @@
         -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
         -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
 
+    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation. 
+
 # Code Hiearchy
 
 c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
@@ -54,6 +56,10 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 -   Enables receiving messages.
 
+**unsigned char * return_decrypted_buf()**
+
+-   Returns the buffer of the decrypted message or returns NULL when an error occurs.
+
 **void send_secure_message()**
 
 -   `secure send_secure_message()` is a function that send a message with secure communication to the server by encrypting it with the session key.
@@ -69,14 +75,19 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 # Compile
 
-`$cd $SST_ROOT/entity/sst-c-api/examples`
-`$mkdir build && cd build`
-`$cmake ../`
-`$make`
+For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
+
+
+```
+$cd $SST_ROOT/entity/c/examples
+$mkdir build && cd build
+$cmake ../
+$make
+```
 
 # Example
 
--   Turn on two different terminals at `$SST_ROOT/entity/sst-c-api/examples/build`, and turn on Auth on the third terminal.
+-   Turn on two different terminals at `$SST_ROOT/entity/c/examples/build`, and turn on Auth on the third terminal.
 
 Execute
 
