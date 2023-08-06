@@ -31,8 +31,7 @@ int get_key_value(char *ptr) {
         return AUTH_INFO_PORT;
     } else if (strcmp(ptr, entity_serverInfo_ip_address) == 0) {
         return ENTITY_SERVER_INFO_IP_ADDRESS;
-    }
-    else if (strcmp(ptr, entity_serverInfo_port_number) == 0) {
+    } else if (strcmp(ptr, entity_serverInfo_port_number) == 0) {
         return ENTITY_SERVER_INFO_PORT_NUMBER;
     } else if (strcmp(ptr, network_protocol) == 0) {
         return NETWORK_PROTOCOL;
@@ -71,8 +70,7 @@ config_t *load_config(const char *path) {
                         printf("First purpose: %s\n", ptr);
                         strcpy(c->purpose[purpose_index], ptr);
                         purpose_index += 1;
-                    }
-                    else {
+                    } else {
                         printf("Second purpose: %s\n", ptr);
                         strcpy(c->purpose[purpose_index], ptr);
                     }
