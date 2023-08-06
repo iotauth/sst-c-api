@@ -37,8 +37,8 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     int suffix_num = 0;
     // Copy file name.
     memcpy(file_name_buf, file_name, strlen(file_name));
-    memcpy(file_name_buf + strlen(file_name), file_extension, strlen(file_name));
-    file_name_buf[strlen(file_name) + strlen(file_name)] = 0;
+    memcpy(file_name_buf + strlen(file_name), file_extension, strlen(file_extension));
+    file_name_buf[strlen(file_name) + strlen(file_extension)] = 0;
     for (;;) {
         if (suffix_num == MAX_REPLY_NUM) {
             printf("Cannot save the file. \n");
@@ -51,6 +51,8 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
             sprintf(suffix_in_string, "%d", suffix_num);
             memcpy(file_name_buf + strlen(file_name), suffix_in_string, strlen(suffix_in_string));
             memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string), file_extension, strlen(file_extension));
+            file_name_buf[strlen(file_name) + strlen(suffix_in_string) + strlen(file_extension)] = 0;
+            
             suffix_num += 1;
         }
         else {
