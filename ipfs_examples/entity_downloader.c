@@ -67,7 +67,7 @@ int main(int argc, char *argv[]) {
     sleep(5);
     file_download_decrypt(*session_key1, &file_name1[0]);
 
-    // close(clnt_sock2);
-    // close(serv_sock);
+    close(clnt_sock2);
+    close(serv_sock);
     free_SST_ctx_t(ctx);
 }
