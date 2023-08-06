@@ -45,7 +45,7 @@ int get_key_value(char *ptr) {
     }
 }
 
-config_t *load_config(char *path) {
+config_t *load_config(const char *path) {
     config_t *c = malloc(sizeof(config_t));
     FILE *fp = fopen(path, "r");
     char buffer[MAX] = {

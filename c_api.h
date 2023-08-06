@@ -9,7 +9,7 @@
 // @param path config file path
 // @return SST_ctx_t struct stores config, public and private keys, and
 // distribution key.
-SST_ctx_t *init_SST(char *config_path);
+SST_ctx_t *init_SST(const char *config_path);
 
 // Add the server's ip address and port number to the SST_ctx_t.
 // @param ctx Configuration struct obtained from init_SST().

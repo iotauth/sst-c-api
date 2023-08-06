@@ -3,7 +3,7 @@
 extern unsigned char entity_client_state;
 extern unsigned char entity_server_state;
 
-SST_ctx_t *init_SST(char *config_path) {
+SST_ctx_t *init_SST(const char *config_path) {
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
     ctx->config = load_config(config_path);
     int numkey = ctx->config->numkey;
