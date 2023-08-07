@@ -3,7 +3,12 @@
 int main(int argc, char* argv[]) {
     char* config_path = argv[1];
     SST_ctx_t* ctx = init_SST(config_path);
+    ctx->purpose_index = 2;
+
+    send_add_reader_req_via_TCP(ctx);
+
     ctx->purpose_index = 1;
+    
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
@@ -24,7 +29,9 @@ int main(int argc, char* argv[]) {
 
     free(session_ctx);
 
-    free_SST_ctx_t(ctx);
+    // free_SST_ctx_t(ctx);
+    // ctx->purpose_index = 2;
 
+    send_add_reader_req_via_TCP(ctx);
     sleep(3);
 }
