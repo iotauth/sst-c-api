@@ -59,5 +59,8 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
 
 session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
 
+unsigned char *auth_reply_message(unsigned char *entity_nonce, unsigned char *auth_nonce, char *sender, char *purpose, unsigned int *ret_length);
+
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx);
 
 #endif

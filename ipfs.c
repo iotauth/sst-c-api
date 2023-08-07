@@ -237,3 +237,153 @@ session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, 
     }
     return s_key;
 }
+
+unsigned char *auth_reply_message(unsigned char *entity_nonce,
+                                        unsigned char *auth_nonce,
+                                        char *sender, char *purpose,
+                                        unsigned int *ret_length) {
+    size_t sender_length = strlen(sender);
+    size_t purpose_length = strlen(purpose);
+
+    unsigned char *ret = (unsigned char *)malloc(
+        NONCE_SIZE * 2 + sender_length + purpose_length +
+        8 /* +8 for two var length ints */);
+
+    size_t offset = 0;
+    memcpy(ret + offset, entity_nonce, NONCE_SIZE);
+    offset += NONCE_SIZE;
+
+    memcpy(ret + offset, auth_nonce, NONCE_SIZE);
+    offset += NONCE_SIZE;
+
+    unsigned char var_length_int_buf[4];
+    unsigned int var_length_int_len;
+
+    num_to_var_length_int(sender_length, var_length_int_buf,
+                          &var_length_int_len);
+    memcpy(ret + offset, var_length_int_buf, var_length_int_len);
+    offset += var_length_int_len;
+
+    memcpy(ret + offset, sender, sender_length);
+    offset += sender_length;
+
+    num_to_var_length_int(purpose_length, var_length_int_buf,
+                          &var_length_int_len);
+    memcpy(ret + offset, var_length_int_buf, var_length_int_len);
+    offset += var_length_int_len;
+
+    memcpy(ret + offset, purpose, purpose_length);
+    offset += purpose_length;
+
+    *ret_length = offset;
+
+    return ret;
+}
+
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
+    int sock;
+    connect_as_client((const char *)ctx->config->auth_ip_addr,
+                      (const char *)ctx->config->auth_port_num, &sock);
+    unsigned char entity_nonce[NONCE_SIZE];
+    while (1) {
+        unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
+        unsigned int received_buf_length =
+            read(sock, received_buf, sizeof(received_buf));
+        unsigned char message_type;
+        unsigned int data_buf_length;
+        unsigned char *data_buf = parse_received_message(
+            received_buf, received_buf_length, &message_type, &data_buf_length);
+        if (message_type == AUTH_HELLO) {
+            unsigned int auth_Id;
+            unsigned char auth_nonce[NONCE_SIZE];
+            auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
+            RAND_bytes(entity_nonce, NONCE_SIZE);
+
+            unsigned int serialized_length;
+            unsigned char *serialized = auth_reply_message(
+                entity_nonce, auth_nonce,
+                ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
+            if (check_validity(
+                    ctx->dist_key.abs_validity)) {  // when dist_key expired
+                printf(
+                    "Current distribution key expired, requesting new "
+                    "distribution key as well...\n");
+                unsigned int enc_length;
+                unsigned char *enc = encrypt_and_sign(
+                    serialized, serialized_length, ctx, &enc_length);
+                free(serialized);
+                unsigned char message[MAX_AUTH_COMM_LENGTH];
+                unsigned int message_length;
+                make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC,
+                                message, &message_length);
+                write(sock, message, message_length);
+                free(enc);
+            } else {
+                unsigned int enc_length;
+                unsigned char *enc =
+                    serialize_session_key_req_with_distribution_key(
+                        serialized, serialized_length, &ctx->dist_key,
+                        ctx->config->name, &enc_length);
+                unsigned char message[MAX_AUTH_COMM_LENGTH];
+                unsigned int message_length;
+                make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
+                                &message_length);
+                write(sock, message, message_length);
+                free(enc);
+            }       
+        } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
+            signed_data_t signed_data;
+            size_t key_size = RSA_KEY_SIZE;
+
+            // parse data
+            unsigned int encrypted_entity_nonce_length =
+                data_buf_length - (key_size * 2);
+            unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
+            memcpy(signed_data.data, data_buf, key_size);
+            memcpy(signed_data.sign, data_buf + key_size, key_size);
+            memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
+                   encrypted_entity_nonce_length);
+
+            // verify
+            SHA256_verify(signed_data.data, key_size, signed_data.sign,
+                          key_size, ctx->pub_key);
+            printf("auth signature verified\n");
+
+            // decrypt encrypted_distribution_key
+            size_t decrypted_dist_key_buf_length;
+            unsigned char *decrypted_dist_key_buf =
+                private_decrypt(signed_data.data, key_size, RSA_PKCS1_PADDING,
+                                ctx->priv_key, &decrypted_dist_key_buf_length);
+
+            // parse decrypted_dist_key_buf to mac_key & cipher_key
+            parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,
+                                   decrypted_dist_key_buf_length);
+            free(decrypted_dist_key_buf);
+            
+            // decrypt session_key with decrypted_dist_key_buf
+            unsigned int decrypted_entity_nonce_length;
+            unsigned char *decrypted_entity_nonce =
+                symmetric_decrypt_authenticate(
+                    encrypted_entity_nonce, encrypted_entity_nonce_length,
+                    ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
+                    ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
+                    AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
+
+            // parse decrypted_entity_nonce for nonce comparison &
+            // session_key.
+            printf("reply_nonce in sessionKeyResp: ");
+            print_buf(decrypted_entity_nonce, NONCE_SIZE);
+
+            if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
+                                             // & received entity's nonce.
+                error_handling("auth nonce NOT verified");
+            } else {
+                printf("auth nonce verified!\n");
+            }
+            close(sock);
+            break;
+        }
+    }
+}

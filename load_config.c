@@ -72,9 +72,14 @@ config_t *load_config(char *path) {
                         strcpy(c->purpose[purpose_index], ptr);
                         purpose_index += 1;
                     }
-                    else {
+                    else if (purpose_index == 1) {
                         printf("Second purpose: %s\n", ptr);
                         strcpy(c->purpose[purpose_index], ptr);
+                        purpose_index += 1;
+                    }
+                    else {
+                        printf("Third purpose: %s\n", ptr);
+                        strcpy(c->purpose[purpose_index], ptr);                       
                     }
                     break;
                 case ENTITY_INFO_NUMKEY:
