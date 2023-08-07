@@ -9,16 +9,30 @@
 // @param path config file path
 // @return SST_ctx_t struct stores config, public and private keys, and
 // distribution key.
-SST_ctx_t *init_SST(char *config_path);
+SST_ctx_t *init_SST(const char *config_path);
+
+// Add the server's ip address and port number to the SST_ctx_t.
+// @param ctx Configuration struct obtained from init_SST().
+void get_server_ip_addr_and_port_num(SST_ctx_t *ctx,
+                                     struct sockaddr_in server_fd);
 
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
-// @param config_info config struct obtained from load_config()
-// @return secure session key
+// @param ctx Configuration struct obtained from init_SST()
+// @param existing_s_key_list The original session_key_list
+// @return session_key_list_t
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list);
 
-// Connect with other entity such as entity servers using secure session key.
+// Connect to entity_server using the session key. This function can be called
+// after the connect() function, and uses the user's socket.
+SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
+                                                        SST_ctx_t *ctx,
+                                                        int sock);
+
+// Connect with other entity such as entity servers using the session key. This
+// function contains the connect() function, and uses the
+// secure_connect_to_server_with_socket() function.
 // @param s_key session key struct received by Auth
 // @return secure socket number
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
@@ -26,6 +40,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
+// @param ctx Configuration struct obtained from init_SST()
 // Returns the session context for the secure communication if it succeeds,
 // or returns NULL otherwise.
 // @param config config struct for information
@@ -63,11 +78,22 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
                                     SST_session_ctx_t *session_ctx);
 
+// Encrypt the message with session key and get the encrypted buffer.
+// @param msg message to send
+// @param msg_length length of message
+// @param ctx Configuration struct obtained from init_SST()
+// @param sender_buf buffer to send
+// @param sender_buf_length length of the buffer to send
+unsigned char *get_encrypted_sender_buf(char *msg, unsigned int msg_length,
+                                        SST_session_ctx_t *session_ctx,
+                                        unsigned char *sender_buf,
+                                        unsigned int *sender_buf_length);
+
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
 // @param msg message to send
 // @param msg_length length of message
-// @param SST_session_ctx_t session ctx struct
+// @param ctx Configuration struct obtained from init_SST()
 void send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx);
 
