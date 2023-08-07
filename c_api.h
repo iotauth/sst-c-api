@@ -78,6 +78,17 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
                                     SST_session_ctx_t *session_ctx);
 
+// Encrypt the message with session key and get the encrypted buffer.
+// @param msg message to send
+// @param msg_length length of message
+// @param ctx Configuration struct obtained from init_SST()
+// @param sender_buf buffer to send
+// @param sender_buf_length length of the buffer to send
+unsigned char *get_encrypted_sender_buf(char *msg, unsigned int msg_length,
+                                        SST_session_ctx_t *session_ctx,
+                                        unsigned char *sender_buf,
+                                        unsigned int *sender_buf_length);
+
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
 // @param msg message to send

@@ -301,8 +301,10 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     return NULL;
 }
 
-void send_secure_message(char *msg, unsigned int msg_length,
-                         SST_session_ctx_t *session_ctx) {
+unsigned char *get_encrypted_sender_buf(char *msg, unsigned int msg_length,
+                                        SST_session_ctx_t *session_ctx,
+                                        unsigned char *sender_buf,
+                                        unsigned int *sender_buf_length) {
     if (check_session_key_validity(&session_ctx->s_key)) {
         error_handling("Session key expired!\n");
     }
@@ -319,6 +321,13 @@ void send_secure_message(char *msg, unsigned int msg_length,
         AES_CBC_128_IV_SIZE, &encrypted_length);
 
     session_ctx->sent_seq_num++;
+    make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
+                    sender_buf_length);
+    free(encrypted);
+}
+
+void send_secure_message(char *msg, unsigned int msg_length,
+                         SST_session_ctx_t *session_ctx) {
     unsigned char
         sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
                                          // does not support dynamic sizes,
@@ -326,9 +335,8 @@ void send_secure_message(char *msg, unsigned int msg_length,
                                          // 1024. Must need to decide static
                                          // or dynamic buffer size.
     unsigned int sender_buf_length;
-    make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
-                    &sender_buf_length);
-    free(encrypted);
+    get_encrypted_sender_buf(msg, msg_length, session_ctx, sender_buf,
+                             &sender_buf_length);
     write(session_ctx->sock, sender_buf, sender_buf_length);
 }
 
