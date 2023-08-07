@@ -32,6 +32,6 @@ int main(int argc, char* argv[]) {
     // free_SST_ctx_t(ctx);
     // ctx->purpose_index = 2;
 
-    send_add_reader_req_via_TCP(ctx);
+    // send_add_reader_req_via_TCP(ctx);
     sleep(3);
 }

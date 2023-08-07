@@ -384,6 +384,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
             }
             close(sock);
             break;
+        } else {
+            break;
         }
     }
 }
