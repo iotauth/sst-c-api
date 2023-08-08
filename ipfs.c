@@ -205,7 +205,7 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
     printf("Download the file: %s\n", file_name);
 }
 
-session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
+session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
     
     session_key_t *s_key;
     unsigned int expected_key_id_int =
@@ -238,7 +238,7 @@ session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, 
     return s_key;
 }
 
-unsigned char *auth_reply_message(unsigned char *entity_nonce,
+unsigned char *auth_hello_reply_message_for_adding_reader(unsigned char *entity_nonce,
                                         unsigned char *auth_nonce,
                                         char *sender, char *purpose,
                                         unsigned int *ret_length) {
@@ -301,7 +301,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
             unsigned int serialized_length;
-            unsigned char *serialized = auth_reply_message(
+            unsigned char *serialized = auth_hello_reply_message_for_adding_reader(
                 entity_nonce, auth_nonce,
                 ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
             if (check_validity(
@@ -361,7 +361,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
                                    decrypted_dist_key_buf_length);
             free(decrypted_dist_key_buf);
             
-            // decrypt session_key with decrypted_dist_key_buf
+            // decrypt entity_nonce with decrypted_dist_key_buf
             unsigned int decrypted_entity_nonce_length;
             unsigned char *decrypted_entity_nonce =
                 symmetric_decrypt_authenticate(
@@ -370,9 +370,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
 
-            // parse decrypted_entity_nonce for nonce comparison &
-            // session_key.
-            printf("reply_nonce in sessionKeyResp: ");
+            // parse decrypted_entity_nonce for nonce comparison
+            printf("reply_nonce in addReaderResp: ");
             print_buf(decrypted_entity_nonce, NONCE_SIZE);
 
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
@@ -385,6 +384,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
             close(sock);
             break;
         } else {
+            close(sock);
             break;
         }
     }

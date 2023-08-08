@@ -16,6 +16,7 @@ void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize)
 
 // To return the file size.
 // @param file_name name of the file.
+// @return file size
 unsigned long file_size_return(FILE* fin);
 
 // To check duplication for name of the file.
@@ -56,11 +57,24 @@ void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, u
 // @param file_name file name to save the file.
 void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name);
 
+// Check the session key and request to Auth if you don't have the session key you want.
+// Return the session key information you want.
+// @param expected_key_id session key you want to find.
+// @param ctx information to access to Auth if you don't have the session key you want.
+// @param existing_s_key_list list of session keys you currently have.
+session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
 
-session_key_t *check_sessionkey_request_to_auth(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+// Make Auth hello reply message by serializing information.
+// Return concated total buffer.
+// @param entity_nonce entity's nonce.
+// @param auth_nonce received auth's nonce.
+// @param sender name of sender.
+// @param purpose purpose to add the reader in database.
+// @param ret_length length of return buffer.
+unsigned char *auth_hello_reply_message_for_adding_reader(unsigned char *entity_nonce, unsigned char *auth_nonce, char *sender, char *purpose, unsigned int *ret_length);
 
-unsigned char *auth_reply_message(unsigned char *entity_nonce, unsigned char *auth_nonce, char *sender, char *purpose, unsigned int *ret_length);
-
+// Send the request for adding the reader to Auth.
+// @param ctx information to access to Auth.
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx);
 
 #endif
