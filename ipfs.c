@@ -101,7 +101,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, encrypted, &encrypted_length);
     free(file_buf);
-    printf("Success file encryption.\n\n");
+    printf("\n\nSuccess file encryption.\n");
 
     char file_name_buffer[20];
     file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer[0]);
@@ -382,6 +382,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
             } else {
                 printf("auth nonce verified!\n");
             }
+            printf("Success adding file reader in database.\n");
             close(sock);
             break;
         } else {
