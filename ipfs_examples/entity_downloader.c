@@ -6,7 +6,6 @@ int main(int argc, char *argv[]) {
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
-    // Initialize the session key list.
     INIT_SESSION_KEY_LIST(s_key_list);
     ctx->purpose_index = 0;
     sleep(5);
