@@ -132,6 +132,7 @@ void file_download_decrypt(session_key_t s_key, char* file_name) {
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     get_file_content(fin, file_buf, bufsize);
     fclose(fin);
+
     unsigned int owner_name_len = file_buf[0];
     unsigned char owner_name[owner_name_len];
     memcpy(owner_name, file_buf + 1, owner_name_len);
@@ -238,7 +239,7 @@ session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SS
     return s_key;
 }
 
-unsigned char *auth_hello_reply_message_for_adding_reader(unsigned char *entity_nonce,
+unsigned char *serialize_message_for_adding_reader_req(unsigned char *entity_nonce,
                                         unsigned char *auth_nonce,
                                         char *sender, char *purpose,
                                         unsigned int *ret_length) {
@@ -301,7 +302,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
             unsigned int serialized_length;
-            unsigned char *serialized = auth_hello_reply_message_for_adding_reader(
+            unsigned char *serialized = serialize_message_for_adding_reader_req(
                 entity_nonce, auth_nonce,
                 ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
             if (check_validity(

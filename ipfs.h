@@ -64,14 +64,14 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
 // @param existing_s_key_list list of session keys you currently have.
 session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
 
-// Make Auth hello reply message by serializing information.
+// Serialize message for adding reader in database.
 // Return concated total buffer.
 // @param entity_nonce entity's nonce.
 // @param auth_nonce received auth's nonce.
 // @param sender name of sender.
 // @param purpose purpose to add the reader in database.
 // @param ret_length length of return buffer.
-unsigned char *auth_hello_reply_message_for_adding_reader(unsigned char *entity_nonce, unsigned char *auth_nonce, char *sender, char *purpose, unsigned int *ret_length);
+unsigned char *serialize_message_for_adding_reader_req(unsigned char *entity_nonce, unsigned char *auth_nonce, char *sender, char *purpose, unsigned int *ret_length);
 
 // Send the request for adding the reader to Auth.
 // @param ctx information to access to Auth.
