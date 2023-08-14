@@ -224,7 +224,6 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
-
             unsigned int serialized_length;
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, 0,
@@ -237,8 +236,6 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
             encrypted_entity_nonce_length);
             save_distributionkey(data_buf, data_buf_length, ctx, key_size);
-            
-            // decrypt entity_nonce with decrypted_dist_key_buf
             unsigned int decrypted_entity_nonce_length;
             unsigned char *decrypted_entity_nonce =
                 symmetric_decrypt_authenticate(
@@ -246,13 +243,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
-
-            printf("Reply_nonce in addReaderResp: ");
-            print_buf(decrypted_entity_nonce, NONCE_SIZE);
-
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
-                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                                             // & received entity's nonce.
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_handling("Auth nonce NOT verified");
             } else {
                 printf("Auth nonce verified!\n");
@@ -267,12 +259,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                 ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                 ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
                 &decrypted_entity_nonce_length);
-            printf("Reply_nonce in addReaderResp: ");
-            print_buf(decrypted_entity_nonce, NONCE_SIZE);
-
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
-                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                                             // & received entity's nonce.
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_handling("Auth nonce NOT verified");
             } else {
                 printf("Auth nonce verified!\n");
