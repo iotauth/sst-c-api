@@ -281,7 +281,7 @@ unsigned char *serialize_message_for_adding_reader_req(unsigned char *entity_non
     return ret;
 }
 
-void send_add_reader_req_via_TCP(SST_ctx_t *ctx) {
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
                       (const char *)ctx->config->auth_port_num, &sock);

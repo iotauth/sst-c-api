@@ -75,6 +75,6 @@ unsigned char *serialize_message_for_adding_reader_req(unsigned char *entity_non
 
 // Send the request for adding the reader to Auth.
 // @param ctx information to access to Auth.
-void send_add_reader_req_via_TCP(SST_ctx_t *ctx);
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path);
 
 #endif
