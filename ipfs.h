@@ -64,8 +64,8 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
 // @param existing_s_key_list list of session keys you currently have.
 session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
 
-// Serialize message for adding reader in database.
-// Return concated total buffer.
+// Serialize Add Reader Request Message for adding a reader to a list of readers with access to the file sharing group.
+// Return serialized message as a buffer.
 // @param entity_nonce entity's nonce.
 // @param auth_nonce received auth's nonce.
 // @param sender name of sender.
