@@ -229,7 +229,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, 0,
                 ctx->config->name, add_reader, &serialized_length);
-            send_request_message(serialized, serialized_length, ctx, sock, 0);
+            send_auth_request_message(serialized, serialized_length, ctx, sock, 0);
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_entity_nonce_length = data_buf_length - (key_size * 2);

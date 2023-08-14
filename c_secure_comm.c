@@ -53,7 +53,7 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
-void send_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex) {
+void send_auth_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex) {
     if (check_validity(
         ctx->dist_key.abs_validity)) {  // when dist_key expired
         printf(
@@ -415,7 +415,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, ctx->config->numkey,
                 ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
-            send_request_message(serialized, serialized_length, ctx, sock, 1);
+            send_auth_request_message(serialized, serialized_length, ctx, sock, 1);
         } else if (message_type == SESSION_KEY_RESP) {
             printf(
                 "Received session key response encrypted with distribution "
