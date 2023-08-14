@@ -57,8 +57,8 @@ void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, u
 // @param file_name file name to save the file.
 void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name);
 
-// Check the session key and request to Auth if you don't have the session key you want.
-// Return the session key information you want.
+// Try finding a target session key with its ID. If the entity has the target session key, return the session key.
+// Otherwise, request and receive the target session key by ID from Auth and return the session key.
 // @param target_session_key_id ID of the target session key.
 // @param ctx SST context to communicate with Auth.
 // @param s_key_list list of session keys that currently exist.
