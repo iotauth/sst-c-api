@@ -59,10 +59,10 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
 
 // Check the session key and request to Auth if you don't have the session key you want.
 // Return the session key information you want.
-// @param expected_key_id session key you want to find.
-// @param ctx information to access to Auth if you don't have the session key you want.
-// @param existing_s_key_list list of session keys you currently have.
-session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+// @param target_session_key_id ID of the target session key.
+// @param ctx SST context to communicate with Auth.
+// @param s_key_list list of session keys that currently exist.
+session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *s_key_list);
 
 // Serialize Add Reader Request Message for adding a reader to a list of readers with access to the file sharing group.
 // Return serialized message as a buffer.
