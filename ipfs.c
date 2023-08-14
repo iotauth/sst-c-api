@@ -176,7 +176,7 @@ void upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, unsigne
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name) {
+void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t* ctx, char* file_name) {
     FILE* fin;
     int sock;
     connect_as_client((const char*)ctx->config->file_system_manager_ip_addr,
