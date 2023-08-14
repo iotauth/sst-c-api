@@ -24,6 +24,9 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
 
+
+session_key_t *get_session_key_by_ID(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
 // Returns the session context for the secure communication if it succeeds,

@@ -101,7 +101,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, encrypted, &encrypted_length);
     free(file_buf);
-    printf("\n\nSuccess file encryption.\n");
+    printf("\nSuccess file encryption.\n");
 
     char file_name_buffer[20];
     file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer[0]);
@@ -195,7 +195,7 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     printf("Receive the information for file.\n");
     int command_size;
     command_size = received_buf[2 + KEY_ID_SIZE];
-    memcpy(skey_id, received_buf + 2, KEY_ID_SIZE);
+    memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
     char command[BUFF_SIZE];
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
@@ -206,82 +206,7 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     printf("Download the file: %s\n", file_name);
 }
 
-session_key_t *check_sessionkey_from_key_list(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
-    
-    session_key_t *s_key;
-    unsigned int expected_key_id_int =
-        read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
-
-    // If the entity_server already has the corresponding session key,
-    // it does not have to request session key from Auth
-    int session_key_found = -1;
-    if (existing_s_key_list != NULL) {
-        for (int i = 0; i < existing_s_key_list->num_key; i++) {
-            session_key_found = check_session_key(
-                expected_key_id_int, existing_s_key_list, i);
-        }
-    }
-    if (session_key_found >= 0) {
-        s_key = &existing_s_key_list->s_key[session_key_found];
-    } else if (session_key_found == -1) {
-        // WARNING: The following line overwrites the purpose.
-        sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
-                expected_key_id_int);
-
-        session_key_list_t *s_key_list;
-        s_key_list = send_session_key_request_check_protocol(
-            ctx, expected_key_id);
-        s_key = s_key_list->s_key;
-        if (existing_s_key_list != NULL) {
-            add_session_key_to_list(s_key, existing_s_key_list);
-        }
-    }
-    return s_key;
-}
-
-unsigned char *serialize_message_for_adding_reader_req(unsigned char *entity_nonce,
-                                        unsigned char *auth_nonce,
-                                        char *sender, char *purpose,
-                                        unsigned int *ret_length) {
-    size_t sender_length = strlen(sender);
-    size_t purpose_length = strlen(purpose);
-
-    unsigned char *ret = (unsigned char *)malloc(
-        NONCE_SIZE * 2 + sender_length + purpose_length +
-        8 /* +8 for two var length ints */);
-
-    size_t offset = 0;
-    memcpy(ret + offset, entity_nonce, NONCE_SIZE);
-    offset += NONCE_SIZE;
-
-    memcpy(ret + offset, auth_nonce, NONCE_SIZE);
-    offset += NONCE_SIZE;
-
-    unsigned char var_length_int_buf[4];
-    unsigned int var_length_int_len;
-
-    num_to_var_length_int(sender_length, var_length_int_buf,
-                          &var_length_int_len);
-    memcpy(ret + offset, var_length_int_buf, var_length_int_len);
-    offset += var_length_int_len;
-
-    memcpy(ret + offset, sender, sender_length);
-    offset += sender_length;
-
-    num_to_var_length_int(purpose_length, var_length_int_buf,
-                          &var_length_int_len);
-    memcpy(ret + offset, var_length_int_buf, var_length_int_len);
-    offset += var_length_int_len;
-
-    memcpy(ret + offset, purpose, purpose_length);
-    offset += purpose_length;
-
-    *ret_length = offset;
-
-    return ret;
-}
-
-void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path) {
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
                       (const char *)ctx->config->auth_port_num, &sock);
@@ -302,9 +227,9 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path) {
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
             unsigned int serialized_length;
-            unsigned char *serialized = serialize_message_for_adding_reader_req(
-                entity_nonce, auth_nonce,
-                ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
+            unsigned char *serialized = serialize_message_for_auth(
+                entity_nonce, auth_nonce, 0,
+                ctx->config->name, add_reader, &serialized_length);
             if (check_validity(
                     ctx->dist_key.abs_validity)) {  // when dist_key expired
                 printf(
@@ -385,7 +310,26 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path) {
             printf("Success adding file reader in database.\n");
             close(sock);
             break;
-        } else {
+        } else if (message_type == ADD_READER_RESP) {
+            unsigned int decrypted_entity_nonce_length;
+            unsigned char *decrypted_entity_nonce = symmetric_decrypt_authenticate(
+                data_buf, data_buf_length, ctx->dist_key.mac_key,
+                ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
+                ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
+                &decrypted_entity_nonce_length);
+            // parse decrypted_entity_nonce for nonce comparison
+            printf("reply_nonce in addReaderResp: ");
+            print_buf(decrypted_entity_nonce, NONCE_SIZE);
+
+            if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
+                                             // & received entity's nonce.
+                error_handling("auth nonce NOT verified");
+            } else {
+                printf("auth nonce verified!\n");
+            }
+            printf("Success adding file reader in database.\n");
+            
             close(sock);
             break;
         }

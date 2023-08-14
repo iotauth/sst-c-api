@@ -65,7 +65,7 @@ typedef struct {
 // @param purpose_length length of purpose
 // @param ret_length length of return buffer
 // @return concated total buffer
-unsigned char *auth_hello_reply_message(unsigned char *entity_nonce,
+unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
                                         unsigned char *auth_nonce, int num_key,
                                         char *sender, char *purpose,
                                         unsigned int *ret_length);
@@ -116,11 +116,11 @@ void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
                                 session_key_list_t *session_key_list);
 
 // Serializes the session_key request.
-// Symmetric encrypt authenticates the auth_hello_reply_message with the
+// Symmetric encrypt authenticates the serialize_message_for_auth with the
 // distribution key. Serializes the sender_length, sender_name, and encrypted
 // message above.
-// @param serialized return buffer of auth_hello_reply_message
-// @param serialized_length buffer length of return of auth_hello_reply_message
+// @param serialized return buffer of serialize_message_for_auth
+// @param serialized_length buffer length of return of serialize_message_for_auth
 // buffer
 // @param dist_key key to symmetric encrypt & authenticate
 // @param name entity_sender name.

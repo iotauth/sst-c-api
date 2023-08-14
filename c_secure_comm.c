@@ -3,7 +3,7 @@
 unsigned char entity_client_state;
 unsigned char entity_server_state;
 
-unsigned char *auth_hello_reply_message(unsigned char *entity_nonce,
+unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
                                         unsigned char *auth_nonce, int num_key,
                                         char *sender, char *purpose,
                                         unsigned int *ret_length) {
@@ -13,9 +13,6 @@ unsigned char *auth_hello_reply_message(unsigned char *entity_nonce,
     unsigned char *ret = (unsigned char *)malloc(
         NONCE_SIZE * 2 + NUMKEY_SIZE + sender_length + purpose_length +
         8 /* +8 for two var length ints */);
-    unsigned char num_key_buf[NUMKEY_SIZE];
-    memset(num_key_buf, 0, NUMKEY_SIZE);
-    write_in_n_bytes(num_key, NUMKEY_SIZE, num_key_buf);
 
     size_t offset = 0;
     memcpy(ret + offset, entity_nonce, NONCE_SIZE);
@@ -23,9 +20,14 @@ unsigned char *auth_hello_reply_message(unsigned char *entity_nonce,
 
     memcpy(ret + offset, auth_nonce, NONCE_SIZE);
     offset += NONCE_SIZE;
+    if (num_key != 0) {
+        unsigned char num_key_buf[NUMKEY_SIZE];
+        memset(num_key_buf, 0, NUMKEY_SIZE);
+        write_in_n_bytes(num_key, NUMKEY_SIZE, num_key_buf);
 
-    memcpy(ret + offset, num_key_buf, NUMKEY_SIZE);
-    offset += NUMKEY_SIZE;
+        memcpy(ret + offset, num_key_buf, NUMKEY_SIZE);
+        offset += NUMKEY_SIZE;
+    }
 
     unsigned char var_length_int_buf[4];
     unsigned int var_length_int_len;
@@ -338,7 +340,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
             unsigned int serialized_length;
-            unsigned char *serialized = auth_hello_reply_message(
+            unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, ctx->config->numkey,
                 ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
             if (check_validity(

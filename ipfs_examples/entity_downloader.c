@@ -8,7 +8,6 @@ int main(int argc, char *argv[]) {
     SST_ctx_t *ctx = init_SST(config_path);
     INIT_SESSION_KEY_LIST(s_key_list);
     ctx->purpose_index = 0;
-    sleep(5);
     
     char file_name[BUFF_SIZE];
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];

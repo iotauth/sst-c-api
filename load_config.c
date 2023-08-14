@@ -78,8 +78,7 @@ config_t *load_config(char *path) {
                         purpose_index += 1;
                     }
                     else {
-                        printf("Third purpose: %s\n", ptr);
-                        strcpy(c->purpose[purpose_index], ptr);                       
+                        printf("Error for wrong number of purpose.\n");
                     }
                     break;
                 case ENTITY_INFO_NUMKEY:
