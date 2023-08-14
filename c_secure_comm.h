@@ -91,6 +91,8 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
 void parse_distribution_key(distribution_key_t *parsed_distribution_key,
                             unsigned char *buf, unsigned int buf_length);
 
+void save_distributionkey(unsigned char *data_buf, int data_buf_length, SST_ctx_t* ctx, size_t key_size);
+
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec
 // @param buf_length length of buf

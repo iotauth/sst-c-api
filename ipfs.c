@@ -231,33 +231,12 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                 ctx->config->name, add_reader, &serialized_length);
             send_request_message(serialized, serialized_length, ctx, sock, 0);
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
-            signed_data_t signed_data;
             size_t key_size = RSA_KEY_SIZE;
-
-            // parse data
-            unsigned int encrypted_entity_nonce_length =
-                data_buf_length - (key_size * 2);
+            unsigned int encrypted_entity_nonce_length = data_buf_length - (key_size * 2);
             unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
-            memcpy(signed_data.data, data_buf, key_size);
-            memcpy(signed_data.sign, data_buf + key_size, key_size);
             memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
-                   encrypted_entity_nonce_length);
-
-            // verify
-            SHA256_verify(signed_data.data, key_size, signed_data.sign,
-                          key_size, ctx->pub_key);
-            printf("auth signature verified\n");
-
-            // decrypt encrypted_distribution_key
-            size_t decrypted_dist_key_buf_length;
-            unsigned char *decrypted_dist_key_buf =
-                private_decrypt(signed_data.data, key_size, RSA_PKCS1_PADDING,
-                                ctx->priv_key, &decrypted_dist_key_buf_length);
-
-            // parse decrypted_dist_key_buf to mac_key & cipher_key
-            parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,
-                                   decrypted_dist_key_buf_length);
-            free(decrypted_dist_key_buf);
+            encrypted_entity_nonce_length);
+            save_distributionkey(data_buf, data_buf_length, ctx, key_size);
             
             // decrypt entity_nonce with decrypted_dist_key_buf
             unsigned int decrypted_entity_nonce_length;
@@ -268,16 +247,15 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
 
-            // parse decrypted_entity_nonce for nonce comparison
-            printf("reply_nonce in addReaderResp: ");
+            printf("Reply_nonce in addReaderResp: ");
             print_buf(decrypted_entity_nonce, NONCE_SIZE);
 
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
-                error_handling("auth nonce NOT verified");
+                error_handling("Auth nonce NOT verified");
             } else {
-                printf("auth nonce verified!\n");
+                printf("Auth nonce verified!\n");
             }
             printf("Add a file reader to the database.\n");
             close(sock);
@@ -289,16 +267,15 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                 ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                 ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
                 &decrypted_entity_nonce_length);
-            // parse decrypted_entity_nonce for nonce comparison
-            printf("reply_nonce in addReaderResp: ");
+            printf("Reply_nonce in addReaderResp: ");
             print_buf(decrypted_entity_nonce, NONCE_SIZE);
 
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
-                error_handling("auth nonce NOT verified");
+                error_handling("Auth nonce NOT verified");
             } else {
-                printf("auth nonce verified!\n");
+                printf("Auth nonce verified!\n");
             }
             printf("Add a file reader to the database.\n");
             close(sock);
