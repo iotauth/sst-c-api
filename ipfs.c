@@ -52,7 +52,6 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
             memcpy(file_name_buf + strlen(file_name), suffix_in_string, strlen(suffix_in_string));
             memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string), file_extension, strlen(file_extension));
             file_name_buf[strlen(file_name) + strlen(suffix_in_string) + strlen(file_extension)] = 0;
-            
             suffix_num += 1;
         }
         else {
@@ -101,7 +100,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, encrypted, &encrypted_length);
     free(file_buf);
-    printf("\nSuccess file encryption.\n");
+    printf("\nFile encryption was successful.\n");
 
     char file_name_buffer[20];
     file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION, &file_name_buffer[0]);
@@ -117,7 +116,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     free(encrypted);
     fwrite(enc_save, 1, encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len, fenc);
     free(enc_save);
-    printf("File is saved: %s.\n", file_name_buffer);
+    printf("File was saved: %s.\n", file_name_buffer);
     fclose(fenc);
     sleep(1);
     return execute_command_and_save_result(&file_name_buffer[0], hash_value);
@@ -230,34 +229,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, 0,
                 ctx->config->name, add_reader, &serialized_length);
-            if (check_validity(
-                    ctx->dist_key.abs_validity)) {  // when dist_key expired
-                printf(
-                    "Current distribution key expired, requesting new "
-                    "distribution key as well...\n");
-                unsigned int enc_length;
-                unsigned char *enc = encrypt_and_sign(
-                    serialized, serialized_length, ctx, &enc_length);
-                free(serialized);
-                unsigned char message[MAX_AUTH_COMM_LENGTH];
-                unsigned int message_length;
-                make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC,
-                                message, &message_length);
-                write(sock, message, message_length);
-                free(enc);
-            } else {
-                unsigned int enc_length;
-                unsigned char *enc =
-                    serialize_session_key_req_with_distribution_key(
-                        serialized, serialized_length, &ctx->dist_key,
-                        ctx->config->name, &enc_length);
-                unsigned char message[MAX_AUTH_COMM_LENGTH];
-                unsigned int message_length;
-                make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
-                                &message_length);
-                write(sock, message, message_length);
-                free(enc);
-            }       
+            send_request_message(serialized, serialized_length, ctx, sock, 0);
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             signed_data_t signed_data;
             size_t key_size = RSA_KEY_SIZE;
@@ -307,7 +279,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             } else {
                 printf("auth nonce verified!\n");
             }
-            printf("Success adding file reader in database.\n");
+            printf("Add a file reader to the database.\n");
             close(sock);
             break;
         } else if (message_type == ADD_READER_RESP) {
@@ -328,8 +300,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             } else {
                 printf("auth nonce verified!\n");
             }
-            printf("Success adding file reader in database.\n");
-            
+            printf("Add a file reader to the database.\n");
             close(sock);
             break;
         }

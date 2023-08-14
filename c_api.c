@@ -99,11 +99,11 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     return session_ctx;
 }
 
-session_key_t *get_session_key_by_ID(unsigned char* expected_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
+session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
     
     session_key_t *s_key;
-    unsigned int expected_key_id_int =
-        read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
+    unsigned int target_session_key_id_int =
+        read_unsigned_int_BE(target_session_key_id, SESSION_KEY_ID_SIZE);
 
     // If the entity_server already has the corresponding session key,
     // it does not have to request session key from Auth
@@ -111,7 +111,7 @@ session_key_t *get_session_key_by_ID(unsigned char* expected_key_id, SST_ctx_t *
     if (existing_s_key_list != NULL) {
         for (int i = 0; i < existing_s_key_list->num_key; i++) {
             session_key_found = check_session_key(
-                expected_key_id_int, existing_s_key_list, i);
+                target_session_key_id_int, existing_s_key_list, i);
         }
     }
     if (session_key_found >= 0) {
@@ -119,11 +119,11 @@ session_key_t *get_session_key_by_ID(unsigned char* expected_key_id, SST_ctx_t *
     } else if (session_key_found == -1) {
         // WARNING: The following line overwrites the purpose.
         sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
-                expected_key_id_int);
+                target_session_key_id_int);
 
         session_key_list_t *s_key_list;
         s_key_list = send_session_key_request_check_protocol(
-            ctx, expected_key_id);
+            ctx, target_session_key_id);
         s_key = s_key_list->s_key;
         if (existing_s_key_list != NULL) {
             add_session_key_to_list(s_key, existing_s_key_list);
@@ -163,11 +163,10 @@ SST_session_ctx_t *server_secure_comm_setup(
             }
             printf("switching to HANDSHAKE_1_RECEIVED state.\n");
             entity_server_state = HANDSHAKE_1_RECEIVED;
-            unsigned char expected_key_id[SESSION_KEY_ID_SIZE];
-            memcpy(expected_key_id, data_buf, SESSION_KEY_ID_SIZE);
+            unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
+            memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
 
-            s_key = get_session_key_by_ID(expected_key_id, ctx, existing_s_key_list);
-
+            s_key = get_session_key_by_ID(target_session_key_id, ctx, existing_s_key_list);
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
                 error_handling(
                     "Error during comm init - in wrong state, expected: "

@@ -53,6 +53,49 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
+void send_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex) {
+    if (check_validity(
+        ctx->dist_key.abs_validity)) {  // when dist_key expired
+        printf(
+            "Current distribution key expired, requesting new "
+            "distribution key as well...\n");
+        unsigned int enc_length;
+        unsigned char *enc = encrypt_and_sign(
+            serialized, serialized_length, ctx, &enc_length);
+        free(serialized);
+        unsigned char message[MAX_AUTH_COMM_LENGTH];
+        unsigned int message_length;
+        if (requestIndex) {
+        make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
+                        message, &message_length);
+        }
+        else {
+        make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC,
+                        message, &message_length);    
+        }
+        write(sock, message, message_length);
+        free(enc);
+    } else {
+        unsigned int enc_length;
+        unsigned char *enc =
+        serialize_session_key_req_with_distribution_key(
+                serialized, serialized_length, &ctx->dist_key,
+                ctx->config->name, &enc_length);
+        unsigned char message[MAX_AUTH_COMM_LENGTH];
+        unsigned int message_length;
+        if (requestIndex) {
+        make_sender_buf(enc, enc_length, SESSION_KEY_REQ,
+                        message, &message_length);
+        }
+        else {
+        make_sender_buf(enc, enc_length, ADD_READER_REQ,
+                        message, &message_length);    
+        }
+        write(sock, message, message_length);
+        free(enc);
+    }
+}
+
 unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
                                 SST_ctx_t *ctx, unsigned int *message_length) {
     size_t encrypted_length;
@@ -343,34 +386,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, ctx->config->numkey,
                 ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
-            if (check_validity(
-                    ctx->dist_key.abs_validity)) {  // when dist_key expired
-                printf(
-                    "Current distribution key expired, requesting new "
-                    "distribution key as well...\n");
-                unsigned int enc_length;
-                unsigned char *enc = encrypt_and_sign(
-                    serialized, serialized_length, ctx, &enc_length);
-                free(serialized);
-                unsigned char message[MAX_AUTH_COMM_LENGTH];
-                unsigned int message_length;
-                make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
-                                message, &message_length);
-                write(sock, message, message_length);
-                free(enc);
-            } else {
-                unsigned int enc_length;
-                unsigned char *enc =
-                    serialize_session_key_req_with_distribution_key(
-                        serialized, serialized_length, &ctx->dist_key,
-                        ctx->config->name, &enc_length);
-                unsigned char message[MAX_AUTH_COMM_LENGTH];
-                unsigned int message_length;
-                make_sender_buf(enc, enc_length, SESSION_KEY_REQ, message,
-                                &message_length);
-                write(sock, message, message_length);
-                free(enc);
-            }
+            send_request_message(serialized, serialized_length, ctx, sock, 1);
         } else if (message_type == SESSION_KEY_RESP) {
             printf(
                 "Received session key response encrypted with distribution "

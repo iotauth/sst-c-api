@@ -70,6 +70,9 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
                                         char *sender, char *purpose,
                                         unsigned int *ret_length);
 
+
+void send_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex);
+
 // Encrypt the message and sign the encrypted message.
 // @param buf input buffer
 // @param buf_len length of buf
