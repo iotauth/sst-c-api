@@ -20,6 +20,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 
 // Connect with other entity such as entity servers using secure session key.
 // @param s_key session key struct received by Auth
+// @param ctx config struct obtained from load_config()
 // @return secure socket number
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);

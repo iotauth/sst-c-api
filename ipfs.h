@@ -34,7 +34,7 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value);
 // Encrypt the file with sessionkey and upload the file in IPFS environment.
 // Return length of the hash value receieved from 'execute_command_and_save_result' function.
 // @param session_ctx session key to encrypt the file.
-// @param ctx information to be included in encryption.
+// @param ctx config struct obtained from load_config()
 // @param my_file_path path of the file to encrypt.
 // @param hash_value value to send to file system manager.
 int file_encrypt_upload(session_key_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value);
@@ -46,19 +46,19 @@ void file_download_decrypt(session_key_t session_ctx, char* file_name);
 
 // Request the data to file system manager.
 // @param session_ctx session key information to send to file system manager.
-// @param ctx owner information to send to file system manager.
+// @param ctx config struct obtained from load_config()
 // @param hash_value value to send to file system manager.
 // @param hash_value_len length of value to send to file system manager.
 void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
 // Receive the data from file system manager.
 // @param session_ctx session key information to compare with session key received from file system manager.
-// @param ctx information to access the file system manager.
+// @param ctx config struct obtained from load_config()
 // @param file_name file name to save the file.
 void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name);
 
 // Send the request for adding the reader to Auth.
-// @param ctx information to access to Auth.
+// @param ctx config struct obtained from load_config()
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path);
 
 #endif

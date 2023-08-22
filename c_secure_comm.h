@@ -73,7 +73,7 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
 // Encrypt the message and send the request message to Auth.
 // @param serialized total message
 // @param serialized_length length of message
-// @param ctx ctx
+// @param ctx config struct obtained from load_config()
 // @param sock socket number
 // @param requestIndex request index for purpose
 void send_auth_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex);
@@ -81,7 +81,7 @@ void send_auth_request_message(unsigned char *serialized, unsigned int serialize
 // Encrypt the message and sign the encrypted message.
 // @param buf input buffer
 // @param buf_len length of buf
-// @param ctx ctx
+// @param ctx config struct obtained from load_config()
 // @param message message with encrypted message and signature
 // @param message_length length of message
 unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
@@ -100,7 +100,7 @@ void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
 // @param data_buf_length length of data buffer
-// @param ctx ctx
+// @param ctx config struct obtained from load_config()
 // @param key_size key size to decrypt
 void save_distributionkey(unsigned char *data_buf, int data_buf_length, SST_ctx_t* ctx, size_t key_size);
 
@@ -201,7 +201,7 @@ int check_session_key_validity(session_key_t *session_key);
 int check_validity(unsigned char *validity);
 
 // Check if entity has session key and if not, request the session key to Auth.
-// @param ctx ctx struct
+// @param ctx config struct obtained from load_config()
 // @param target_key_id id of session key
 // @return session key struct according to key id
 session_key_list_t *send_session_key_request_check_protocol(
