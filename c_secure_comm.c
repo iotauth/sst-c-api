@@ -383,7 +383,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         return s_key_list;
     }
-    return 0;
+    return NULL;
 }
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
@@ -523,6 +523,7 @@ unsigned char *check_handshake1_send_handshake2(
 
 int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
                       int idx) {
+    // TODO: Fix integer size 32 or 64
     unsigned int list_key_id = read_unsigned_int_BE(
         s_key_list->s_key[idx].key_id, SESSION_KEY_ID_SIZE);
 

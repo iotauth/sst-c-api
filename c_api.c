@@ -102,6 +102,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
     
     session_key_t *s_key;
+    // TODO: Fix integer size 32 or 64
     unsigned int target_session_key_id_int =
         read_unsigned_int_BE(target_session_key_id, SESSION_KEY_ID_SIZE);
 
