@@ -8,12 +8,12 @@ const char DOWNLOAD_FILE_NAME[] = "download";
 
 void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
-        error_handling("Start point is not zero.\n");
+        error_exit("Start point is not zero.\n");
         exit(1);
     }
     size_t newLen = fread(file_buf, sizeof(char), bufsize, fin);
     if (ferror(fin) != 0) {
-        error_handling("Error reading file.\n");
+        error_exit("Error reading file.\n");
         exit(1);
     }
     file_buf[newLen++] = '\0';
@@ -22,11 +22,11 @@ void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize)
 unsigned long file_size_return(FILE* fin) {
     unsigned long bufsize;
     if (fin == NULL) {
-        error_handling("Cannot read the file.\n");
+        error_exit("Cannot read the file.\n");
         exit(1);
     }
     if (fseek(fin, 0L, SEEK_END) != 0) {
-        error_handling("Cannot move pointer to the end of file.\n");
+        error_exit("Cannot move pointer to the end of file.\n");
     }
     bufsize = ftell(fin);
 
@@ -69,7 +69,7 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value) 
     printf("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
-        error_handling("Popen failed.\n");
+        error_exit("Popen failed.\n");
         exit(1);
     }
     while (fgets(buff, BUFF_SIZE, fp))
@@ -245,7 +245,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
-                error_handling("Auth nonce NOT verified");
+                error_exit("Auth nonce NOT verified");
             } else {
                 printf("Auth nonce verified!\n");
             }
@@ -261,7 +261,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
                 &decrypted_entity_nonce_length);
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
-                error_handling("Auth nonce NOT verified");
+                error_exit("Auth nonce NOT verified");
             } else {
                 printf("Auth nonce verified!\n");
             }

@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     FILE* add_reader_file = fopen(add_reader_path,"r");
     char addReader[64];
     if (add_reader_file == NULL) {
-        error_handling("Cannot open file.\n");
+        error_exit("Cannot open file.\n");
 		exit(1);
 	}
     while(fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {

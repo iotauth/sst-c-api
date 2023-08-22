@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        error_handling("Enter config path");
+        error_exit("Enter config path");
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
@@ -12,7 +12,7 @@ int main(int argc, char *argv[]) {
     socklen_t clnt_addr_size;
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1) {
-        error_handling("socket() error");
+        error_exit("socket() error");
     }
     int on = 1;
     if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
@@ -26,19 +26,19 @@ int main(int argc, char *argv[]) {
 
     if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
-        error_handling("bind() error");
+        error_exit("bind() error");
         return -1;
     }
 
     if (listen(serv_sock, 5) == -1) {
-        error_handling("listen() error");
+        error_exit("listen() error");
         return -1;
     }
     clnt_addr_size = sizeof(clnt_addr);
     clnt_sock =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
-        error_handling("accept() error");
+        error_exit("accept() error");
         return -1;
     }
 
@@ -48,24 +48,26 @@ int main(int argc, char *argv[]) {
     INIT_SESSION_KEY_LIST(s_key_list);
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
+    if (session_ctx == NULL) {
+        printf("There is no session key.\n");
+    } else {
+        pthread_t thread;
+        pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
+        sleep(1);
 
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
-    sleep(1);
-
-    send_secure_message("Hello client", strlen("Hello client"), session_ctx);
-    sleep(1);
-    send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
-    sleep(2);
-    close(clnt_sock);
-    pthread_cancel(thread);
-    printf("Finished first communication\n");
-
+        send_secure_message("Hello client", strlen("Hello client"), session_ctx);
+        sleep(1);
+        send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
+        sleep(2);
+        close(clnt_sock);
+        pthread_cancel(thread);
+        printf("Finished first communication\n");
+    }
     // Second connection. session_key_list caches the session key.
     clnt_sock2 =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock2 == -1) {
-        error_handling("accept() error");
+        error_exit("accept() error");
     }
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, &s_key_list);

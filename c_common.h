@@ -73,8 +73,14 @@ typedef struct {
 } HS_nonce_t;
 
 // Handle whether message has error or not.
+// return exit(1)
 // @param message input message
-void error_handling(char *message);
+void error_exit(char *message);
+
+// Handle whether message has error or not.
+// return NULL value
+// @param message input message
+void* error_return_null(char *message);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.

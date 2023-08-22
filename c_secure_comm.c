@@ -166,7 +166,7 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
     var_length_int_to_num(buf + offset, buf_length, &num,
                           &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {
-        error_handling(
+        error_exit(
             "Buffer size of the variable length integer cannot be 0.");
     }
     *return_to_length = num + var_len_int_buf_size;
@@ -286,7 +286,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     // compare my_nonce and received_nonce
     if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
                 HS_NONCE_SIZE) != 0) {
-        error_handling(
+        error_exit(
             "Comm init failed: server NOT verified, nonce NOT matched, "
             "disconnecting...\n");
     } else {
@@ -323,10 +323,10 @@ unsigned char *decrypt_received_message(unsigned char *data,
     unsigned int received_seq_num =
         read_unsigned_int_BE(decrypted, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
-        error_handling("Wrong sequence number expected.");
+        error_exit("Wrong sequence number expected.");
     }
     if (check_session_key_validity(&session_ctx->s_key)) {
-        error_handling("Session key expired!\n");
+        error_exit("Session key expired!\n");
     }
     session_ctx->received_seq_num++;
     printf("Received seq_num: %d\n", received_seq_num);
@@ -358,6 +358,9 @@ session_key_list_t *send_session_key_request_check_protocol(
     if (strcmp((const char *)ctx->config->network_protocol, "TCP") ==
         0) {  // TCP
         session_key_list_t *s_key_list = send_session_key_req_via_TCP(ctx);
+        if (s_key_list == NULL) {
+            return NULL;
+        }
         printf("received %d keys\n", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
@@ -371,19 +374,18 @@ session_key_list_t *send_session_key_request_check_protocol(
             if (strncmp((const char *)s_key_list->s_key[0].key_id,
                         (const char *)target_key_id,
                         SESSION_KEY_ID_SIZE) != 0) {
-                error_handling("Session key id is NOT as expected\n");
+                error_exit("Session key id is NOT as expected\n");
             } else {
                 printf("Session key id is as expected\n");
             }
             return s_key_list;
         }
-    }
-    if (strcmp((const char *)ctx->config->network_protocol, "UDP") == 0) {
+    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") == 0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         return s_key_list;
     }
-    return NULL;
+    return error_return_null("Invalid network protocol name.\n");
 }
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
@@ -430,13 +432,14 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             parse_session_key_response(decrypted, decrypted_length, reply_nonce,
                                        session_key_list);
 
-            printf("reply_nonce in sessionKeyResp: ");
+            printf("Reply_nonce in sessionKeyResp: ");
             print_buf(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {
-                error_handling("auth nonce NOT verified");
+                // error_exit("Auth nonce NOT verified");
+                return error_return_null("Auth nonce NOT verified\n");
             } else {
-                printf("auth nonce verified!\n");
+                printf("Auth nonce verified!\n");
             }
             close(sock);
             return session_key_list;
@@ -465,14 +468,14 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                                        decrypted_session_key_response_length,
                                        reply_nonce, session_key_list);
 
-            printf("reply_nonce in sessionKeyResp: ");
+            printf("Reply_nonce in sessionKeyResp: ");
             print_buf(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
-                error_handling("auth nonce NOT verified");
+                return error_return_null("Auth nonce NOT verified\n");
             } else {
-                printf("auth nonce verified!\n");
+                printf("Auth nonce verified!\n");
             }
             close(sock);
             return session_key_list;
@@ -484,7 +487,7 @@ session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
     session_key_list_t *s_key_list;
     return s_key_list;
     // TODO:(Dongha Kim) Implement this function.
-    error_handling("This function is not implemented yet.");
+    error_exit("This function is not implemented yet.");
 }
 
 unsigned char *check_handshake1_send_handshake2(

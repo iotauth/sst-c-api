@@ -266,7 +266,7 @@ unsigned char *symmetric_decrypt_authenticate(
         print_buf(received_tag, mac_key_size);
         printf("Hmac tag: ");
         print_buf(hmac_tag, mac_key_size);
-        error_handling("Invalid MAC error!");
+        error_exit("Invalid MAC error!");
     } else {
         printf("MAC verified!\n");
     }
