@@ -77,7 +77,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
-            error_handling(
+            error_exit(
                 "Comm init failed: wrong sequence of handshake, "
                 "disconnecting...\n");
         }
@@ -97,6 +97,42 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
     session_ctx->sock = sock;
     return session_ctx;
+}
+
+session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
+    
+    session_key_t *s_key;
+    // TODO: Fix integer size 32 or 64
+    unsigned int target_session_key_id_int =
+        read_unsigned_int_BE(target_session_key_id, SESSION_KEY_ID_SIZE);
+
+    // If the entity_server already has the corresponding session key,
+    // it does not have to request session key from Auth
+    int session_key_found = -1;
+    if (existing_s_key_list == NULL) {
+        error_exit("Session key list must be not NULL.\n");
+    }
+    for (int i = 0; i < existing_s_key_list->num_key; i++) {
+        session_key_found = check_session_key(
+            target_session_key_id_int, existing_s_key_list, i);
+    }
+    if (session_key_found >= 0) {
+        s_key = &existing_s_key_list->s_key[session_key_found];
+    } else if (session_key_found == -1) {
+        // WARNING: The following line overwrites the purpose.
+        sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
+                target_session_key_id_int);
+
+        session_key_list_t *s_key_list;
+        s_key_list = send_session_key_request_check_protocol(
+            ctx, target_session_key_id);
+        if (s_key_list == NULL) {
+            return error_return_null("Failed to get session key from auth.\n");
+        }
+        s_key = s_key_list->s_key;
+        add_session_key_to_list(s_key, existing_s_key_list);
+    }
+    return s_key;
 }
 
 SST_session_ctx_t *server_secure_comm_setup(
@@ -124,43 +160,18 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_1) {
             printf("received session key handshake1\n");
             if (entity_server_state != IDLE) {
-                error_handling(
+                error_exit(
                     "Error during comm init - in wrong state, expected: IDLE, "
                     "disconnecting...\n");
             }
             printf("switching to HANDSHAKE_1_RECEIVED state.\n");
             entity_server_state = HANDSHAKE_1_RECEIVED;
-            unsigned char expected_key_id[SESSION_KEY_ID_SIZE];
-            memcpy(expected_key_id, data_buf, SESSION_KEY_ID_SIZE);
-            unsigned int expected_key_id_int =
-                read_unsigned_int_BE(expected_key_id, SESSION_KEY_ID_SIZE);
+            unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
+            memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
 
-            // If the entity_server already has the corresponding session key,
-            // it does not have to request session key from Auth
-            int session_key_found = -1;
-            if (existing_s_key_list != NULL) {
-                for (int i = 0; i < existing_s_key_list->num_key; i++) {
-                    session_key_found = check_session_key(
-                        expected_key_id_int, existing_s_key_list, i);
-                }
-            }
-            if (session_key_found >= 0) {
-                s_key = &existing_s_key_list->s_key[session_key_found];
-            } else if (session_key_found == -1) {
-                // WARNING: The following line overwrites the purpose.
-                sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
-                        expected_key_id_int);
-
-                session_key_list_t *s_key_list;
-                s_key_list = send_session_key_request_check_protocol(
-                    ctx, expected_key_id);
-                s_key = s_key_list->s_key;
-                if (existing_s_key_list != NULL) {
-                    add_session_key_to_list(s_key, existing_s_key_list);
-                }
-            }
+            s_key = get_session_key_by_ID(target_session_key_id, ctx, existing_s_key_list);
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
-                error_handling(
+                error_exit(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_1_RECEIVED, disconnecting...");
             }
@@ -190,7 +201,7 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_3) {
             printf("received session key handshake3!\n");
             if (entity_server_state != HANDSHAKE_2_SENT) {
-                error_handling(
+                error_exit(
                     "Error during comm init - in wrong state, expected: IDLE, "
                     "disconnecting...\n");
             }
@@ -205,7 +216,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             // compare my_nonce and received_nonce
             if (strncmp((const char *)hs.reply_nonce,
                         (const char *)server_nonce, HS_NONCE_SIZE) != 0) {
-                error_handling(
+                error_exit(
                     "Comm init failed: server NOT verified, nonce NOT matched, "
                     "disconnecting...\n");
             } else {
@@ -218,8 +229,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    error_handling("Unrecognized or invalid state for server.\n");
-    return NULL;
+    return error_return_null("Unrecognized or invalid state for server.\n");
 }
 
 void *receive_thread(void *SST_session_ctx) {
@@ -281,14 +291,13 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     if (message_type == SECURE_COMM_MSG) {
         return decrypt_received_message(data_buf, data_buf_length, session_ctx);
     }
-    error_handling("Invalid message type while in secure communication.\n");
-    return NULL;
+    return error_return_null("Invalid message type while in secure communication.\n");
 }
 
 void send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx) {
     if (check_session_key_validity(&session_ctx->s_key)) {
-        error_handling("Session key expired!\n");
+        error_exit("Session key expired!\n");
     }
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);

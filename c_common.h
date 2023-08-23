@@ -37,6 +37,10 @@
 #define MIGRATION_RESP_WITH_SIGN 51
 #define MIGRATION_REQ_WITH_MAC 52
 #define MIGRATION_RESP_WITH_MAC 53
+#define ADD_READER_REQ_IN_PUB_ENC 60
+#define ADD_READER_RESP_WITH_DIST_KEY 61
+#define ADD_READER_REQ 62
+#define ADD_READER_RESP 63
 #define AUTH_ALERT 100
 
 // Size //
@@ -68,9 +72,14 @@ typedef struct {
                               // none. Need to implement diffie_helman protocol.
 } HS_nonce_t;
 
-// Handle whether message has error or not.
-// @param message input message
-void error_handling(char *message);
+// Print out error message and exit program.
+// @param message error message
+void error_exit(char *message);
+
+// Print out error message and return NULL.
+// return NULL value
+// @param message error message
+void* error_return_null(char *message);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.

@@ -1,9 +1,15 @@
 #include "c_common.h"
 
-void error_handling(char *message) {
+void error_exit(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     exit(1);
+}
+
+void* error_return_null(char *message) {
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    return NULL;
 }
 
 void print_buf(unsigned char *buf, size_t size) {
@@ -111,7 +117,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        error_handling("Wrong header calculation... Exiting...");
+        error_exit("Wrong header calculation... Exiting...");
     }
     read(socket, ret, *ret_length);
     return 1;
@@ -150,7 +156,7 @@ void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     int str_len;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
-        error_handling("socket() error");
+        error_exit("socket() error");
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
@@ -159,7 +165,7 @@ void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     serv_addr.sin_port = htons(atoi(port_num));
     if (connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
-        error_handling("connect() error!");
+        error_exit("connect() error!");
     }
     printf("\n\n------------Connected-------------\n");
 }
@@ -167,7 +173,7 @@ void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
 void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
                          unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
-        error_handling("Error: handshake should include at least on nonce.");
+        error_exit("Error: handshake should include at least on nonce.");
     }
     unsigned char indicator = 0;
     if (nonce != NULL) {

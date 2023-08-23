@@ -20,9 +20,17 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 
 // Connect with other entity such as entity servers using secure session key.
 // @param s_key session key struct received by Auth
+// @param ctx config struct obtained from load_config()
 // @return secure socket number
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
+
+// Try finding a target session key with its ID. If the entity has the target session key, return the session key.
+// Otherwise, request and receive the target session key by ID from Auth and return the session key.
+// @param target_session_key_id ID of the target session key.
+// @param ctx SST context to communicate with Auth.
+// @param existing_s_key_list list of session keys that currently exist.
+session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.

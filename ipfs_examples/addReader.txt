@@ -1,0 +1,2 @@
+{"AddReader":"net1.david"}
+{"AddReader":"net1.Alice"}
