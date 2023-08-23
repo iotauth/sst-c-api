@@ -101,8 +101,8 @@ void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // @param data_buf total data buffer
 // @param data_buf_length length of data buffer
 // @param ctx config struct obtained from load_config()
-// @param key_size key size to decrypt
-void save_distributionkey(unsigned char *data_buf, int data_buf_length, SST_ctx_t* ctx, size_t key_size);
+// @param key_size size of the public crypto key
+void save_distribution_key(unsigned char *data_buf, int data_buf_length, SST_ctx_t* ctx, size_t key_size);
 
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec

@@ -113,7 +113,7 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     return message;
 }
 
-void save_distributionkey(unsigned char *data_buf, int data_buf_length,  SST_ctx_t* ctx, size_t key_size) {
+void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ctx_t* ctx, size_t key_size) {
     signed_data_t signed_data;
 
     // parse data
@@ -450,7 +450,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char encrypted_session_key[encrypted_session_key_length];
             memcpy(encrypted_session_key, data_buf + key_size * 2,
             encrypted_session_key_length);
-            save_distributionkey(data_buf, data_buf_length, ctx, key_size);
+            save_distribution_key(data_buf, data_buf_length, ctx, key_size);
 
             // decrypt session_key with decrypted_dist_key_buf
             unsigned int decrypted_session_key_response_length;

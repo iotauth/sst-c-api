@@ -72,14 +72,13 @@ typedef struct {
                               // none. Need to implement diffie_helman protocol.
 } HS_nonce_t;
 
-// Handle whether message has error or not.
-// return exit(1)
-// @param message input message
+// Print out error message and exit program.
+// @param message error message
 void error_exit(char *message);
 
-// Handle whether message has error or not.
+// Print out error message and return NULL.
 // return NULL value
-// @param message input message
+// @param message error message
 void* error_return_null(char *message);
 
 // Utility function for printing unsigned char buffer in hex string.

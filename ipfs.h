@@ -59,6 +59,7 @@ void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, c
 
 // Send the request for adding the reader to Auth.
 // @param ctx config struct obtained from load_config()
+// @param add_reader_path path to the file including a list of readers to be added
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader_path);
 
 #endif

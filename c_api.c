@@ -109,11 +109,12 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
     // If the entity_server already has the corresponding session key,
     // it does not have to request session key from Auth
     int session_key_found = -1;
-    if (existing_s_key_list != NULL) {
-        for (int i = 0; i < existing_s_key_list->num_key; i++) {
-            session_key_found = check_session_key(
-                target_session_key_id_int, existing_s_key_list, i);
-        }
+    if (existing_s_key_list == NULL) {
+        error_exit("Session key list must be not NULL.\n");
+    }
+    for (int i = 0; i < existing_s_key_list->num_key; i++) {
+        session_key_found = check_session_key(
+            target_session_key_id_int, existing_s_key_list, i);
     }
     if (session_key_found >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_found];
@@ -129,9 +130,7 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
             return error_return_null("Failed to get session key from auth.\n");
         }
         s_key = s_key_list->s_key;
-        // if (existing_s_key_list != NULL) {
         add_session_key_to_list(s_key, existing_s_key_list);
-        // }
     }
     return s_key;
 }

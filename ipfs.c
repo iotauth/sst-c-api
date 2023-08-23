@@ -38,7 +38,7 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     // Copy file name.
     memcpy(file_name_buf, file_name, strlen(file_name));
     memcpy(file_name_buf + strlen(file_name), file_extension, strlen(file_extension));
-    file_name_buf[strlen(file_name) + strlen(file_extension)] = 0;
+    file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
     for (;;) {
         if (suffix_num == MAX_REPLY_NUM) {
             printf("Cannot save the file. \n");
@@ -51,7 +51,7 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
             sprintf(suffix_in_string, "%d", suffix_num);
             memcpy(file_name_buf + strlen(file_name), suffix_in_string, strlen(suffix_in_string));
             memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string), file_extension, strlen(file_extension));
-            file_name_buf[strlen(file_name) + strlen(suffix_in_string) + strlen(file_extension)] = 0;
+            file_name_buf[strlen(file_name) + strlen(suffix_in_string) + strlen(file_extension)] = '\0';
             suffix_num += 1;
         }
         else {
@@ -210,7 +210,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
     connect_as_client((const char *)ctx->config->auth_ip_addr,
                       (const char *)ctx->config->auth_port_num, &sock);
     unsigned char entity_nonce[NONCE_SIZE];
-    while (1) {
+    for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
             read(sock, received_buf, sizeof(received_buf));
@@ -235,7 +235,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
             memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
             encrypted_entity_nonce_length);
-            save_distributionkey(data_buf, data_buf_length, ctx, key_size);
+            save_distribution_key(data_buf, data_buf_length, ctx, key_size);
             unsigned int decrypted_entity_nonce_length;
             unsigned char *decrypted_entity_nonce =
                 symmetric_decrypt_authenticate(
