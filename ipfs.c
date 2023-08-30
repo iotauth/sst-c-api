@@ -60,10 +60,13 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     }
 }
 
-int execute_command_and_save_result(char* file_name, unsigned char* hash_value) {
+int execute_command_and_save_result(char* file_name, unsigned char* hash_value, estimate_time_t* total_time) {
     char buff[BUFF_SIZE];
     FILE* fp;
     char command[BUFF_SIZE];
+    struct timeval start, end;
+    float time_interval;
+    gettimeofday(&start, NULL);
     memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
     memcpy(command + sizeof(IPFS_ADD_COMMAND) - 1, file_name, strlen(file_name));
     printf("Command: %s\n", command);
@@ -79,11 +82,19 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value) 
     strtok(buff, " ");
     result = strtok(NULL, " ");
     memcpy(hash_value, result, strlen(result));
+    gettimeofday(&end, NULL);
+    float usec = (end.tv_usec - start.tv_usec);
+    total_time->up_download_time = (end.tv_sec - start.tv_sec) + usec / 1000000;
     return strlen(result);
 }
 
-int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value) {
+int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value, estimate_time_t* total_time) {
     FILE* fgen, * fin, * fout, * fenc;
+
+    struct timeval start, end;
+    float time_interval;
+    gettimeofday(&start, NULL);
+
     fin = fopen(my_file_path, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
@@ -118,8 +129,11 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     free(enc_save);
     printf("File was saved: %s.\n", file_name_buffer);
     fclose(fenc);
+    gettimeofday(&end, NULL);
+    float usec = (end.tv_usec - start.tv_usec);
+    total_time->enc_dec_time = (end.tv_sec - start.tv_sec) + usec / 1000000;
     sleep(1);
-    return execute_command_and_save_result(&file_name_buffer[0], hash_value);
+    return execute_command_and_save_result(&file_name_buffer[0], hash_value, total_time);
 }
 
 void file_download_decrypt(session_key_t s_key, char* file_name) {
@@ -175,9 +189,12 @@ void upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, unsigne
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t* ctx, char* file_name) {
+void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t* ctx, char* file_name, estimate_time_t* total_time) {
     FILE* fin;
     int sock;
+    struct timeval start, end;
+    float time_interval;
+    gettimeofday(&start, NULL);
     connect_as_client((const char*)ctx->config->file_system_manager_ip_addr,
         (const char*)ctx->config->file_system_manager_port_num, &sock);
     int name_size;
@@ -187,11 +204,17 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
     write(sock, data, 2 + name_size);
-    sleep(1);
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length =
         read(sock, received_buf, sizeof(received_buf));
     printf("Receive the information for file.\n");
+    gettimeofday(&end, NULL);
+    float usec = (end.tv_usec - start.tv_usec);
+    total_time->filemanager_time = (end.tv_sec - start.tv_sec) + (usec/1000000);
+    
+    struct timeval start1, end1;
+    float time_interval1;
+    gettimeofday(&start1, NULL);
     int command_size;
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
@@ -201,8 +224,13 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     memcpy(command + command_size - 1, file_name, strlen(file_name));
     printf("Command: %s \n", command);
     fin = popen(command, "r");
+    gettimeofday(&end1, NULL);
+    float usec1 = (end1.tv_usec - start1.tv_usec);
+    total_time->up_download_time = (end1.tv_sec - start1.tv_sec) + (usec1/1000000);
     pclose(fin);
     printf("Download the file: %s\n", file_name);
+    printf("download from filesystem manager %lf\n", total_time->filemanager_time);
+    printf("download the file from IPFS %lf\n", total_time->up_download_time);
 }
 
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
