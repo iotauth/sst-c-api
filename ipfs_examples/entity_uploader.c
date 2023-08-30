@@ -57,10 +57,10 @@ int main(int argc, char* argv[]) {
         gettimeofday(&end1, NULL);
         float usec1 = (end1.tv_usec - start1.tv_usec);
         total_time[i].filemanager_time = (end1.tv_sec - start1.tv_sec) + usec1 / 1000000;
-        printf("download from filesystem manager %lf\n", total_time[i].filemanager_time);
-        printf("download the file from IPFS %lf\n", total_time[i].up_download_time);
+        printf("Upload the data to filesystem manager %lf\n", total_time[i].filemanager_time);
+        printf("Upload the file to IPFS %lf\n", total_time[i].up_download_time);
         printf("key generate %lf\n", total_time[i].keygenerate_time);
-        printf("decrypt the file %lf\n", total_time[i].enc_dec_time);
+        printf("encrypt the file %lf\n", total_time[i].enc_dec_time);
         fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", total_time[i].up_download_time, total_time[i].keygenerate_time, total_time[i].enc_dec_time, total_time[i].filemanager_time);
         sleep(5);
 
