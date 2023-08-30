@@ -31,6 +31,19 @@ int main(int argc, char* argv[]) {
 
     unsigned char hash_value[BUFF_SIZE];
     int hash_value_len;
+
+    char* filename="result.csv";
+    FILE* file;
+    file = fopen(filename, "r");
+    if(file){
+        fclose(file);
+    } else {
+        file = fopen(filename, "w");
+        fprintf(file, "upload_time,keygenerate_time,enc_time,filemanager_time\n");   // columns
+        fclose(file);
+    }
+    
+    file = fopen(filename, "a");
     for(int i = 0; i < ctx->config->numkey; i++) {
         if (i != 0) {
             total_time[i].keygenerate_time = 0;
@@ -48,10 +61,11 @@ int main(int argc, char* argv[]) {
         printf("download the file from IPFS %lf\n", total_time[i].up_download_time);
         printf("key generate %lf\n", total_time[i].keygenerate_time);
         printf("decrypt the file %lf\n", total_time[i].enc_dec_time);
+        fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", total_time[i].up_download_time, total_time[i].keygenerate_time, total_time[i].enc_dec_time, total_time[i].filemanager_time);
         sleep(5);
 
     }
-
+    fclose(file);
     // unsigned char hash_value1[BUFF_SIZE];
     // int hash_value_len1 = file_encrypt_upload(&s_key_list_0->s_key[1], ctx, my_file_path, &hash_value1[0]);
     // sleep(1);

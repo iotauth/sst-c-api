@@ -229,8 +229,6 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     total_time->up_download_time = (end1.tv_sec - start1.tv_sec) + (usec1/1000000);
     pclose(fin);
     printf("Download the file: %s\n", file_name);
-    printf("download from filesystem manager %lf\n", total_time->filemanager_time);
-    printf("download the file from IPFS %lf\n", total_time->up_download_time);
 }
 
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {

@@ -12,6 +12,19 @@ int main(int argc, char *argv[]) {
     char file_name[BUFF_SIZE];
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     estimate_time_t total_time[5];
+
+    char* filename="result.csv";
+    FILE* file;
+    file = fopen(filename, "r");
+    if(file){
+        fclose(file);
+    } else {
+        file = fopen(filename, "w");
+        fprintf(file, "download_time,keygenerate_time,dec_time,filemanager_time\n");   // columns
+        fclose(file);
+    }
+    
+    file = fopen(filename, "a");
     for(int i = 0; i < 5; i++) {
 
         download_from_file_system_manager(&received_skey_id[0], ctx, &file_name[0], &total_time[i]);
@@ -40,10 +53,10 @@ int main(int argc, char *argv[]) {
         printf("download the file from IPFS %lf\n", total_time[i].up_download_time);
         printf("key generate %lf\n", total_time[i].keygenerate_time);
         printf("decrypt the file %lf\n", total_time[i].enc_dec_time);
-
+        fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", total_time[i].up_download_time, total_time[i].keygenerate_time, total_time[i].enc_dec_time,total_time[i].filemanager_time);
         sleep(3);
-
     }
+    fclose(file);
     // char file_name1[BUFF_SIZE];
     // unsigned char received_skey_id1[SESSION_KEY_ID_SIZE];
     // download_from_file_system_manager(&received_skey_id1[0], ctx, &file_name1[0]);
