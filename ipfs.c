@@ -224,11 +224,11 @@ void download_from_file_system_manager(unsigned char* skey_id_in_str, SST_ctx_t*
     memcpy(command + command_size - 1, file_name, strlen(file_name));
     printf("Command: %s \n", command);
     fin = popen(command, "r");
+    pclose(fin);
+    printf("Download the file: %s\n", file_name);
     gettimeofday(&end1, NULL);
     float usec1 = (end1.tv_usec - start1.tv_usec);
     total_time->up_download_time = (end1.tv_sec - start1.tv_sec) + (usec1/1000000);
-    pclose(fin);
-    printf("Download the file: %s\n", file_name);
 }
 
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {

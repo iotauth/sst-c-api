@@ -57,12 +57,5 @@ int main(int argc, char *argv[]) {
         sleep(3);
     }
     fclose(file);
-    // char file_name1[BUFF_SIZE];
-    // unsigned char received_skey_id1[SESSION_KEY_ID_SIZE];
-    // download_from_file_system_manager(&received_skey_id1[0], ctx, &file_name1[0]);
-    // session_key_t *session_key1 = get_session_key_by_ID(&received_skey_id1[0], ctx, &s_key_list);
-    // sleep(5);
-    // file_download_decrypt(*session_key1, &file_name1[0]);
-
     free_SST_ctx_t(ctx);
 }

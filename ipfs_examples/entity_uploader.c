@@ -66,10 +66,6 @@ int main(int argc, char* argv[]) {
 
     }
     fclose(file);
-    // unsigned char hash_value1[BUFF_SIZE];
-    // int hash_value_len1 = file_encrypt_upload(&s_key_list_0->s_key[1], ctx, my_file_path, &hash_value1[0]);
-    // sleep(1);
-    // upload_to_file_system_manager(&s_key_list_0->s_key[1], ctx, &hash_value1[0], hash_value_len1);
 
     free_SST_ctx_t(ctx);
 }
