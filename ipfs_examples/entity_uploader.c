@@ -19,14 +19,15 @@ int main(int argc, char* argv[]) {
     
     // Set purpose to make session key request for file sharing.
     ctx->purpose_index = 1;
-    estimate_time_t total_time[5];
-    struct timeval start, end;
+    estimate_time_t estimate_time[5];
+    struct timeval keygen_start, keygen_end;
     float time_interval;
-    gettimeofday(&start, NULL);
+    gettimeofday(&keygen_start, NULL);
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
-    gettimeofday(&end, NULL);
-    float usec = (end.tv_usec - start.tv_usec);
-    total_time[0].keygenerate_time = (end.tv_sec - start.tv_sec) + usec / 1000000;
+    gettimeofday(&keygen_end, NULL);
+    float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
+    float keygen_utime = keygen_end.tv_usec - keygen_start.tv_usec;
+    estimate_time[0].keygenerate_time = keygen_time + keygen_utime / 1000000;
     sleep(1);
 
     unsigned char hash_value[BUFF_SIZE];
@@ -46,22 +47,23 @@ int main(int argc, char* argv[]) {
     file = fopen(filename, "a");
     for(int i = 0; i < ctx->config->numkey; i++) {
         if (i != 0) {
-            total_time[i].keygenerate_time = 0;
+            estimate_time[i].keygenerate_time = 0;
         }
-        hash_value_len = file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path, &hash_value[0], &total_time[i]);
+        hash_value_len = file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path, &hash_value[0], &estimate_time[i]);
         sleep(1);
-        struct timeval start1, end1;
-        float time_interval1;
-        gettimeofday(&start1, NULL);
+        struct timeval filemanager_start, filemanager_end;
+        gettimeofday(&filemanager_start, NULL);
         upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx, &hash_value[0], hash_value_len);
-        gettimeofday(&end1, NULL);
-        float usec1 = (end1.tv_usec - start1.tv_usec);
-        total_time[i].filemanager_time = (end1.tv_sec - start1.tv_sec) + usec1 / 1000000;
-        printf("Upload the data to filesystem manager %lf\n", total_time[i].filemanager_time);
-        printf("Upload the file to IPFS %lf\n", total_time[i].up_download_time);
-        printf("key generate %lf\n", total_time[i].keygenerate_time);
-        printf("encrypt the file %lf\n", total_time[i].enc_dec_time);
-        fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", total_time[i].up_download_time, total_time[i].keygenerate_time, total_time[i].enc_dec_time, total_time[i].filemanager_time);
+        gettimeofday(&filemanager_end, NULL);
+        float filemanager_time = filemanager_end.tv_sec - filemanager_start.tv_sec;
+        float filemanager_utime = filemanager_end.tv_usec - filemanager_start.tv_usec;
+        estimate_time[i].filemanager_time = filemanager_time + filemanager_utime / 1000000;
+
+        printf("Upload the data to filesystem manager %lf\n", estimate_time[i].filemanager_time);
+        printf("Upload the file to IPFS %lf\n", estimate_time[i].up_download_time);
+        printf("key generate %lf\n", estimate_time[i].keygenerate_time);
+        printf("encrypt the file %lf\n", estimate_time[i].enc_dec_time);
+        fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time, estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time, estimate_time[i].filemanager_time);
         sleep(5);
 
     }
