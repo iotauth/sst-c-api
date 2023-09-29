@@ -59,10 +59,10 @@ int main(int argc, char* argv[]) {
         float filemanager_utime = filemanager_end.tv_usec - filemanager_start.tv_usec;
         estimate_time[i].filemanager_time = filemanager_time + filemanager_utime / 1000000;
 
-        printf("Upload the data to filesystem manager %lf\n", estimate_time[i].filemanager_time);
-        printf("Upload the file to IPFS %lf\n", estimate_time[i].up_download_time);
-        printf("key generate %lf\n", estimate_time[i].keygenerate_time);
-        printf("encrypt the file %lf\n", estimate_time[i].enc_dec_time);
+        printf("Time for sending the data to filesystem manager %lf\n", estimate_time[i].filemanager_time);
+        printf("Time for uploading the file to IPFS %lf\n", estimate_time[i].up_download_time);
+        printf("Time for key generation %lf\n", estimate_time[i].keygenerate_time);
+        printf("Time for encrypting the file %lf\n", estimate_time[i].enc_dec_time);
         fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time, estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time, estimate_time[i].filemanager_time);
         sleep(5);
 

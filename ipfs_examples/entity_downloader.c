@@ -24,7 +24,7 @@ int main(int argc, char *argv[]) {
         fclose(file);
     }
     // TODO: Check number of files to be provided to me
-    
+
     file = fopen(filename, "a");
     for(int i = 0; i < 5; i++) {
 
@@ -50,10 +50,10 @@ int main(int argc, char *argv[]) {
             estimate_time[i].enc_dec_time = decrypt_time + decrypt_utime / 1000000;
         }
 
-        printf("download from filesystem manager %lf\n", estimate_time[i].filemanager_time);
-        printf("download the file from IPFS %lf\n", estimate_time[i].up_download_time);
-        printf("key generate %lf\n", estimate_time[i].keygenerate_time);
-        printf("decrypt the file %lf\n", estimate_time[i].enc_dec_time);
+        printf("Time for receiving the data from filesystem manager %lf\n", estimate_time[i].filemanager_time);
+        printf("Time for downloading the file from IPFS %lf\n", estimate_time[i].up_download_time);
+        printf("Time for key generation %lf\n", estimate_time[i].keygenerate_time);
+        printf("Time for decrypting the file %lf\n", estimate_time[i].enc_dec_time);
         fprintf(file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time, estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time,estimate_time[i].filemanager_time);
         sleep(3);
     }
