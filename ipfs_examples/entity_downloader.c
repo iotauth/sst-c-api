@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     estimate_time_t estimate_time[5];
 
-    char* filename="result.csv";
+    char* filename="Download_result.csv";
     FILE* file;
     file = fopen(filename, "r");
     if(file){

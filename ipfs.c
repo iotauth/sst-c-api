@@ -64,7 +64,6 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value, 
     char buff[BUFF_SIZE];
     FILE* fp;
     char command[BUFF_SIZE];
-
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
     memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
@@ -91,10 +90,8 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value, 
 
 int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value, estimate_time_t* estimate_time) {
     FILE* fgen, * fin, * fout, * fenc;
-
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
-
     fin = fopen(my_file_path, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
@@ -129,7 +126,6 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     free(enc_save);
     printf("File was saved: %s.\n", file_name_buffer);
     fclose(fenc);
-
     gettimeofday(&encrypt_end, NULL);
     float encrypt_time = encrypt_end.tv_sec - encrypt_start.tv_sec;
     float encrypt_utime = encrypt_end.tv_usec - encrypt_start.tv_usec;
@@ -210,11 +206,9 @@ void receive_data_and_download_file(unsigned char* skey_id_in_str, SST_ctx_t* ct
         read(sock, received_buf, sizeof(received_buf));
     printf("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
-
     float filemanager_time = (filemanager_end.tv_sec - filemanager_start.tv_sec);
     float filemanager_utime = (filemanager_end.tv_usec - filemanager_start.tv_usec);
     estimate_time->filemanager_time = filemanager_time + filemanager_utime / 1000000;
-    
     struct timeval download_start, download_end;
     gettimeofday(&download_start, NULL);
     int command_size;

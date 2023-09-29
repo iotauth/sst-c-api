@@ -29,11 +29,10 @@ int main(int argc, char* argv[]) {
     float keygen_utime = keygen_end.tv_usec - keygen_start.tv_usec;
     estimate_time[0].keygenerate_time = keygen_time + keygen_utime / 1000000;
     sleep(1);
-
     unsigned char hash_value[BUFF_SIZE];
     int hash_value_len;
 
-    char* filename="result.csv";
+    char* filename="Upload_result.csv";
     FILE* file;
     file = fopen(filename, "r");
     if(file){
