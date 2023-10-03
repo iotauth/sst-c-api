@@ -8,6 +8,13 @@
 #define DOWNLOAD_INDEX 1
 #define MAX_REPLY_NUM 100
 
+typedef struct {
+    float up_download_time;
+    float keygenerate_time;
+    float enc_dec_time;
+    float filemanager_time;
+} estimate_time_t;
+
 // To get the file content and file size
 // @param fin input file.
 // @param file_buf buffer to save content for the input file.
@@ -29,7 +36,8 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
 // Return length of the hash value received from uploading the file.
 // @param file_name file name to upload in IPFS environment.
 // @param hash_value result value for command "ipfs add <file_name>".
-int execute_command_and_save_result(char* file_name, unsigned char* hash_value);
+// @estimate_time value to measure and store the time for each process.
+int execute_command_and_save_result(char* file_name, unsigned char* hash_value, estimate_time_t* estimate_time);
 
 // Encrypt the file with sessionkey and upload the file in IPFS environment.
 // Return length of the hash value receieved from 'execute_command_and_save_result' function.
@@ -37,12 +45,13 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value);
 // @param ctx config struct obtained from load_config()
 // @param my_file_path path of the file to encrypt.
 // @param hash_value value to send to file system manager.
-int file_encrypt_upload(session_key_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value);
+// @estimate_time value to measure and store the time for each process.
+int file_encrypt_upload(session_key_t* session_ctx, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value, estimate_time_t* estimate_time);
 
-// Download the file in IPFS environment and decrypt the file with sessionkey.
+// Decrypt the file with sessionkey.
 // @param session_ctx session key to decrypt the file.
 // @param file_name file name to save in my repository.
-void file_download_decrypt(session_key_t session_ctx, char* file_name);
+void file_decrypt_save(session_key_t session_ctx, char* file_name);
 
 // Request the data to file system manager.
 // @param session_ctx session key information to send to file system manager.
@@ -51,11 +60,12 @@ void file_download_decrypt(session_key_t session_ctx, char* file_name);
 // @param hash_value_len length of value to send to file system manager.
 void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
-// Receive the data from file system manager.
+// Receive the data from file system manager and download the file in IPFS environment.
 // @param session_ctx session key information to compare with session key received from file system manager.
 // @param ctx config struct obtained from load_config()
 // @param file_name file name to save the file.
-void download_from_file_system_manager(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name);
+// @estimate_time value to measure and store the time for each process.
+void receive_data_and_download_file(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name, estimate_time_t* estimate_time);
 
 // Send the request for adding the reader to Auth.
 // @param ctx config struct obtained from load_config()
