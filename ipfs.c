@@ -153,7 +153,6 @@ void file_decrypt_save(session_key_t s_key, char* file_name) {
     unsigned long int enc_length = bufsize - (1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len);
     unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) / AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
     unsigned char* ret = (unsigned char*)malloc(ret_length);
-    sleep(1);
     AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key.cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, ret, &ret_length);
     free(file_buf);
