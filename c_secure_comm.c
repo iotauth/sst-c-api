@@ -63,6 +63,7 @@ void send_auth_request_message(unsigned char *serialized, unsigned int serialize
         unsigned char *enc = encrypt_and_sign(
             serialized, serialized_length, ctx, &enc_length);
         free(serialized);
+        printf("%d \\\\\\n", enc_length);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
@@ -101,6 +102,7 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     size_t encrypted_length;
     unsigned char *encrypted = public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
                                               ctx->pub_key, &encrypted_length);
+    printf("encrypted length: %d", encrypted_length);
     size_t sigret_length;
     unsigned char *sigret =
         SHA256_sign(encrypted, encrypted_length, ctx->priv_key, &sigret_length);
@@ -108,6 +110,7 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     unsigned char *message = (unsigned char *)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
     memcpy(message + encrypted_length, sigret, sigret_length);
+
     free(encrypted);
     free(sigret);
     return message;
@@ -117,9 +120,6 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ct
     signed_data_t signed_data;
 
     // parse data
-    unsigned int encrypted_entity_nonce_length =
-        data_buf_length - (key_size * 2);
-    unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
     memcpy(signed_data.data, data_buf, key_size);
     memcpy(signed_data.sign, data_buf + key_size, key_size);
     memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
