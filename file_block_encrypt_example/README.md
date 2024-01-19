@@ -1,23 +1,25 @@
 # File block encrypt example
 
-This is a simple example for RocksDB.
+This is a simple example for RocksDB block encryption.
 
-The logic is as below.
+It randomly creates key_values (yet implemented in random buffers), append them into a block with a maximum size 32kbytes.
+The leftover space is filled with zero padding.
+Then the entire buffer is encrypted into a single block. The blocks are appended to a single file.
 
-1. User types the number of blocks they want.
-2. A buffer is created with a random size, and random bytes.
-3. The buffer gets encrypted with SST's session key.
-4. The encrypted buffer is saved as a file named `encrypted.txt`, becoming a block.
-5. The block's first index and length is saved as metadata.
-6. Repeat 2~5 and append it to the `encrypted.txt` file, as much as the user's input.
+The detailed logic is as below.
 
+1. Create random key_values, with a size between 56~144 bytes.
+2. The key_values are appended until the total size is 32 kbytes.
+3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. 
+4. The block is now 32kbytes, and it is encrypted with a session key.
+5. 1~5 is repeated, making a single file. The blocks are appended to each other.
+6. 5 is repeated, making three separate files, `encrypted'i'.txt`. Each file uses different session keys.
 
 ### Comparing part. 
 
-7. The user now selects the block's index they want to decrypt. 
-8. The block is read from the file, using the metadata, and brings the encrypted buffer. 
-9. The buffer gets decrypted. 
-10. Compare the buffer with the plaintext that was also saved in a different file named `plaintext.txt`, using the same logic as above.
+7. To test if the encryption decryption worked prorperly, we make a `plaintext'i'.txt`, which is the blocks not encrypted.
+8. Read the `encrypted'i'.txt` and decrypt it.
+9. Compare it with the read `plaintext'i'.txt`, and check if it's decrypted properly.
 
 # Compile
 
