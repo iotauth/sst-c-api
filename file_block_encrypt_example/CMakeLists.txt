@@ -13,6 +13,3 @@ add_executable(block_encrypt block_encrypt.c ../c_api.c ../c_common.c ../c_crypt
 
 target_link_libraries(block_encrypt OpenSSL::SSL)
 target_link_libraries(block_encrypt Threads::Threads)
-
-# target_link_libraries(entity_server OpenSSL::SSL)
-# target_link_libraries(entity_server Threads::Threads)
