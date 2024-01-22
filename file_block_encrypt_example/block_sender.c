@@ -39,6 +39,13 @@ int main(int argc, char *argv[]) {
     file_metadata_t encrypted_file_metadata[TOTAL_FILE_NUM];
     file_metadata_t plaintext_file_metadata[TOTAL_FILE_NUM];
 
+    char encrypted_metadata_filename = "encrypted_file_metadata";
+    char plaintext_metadata_filename = "plaintext_file_metadata";
+    FILE *encrypted_metadata_fp;
+    FILE *plaintext_metadata_fp;
+    encrypted_metadata_fp = fopen(encrypted_metadata_filename, "wb");
+    plaintext_metadata_fp = fopen(plaintext_metadata_filename, "wb");
+
     // Create three files.
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
         encrypted_file_metadata[i].s_key = &s_key_list->s_key[i];
@@ -51,7 +58,6 @@ int main(int argc, char *argv[]) {
         FILE *plaintext_fp;
         encrypted_fp = fopen(encrypted_filename, "wb");
         plaintext_fp = fopen(plaintext_filename, "wb");
-
         // Create blocks.
         for (int j = 0; j < TOTAL_BLOCK_NUM; j++) {
             encrypted_file_metadata[i].block_metadata[j].first_index =
@@ -126,6 +132,14 @@ int main(int argc, char *argv[]) {
         fclose(encrypted_fp);
         printf("Finished writing encrypted blocks to encrypted%d.txt\n", i);
     }
+    fwrite(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
+    fwrite(&plaintext_file_metadata, sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+    fclose(encrypted_metadata_fp);
+    fclose(plaintext_metadata_fp);
+    // Free memory.
+    free_session_key_list_t(s_key_list);
+    free_SST_ctx_t(ctx);
+
 
     ///////////////////// Decrypt and compare with plaintext
     /////////////////////////////////////
@@ -192,7 +206,4 @@ int main(int argc, char *argv[]) {
         fclose(encrypted_fp);
         fclose(plaintext_fp);
     }
-    // Free memory.
-    free_session_key_list_t(s_key_list);
-    free_SST_ctx_t(ctx);
 }
