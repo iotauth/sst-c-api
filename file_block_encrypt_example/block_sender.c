@@ -115,7 +115,6 @@ int main(int argc, char *argv[]) {
         fwrite(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1, encrypted_metadata_fp);
         fwrite(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
     }
-    fwrite(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
 
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);

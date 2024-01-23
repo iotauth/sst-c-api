@@ -35,7 +35,8 @@ $make
 # Example
 
 - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a client terminal at `$SST_ROOT/entity/c/file_block_encrypt_example/build`
+- Turn on a client1 terminal at `$SST_ROOT/entity/c/file_block_encrypt_example/build`
+- Turn on a client2 terminal at `$SST_ROOT/entity/c/file_block_encrypt_example/build`
 
 Execute
 
@@ -43,4 +44,5 @@ Auth Terminal
 `$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
 
 Client Terminal
-`$ ./block_encrypt ../c_client.config`
+`$ ./block_sender ../c_client.config`
+`$ ./block_receiver ../c_server.config`
