@@ -8,18 +8,23 @@ Then the entire buffer is encrypted into a single block. The blocks are appended
 
 The detailed logic is as below.
 
+### Encrypting part. `block_sender.c`
+
 1. Create random key_values, with a size between 56~144 bytes.
 2. The key_values are appended until the total size is 32 kbytes.
 3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. 
 4. The block is now 32kbytes, and it is encrypted with a session key.
 5. 1~5 is repeated, making a single file. The blocks are appended to each other.
 6. 5 is repeated, making three separate files, `encrypted'i'.txt`. Each file uses different session keys.
-
-### Comparing part. 
-
 7. To test if the encryption decryption worked prorperly, we make a `plaintext'i'.txt`, which is the blocks not encrypted.
-8. Read the `encrypted'i'.txt` and decrypt it.
-9. Compare it with the read `plaintext'i'.txt`, and check if it's decrypted properly.
+8. The metadata is saved inside `encrypted_file_metadata.dat`. Same with `plaintext_file_metadata.dat`. It saves the used session key id for the file.
+
+### Decrypt and Comparing part. `block_receiver.c`
+
+7. Loads the metadata saved.
+8. Requests the session key corresponding to the session key id.
+9. Read the `encrypted'i'.txt` and decrypt it with the requested session key.
+10. Compare it with the read `plaintext'i'.txt`, and check if it's decrypted properly.
 
 # Compile
 
