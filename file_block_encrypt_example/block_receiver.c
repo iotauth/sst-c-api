@@ -23,9 +23,6 @@ int main(int argc, char *argv[]) {
         fread(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
     }
 
-    // fread(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
-    // fread(&plaintext_file_metadata, sizeof(file_metadata_t), 1, plaintext_metadata_fp);
-
     // Macro initializing session_key_list.
     INIT_SESSION_KEY_LIST(s_key_list);
     
