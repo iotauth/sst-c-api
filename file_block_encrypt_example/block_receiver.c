@@ -18,8 +18,13 @@ int main(int argc, char *argv[]) {
 
     file_metadata_t encrypted_file_metadata[TOTAL_FILE_NUM];
     file_metadata_t plaintext_file_metadata[TOTAL_FILE_NUM];
-    fread(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
-    fread(&plaintext_file_metadata, sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+    for (int var = 0; var < TOTAL_FILE_NUM; ++var) {
+        fread(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1, encrypted_metadata_fp);
+        fread(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+    }
+
+    // fread(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
+    // fread(&plaintext_file_metadata, sizeof(file_metadata_t), 1, plaintext_metadata_fp);
 
     // Macro initializing session_key_list.
     INIT_SESSION_KEY_LIST(s_key_list);
@@ -70,10 +75,10 @@ int main(int argc, char *argv[]) {
             unsigned char *decrypted = symmetric_decrypt_authenticate(
                 read_encrypted_buf,
                 encrypted_file_metadata[i].block_metadata[j].length,
-                encrypted_file_metadata[i].s_key->mac_key,
-                encrypted_file_metadata[i].s_key->mac_key_size,
-                encrypted_file_metadata[i].s_key->cipher_key,
-                encrypted_file_metadata[i].s_key->cipher_key_size, IV_SIZE,
+                s_key_list.s_key[i].mac_key,
+                s_key_list.s_key[i].mac_key_size,
+                s_key_list.s_key[i].cipher_key,
+                s_key_list.s_key[i].cipher_key_size, IV_SIZE,
                 &decrypted_length);
 
             // Compare original buffer and reopened buffer.
@@ -95,6 +100,5 @@ int main(int argc, char *argv[]) {
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);
     // Free memory.
-    free_session_key_list_t(&s_key_list);
     free_SST_ctx_t(ctx);
 }

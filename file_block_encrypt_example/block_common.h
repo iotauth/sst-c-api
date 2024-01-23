@@ -19,6 +19,5 @@ typedef struct {
 
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    session_key_t *s_key;
     block_metadata_t block_metadata[TOTAL_BLOCK_NUM];
 } file_metadata_t;

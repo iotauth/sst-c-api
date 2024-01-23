@@ -110,10 +110,13 @@ int main(int argc, char *argv[]) {
         fclose(encrypted_fp);
         printf("Finished writing encrypted blocks to encrypted%d.txt\n", i);
     }
-    fwrite(&encrypted_file_metadata, sizeof(file_metadata_t), 1,
-           encrypted_metadata_fp);
-    fwrite(&plaintext_file_metadata, sizeof(file_metadata_t), 1,
-           plaintext_metadata_fp);
+
+    for (int var = 0; var < TOTAL_FILE_NUM; ++var) {
+        fwrite(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1, encrypted_metadata_fp);
+        fwrite(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+    }
+    fwrite(&encrypted_file_metadata, sizeof(file_metadata_t), 1, encrypted_metadata_fp);
+
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);
     // Free memory.
