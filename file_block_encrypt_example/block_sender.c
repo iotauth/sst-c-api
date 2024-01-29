@@ -1,9 +1,8 @@
 #include "block_common.h"
 
+int temp_buf_length;
+
 int main(int argc, char *argv[]) {
-    // int block_num;
-    // printf("How many random blocks do you want? \n");
-    // scanf("%d", &block_num);
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
@@ -26,7 +25,15 @@ int main(int argc, char *argv[]) {
 
     // Create three files.
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
-        memcpy(encrypted_file_metadata[i].key_id, s_key_list->s_key[i].key_id, SESSION_KEY_ID_SIZE);
+        // Reset temporary buf. It will be used for the leftover buffers, when
+        // the total block size exceeds the available block size. It will be
+        // saved in the next block. However, if the file is full, the leftover
+        // buffer will not be moved to the next file.
+        int temp_buf_length = 0;
+        unsigned char temp_buf[MAX_KEY_VALUE_SIZE];
+
+        memcpy(encrypted_file_metadata[i].key_id, s_key_list->s_key[i].key_id,
+               SESSION_KEY_ID_SIZE);
         char encrypted_filename[15];
         sprintf(encrypted_filename, "encrypted%d.txt", i);
         char plaintext_filename[15];
@@ -47,6 +54,11 @@ int main(int argc, char *argv[]) {
             // single block.
             unsigned char plaintext_block_buf[MAX_PLAINTEXT_BLOCK_SIZE];
             unsigned int total_block_size = 0;
+
+            if (temp_buf_length != 0) {
+                memcpy(plaintext_block_buf, temp_buf, temp_buf_length);
+                total_block_size += temp_buf_length;
+            }
 
             // Create random key value buffers.
             while (total_block_size < MAX_PLAINTEXT_BLOCK_SIZE) {
@@ -77,6 +89,11 @@ int main(int argc, char *argv[]) {
                     // MAX_PLAINTEXT_BLOCK_SIZE.
                     total_block_size +=
                         MAX_PLAINTEXT_BLOCK_SIZE - total_block_size;
+
+                    // Save the created random buffer to put it into the next
+                    // block.
+                    temp_buf_length = plaintext_buf_length;
+                    memcpy(temp_buf, plaintext_buf, temp_buf_length);
                     break;
                 } else {
                     memcpy(plaintext_block_buf + total_block_size,
@@ -94,8 +111,7 @@ int main(int argc, char *argv[]) {
             unsigned int encrypted_length;
             unsigned char *encrypted = symmetric_encrypt_authenticate(
                 plaintext_block_buf, total_block_size,
-                s_key_list->s_key[i].mac_key,
-                s_key_list->s_key[i].mac_key_size,
+                s_key_list->s_key[i].mac_key, s_key_list->s_key[i].mac_key_size,
                 s_key_list->s_key[i].cipher_key,
                 s_key_list->s_key[i].cipher_key_size, IV_SIZE,
                 &encrypted_length);
@@ -111,9 +127,12 @@ int main(int argc, char *argv[]) {
         printf("Finished writing encrypted blocks to encrypted%d.txt\n", i);
     }
 
+    // Save the file_metadata.
     for (int var = 0; var < TOTAL_FILE_NUM; ++var) {
-        fwrite(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1, encrypted_metadata_fp);
-        fwrite(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+        fwrite(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1,
+               encrypted_metadata_fp);
+        fwrite(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1,
+               plaintext_metadata_fp);
     }
 
     fclose(encrypted_metadata_fp);

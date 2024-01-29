@@ -2,9 +2,6 @@
 
 
 int main(int argc, char *argv[]) {
-    // int block_num;
-    // printf("How many random blocks do you want? \n");
-    // scanf("%d", &block_num);
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
@@ -26,9 +23,7 @@ int main(int argc, char *argv[]) {
     // Macro initializing session_key_list.
     INIT_SESSION_KEY_LIST(s_key_list);
     
-    
-    ///////////////////// Decrypt and compare with plaintext
-    /////////////////////////////////////
+    //  ----Decrypt and compare with plaintext----
 
     // Read files.
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {

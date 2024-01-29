@@ -12,7 +12,7 @@ The detailed logic is as below.
 
 1. Create random key_values, with a size between 56~144 bytes.
 2. The key_values are appended until the total size is 32 kbytes.
-3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. 
+3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. The leftover buffer will be used in the next block.
 4. The block is now 32kbytes, and it is encrypted with a session key.
 5. 1~5 is repeated, making a single file. The blocks are appended to each other.
 6. 5 is repeated, making three separate files, `encrypted'i'.txt`. Each file uses different session keys.
