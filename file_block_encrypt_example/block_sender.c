@@ -1,7 +1,5 @@
 #include "block_common.h"
 
-int temp_buf_length;
-
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
