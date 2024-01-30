@@ -9,11 +9,17 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
-add_executable(block_receiver block_receiver.c ../c_api.c ../c_common.c ../c_crypto.c ../c_secure_comm.c ../load_config.c)
-add_executable(block_sender block_sender.c ../c_api.c ../c_common.c ../c_crypto.c ../c_secure_comm.c ../load_config.c)
+add_library(SSTLIB        
+  ../c_api.c
+  ../c_common.c
+  ../c_crypto.c
+  ../c_secure_comm.c
+  ../load_config.c)
 
-target_link_libraries(block_receiver OpenSSL::SSL)
-target_link_libraries(block_receiver Threads::Threads)
+target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
-target_link_libraries(block_sender OpenSSL::SSL)
-target_link_libraries(block_sender Threads::Threads)
+add_executable(block_receiver block_receiver.c)
+add_executable(block_sender block_sender.c)
+
+target_link_libraries(block_sender OpenSSL::SSL Threads::Threads SSTLIB)
+target_link_libraries(block_receiver OpenSSL::SSL Threads::Threads SSTLIB)
