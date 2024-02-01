@@ -18,8 +18,8 @@ add_library(SSTLIB
 
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
-add_executable(block_receiver block_receiver.c)
-add_executable(block_sender block_sender.c)
+add_executable(block_reader block_reader.c)
+add_executable(block_writer block_writer.c)
 
-target_link_libraries(block_sender OpenSSL::SSL Threads::Threads SSTLIB)
-target_link_libraries(block_receiver OpenSSL::SSL Threads::Threads SSTLIB)
+target_link_libraries(block_writer OpenSSL::SSL Threads::Threads SSTLIB)
+target_link_libraries(block_reader OpenSSL::SSL Threads::Threads SSTLIB)

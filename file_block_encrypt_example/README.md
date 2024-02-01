@@ -8,7 +8,7 @@ Then the entire buffer is encrypted into a single block. The blocks are appended
 
 The detailed logic is as below.
 
-### Encrypting part. `block_sender.c`
+### Encrypting part. `block_writer.c`
 
 1. Create random key_values, with a size between 56~144 bytes.
 2. The key_values are appended until the total size is 32 kbytes.
@@ -19,7 +19,7 @@ The detailed logic is as below.
 7. To test if the encryption decryption worked prorperly, we make a `plaintext'i'.txt`, which is the blocks not encrypted.
 8. The metadata is saved inside `encrypted_file_metadata.dat`. Same with `plaintext_file_metadata.dat`. It saves the used session key id for the file.
 
-### Decrypt and Comparing part. `block_receiver.c`
+### Decrypt and Comparing part. `block_reader.c`
 
 7. Loads the metadata saved.
 8. Requests the session key corresponding to the session key id.
@@ -49,5 +49,5 @@ Auth Terminal
 `$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
 
 Client Terminal
-`$ ./block_sender ../c_client.config`
-`$ ./block_receiver ../c_server.config`
+`$ ./block_writer ../block_writer.config`
+`$ ./block_reader ../block_reader.config`
