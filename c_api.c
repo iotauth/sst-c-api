@@ -335,3 +335,25 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     OPENSSL_free(ctx->pub_key);
     free_config_t(ctx->config);
 }
+
+void save_session_key_list(session_key_list_t *session_key_list, const char *file_path) {
+    FILE *saved_file_fp = fopen(file_path, "wb");
+    // Write the session_key_list_t structure
+    fwrite(session_key_list, sizeof(session_key_list_t), 1, saved_file_fp);
+    // Write the dynamically allocated memory pointed to by s_key
+    fwrite(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY, saved_file_fp);
+    fclose(saved_file_fp);
+}
+
+void load_session_key_list(session_key_list_t *session_key_list, const char *file_path) {
+    FILE *load_file_fp = fopen(file_path, "rb");
+    // Read the session_key_list_t structure
+    fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
+
+    // Allocate memory for s_key
+    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+
+    // Read the dynamically allocated memory pointed to by s_key
+    fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY, load_file_fp);
+    fclose(load_file_fp);
+}
