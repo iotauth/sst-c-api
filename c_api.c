@@ -100,8 +100,9 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     return session_ctx;
 }
 
-session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
-    
+session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
+                                     SST_ctx_t *ctx,
+                                     session_key_list_t *existing_s_key_list) {
     session_key_t *s_key;
     // TODO: Fix integer size 32 or 64
     unsigned int target_session_key_id_int =
@@ -114,8 +115,8 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
         error_exit("Session key list must be not NULL.\n");
     }
     for (int i = 0; i < existing_s_key_list->num_key; i++) {
-        session_key_found = check_session_key(
-            target_session_key_id_int, existing_s_key_list, i);
+        session_key_found = check_session_key(target_session_key_id_int,
+                                              existing_s_key_list, i);
     }
     if (session_key_found >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_found];
@@ -125,8 +126,8 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
                 target_session_key_id_int);
 
         session_key_list_t *s_key_list;
-        s_key_list = send_session_key_request_check_protocol(
-            ctx, target_session_key_id);
+        s_key_list =
+            send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
             return error_return_null("Failed to get session key from auth.\n");
         }
@@ -170,7 +171,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
             memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
 
-            s_key = get_session_key_by_ID(target_session_key_id, ctx, existing_s_key_list);
+            s_key = get_session_key_by_ID(target_session_key_id, ctx,
+                                          existing_s_key_list);
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
                 error_exit(
                     "Error during comm init - in wrong state, expected: "
@@ -292,7 +294,8 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     if (message_type == SECURE_COMM_MSG) {
         return decrypt_received_message(data_buf, data_buf_length, session_ctx);
     }
-    return error_return_null("Invalid message type while in secure communication.\n");
+    return error_return_null(
+        "Invalid message type while in secure communication.\n");
 }
 
 void send_secure_message(char *msg, unsigned int msg_length,
@@ -326,33 +329,35 @@ void send_secure_message(char *msg, unsigned int msg_length,
     write(session_ctx->sock, sender_buf, sender_buf_length);
 }
 
-int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext, size_t plaintext_length, unsigned char *encrypted, size_t *encrypted_length) {
-    if (check_session_key_validity(s_key)) {
+int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
+                                 size_t plaintext_length,
+                                 unsigned char *encrypted,
+                                 size_t *encrypted_length) {
+    if (!check_session_key_validity(s_key)) {
         encrypted = symmetric_encrypt_authenticate(
-            plaintext, plaintext_length,
-            s_key->mac_key, s_key->mac_key_size,
-            s_key->cipher_key,
-            s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
+            plaintext, plaintext_length, s_key->mac_key, s_key->mac_key_size,
+            s_key->cipher_key, s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
             encrypted_length);
-        return 1;
+        return 0;
     } else {
         printf("Session key is expired.\n");
-        return 0;
+        return 1;
     }
 }
 
-int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted, size_t encrypted_length, unsigned char *decrypted, size_t *decrypted_length) {
-    if (check_session_key_validity(s_key)) {
+int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
+                                 size_t encrypted_length,
+                                 unsigned char *decrypted,
+                                 size_t *decrypted_length) {
+    if (!check_session_key_validity(s_key)) {
         decrypted = symmetric_decrypt_authenticate(
-            encrypted, encrypted_length,
-            s_key->mac_key, s_key->mac_key_size,
-            s_key->cipher_key,
-            s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
+            encrypted, encrypted_length, s_key->mac_key, s_key->mac_key_size,
+            s_key->cipher_key, s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
             decrypted_length);
-        return 1;
+        return 0;
     } else {
         printf("Session key is expired.\n");
-        return 0;
+        return 1;
     }
 }
 
@@ -367,16 +372,19 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     free_config_t(ctx->config);
 }
 
-void save_session_key_list(session_key_list_t *session_key_list, const char *file_path) {
+void save_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path) {
     FILE *saved_file_fp = fopen(file_path, "wb");
     // Write the session_key_list_t structure
     fwrite(session_key_list, sizeof(session_key_list_t), 1, saved_file_fp);
     // Write the dynamically allocated memory pointed to by s_key
-    fwrite(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY, saved_file_fp);
+    fwrite(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
+           saved_file_fp);
     fclose(saved_file_fp);
 }
 
-void load_session_key_list(session_key_list_t *session_key_list, const char *file_path) {
+void load_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path) {
     FILE *load_file_fp = fopen(file_path, "rb");
     // Read the session_key_list_t structure
     fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
@@ -385,6 +393,7 @@ void load_session_key_list(session_key_list_t *session_key_list, const char *fil
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
 
     // Read the dynamically allocated memory pointed to by s_key
-    fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY, load_file_fp);
+    fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
+          load_file_fp);
     fclose(load_file_fp);
 }

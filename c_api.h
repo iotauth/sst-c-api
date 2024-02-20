@@ -25,12 +25,15 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
 
-// Try finding a target session key with its ID. If the entity has the target session key, return the session key.
-// Otherwise, request and receive the target session key by ID from Auth and return the session key.
+// Try finding a target session key with its ID. If the entity has the target
+// session key, return the session key. Otherwise, request and receive the
+// target session key by ID from Auth and return the session key.
 // @param target_session_key_id ID of the target session key.
 // @param ctx SST context to communicate with Auth.
 // @param existing_s_key_list list of session keys that currently exist.
-session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
+                                     SST_ctx_t *ctx,
+                                     session_key_list_t *existing_s_key_list);
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
@@ -85,7 +88,11 @@ void send_secure_message(char *msg, unsigned int msg_length,
 // @param plaintext_length length of plaintext to be encrypted
 // @param encrypted returned encrypted buffer
 // @param encrypted_length length of returned encrypted buffer
-int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext, size_t plaintext_length, unsigned char *encrypted, size_t *encrypted_length);
+// @return 0 for success, 1 for fail
+int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
+                                 size_t plaintext_length,
+                                 unsigned char *encrypted,
+                                 size_t *encrypted_length);
 
 // Decrypt buffer with session key.
 // @param s_key session key to decrypt
@@ -93,7 +100,11 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param encrypted_length length of encrypted buffer to be decrypted
 // @param decrypted returned decrypted buffer
 // @param decrypted_length length of returned decrypted buffer
-int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted, size_t encrypted_length, unsigned char *decrypted, size_t *decrypted_length);
+// @return 0 for success, 1 for fail
+int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
+                                 size_t encrypted_length,
+                                 unsigned char *decrypted,
+                                 size_t *decrypted_length);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
@@ -103,15 +114,16 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
 
-
 // Save session key list recursively.
 // @param session_key_list_t session_key_list to save
 // @param file_path file_path to save
-void save_session_key_list(session_key_list_t *session_key_list, const char *file_path);
+void save_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path);
 
 // Load session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
-void load_session_key_list(session_key_list_t *session_key_list, const char *file_path);
+void load_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path);
 
 #endif  // C_API_H
