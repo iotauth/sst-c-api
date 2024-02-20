@@ -90,9 +90,9 @@ void send_secure_message(char *msg, unsigned int msg_length,
 // @param encrypted_length length of returned encrypted buffer
 // @return 0 for success, 1 for fail
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
-                                 size_t plaintext_length,
+                                 unsigned int plaintext_length,
                                  unsigned char *encrypted,
-                                 size_t *encrypted_length);
+                                 unsigned int *encrypted_length);
 
 // Decrypt buffer with session key.
 // @param s_key session key to decrypt
@@ -102,9 +102,9 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param decrypted_length length of returned decrypted buffer
 // @return 0 for success, 1 for fail
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
-                                 size_t encrypted_length,
+                                 unsigned int encrypted_length,
                                  unsigned char *decrypted,
-                                 size_t *decrypted_length);
+                                 unsigned int *decrypted_length);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free

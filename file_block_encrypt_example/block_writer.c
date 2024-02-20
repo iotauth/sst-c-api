@@ -105,14 +105,12 @@ int main(int argc, char *argv[]) {
             plaintext_file_metadata[i].block_metadata[j].length =
                 total_block_size;
 
-            // Encrypt plaintext block.
+
             unsigned int encrypted_length;
-            unsigned char *encrypted = symmetric_encrypt_authenticate(
-                plaintext_block_buf, total_block_size,
-                s_key_list->s_key[i].mac_key, s_key_list->s_key[i].mac_key_size,
-                s_key_list->s_key[i].cipher_key,
-                s_key_list->s_key[i].cipher_key_size, IV_SIZE,
-                &encrypted_length);
+            unsigned char *encrypted;
+            if(encrypt_buf_with_session_key(&s_key_list->s_key[i], plaintext_block_buf, total_block_size, encrypted, &encrypted_length) > 0){
+                printf("Encryption failed!\n");
+            }
 
             // Save the encrypted block.
             fwrite(encrypted, encrypted_length, 1, encrypted_fp);

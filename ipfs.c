@@ -105,8 +105,10 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     unsigned int encrypted_length = (((bufsize) / AES_CBC_128_IV_SIZE) + 1) * AES_CBC_128_IV_SIZE;
     unsigned char* encrypted = (unsigned char*)malloc(encrypted_length);
     generate_nonce(AES_CBC_128_IV_SIZE, iv);
-    AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
-        AES_CBC_128_IV_SIZE, encrypted, &encrypted_length);
+    if(AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
+        AES_CBC_128_IV_SIZE, encrypted, &encrypted_length)){
+            printf("Encryption failed!\n");
+    }
     free(file_buf);
     printf("\nFile encryption was successful.\n");
 
@@ -153,8 +155,10 @@ void file_decrypt_save(session_key_t s_key, char* file_name) {
     unsigned long int enc_length = bufsize - (1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len);
     unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) / AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
     unsigned char* ret = (unsigned char*)malloc(ret_length);
-    AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key.cipher_key, CIPHER_KEY_SIZE, iv,
-        AES_CBC_128_IV_SIZE, ret, &ret_length);
+    if(AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key.cipher_key, CIPHER_KEY_SIZE, iv, 
+        AES_CBC_128_IV_SIZE, ret, &ret_length)) {
+            printf("Error while decrypting.\n");
+    }
     free(file_buf);
 
     int reply_num = 0;
@@ -259,12 +263,14 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             encrypted_entity_nonce_length);
             save_distribution_key(data_buf, data_buf_length, ctx, key_size);
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce =
-                symmetric_decrypt_authenticate(
+            unsigned char *decrypted_entity_nonce;
+            if(symmetric_decrypt_authenticate(
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
+                    AES_CBC_128_IV_SIZE, &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
+                error_exit("Error during decryption after receiving ADD_READER_RESP_WITH_DIST_KEY.\n");
+            }
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
@@ -276,11 +282,14 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char* add_reader) {
             break;
         } else if (message_type == ADD_READER_RESP) {
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce = symmetric_decrypt_authenticate(
+            unsigned char *decrypted_entity_nonce;
+            if(symmetric_decrypt_authenticate(
                 data_buf, data_buf_length, ctx->dist_key.mac_key,
                 ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                 ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
-                &decrypted_entity_nonce_length);
+                &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
+                error_exit("Error during decryption after receiving ADD_READER_RESP.\n");
+            }
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_exit("Auth nonce NOT verified");

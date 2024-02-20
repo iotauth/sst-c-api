@@ -62,16 +62,14 @@ int main(int argc, char *argv[]) {
                   plaintext_file_metadata[i].block_metadata[j].length, 1,
                   plaintext_fp);
 
-            // Decrypt read_encrypted_buf.
             unsigned int decrypted_length;
-            unsigned char *decrypted = symmetric_decrypt_authenticate(
-                read_encrypted_buf,
-                encrypted_file_metadata[i].block_metadata[j].length,
-                s_key_list.s_key[i].mac_key,
-                s_key_list.s_key[i].mac_key_size,
-                s_key_list.s_key[i].cipher_key,
-                s_key_list.s_key[i].cipher_key_size, IV_SIZE,
-                &decrypted_length);
+            unsigned char *decrypted;
+            if(decrypt_buf_with_session_key(&s_key_list.s_key[i], read_encrypted_buf, encrypted_file_metadata[i].block_metadata[j].length, decrypted, &decrypted_length) > 0){
+                printf("Decryption Success!\n");
+            } else{
+                printf("Decryption failed!\n");
+                break;
+            }
 
             // Compare original buffer and reopened buffer.
             if (!memcmp(read_plaintext_buf, decrypted, decrypted_length)) {
