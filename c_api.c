@@ -326,6 +326,36 @@ void send_secure_message(char *msg, unsigned int msg_length,
     write(session_ctx->sock, sender_buf, sender_buf_length);
 }
 
+int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext, size_t plaintext_length, unsigned char *encrypted, size_t *encrypted_length) {
+    if (check_session_key_validity(s_key)) {
+        encrypted = symmetric_encrypt_authenticate(
+            plaintext, plaintext_length,
+            s_key->mac_key, s_key->mac_key_size,
+            s_key->cipher_key,
+            s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
+            encrypted_length);
+        return 1;
+    } else {
+        printf("Session key is expired.\n");
+        return 0;
+    }
+}
+
+int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted, size_t encrypted_length, unsigned char *decrypted, size_t *decrypted_length) {
+    if (check_session_key_validity(s_key)) {
+        decrypted = symmetric_decrypt_authenticate(
+            encrypted, encrypted_length,
+            s_key->mac_key, s_key->mac_key_size,
+            s_key->cipher_key,
+            s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
+            decrypted_length);
+        return 1;
+    } else {
+        printf("Session key is expired.\n");
+        return 0;
+    }
+}
+
 void free_session_key_list_t(session_key_list_t *session_key_list) {
     free(session_key_list->s_key);
     free(session_key_list);

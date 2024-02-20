@@ -79,6 +79,22 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 void send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx);
 
+// Encrypt buffer with session key.
+// @param s_key session key to encrypt
+// @param plaintext plaintext to be encrypted
+// @param plaintext_length length of plaintext to be encrypted
+// @param encrypted returned encrypted buffer
+// @param encrypted_length length of returned encrypted buffer
+int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext, size_t plaintext_length, unsigned char *encrypted, size_t *encrypted_length);
+
+// Decrypt buffer with session key.
+// @param s_key session key to decrypt
+// @param encrypted encrypted buffer to be decrypted
+// @param encrypted_length length of encrypted buffer to be decrypted
+// @param decrypted returned decrypted buffer
+// @param decrypted_length length of returned decrypted buffer
+int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted, size_t encrypted_length, unsigned char *decrypted, size_t *decrypted_length);
+
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);
