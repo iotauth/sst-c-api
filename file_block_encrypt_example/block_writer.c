@@ -135,6 +135,7 @@ int main(int argc, char *argv[]) {
 
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);
+    save_session_key_list(s_key_list, "s_key_list.bin");
     // Free memory.
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);

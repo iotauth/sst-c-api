@@ -51,3 +51,6 @@ Auth Terminal
 Client Terminal
 `$ ./block_writer ../block_writer.config`
 `$ ./block_reader ../block_reader.config`
+
+Loading the saved key is also possible.
+`$ ./block_reader_load_s_key_list`
