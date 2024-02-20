@@ -9,7 +9,7 @@
 // @param path config file path
 // @return SST_ctx_t struct stores config, public and private keys, and
 // distribution key.
-SST_ctx_t *init_SST(char *config_path);
+SST_ctx_t *init_SST(const char *config_path);
 
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
