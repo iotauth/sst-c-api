@@ -16,6 +16,7 @@ SST_ctx_t *init_SST(char *config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
+    bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
 
