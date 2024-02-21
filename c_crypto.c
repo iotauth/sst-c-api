@@ -245,7 +245,7 @@ int symmetric_encrypt_authenticate(
     unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
     *ret_length = iv_size + encrypted_length + mac_key_size;
     *ret = (unsigned char *)malloc(*ret_length);
-    
+    // ret = IV (16) + encrypted(IV+buf) + HMAC((IV + encrypted)32)
     // First attach IV.
     generate_nonce(iv_size, *ret);
     unsigned int count = iv_size;
@@ -269,32 +269,22 @@ int symmetric_decrypt_authenticate(
     unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
     unsigned int *ret_length) {
     unsigned int encrypted_length = buf_length - mac_key_size;
-    unsigned char encrypted[encrypted_length];
-    memcpy(encrypted, buf, encrypted_length);
-    unsigned char received_tag[mac_key_size];
-    memcpy(received_tag, buf + encrypted_length, mac_key_size);
-    unsigned char hmac_tag[mac_key_size];
-    HMAC(EVP_sha256(), mac_key, mac_key_size, encrypted, encrypted_length,
-         hmac_tag, &mac_key_size);
-    if (memcmp(received_tag, hmac_tag, mac_key_size) != 0) {
-        printf("Received tag: ");
-        print_buf(received_tag, mac_key_size);
-        printf("Hmac tag: ");
-        print_buf(hmac_tag, mac_key_size);
+    *ret_length = encrypted_length / iv_size * iv_size;
+    *ret = (unsigned char *)malloc(*ret_length);
+    unsigned char reproduced_tag[mac_key_size];
+    HMAC(EVP_sha256(), mac_key, mac_key_size, buf, encrypted_length,
+         reproduced_tag, &mac_key_size);
+    if (memcmp(reproduced_tag, buf + encrypted_length, mac_key_size) != 0) {
+        // printf("Received tag: ");
+        // print_buf(received_tag, mac_key_size);
+        // printf("Hmac tag: ");
+        // print_buf(hmac_tag, mac_key_size);
         error_exit("Invalid MAC error!");
     } else {
         printf("MAC verified!\n");
     }
-    unsigned char iv[iv_size];
-    memcpy(iv, encrypted, iv_size);
 
-    unsigned int temp_length = encrypted_length - iv_size;
-    unsigned char temp[temp_length];
-    memcpy(temp, encrypted + iv_size, temp_length);
-    *ret_length = ((temp_length) + iv_size) / iv_size * iv_size;
-    *ret = (unsigned char *)malloc(*ret_length);
-    memset(*ret, 0, *ret_length);
-    if(AES_CBC_128_decrypt(temp, temp_length, cipher_key, cipher_key_size, iv, iv_size, *ret, ret_length)) {
+    if(AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size, cipher_key, cipher_key_size, buf, iv_size, *ret, ret_length)) {
         printf("AES_CBC_128_decrypt failed!");
         return 1;
     }
