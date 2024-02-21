@@ -86,7 +86,7 @@ void send_secure_message(char *msg, unsigned int msg_length,
 // @param s_key session key to encrypt
 // @param plaintext plaintext to be encrypted
 // @param plaintext_length length of plaintext to be encrypted
-// @param encrypted returned encrypted buffer
+// @param encrypted double pointer of returned encrypted buffer
 // @param encrypted_length length of returned encrypted buffer
 // @return 0 for success, 1 for fail
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
@@ -98,7 +98,7 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param s_key session key to decrypt
 // @param encrypted encrypted buffer to be decrypted
 // @param encrypted_length length of encrypted buffer to be decrypted
-// @param decrypted returned decrypted buffer
+// @param decrypted double pointer of returned decrypted buffer
 // @param decrypted_length length of returned decrypted buffer
 // @return 0 for success, 1 for fail
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
