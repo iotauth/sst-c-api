@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
 
             unsigned int encrypted_length;
             unsigned char *encrypted;
-            if(encrypt_buf_with_session_key(&s_key_list->s_key[i], plaintext_block_buf, total_block_size, encrypted, &encrypted_length) > 0){
+            if(encrypt_buf_with_session_key(&s_key_list->s_key[i], plaintext_block_buf, total_block_size, &encrypted, &encrypted_length) > 0){
                 printf("Encryption failed!\n");
             }
 
