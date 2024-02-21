@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
-                    &decrypted, &decrypted_length) > 0) {
+                    &decrypted, &decrypted_length)) {
                 printf("Decryption Success!\n");
             } else {
                 printf("Decryption failed!\n");
