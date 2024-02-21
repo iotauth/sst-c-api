@@ -178,13 +178,12 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
     return digest;
 }
 
-int AES_CBC_128_encrypt(unsigned char *plaintext,
-                         unsigned int plaintext_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length) {
+int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
+                        unsigned char *key, unsigned int key_length,
+                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)){
+    if (!EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)) {
         // Error
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptInit_ex failed");
@@ -208,13 +207,12 @@ int AES_CBC_128_encrypt(unsigned char *plaintext,
     return 0;
 }
 
-int AES_CBC_128_decrypt(unsigned char *encrypted,
-                         unsigned int encrypted_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length) {
+int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
+                        unsigned char *key, unsigned int key_length,
+                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if(!EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)){
+    if (!EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptInit_ex failed");
         return 1;
@@ -236,12 +234,13 @@ int AES_CBC_128_decrypt(unsigned char *encrypted,
     return 0;
 }
 
-int symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
-    unsigned int *ret_length) {
-
+int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length) {
     unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
     *ret_length = iv_size + encrypted_length + mac_key_size;
     *ret = (unsigned char *)malloc(*ret_length);
@@ -250,23 +249,25 @@ int symmetric_encrypt_authenticate(
     generate_nonce(iv_size, *ret);
     unsigned int count = iv_size;
     // Attach encrypted buffer
-    if(AES_CBC_128_encrypt(buf, buf_length, cipher_key, cipher_key_size, *ret,
-                        iv_size, *ret + count, &encrypted_length)) {
+    if (AES_CBC_128_encrypt(buf, buf_length, cipher_key, cipher_key_size, *ret,
+                            iv_size, *ret + count, &encrypted_length)) {
         printf("AES_CBC_128_encrypt failed!");
         return 1;
     }
     // Attach HMAC tag
     count += encrypted_length;
-    HMAC(EVP_sha256(), mac_key, mac_key_size, *ret, iv_size + encrypted_length, *ret + count,
-         &mac_key_size);
+    HMAC(EVP_sha256(), mac_key, mac_key_size, *ret, iv_size + encrypted_length,
+         *ret + count, &mac_key_size);
     return 0;
 }
 
-int symmetric_decrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
-    unsigned int *ret_length) {
+int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length) {
     unsigned int encrypted_length = buf_length - mac_key_size;
     *ret_length = encrypted_length / iv_size * iv_size;
     *ret = (unsigned char *)malloc(*ret_length);
@@ -283,7 +284,9 @@ int symmetric_decrypt_authenticate(
         printf("MAC verified!\n");
     }
 
-    if(AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size, cipher_key, cipher_key_size, buf, iv_size, *ret, ret_length)) {
+    if (AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size,
+                            cipher_key, cipher_key_size, buf, iv_size, *ret,
+                            ret_length)) {
         printf("AES_CBC_128_decrypt failed!");
         return 1;
     }

@@ -1,6 +1,5 @@
 #include "block_common.h"
 
-
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
@@ -16,19 +15,23 @@ int main(int argc, char *argv[]) {
     file_metadata_t encrypted_file_metadata[TOTAL_FILE_NUM];
     file_metadata_t plaintext_file_metadata[TOTAL_FILE_NUM];
     for (int var = 0; var < TOTAL_FILE_NUM; ++var) {
-        fread(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1, encrypted_metadata_fp);
-        fread(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1, plaintext_metadata_fp);
+        fread(&encrypted_file_metadata[var], sizeof(file_metadata_t), 1,
+              encrypted_metadata_fp);
+        fread(&plaintext_file_metadata[var], sizeof(file_metadata_t), 1,
+              plaintext_metadata_fp);
     }
 
     // Macro initializing session_key_list.
     INIT_SESSION_KEY_LIST(s_key_list);
-    
+
     //  ----Decrypt and compare with plaintext----
 
     // Read files.
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
-        // Request session key by session key ID. It will be added to the s_key_list.
-        get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx, &s_key_list);
+        // Request session key by session key ID. It will be added to the
+        // s_key_list.
+        get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
+                              &s_key_list);
         char encrypted_filename[15];
         sprintf(encrypted_filename, "encrypted%d.txt", i);
         char plaintext_filename[15];
@@ -64,7 +67,10 @@ int main(int argc, char *argv[]) {
 
             unsigned int decrypted_length;
             unsigned char *decrypted;
-            if(decrypt_buf_with_session_key(&s_key_list.s_key[i], read_encrypted_buf, encrypted_file_metadata[i].block_metadata[j].length, &decrypted, &decrypted_length) > 0){
+            if (decrypt_buf_with_session_key(
+                    &s_key_list.s_key[i], read_encrypted_buf,
+                    encrypted_file_metadata[i].block_metadata[j].length,
+                    &decrypted, &decrypted_length) > 0) {
                 printf("Decryption failed!\n");
                 break;
             }
@@ -84,7 +90,7 @@ int main(int argc, char *argv[]) {
         }
         fclose(encrypted_fp);
         fclose(plaintext_fp);
-    }    
+    }
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);
     // Free memory.
