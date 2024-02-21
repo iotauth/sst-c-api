@@ -337,13 +337,13 @@ void send_secure_message(char *msg, unsigned int msg_length,
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned int plaintext_length,
-                                 unsigned char *encrypted,
+                                 unsigned char **encrypted,
                                  unsigned int *encrypted_length) {
     if (!check_session_key_validity(s_key)) {
         if(symmetric_encrypt_authenticate(
             plaintext, plaintext_length, s_key->mac_key, s_key->mac_key_size,
             s_key->cipher_key, s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
-            &encrypted, encrypted_length)) {
+            encrypted, encrypted_length)) {
             error_exit("Error during encrypting buffer with session key.\n");
         }
         return 0;
@@ -355,13 +355,13 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned int encrypted_length,
-                                 unsigned char *decrypted,
+                                 unsigned char **decrypted,
                                  unsigned int *decrypted_length) {
     if (!check_session_key_validity(s_key)) {
         if(symmetric_decrypt_authenticate(
             encrypted, encrypted_length, s_key->mac_key, s_key->mac_key_size,
             s_key->cipher_key, s_key->cipher_key_size, AES_CBC_128_IV_SIZE,
-            &decrypted, decrypted_length)) {
+            decrypted, decrypted_length)) {
             error_exit("Error during decrypting buffer with session key.\n");
         }
         return 0;

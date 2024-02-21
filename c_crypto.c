@@ -259,7 +259,6 @@ int symmetric_encrypt_authenticate(
     count += encrypted_length;
     HMAC(EVP_sha256(), mac_key, mac_key_size, *ret, iv_size + encrypted_length, *ret + count,
          &mac_key_size);
-    printf("Hello\n");
     return 0;
 }
 
