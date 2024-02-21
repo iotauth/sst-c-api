@@ -117,6 +117,7 @@ int main(int argc, char *argv[]) {
             fwrite(encrypted, encrypted_length, 1, encrypted_fp);
             encrypted_file_metadata[i].block_metadata[j].length =
                 encrypted_length;
+            free(encrypted);
             printf("Wrote encrypted block %d\n", j);
         }
         fclose(plaintext_fp);
