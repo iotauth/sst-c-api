@@ -102,7 +102,6 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     size_t encrypted_length;
     unsigned char *encrypted = public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
                                               ctx->pub_key, &encrypted_length);
-    printf("encrypted length: %d", encrypted_length);
     size_t sigret_length;
     unsigned char *sigret =
         SHA256_sign(encrypted, encrypted_length, ctx->priv_key, &sigret_length);
@@ -122,8 +121,6 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ct
     // parse data
     memcpy(signed_data.data, data_buf, key_size);
     memcpy(signed_data.sign, data_buf + key_size, key_size);
-    memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
-            encrypted_entity_nonce_length);
 
     // verify
     SHA256_verify(signed_data.data, key_size, signed_data.sign,

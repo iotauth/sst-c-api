@@ -6,6 +6,7 @@
 #define BUFF_SIZE 100
 #define UPLOAD_INDEX 0
 #define DOWNLOAD_INDEX 1
+#define DOWNLOAD_RESP 2
 #define MAX_REPLY_NUM 100
 
 typedef struct {
@@ -60,12 +61,19 @@ void file_decrypt_save(session_key_t session_ctx, char* file_name);
 // @param hash_value_len length of value to send to file system manager.
 void upload_to_file_system_manager(session_key_t* session_ctx, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len);
 
+int upload_concat_buffer(session_key_t* s_key, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len, char* concat_buffer);
+
+int download_concat_buffer(SST_ctx_t* ctx, char* concat_buffer);
+
 // Receive the data from file system manager and download the file in IPFS environment.
 // @param session_ctx session key information to compare with session key received from file system manager.
 // @param ctx config struct obtained from load_config()
 // @param file_name file name to save the file.
 // @estimate_time value to measure and store the time for each process.
 void receive_data_and_download_file(unsigned char* skey_id, SST_ctx_t* ctx, char* file_name, estimate_time_t* estimate_time);
+
+void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str, char* file_name);
+
 
 // Send the request for adding the reader to Auth.
 // @param ctx config struct obtained from load_config()
