@@ -16,12 +16,6 @@ int main(int argc, char* argv[]) {
         send_add_reader_req_via_TCP(ctx, addReader);
     }
     fclose(add_reader_file);
-
-    session_key_list_t *s_key_list = get_session_key(ctx, NULL);
-    SST_session_ctx_t *session_ctx =
-        secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    printf("finished\n");
-
     // Set purpose to make session key request for file sharing.
     ctx->purpose_index = 1;
     estimate_time_t estimate_time[5];

@@ -282,7 +282,7 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str, c
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
-        (const char *)ctx->config->auth_port_num, &sock);
+                      (const char *)ctx->config->auth_port_num, &sock);
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
@@ -318,7 +318,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
             if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
-                NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
             } else {
                 printf("Auth nonce verified!\n");
@@ -326,8 +326,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             printf("Add a file reader to the database.\n");
             close(sock);
             break;
-        }
-        else if (message_type == ADD_READER_RESP) {
+        } else if (message_type == ADD_READER_RESP) {
             unsigned int decrypted_entity_nonce_length;
             unsigned char *decrypted_entity_nonce = symmetric_decrypt_authenticate(
                 data_buf, data_buf_length, ctx->dist_key.mac_key,
