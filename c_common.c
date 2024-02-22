@@ -111,14 +111,11 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         return 0;
     }
     *message_type = received_buf[0];
-    print_buf(message_type, 1);
     unsigned int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
-    printf("Size: %d\n", var_length_buf_size);
     unsigned int var_length_buf_size_checked;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           ret_length, &var_length_buf_size_checked);
-    printf("Size: %d\n", var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
         error_exit("Wrong header calculation... Exiting...");
     }

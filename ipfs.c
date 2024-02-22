@@ -6,7 +6,7 @@ const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
 const char DOWNLOAD_FILE_NAME[] = "download";
 
-void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize) {
+void get_file_content(FILE *fin, unsigned char *file_buf, unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
         error_exit("Start point is not zero.\n");
         exit(1);
@@ -19,7 +19,7 @@ void get_file_content(FILE* fin, unsigned char* file_buf, unsigned long bufsize)
     file_buf[newLen++] = '\0';
 }
 
-unsigned long file_size_return(FILE* fin) {
+unsigned long file_size_return(FILE *fin) {
     unsigned long bufsize;
     if (fin == NULL) {
         error_exit("Cannot read the file.\n");
@@ -33,7 +33,7 @@ unsigned long file_size_return(FILE* fin) {
     return bufsize;
 }
 
-void file_duplication_check(const char* file_name, const char* file_extension, char* file_name_buf) {
+void file_duplication_check(const char *file_name, const char *file_extension, char *file_name_buf) {
     int suffix_num = 0;
     // Copy file name.
     memcpy(file_name_buf, file_name, strlen(file_name));
@@ -60,9 +60,9 @@ void file_duplication_check(const char* file_name, const char* file_extension, c
     }
 }
 
-int execute_command_and_save_result(char* file_name, unsigned char* hash_value, estimate_time_t* estimate_time) {
+int execute_command_and_save_result(char *file_name, unsigned char *hash_value, estimate_time_t *estimate_time) {
     char buff[BUFF_SIZE];
-    FILE* fp;
+    FILE *fp;
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
@@ -77,7 +77,7 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value, 
     while (fgets(buff, BUFF_SIZE, fp))
         printf("%s\n", buff);
     pclose(fp);
-    char* result;
+    char *result;
     strtok(buff, " ");
     result = strtok(NULL, " ");
     memcpy(hash_value, result, strlen(result));
@@ -88,14 +88,14 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value, 
     return strlen(result);
 }
 
-int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path, unsigned char* hash_value, estimate_time_t* estimate_time) {
-    FILE* fgen, * fin, * fout, * fenc;
+int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx, char *my_file_path, unsigned char *hash_value, estimate_time_t *estimate_time) {
+    FILE *fgen,  *fin,  *fout,  *fenc;
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
     fin = fopen(my_file_path, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
-    unsigned char* file_buf = NULL;
+    unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     get_file_content(fin, file_buf, bufsize);
     fclose(fin);
@@ -103,7 +103,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     unsigned char iv[AES_CBC_128_IV_SIZE];
     int provider_len = sizeof(ctx->config->name);
     unsigned int encrypted_length = (((bufsize) / AES_CBC_128_IV_SIZE) + 1) * AES_CBC_128_IV_SIZE;
-    unsigned char* encrypted = (unsigned char*)malloc(encrypted_length);
+    unsigned char *encrypted = (unsigned char*)malloc(encrypted_length);
     generate_nonce(AES_CBC_128_IV_SIZE, iv);
     AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, encrypted, &encrypted_length);
@@ -115,7 +115,7 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
 
     // File descriptor for the encrypted file.
     fenc = fopen(file_name_buffer, "w");
-    unsigned char* enc_save = (unsigned char*)malloc(encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len);
+    unsigned char *enc_save = (unsigned char*)malloc(encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
     memcpy(enc_save + 1, ctx->config->name, provider_len);
     enc_save[provider_len + 1] = AES_CBC_128_IV_SIZE;
@@ -134,12 +134,12 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx, char* my_file_path
     return execute_command_and_save_result(&file_name_buffer[0], hash_value, estimate_time);
 }
 
-void file_decrypt_save(session_key_t s_key, char* file_name) {
-    FILE* fp, * fin, * fout;
+void file_decrypt_save(session_key_t s_key, char *file_name) {
+    FILE *fp,  *fin,  *fout;
     fin = fopen(file_name, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
-    unsigned char* file_buf = NULL;
+    unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     get_file_content(fin, file_buf, bufsize);
     fclose(fin);
@@ -152,7 +152,7 @@ void file_decrypt_save(session_key_t s_key, char* file_name) {
 
     unsigned long int enc_length = bufsize - (1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len);
     unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) / AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
-    unsigned char* ret = (unsigned char*)malloc(ret_length);
+    unsigned char *ret = (unsigned char*)malloc(ret_length);
     AES_CBC_128_decrypt(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length, s_key.cipher_key, CIPHER_KEY_SIZE, iv,
         AES_CBC_128_IV_SIZE, ret, &ret_length);
     free(file_buf);
@@ -167,7 +167,7 @@ void file_decrypt_save(session_key_t s_key, char* file_name) {
     printf("Completed decryption and saved the file: %s\n", result_file_name);
 }
 
-void upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len) {
+void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx, unsigned char *hash_value, int hash_value_len) {
     int sock;
     connect_as_client((const char*)ctx->config->file_system_manager_ip_addr,
         (const char*)ctx->config->file_system_manager_port_num, &sock);
@@ -186,7 +186,7 @@ void upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx, unsigne
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-int upload_concat_buffer(session_key_t* s_key, SST_ctx_t* ctx, unsigned char* hash_value, int hash_value_len, char* concat_buffer) {
+int upload_concat_buffer(session_key_t *s_key, SST_ctx_t *ctx, unsigned char *hash_value, int hash_value_len, char *concat_buffer) {
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
     name_size = sizeof(ctx->config->name);
@@ -208,7 +208,7 @@ int upload_concat_buffer(session_key_t* s_key, SST_ctx_t* ctx, unsigned char* ha
     return index;
 }
 
-int download_concat_buffer(SST_ctx_t* ctx, char* concat_buffer) {
+int download_concat_buffer(SST_ctx_t *ctx, char *concat_buffer) {
     int name_size;
     name_size = sizeof(ctx->config->name);
     int index = 0;
@@ -221,8 +221,8 @@ int download_concat_buffer(SST_ctx_t* ctx, char* concat_buffer) {
     return index;
 }
 
-void receive_data_and_download_file(unsigned char* skey_id_in_str, SST_ctx_t* ctx, char* file_name, estimate_time_t* estimate_time) {
-    FILE* fin;
+void receive_data_and_download_file(unsigned char *skey_id_in_str, SST_ctx_t *ctx, char *file_name, estimate_time_t *estimate_time) {
+    FILE *fin;
     int sock;
     struct timeval filemanager_start, filemanager_end;
     gettimeofday(&filemanager_start, NULL);
@@ -262,8 +262,8 @@ void receive_data_and_download_file(unsigned char* skey_id_in_str, SST_ctx_t* ct
     estimate_time->up_download_time = download_time + download_utime / 1000000;
 }
 
-void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str, char* file_name) {
-    FILE* fin;
+void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str, char *file_name) {
+    FILE *fin;
     int command_size;
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
@@ -279,10 +279,10 @@ void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str, c
 
 }
 
-void send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
+void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
-    connect_as_client((const char*)ctx->config->auth_ip_addr,
-        (const char*)ctx->config->auth_port_num, &sock);
+    connect_as_client((const char *)ctx->config->auth_ip_addr,
+        (const char *)ctx->config->auth_port_num, &sock);
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
@@ -290,7 +290,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
             read(sock, received_buf, sizeof(received_buf));
         unsigned char message_type;
         unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
+        unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
             unsigned int auth_Id;
@@ -299,30 +299,28 @@ void send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
             unsigned int serialized_length;
-            unsigned char* serialized = serialize_message_for_auth(
+            unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, 0,
                 ctx->config->name, add_reader, &serialized_length);
             send_auth_request_message(serialized, serialized_length, ctx, sock, 0);
-        }
-        else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
+        } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_entity_nonce_length = data_buf_length - (key_size * 2);
             unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
             memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
-                encrypted_entity_nonce_length);
+            encrypted_entity_nonce_length);
             save_distribution_key(data_buf, data_buf_length, ctx, key_size);
             unsigned int decrypted_entity_nonce_length;
-            unsigned char* decrypted_entity_nonce =
+            unsigned char *decrypted_entity_nonce =
                 symmetric_decrypt_authenticate(
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_CBC_128_IV_SIZE, &decrypted_entity_nonce_length);
-            if (strncmp((const char*)decrypted_entity_nonce, (const char*)entity_nonce,
+            if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
                 NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
-            }
-            else {
+            } else {
                 printf("Auth nonce verified!\n");
             }
             printf("Add a file reader to the database.\n");
@@ -331,16 +329,15 @@ void send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
         }
         else if (message_type == ADD_READER_RESP) {
             unsigned int decrypted_entity_nonce_length;
-            unsigned char* decrypted_entity_nonce = symmetric_decrypt_authenticate(
+            unsigned char *decrypted_entity_nonce = symmetric_decrypt_authenticate(
                 data_buf, data_buf_length, ctx->dist_key.mac_key,
                 ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                 ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
                 &decrypted_entity_nonce_length);
-            if (strncmp((const char*)decrypted_entity_nonce, (const char*)entity_nonce,
-                NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
+            if (strncmp((const char *)decrypted_entity_nonce, (const char *)entity_nonce,
+                        NONCE_SIZE) != 0) {  // compare generated entity's nonce & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
-            }
-            else {
+            } else {
                 printf("Auth nonce verified!\n");
             }
             printf("Add a file reader to the database.\n");

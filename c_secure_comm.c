@@ -102,6 +102,7 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     size_t encrypted_length;
     unsigned char *encrypted = public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
                                               ctx->pub_key, &encrypted_length);
+    printf("encrypted length: %d", encrypted_length);
     size_t sigret_length;
     unsigned char *sigret =
         SHA256_sign(encrypted, encrypted_length, ctx->priv_key, &sigret_length);
