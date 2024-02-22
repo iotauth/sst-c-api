@@ -66,9 +66,10 @@ typedef struct {
 // @param ret_length length of return buffer
 // @return concated total buffer
 unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
-                                        unsigned char *auth_nonce, int num_key,
-                                        char *sender, char *purpose,
-                                        unsigned int *ret_length);
+                                          unsigned char *auth_nonce,
+                                          int num_key, char *sender,
+                                          char *purpose,
+                                          unsigned int *ret_length);
 
 // Encrypt the message and send the request message to Auth.
 // @param serialized total message
@@ -76,7 +77,9 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
 // @param ctx config struct obtained from load_config()
 // @param sock socket number
 // @param requestIndex request index for purpose
-void send_auth_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex);
+void send_auth_request_message(unsigned char *serialized,
+                               unsigned int serialized_length, SST_ctx_t *ctx,
+                               int sock, int requestIndex);
 
 // Encrypt the message and sign the encrypted message.
 // @param buf input buffer
@@ -96,13 +99,13 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
 void parse_distribution_key(distribution_key_t *parsed_distribution_key,
                             unsigned char *buf, unsigned int buf_length);
 
-
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
 // @param data_buf_length length of data buffer
 // @param ctx config struct obtained from load_config()
 // @param key_size size of the public crypto key
-void save_distribution_key(unsigned char *data_buf, int data_buf_length, SST_ctx_t* ctx, size_t key_size);
+void save_distribution_key(unsigned char *data_buf, int data_buf_length,
+                           SST_ctx_t *ctx, size_t key_size);
 
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec
@@ -136,8 +139,8 @@ void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
 // distribution key. Serializes the sender_length, sender_name, and encrypted
 // message above.
 // @param serialized return buffer of serialize_message_for_auth
-// @param serialized_length buffer length of return of serialize_message_for_auth
-// buffer
+// @param serialized_length buffer length of return of
+// serialize_message_for_auth buffer
 // @param dist_key key to symmetric encrypt & authenticate
 // @param name entity_sender name.
 // @param ret_length

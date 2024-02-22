@@ -43,7 +43,7 @@ int get_key_value(char *ptr);
 // Load config file from path and save the information in config struct.
 // @param path config file path
 // @return config struct to use when connecting to Auth
-config_t *load_config(char *path);
+config_t *load_config(const char *path);
 
 // Free memory used in config_t.
 // @param config struct config_t to be freed.

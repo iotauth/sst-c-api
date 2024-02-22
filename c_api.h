@@ -9,7 +9,7 @@
 // @param path config file path
 // @return SST_ctx_t struct stores config, public and private keys, and
 // distribution key.
-SST_ctx_t *init_SST(char *config_path);
+SST_ctx_t *init_SST(const char *config_path);
 
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
@@ -25,12 +25,15 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
 
-// Try finding a target session key with its ID. If the entity has the target session key, return the session key.
-// Otherwise, request and receive the target session key by ID from Auth and return the session key.
+// Try finding a target session key with its ID. If the entity has the target
+// session key, return the session key. Otherwise, request and receive the
+// target session key by ID from Auth and return the session key.
 // @param target_session_key_id ID of the target session key.
 // @param ctx SST context to communicate with Auth.
 // @param existing_s_key_list list of session keys that currently exist.
-session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list);
+session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
+                                     SST_ctx_t *ctx,
+                                     session_key_list_t *existing_s_key_list);
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
@@ -79,6 +82,30 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 void send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx);
 
+// Encrypt buffer with session key.
+// @param s_key session key to encrypt
+// @param plaintext plaintext to be encrypted
+// @param plaintext_length length of plaintext to be encrypted
+// @param encrypted double pointer of returned encrypted buffer
+// @param encrypted_length length of returned encrypted buffer
+// @return 0 for success, 1 for fail
+int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
+                                 unsigned int plaintext_length,
+                                 unsigned char **encrypted,
+                                 unsigned int *encrypted_length);
+
+// Decrypt buffer with session key.
+// @param s_key session key to decrypt
+// @param encrypted encrypted buffer to be decrypted
+// @param encrypted_length length of encrypted buffer to be decrypted
+// @param decrypted double pointer of returned decrypted buffer
+// @param decrypted_length length of returned decrypted buffer
+// @return 0 for success, 1 for fail
+int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
+                                 unsigned int encrypted_length,
+                                 unsigned char **decrypted,
+                                 unsigned int *decrypted_length);
+
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);
@@ -86,5 +113,17 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
+
+// Save session key list recursively.
+// @param session_key_list_t session_key_list to save
+// @param file_path file_path to save
+void save_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path);
+
+// Load session key list recursively.
+// @param session_key_list_t session_key_list to load
+// @param file_path file_path to load
+void load_session_key_list(session_key_list_t *session_key_list,
+                           const char *file_path);
 
 #endif  // C_API_H

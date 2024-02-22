@@ -6,3 +6,4 @@ entity_server
 /**/cmake_install.cmake
 /**/CMakeFiles/
 /**/Makefile
+**/build/**

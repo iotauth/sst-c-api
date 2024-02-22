@@ -133,11 +133,11 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
 // @param iv_length length of iv buffer
 // @param ret decrypted message received from CBC encryption
 // @param ret_length length of ret
-void AES_CBC_128_encrypt(unsigned char *plaintext,
-                         unsigned int plaintext_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length);
+// @return 0 for success, 1 for error.
+int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
+                        unsigned char *key, unsigned int key_length,
+                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *ret, unsigned int *ret_length);
 
 // Decrypt the message with the cipher key of the session key obtained from Auth
 // by using Cipher Block Chaining(CBC) decryption of OpenSSL.
@@ -149,11 +149,11 @@ void AES_CBC_128_encrypt(unsigned char *plaintext,
 // @param iv_length length of iv buffer
 // @param ret decrypted message received from CBC decryption
 // @param ret_length length of ret
-void AES_CBC_128_decrypt(unsigned char *encrypted,
-                         unsigned int encrypted_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length);
+// @return 0 for success, 1 for error.
+int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
+                        unsigned char *key, unsigned int key_length,
+                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *ret, unsigned int *ret_length);
 
 // Encrypt the message with cipher key and
 // make HMAC(Hashed Message Authenticate Code) with mac key from session key.
@@ -165,11 +165,14 @@ void AES_CBC_128_decrypt(unsigned char *encrypted,
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param ret_length length of return buffer
-unsigned char *symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    unsigned int *ret_length);
+// @return 0 for success, 1 for error.
+int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length);
 
 // Decrypt the encrypted message with cipher key and
 // make HMAC(Hashed Message Authenticate Code) with mac key from session key.
@@ -181,10 +184,13 @@ unsigned char *symmetric_encrypt_authenticate(
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param ret_length length of return buffer
-unsigned char *symmetric_decrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    unsigned int *ret_length);
+// @return 0 for success, 1 for error.
+int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length);
 
 #endif  // C_CRYPTO_H
