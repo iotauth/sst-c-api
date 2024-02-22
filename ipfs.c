@@ -186,7 +186,7 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx, unsigne
     printf("Send the data such as sessionkey id, hash value for file. \n");
 }
 
-int upload_concat_buffer(session_key_t *s_key, SST_ctx_t *ctx, unsigned char *hash_value, int hash_value_len, char *concat_buffer) {
+int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx, unsigned char *hash_value, int hash_value_len, char *concat_buffer) {
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
     name_size = sizeof(ctx->config->name);
@@ -208,7 +208,7 @@ int upload_concat_buffer(session_key_t *s_key, SST_ctx_t *ctx, unsigned char *ha
     return index;
 }
 
-int download_concat_buffer(SST_ctx_t *ctx, char *concat_buffer) {
+int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
     int name_size;
     name_size = sizeof(ctx->config->name);
     int index = 0;
