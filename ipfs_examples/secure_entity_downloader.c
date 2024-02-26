@@ -13,7 +13,7 @@ int main(int argc, char *argv[]) {
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
     sleep(3);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
-    int concat_buffer_size = download_concat_buffer(ctx, &concat_buffer);
+    int concat_buffer_size = make_download_req_buffer(ctx, &concat_buffer);
     send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
     // ctx->purpose_index = 1;
     char file_name[BUFF_SIZE];

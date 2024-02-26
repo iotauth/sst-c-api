@@ -25,7 +25,7 @@ int main(int argc, char* argv[]) {
     estimate_time_t estimate_time[5];
     hash_value_len = file_encrypt_upload(&s_key_list_0->s_key[0], ctx, my_file_path, &hash_value[0], &estimate_time[0]);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
-    int concat_buffer_size = upload_concat_buffer(&s_key_list_0->s_key[0], ctx, &hash_value[0], hash_value_len, &concat_buffer);
+    int concat_buffer_size = make_upload_req_buffer(&s_key_list_0->s_key[0], ctx, &hash_value[0], hash_value_len, &concat_buffer);
     ctx->purpose_index = 0;
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
     SST_session_ctx_t *session_ctx =
