@@ -117,13 +117,8 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ct
     signed_data_t signed_data;
 
     // parse data
-    unsigned int encrypted_entity_nonce_length =
-        data_buf_length - (key_size * 2);
-    unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
     memcpy(signed_data.data, data_buf, key_size);
     memcpy(signed_data.sign, data_buf + key_size, key_size);
-    memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
-            encrypted_entity_nonce_length);
 
     // verify
     SHA256_verify(signed_data.data, key_size, signed_data.sign,
