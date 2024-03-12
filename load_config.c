@@ -52,7 +52,8 @@ config_t *load_config(const char *path) {
     };
     char *pline;
     static const char delimiters[] = " \n";
-    int purpose_index = 0;
+    unsigned short purpose_count = 0;
+    c->purpose_index = 0;
     printf("--config--\n");
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);
@@ -66,17 +67,18 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_INFO_PURPOSE:
                     ptr = strtok(NULL, delimiters);
-                    if (purpose_index == 0) {
+                    if (purpose_count == 0) {
                         printf("First purpose: %s\n", ptr);
-                        strcpy(c->purpose[purpose_index], ptr);
-                        purpose_index += 1;
-                    } else if (purpose_index == 1) {
+                        strcpy(c->purpose[purpose_count], ptr);
+                        purpose_count += 1;
+                    } else if (purpose_count == 1) {
                         printf("Second purpose: %s\n", ptr);
-                        strcpy(c->purpose[purpose_index], ptr);
-                        purpose_index += 1;
+                        strcpy(c->purpose[purpose_count], ptr);
+                        purpose_count += 1;
                     } else {
                         printf("Error for wrong number of purpose.\n");
                     }
+                    c->purpose_index = purpose_count - 1;
                     break;
                 case ENTITY_INFO_NUMKEY:
                     ptr = strtok(NULL, delimiters);

@@ -435,7 +435,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned int serialized_length;
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose[ctx->purpose_index],
+                ctx->config->name, ctx->config->purpose[ctx->config->purpose_index],
                 &serialized_length);
             send_auth_request_message(serialized, serialized_length, ctx, sock,
                                       1);

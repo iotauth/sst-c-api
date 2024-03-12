@@ -122,7 +122,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key = &existing_s_key_list->s_key[session_key_found];
     } else if (session_key_found == -1) {
         // WARNING: The following line overwrites the purpose.
-        sprintf(ctx->config->purpose[ctx->purpose_index], "{\"keyId\":%d}",
+        sprintf(ctx->config->purpose[ctx->config->purpose_index], "{\"keyId\":%d}",
                 target_session_key_id_int);
 
         session_key_list_t *s_key_list;

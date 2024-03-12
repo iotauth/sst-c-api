@@ -44,7 +44,6 @@ typedef struct {
     config_t *config;
     EVP_PKEY *pub_key;
     EVP_PKEY *priv_key;
-    int purpose_index;
 } SST_ctx_t;
 
 #define INIT_SESSION_KEY_LIST(X)                                  \
