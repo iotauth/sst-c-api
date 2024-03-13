@@ -129,13 +129,15 @@ void free_SST_ctx_t(SST_ctx_t *ctx);
 // Save session key list recursively.
 // @param session_key_list_t session_key_list to save
 // @param file_path file_path to save
-void save_session_key_list(session_key_list_t *session_key_list,
+// @return 0 for success, 1 for fail
+int save_session_key_list(session_key_list_t *session_key_list,
                            const char *file_path);
 
 // Load session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
-void load_session_key_list(session_key_list_t *session_key_list,
+// @return 0 for success, 1 for fail
+int load_session_key_list(session_key_list_t *session_key_list,
                            const char *file_path);
 
 #endif  // C_API_H

@@ -409,7 +409,7 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     free_config_t(ctx->config);
 }
 
-void save_session_key_list(session_key_list_t *session_key_list,
+int save_session_key_list(session_key_list_t *session_key_list,
                            const char *file_path) {
     FILE *saved_file_fp = fopen(file_path, "wb");
     // Write the session_key_list_t structure
@@ -418,19 +418,26 @@ void save_session_key_list(session_key_list_t *session_key_list,
     fwrite(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
            saved_file_fp);
     fclose(saved_file_fp);
+    return 1;
 }
 
-void load_session_key_list(session_key_list_t *session_key_list,
+int load_session_key_list(session_key_list_t *session_key_list,
                            const char *file_path) {
-    FILE *load_file_fp = fopen(file_path, "rb");
-    // Save the malloced pointer.
-    session_key_t *s = session_key_list->s_key;
-    // Read the session_key_list_t structure
-    fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
-    //Reload the saved pointer.
-    session_key_list->s_key = s;
-    // Read the dynamically allocated memory pointed to by s_key
-    fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
-          load_file_fp);
-    fclose(load_file_fp);
+    FILE *load_file_fp;
+    if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
+        return 1; 
+    }
+    else {
+        // Save the malloced pointer.
+        session_key_t *s = session_key_list->s_key;
+        // Read the session_key_list_t structure
+        fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
+        //Reload the saved pointer.
+        session_key_list->s_key = s;
+        // Read the dynamically allocated memory pointed to by s_key
+        fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
+              load_file_fp);
+        fclose(load_file_fp);
+        return 0;
+    }
 }
