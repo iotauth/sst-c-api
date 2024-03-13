@@ -33,8 +33,8 @@ typedef struct {
 // The session_key_list as a circular array.
 typedef struct {
     int num_key;
-    session_key_t *s_key;
     int rear_idx;
+    session_key_t *s_key;
 } session_key_list_t;
 
 // This struct contains distribution_key, loaded config, public and private

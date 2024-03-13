@@ -11,6 +11,10 @@
 // distribution key.
 SST_ctx_t *init_SST(const char *config_path);
 
+// Initializes empty session_key_list. 
+// Mallocs session_key_list_t and the session_key_t as much as the MAX_SESSION_KEY.
+session_key_list_t *init_empty_session_key_list();
+
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
 // @param config_info config struct obtained from load_config()

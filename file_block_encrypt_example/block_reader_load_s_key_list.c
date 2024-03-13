@@ -21,10 +21,10 @@ int main(int argc, char *argv[]) {
     }
 
     // Macro initializing session_key_list.
-    session_key_list_t *s_key_list;
+    session_key_list_t *s_key_list = init_empty_session_key_list();
     load_session_key_list(s_key_list, "s_key_list.bin");
-    //  ----Decrypt and compare with plaintext----
 
+    //  ----Decrypt and compare with plaintext----
     // Read files.
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
         // Request session key by session key ID. It will be added to the
@@ -69,8 +69,6 @@ int main(int argc, char *argv[]) {
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
                     &decrypted, &decrypted_length)) {
-                printf("Decryption Success!\n");
-            } else {
                 printf("Decryption failed!\n");
                 break;
             }

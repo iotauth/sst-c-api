@@ -20,6 +20,13 @@ SST_ctx_t *init_SST(const char *config_path) {
     return ctx;
 }
 
+session_key_list_t *init_empty_session_key_list() {
+    session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
+    session_key_list->num_key = 0;
+    session_key_list->rear_idx = 0;
+    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+}
+
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list) {
     if (existing_s_key_list != NULL) {
@@ -373,7 +380,9 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
     }
 }
 
-void free_session_key_list_t(session_key_list_t *session_key_list) {
+void free_session_key_list_t(session_key_list_t *session_key_list) { 
+    bzero(session_key_list->s_key, sizeof(session_key_t)*MAX_SESSION_KEY);
+    bzero(session_key_list, sizeof(session_key_list_t));
     free(session_key_list->s_key);
     free(session_key_list);
 }
@@ -398,14 +407,53 @@ void save_session_key_list(session_key_list_t *session_key_list,
 void load_session_key_list(session_key_list_t *session_key_list,
                            const char *file_path) {
     FILE *load_file_fp = fopen(file_path, "rb");
+    // Save the malloced pointer.
+    session_key_t *s = session_key_list->s_key;
     // Read the session_key_list_t structure
     fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
-
-    // Allocate memory for s_key
-    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
-
+    //Reload the saved pointer.
+    session_key_list->s_key = s;
     // Read the dynamically allocated memory pointed to by s_key
     fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
           load_file_fp);
     fclose(load_file_fp);
 }
+
+// int load_session_key_list(session_key_list_t **session_key_list,
+//                            const char *file_path) {
+//     FILE *load_file_fp = fopen(file_path, "rb");
+//     // Check if file opens successfully
+//     if (!load_file_fp) {
+//         // Open failed!
+//         return 0;
+//     }
+//     // Read the session_key_list_t structure
+//     *session_key_list = malloc(sizeof(session_key_list_t));
+//     fread(*session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
+
+//     // Allocate memory for s_key
+//     (*session_key_list)->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+
+//     // Read the dynamically allocated memory pointed to by s_key
+//     fread((*session_key_list)->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
+//           load_file_fp);
+//     fclose(load_file_fp);
+
+//     // Open success!
+//     return 1;
+// }
+
+// void load_session_key_list_full(session_key_list_t **session_key_list,
+//                                 const char *file_path, 
+//                                 unsigned char *session_key_id,
+//                                 SST_ctx_t *ctx) {
+//     int find_file = load_session_key_list(session_key_list, file_path);
+
+//     if (find_file == 0) {
+//         // File was not opened successfully, maybe it does not exist.
+//         // Create a new session key, store in file and return it.
+//         session_key_list_t *new_session_key_list = send_session_key_request_check_protocol(ctx, session_key_id);
+//         save_session_key_list(new_session_key_list, file_path);
+//         *session_key_list = new_session_key_list;
+//     }
+// }
