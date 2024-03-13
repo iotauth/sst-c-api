@@ -140,6 +140,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         }
         s_key = s_key_list->s_key;
         add_session_key_to_list(s_key, existing_s_key_list);
+        free(s_key_list);
     }
     return s_key;
 }
@@ -397,8 +398,6 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
 }
 
 void free_session_key_list_t(session_key_list_t *session_key_list) { 
-    bzero(session_key_list->s_key, sizeof(session_key_t)*MAX_SESSION_KEY);
-    bzero(session_key_list, sizeof(session_key_list_t));
     free(session_key_list->s_key);
     free(session_key_list);
 }
