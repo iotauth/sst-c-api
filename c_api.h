@@ -39,6 +39,14 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
                                      SST_ctx_t *ctx,
                                      session_key_list_t *existing_s_key_list);
 
+                                     
+// Adds session key to the list.
+// Appends at the destination list's rear_idx.
+// @param s_key Session key to add
+// @param existing_s_key_list Destination session_key_list
+void add_session_key_to_list(session_key_t *s_key,
+                             session_key_list_t *existing_s_key_list);
+
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
 // Returns the session context for the secure communication if it succeeds,

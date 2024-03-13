@@ -576,22 +576,6 @@ int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
     }
 }
 
-void add_session_key_to_list(session_key_t *s_key,
-                             session_key_list_t *existing_s_key_list) {
-    existing_s_key_list->num_key++;
-    if (existing_s_key_list->num_key > MAX_SESSION_KEY) {
-        printf(
-            "Warning: Session_key_list is full. Deleting oldest key, and "
-            "adding new "
-            "key.\n");
-        existing_s_key_list->num_key = MAX_SESSION_KEY;
-    }
-    copy_session_key(&existing_s_key_list->s_key[existing_s_key_list->rear_idx],
-                     s_key);
-    existing_s_key_list->rear_idx =
-        (existing_s_key_list->rear_idx + 1) % MAX_SESSION_KEY;
-}
-
 void copy_session_key(session_key_t *dest, session_key_t *src) {
     memcpy(dest, src, sizeof(session_key_t));
     memcpy(dest->mac_key, src->mac_key, src->mac_key_size);
