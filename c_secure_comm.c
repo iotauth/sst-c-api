@@ -582,6 +582,22 @@ void copy_session_key(session_key_t *dest, session_key_t *src) {
     memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
 }
 
+void add_session_key_to_list(session_key_t *s_key,
+                             session_key_list_t *existing_s_key_list) {
+    existing_s_key_list->num_key++;
+    if (existing_s_key_list->num_key > MAX_SESSION_KEY) {
+        printf(
+            "Warning: Session_key_list is full. Deleting oldest key, and "
+            "adding new "
+            "key.\n");
+        existing_s_key_list->num_key = MAX_SESSION_KEY;
+    }
+    copy_session_key(&existing_s_key_list->s_key[existing_s_key_list->rear_idx],
+                     s_key);
+    existing_s_key_list->rear_idx =
+        (existing_s_key_list->rear_idx + 1) % MAX_SESSION_KEY;
+}
+
 void append_session_key_list(session_key_list_t *dest,
                              session_key_list_t *src) {
     if (dest->num_key + src->num_key > MAX_SESSION_KEY) {
