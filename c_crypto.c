@@ -283,7 +283,7 @@ int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
         // print_buf(hmac_tag, mac_key_size);
         error_exit("Invalid MAC error!");
     } else {
-        printf("MAC verified!\n");
+        // printf("MAC verified!\n");
     }
 
     if (AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size,
