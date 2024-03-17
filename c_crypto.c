@@ -25,6 +25,7 @@ EVP_PKEY *load_auth_public_key(const char *path) {
     if (id != EVP_PKEY_RSA) {
         print_last_error("is not RSA Encryption file");
     }
+    fclose(pemFile);
     OPENSSL_free(cert);
     return pub_key;
 }
@@ -32,6 +33,7 @@ EVP_PKEY *load_auth_public_key(const char *path) {
 EVP_PKEY *load_entity_private_key(const char *path) {
     FILE *keyfile = fopen(path, "rb");
     EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+    fclose(keyfile);
     return priv_key;
 }
 
