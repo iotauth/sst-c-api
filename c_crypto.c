@@ -92,6 +92,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
     if (EVP_PKEY_decrypt(ctx, out, ret_len, enc_data, enc_data_len) <= 0) {
         print_last_error("EVP_PKEY_decrypt failed");
     }
+    OPENSSL_free(ctx);
     return out;
 }
 
@@ -127,6 +128,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     if (EVP_PKEY_sign(ctx, sig, sig_length, md, md_length) <= 0) {
         print_last_error("EVP_PKEY_sign failed");
     }
+    OPENSSL_free(ctx);
     OPENSSL_free(md);
 
     return sig;
@@ -154,6 +156,7 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
     if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_length) != 1) {
         print_last_error("EVP_PKEY_verify failed");
     }
+    OPENSSL_free(ctx);
     OPENSSL_free(md);
 }
 
