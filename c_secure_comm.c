@@ -75,7 +75,7 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         write(sock, message, message_length);
-        free(enc);
+        OPENSSL_free(enc);
     } else {
         unsigned int enc_length;
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
@@ -91,7 +91,7 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         write(sock, message, message_length);
-        free(enc);
+        OPENSSL_free(enc);
     }
 }
 
@@ -107,8 +107,8 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     unsigned char *message = (unsigned char *)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
     memcpy(message + encrypted_length, sigret, sigret_length);
-    free(encrypted);
-    free(sigret);
+    OPENSSL_free(encrypted);
+    OPENSSL_free(sigret);
     return message;
 }
 
@@ -139,7 +139,7 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,
                            decrypted_dist_key_buf_length);
-    free(decrypted_dist_key_buf);
+    OPENSSL_free(decrypted_dist_key_buf);
 }
 
 void parse_distribution_key(distribution_key_t *parsed_distribution_key,
@@ -246,7 +246,7 @@ unsigned char *serialize_session_key_req_with_distribution_key(
     memcpy(ret + offset, name, name_length);
     offset += name_length;
     memcpy(ret + offset, temp, temp_length);
-    free(temp);
+    OPENSSL_free(temp);
     *ret_length = 1 + strlen(name) + temp_length;
     return ret;
 }
@@ -272,7 +272,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     unsigned char *ret = (unsigned char *)malloc(*ret_length);
     memcpy(ret, s_key->key_id, KEY_ID_SIZE);
     memcpy(ret + KEY_ID_SIZE, encrypted, encrypted_length);
-    free(encrypted);
+    OPENSSL_free(encrypted);
     return ret;
 };
 
@@ -292,7 +292,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
-    free(decrypted);
+    OPENSSL_free(decrypted);
 
     // compare my_nonce and received_nonce
     if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
@@ -457,7 +457,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char reply_nonce[NONCE_SIZE];
             parse_session_key_response(decrypted, decrypted_length, reply_nonce,
                                        session_key_list);
-            free(decrypted);
+            OPENSSL_free(decrypted);
             printf("Reply_nonce in sessionKeyResp: ");
             print_buf(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
@@ -538,7 +538,7 @@ unsigned char *check_handshake1_send_handshake2(
 
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
-    free(decrypted);
+    OPENSSL_free(decrypted);
 
     printf("client's nonce: ");
     print_buf(hs.nonce, HS_NONCE_SIZE);
