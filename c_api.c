@@ -61,8 +61,10 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     session_ctx->sent_seq_num = 0;
 
     int sock;
-    connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                      (const char *)ctx->config->entity_server_port_num, &sock);
+    if(connect_as_client((const char *)ctx->config->entity_server_ip_addr,
+                      (const char *)ctx->config->entity_server_port_num, &sock) < 0) {
+                        perror("Connect_as_client failed:");
+                      }
     unsigned char entity_nonce[HS_NONCE_SIZE];
     unsigned int parsed_buf_length;
     unsigned char *parsed_buf =
@@ -161,8 +163,12 @@ SST_session_ctx_t *server_secure_comm_setup(
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
+        // memset(received_buf, 0, MAX_HS_BUF_LENGTH);
         int received_buf_length =
             read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+        if(received_buf_length < 0){  
+            perror("Read Error:");
+        } 
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(

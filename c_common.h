@@ -201,7 +201,7 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-void connect_as_client(const char *ip_addr, const char *port_num, int *sock);
+int connect_as_client(const char *ip_addr, const char *port_num, int *sock);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself

@@ -152,7 +152,7 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
                                      payload_length, sender, sender_length);
 }
 
-void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
+int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     struct sockaddr_in serv_addr;
     int str_len;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
@@ -164,10 +164,19 @@ void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     serv_addr.sin_addr.s_addr =
         inet_addr(ip_addr);  // the ip_address to connect to
     serv_addr.sin_port = htons(atoi(port_num));
-    if (connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
-        -1) {
-        error_exit("connect() error!");
+    
+    int count_retries = 0;
+    int ret = -1;
+    while (count_retries++ < 100) {
+        ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
+        if (ret < 0) {
+          usleep(500);
+          continue;
+        } else {
+          break;
+        }
     }
+    return ret;
     // printf("\n\n------------Connected-------------\n");
 }
 
