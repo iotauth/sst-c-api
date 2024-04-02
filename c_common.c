@@ -168,7 +168,7 @@ void connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
         -1) {
         error_exit("connect() error!");
     }
-    printf("\n\n------------Connected-------------\n");
+    // printf("\n\n------------Connected-------------\n");
 }
 
 void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
