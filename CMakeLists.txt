@@ -1,3 +1,6 @@
+# To debug, compile with 
+# $ cmake -DCMAKE_BUILD_TYPE=Debug ../
+
 cmake_minimum_required(VERSION 3.19)
 project(SST VERSION 1.0.0 LANGUAGES C)
 
