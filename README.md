@@ -1,3 +1,7 @@
+# Overview
+---
+This is a repository for C API of **[SST (Secure Swarm Toolkit)](https://github.com/iotauth/iotauth)** as a submodule.
+
 # Prerequisites
 
 -   OpenSSL:
@@ -110,3 +114,5 @@ on each terminal
 # TODOs
 
 -   Implement an additional API function for extracting session key from cached session keys.
+
+*Last updated on February 2, 2024*

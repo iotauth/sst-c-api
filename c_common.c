@@ -90,7 +90,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
     read(socket, buf, 1);
-    if (buf[0] > 128) {
+    if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
     } else {
         return length;
