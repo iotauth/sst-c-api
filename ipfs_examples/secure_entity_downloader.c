@@ -27,8 +27,9 @@ int main(int argc, char *argv[]) {
     read_header_return_data_buf_pointer(session_ctx->sock, 
                                         &message_type, data_buf, &data_buf_length);
     unsigned char *decrypted;
+    unsigned int decrypted_length;
     if (message_type == SECURE_COMM_MSG) {
-        decrypted = decrypt_received_message(data_buf, data_buf_length, session_ctx);
+        decrypted = decrypt_received_message(data_buf, data_buf_length, &decrypted_length, session_ctx);
         sleep(1);
         if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
             error_exit("Not download response!!\n");
@@ -38,6 +39,7 @@ int main(int argc, char *argv[]) {
     }
 
     download_file(&decrypted[SEQ_NUM_SIZE], &received_skey_id[0], &file_name[0]);
+    free(decrypted);
     print_buf(received_skey_id, 8);
     session_key_t *session_key = get_session_key_by_ID(&received_skey_id[0], ctx, &s_key_list);
     if (session_key == NULL) {
