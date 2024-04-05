@@ -305,19 +305,22 @@ void receive_message(unsigned char *received_buf,
 
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
+                                    unsigned int *decrypted_buf_length,
                                     SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SECURE_COMM_MSG) {
-        return decrypt_received_message(data_buf, data_buf_length, session_ctx);
+        // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
+        // Must free() after use.
+        return decrypt_received_message(data_buf, data_buf_length, decrypted_buf_length, session_ctx);
     }
     return error_return_null(
         "Invalid message type while in secure communication.\n");
 }
 
-void send_secure_message(char *msg, unsigned int msg_length,
+int send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx) {
     if (check_session_key_validity(&session_ctx->s_key)) {
         error_exit("Session key expired!\n");
@@ -330,11 +333,9 @@ void send_secure_message(char *msg, unsigned int msg_length,
     // encrypt
     unsigned int encrypted_length;
     unsigned char *encrypted;
-    if (symmetric_encrypt_authenticate(
-            buf, SEQ_NUM_SIZE + msg_length, session_ctx->s_key.mac_key,
-            MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
-            AES_CBC_128_IV_SIZE, &encrypted, &encrypted_length)) {
-        error_exit("Error during encryption while sending message.\n");
+
+    if (encrypt_buf_with_session_key(&session_ctx->s_key, buf, SEQ_NUM_SIZE + msg_length, &encrypted, &encrypted_length)){
+        error_exit("Encryption failed.");
     }
 
     session_ctx->sent_seq_num++;
@@ -348,7 +349,19 @@ void send_secure_message(char *msg, unsigned int msg_length,
     make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
                     &sender_buf_length);
     free(encrypted);
-    write(session_ctx->sock, sender_buf, sender_buf_length);
+
+    ssize_t bytes_written = 0;
+    while (bytes_written < (ssize_t)msg_length) {
+      ssize_t more = write(session_ctx->sock, sender_buf, sender_buf_length);
+      if (more <= 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+        usleep(100);
+        continue;
+      } else if (more < 0) {
+        return -1;
+      }
+      bytes_written += more;
+    }
+    return bytes_written;
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,

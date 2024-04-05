@@ -76,6 +76,7 @@ void receive_message(unsigned char *received_buf,
 // @param SST_session_ctx_t session ctx struct
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
+                                    unsigned int *decrypted_buf_length,
                                     SST_session_ctx_t *session_ctx);
 
 // Encrypt the message with session key and send the encrypted message to
@@ -83,7 +84,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 // @param msg message to send
 // @param msg_length length of message
 // @param SST_session_ctx_t session ctx struct
-void send_secure_message(char *msg, unsigned int msg_length,
+int send_secure_message(char *msg, unsigned int msg_length,
                          SST_session_ctx_t *session_ctx);
 
 // Encrypt buffer with session key.
