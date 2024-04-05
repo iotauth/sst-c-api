@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "c_api.h"
 
 #define MAX 256
 #define ENTITY_INFO_NAME 1
@@ -19,22 +20,6 @@
 #define FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER 11
 #define NETWORK_PROTOCOL 12
 
-typedef struct {
-    char name[32];
-    // Currently, the config struct can hold up to two purposes.
-    unsigned short purpose_index;
-    char purpose[2][36];
-    int numkey;
-    char *auth_pubkey_path;
-    char *entity_privkey_path;
-    char auth_ip_addr[17];
-    char auth_port_num[6];
-    char entity_server_ip_addr[17];
-    char entity_server_port_num[6];
-    char network_protocol[4];
-    char file_system_manager_ip_addr[17];
-    char file_system_manager_port_num[6];
-} config_t;
 
 // Get a value by comparing a string of conditional statement with a variable.
 // @param ptr input variable to compare with string

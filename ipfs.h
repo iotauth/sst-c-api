@@ -3,6 +3,8 @@
 
 #include "c_api.h"
 
+#include <stdio.h>
+
 #define BUFF_SIZE 100
 #define UPLOAD_INDEX 0
 #define DOWNLOAD_INDEX 1

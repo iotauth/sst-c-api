@@ -17,15 +17,10 @@
 
 #define AES_CBC_128_KEY_SIZE 128
 #define AES_CBC_128_IV_SIZE 16
-#define DIST_KEY_EXPIRATION_TIME_SIZE 6
-#define KEY_EXPIRATION_TIME_SIZE 6
-#define SESSION_KEY_ID_SIZE 8
 #define ABS_VALIDITY_SIZE 6
 #define REL_VALIDITY_SIZE 6
-#define MAC_KEY_SIZE 32  // FIXME: To be replaced by config.
 #define MAX_MAC_KEY_SIZE 32
 #define CIPHER_KEY_SIZE 16  // FIXME: To be replaced by config.
-#define MAX_CIPHER_KEY_SIZE 32
 #define RSA_KEY_SIZE 256
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
 #define SHA256_DIGEST_LENGTH 32
@@ -36,25 +31,6 @@ typedef struct {
     unsigned char sign[RSA_KEY_SIZE];
 } signed_data_t;
 
-// Must free mac key & cipher key
-typedef struct {
-    unsigned char mac_key[MAC_KEY_SIZE];
-    unsigned int mac_key_size;
-    unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
-    unsigned int cipher_key_size;
-    unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
-} distribution_key_t;
-
-// Must free mac key & cipher key
-typedef struct {
-    unsigned char key_id[SESSION_KEY_ID_SIZE];
-    unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
-    unsigned char rel_validity[KEY_EXPIRATION_TIME_SIZE];
-    unsigned char mac_key[MAC_KEY_SIZE];
-    unsigned int mac_key_size;
-    unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
-    unsigned int cipher_key_size;
-} session_key_t;
 
 // Print error message when the code has error.
 // @param msg message to print the error

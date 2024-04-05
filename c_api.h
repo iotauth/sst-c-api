@@ -1,7 +1,82 @@
 #ifndef C_API_H
 #define C_API_H
 
-#include "c_secure_comm.h"
+// #include "c_secure_comm.h"
+
+#include <pthread.h>
+
+
+#define DIST_KEY_EXPIRATION_TIME_SIZE 6
+#define KEY_EXPIRATION_TIME_SIZE 6
+#define SESSION_KEY_ID_SIZE 8
+
+#define MAC_KEY_SIZE 32  
+#define MAX_CIPHER_KEY_SIZE 32
+
+#define MAX_SESSION_KEY 10
+
+typedef struct {
+    unsigned char key_id[SESSION_KEY_ID_SIZE];
+    unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
+    unsigned char rel_validity[KEY_EXPIRATION_TIME_SIZE];
+    unsigned char mac_key[MAC_KEY_SIZE];
+    unsigned int mac_key_size;
+    unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
+    unsigned int cipher_key_size;
+} session_key_t;
+
+typedef struct {
+    unsigned char mac_key[MAC_KEY_SIZE];
+    unsigned int mac_key_size;
+    unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
+    unsigned int cipher_key_size;
+    unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
+} distribution_key_t;
+
+typedef struct {
+    char name[32];
+    // Currently, the config struct can hold up to two purposes.
+    unsigned short purpose_index;
+    char purpose[2][36];
+    int numkey;
+    char *auth_pubkey_path;
+    char *entity_privkey_path;
+    char auth_ip_addr[17];
+    char auth_port_num[6];
+    char entity_server_ip_addr[17];
+    char entity_server_port_num[6];
+    char network_protocol[4];
+    char file_system_manager_ip_addr[17];
+    char file_system_manager_port_num[6];
+} config_t;
+
+// This struct is used in receive_thread()
+typedef struct {
+    int sock;
+    session_key_t s_key;
+    int sent_seq_num;
+    int received_seq_num;
+} SST_session_ctx_t;
+
+// This struct is a session_key_list. It can be easily initialized with macro
+// INIT_SESSION_KEY_LIST(X)
+// rear_idx is a indicator that points the next position to add to the list.
+// The session_key_list as a circular array.
+typedef struct {
+    int num_key;
+    int rear_idx;
+    session_key_t *s_key;
+} session_key_list_t;
+
+// This struct contains distribution_key, loaded config, public and private
+// keys.
+typedef struct {
+    distribution_key_t dist_key;
+    config_t *config;
+    void *pub_key;
+    void *priv_key;
+    pthread_mutex_t mutex;
+} SST_ctx_t;
 
 // Load config file from path and save the information in ctx struct.
 // Also loads public and private key in EVP_PKEY struct.

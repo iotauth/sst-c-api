@@ -1,5 +1,5 @@
 #include "../c_api.h"
-
+#include <stdio.h>
 
 void *call_get_session_key_by_ID0(void* SST_ctx){
     SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;

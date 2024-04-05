@@ -1,4 +1,5 @@
 #include "c_api.h"
+#include "c_secure_comm.h"
 
 extern unsigned char entity_client_state;
 extern unsigned char entity_server_state;
@@ -8,8 +9,8 @@ SST_ctx_t *init_SST(const char *config_path) {
     ctx->config = load_config(config_path);
     int numkey = ctx->config->numkey;
 
-    ctx->pub_key = load_auth_public_key(ctx->config->auth_pubkey_path);
-    ctx->priv_key = load_entity_private_key(ctx->config->entity_privkey_path);
+    ctx->pub_key = (void*) load_auth_public_key(ctx->config->auth_pubkey_path);
+    ctx->priv_key = (void*) load_entity_private_key(ctx->config->entity_privkey_path);
     if (numkey > MAX_SESSION_KEY) {
         printf(
             "Too much requests of session keys. The max number of requestable "
@@ -407,8 +408,8 @@ void free_session_key_list_t(session_key_list_t *session_key_list) {
 }
 
 void free_SST_ctx_t(SST_ctx_t *ctx) {
-    OPENSSL_free(ctx->priv_key);
-    OPENSSL_free(ctx->pub_key);
+    OPENSSL_free((EVP_PKEY*) ctx->priv_key);
+    OPENSSL_free((EVP_PKEY*)ctx->pub_key);
     free_config_t(ctx->config);
 }
 

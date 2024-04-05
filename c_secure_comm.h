@@ -3,6 +3,7 @@
 
 #include "c_crypto.h"
 #include "load_config.h"
+#include "c_api.h"
 
 // This file includes functions that uses the struct "session_key"
 
@@ -19,39 +20,6 @@
 
 #define MAX_SESSION_KEY 10
 
-// This struct is used in receive_thread()
-typedef struct {
-    int sock;
-    session_key_t s_key;
-    int sent_seq_num;
-    int received_seq_num;
-} SST_session_ctx_t;
-
-// This struct is a session_key_list. It can be easily initialized with macro
-// INIT_SESSION_KEY_LIST(X)
-// rear_idx is a indicator that points the next position to add to the list.
-// The session_key_list as a circular array.
-typedef struct {
-    int num_key;
-    int rear_idx;
-    session_key_t *s_key;
-} session_key_list_t;
-
-// This struct contains distribution_key, loaded config, public and private
-// keys.
-typedef struct {
-    distribution_key_t dist_key;
-    config_t *config;
-    EVP_PKEY *pub_key;
-    EVP_PKEY *priv_key;
-    pthread_mutex_t mutex;
-} SST_ctx_t;
-
-#define INIT_SESSION_KEY_LIST(X)                                  \
-    session_key_list_t X = {                                      \
-        .num_key = 0,                                             \
-        .s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY), \
-        .rear_idx = 0}
 
 // Parses the the reply message sending to Auth.
 // Concat entity, auth nonce and information such as sender

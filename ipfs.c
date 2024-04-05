@@ -1,4 +1,5 @@
 #include "ipfs.h"
+#include "c_secure_comm.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
 const char TXT_FILE_EXTENSION[] = ".txt";

@@ -99,10 +99,10 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
                                 SST_ctx_t *ctx, unsigned int *message_length) {
     size_t encrypted_length;
     unsigned char *encrypted = public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
-                                              ctx->pub_key, &encrypted_length);
+                                              (EVP_PKEY *) ctx->pub_key, &encrypted_length);
     size_t sigret_length;
     unsigned char *sigret =
-        SHA256_sign(encrypted, encrypted_length, ctx->priv_key, &sigret_length);
+        SHA256_sign(encrypted, encrypted_length, (EVP_PKEY *) ctx->priv_key, &sigret_length);
     *message_length = sigret_length + encrypted_length;
     unsigned char *message = (unsigned char *)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
@@ -122,14 +122,14 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,
 
     // verify
     SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
-                  ctx->pub_key);
+                  (EVP_PKEY *) ctx->pub_key);
     printf("auth signature verified\n");
 
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
     unsigned char *decrypted_dist_key_buf =
         private_decrypt(signed_data.data, key_size, RSA_PKCS1_PADDING,
-                        ctx->priv_key, &decrypted_dist_key_buf_length);
+                        (EVP_PKEY *) ctx->priv_key, &decrypted_dist_key_buf_length);
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,

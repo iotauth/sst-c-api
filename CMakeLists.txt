@@ -23,5 +23,4 @@ target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
 install(TARGETS SSTLIB DESTINATION lib)
 
-install(FILES c_api.h c_secure_comm.h c_common.h c_crypto.h ipfs.h load_config.h
-  DESTINATION include/sst-c-api)
+install(FILES c_api.h DESTINATION include/sst-c-api)
