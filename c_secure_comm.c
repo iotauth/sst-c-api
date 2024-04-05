@@ -410,7 +410,7 @@ typedef enum {
     AUTH_HELLO_RECEIVED,
     SESSION_KEY_RESP_RECEIVED,
     SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED,
-
+    FINISHED,
 } send_state;
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
@@ -425,7 +425,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     unsigned char entity_nonce[NONCE_SIZE];
 
     int state = INIT;
-    while (state == INIT) {
+    while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
             read(sock, received_buf, sizeof(received_buf));
@@ -478,6 +478,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                 printf("Auth nonce verified!\n");
             }
             close(sock);
+            state = FINISHED;
             return session_key_list;
 
         } else if (state == AUTH_HELLO_RECEIVED && message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
@@ -521,6 +522,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                 printf("Auth nonce verified!\n");
             }
             close(sock);
+            state = FINISHED;
             return session_key_list;
         }
     }
