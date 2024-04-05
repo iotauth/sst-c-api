@@ -424,7 +424,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 
     unsigned char entity_nonce[NONCE_SIZE];
 
-    int state;
+    int state = INIT;
     while (state == INIT) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
