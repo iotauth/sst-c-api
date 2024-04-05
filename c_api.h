@@ -9,12 +9,11 @@
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
 #define SESSION_KEY_ID_SIZE 8
-
 #define MAC_KEY_SIZE 32  
 #define MAX_CIPHER_KEY_SIZE 32
-
 #define MAX_SESSION_KEY 10
 
+#define SECURE_COMM_MSG 33
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];

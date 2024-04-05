@@ -9,11 +9,9 @@
  * decrypt_received_message
  * print_buf
  * error_return_null
- * #define SECURE_COMM_MSG 33
  * #define SEQ_NUM_SIZE 8
  */
 #define MAX_PAYLOAD_LENGTH 1024
-#define SECURE_COMM_MSG 33
 #define SEQ_NUM_SIZE 8
 
 int main(int argc, char *argv[]) {
