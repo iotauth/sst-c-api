@@ -317,20 +317,22 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 
 void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
+    unsigned int decrypted_length;
     unsigned char *decrypted =
-        decrypt_received_message(data, data_length, session_ctx);
+        decrypt_received_message(data, data_length, &decrypted_length, session_ctx);
     printf("%s\n", decrypted + SEQ_NUM_SIZE);
+    free(decrypted);
 }
 
 unsigned char *decrypt_received_message(unsigned char *data,
                                         unsigned int data_length,
+                                        unsigned int *decrypted_buf_length,
                                         SST_session_ctx_t *session_ctx) {
-    unsigned int decrypted_length;
     unsigned char *decrypted;
     if (symmetric_decrypt_authenticate(
             data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
             session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE,
-            &decrypted, &decrypted_length)) {
+            &decrypted, decrypted_buf_length)) {
         error_exit("Error during decrypting received message.\n");
     }
     unsigned int received_seq_num =
@@ -343,6 +345,7 @@ unsigned char *decrypt_received_message(unsigned char *data,
     }
     session_ctx->received_seq_num++;
     printf("Received seq_num: %d\n", received_seq_num);
+    // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
     return decrypted;
 }
 
@@ -402,6 +405,14 @@ session_key_list_t *send_session_key_request_check_protocol(
     return error_return_null("Invalid network protocol name.\n");
 }
 
+typedef enum {
+    INIT,
+    AUTH_HELLO_RECEIVED,
+    SESSION_KEY_RESP_RECEIVED,
+    SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED,
+
+} send_state;
+
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
@@ -412,7 +423,9 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
 
     unsigned char entity_nonce[NONCE_SIZE];
-    while (1) {
+
+    int state;
+    while (state == INIT) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
             read(sock, received_buf, sizeof(received_buf));
@@ -420,7 +433,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
-        if (message_type == AUTH_HELLO) {
+        if (state == INIT && message_type == AUTH_HELLO) {
+            state = AUTH_HELLO_RECEIVED;
             unsigned int auth_Id;
             unsigned char auth_nonce[NONCE_SIZE];
             auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
@@ -434,7 +448,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                 &serialized_length);
             send_auth_request_message(serialized, serialized_length, ctx, sock,
                                       1);
-        } else if (message_type == SESSION_KEY_RESP) {
+        } else if (state == AUTH_HELLO_RECEIVED && message_type == SESSION_KEY_RESP) {
+            state = SESSION_KEY_RESP_RECEIVED;
             printf(
                 "Received session key response encrypted with distribution "
                 "key\n");
@@ -465,7 +480,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             close(sock);
             return session_key_list;
 
-        } else if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
+        } else if (state == AUTH_HELLO_RECEIVED && message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
+            state = SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED;
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_session_key_length =
                 data_buf_length - (key_size * 2);
