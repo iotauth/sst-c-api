@@ -64,6 +64,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     if(connect_as_client((const char *)ctx->config->entity_server_ip_addr,
                       (const char *)ctx->config->entity_server_port_num, &sock) < 0) {
                         perror("Connect_as_client failed:");
+                        error_exit("");
                       }
     unsigned char entity_nonce[HS_NONCE_SIZE];
     unsigned int parsed_buf_length;
