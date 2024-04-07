@@ -1,5 +1,7 @@
 
 #include "load_config.h"
+#include "c_common.h"
+#include <errno.h>
 
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
@@ -47,6 +49,19 @@ int get_key_value(char *ptr) {
 config_t *load_config(const char *path) {
     config_t *c = malloc(sizeof(config_t));
     FILE *fp = fopen(path, "r");
+    if (fp == NULL) {
+        // Print an error message based on the error code
+        if (errno == ENOENT) {
+            printf("Error: SST Config file not found on path %s.\n", path);
+        } else if (errno == EACCES) {
+            printf("Error: SST Config file permission denied on path %s.\n", path);
+        } else {
+            printf("Error: SST Config file open failed on path %s.\n", path);
+        }
+        // Print the specific error message
+        perror("fopen");
+        error_exit("");
+    }
     char buffer[MAX] = {
         0,
     };
@@ -54,7 +69,7 @@ config_t *load_config(const char *path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0;
     c->purpose_index = 0;
-    printf("--config--\n");
+    printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);
         char *ptr = strtok(pline, "=");
