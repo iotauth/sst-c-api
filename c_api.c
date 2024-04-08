@@ -26,6 +26,7 @@ session_key_list_t *init_empty_session_key_list() {
     session_key_list->num_key = 0;
     session_key_list->rear_idx = 0;
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+    return session_key_list;
 }
 
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
