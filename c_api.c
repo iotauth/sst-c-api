@@ -141,7 +141,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
-            return error_return_null("Failed to get session key from auth.\n");
+            return NULL;
         }
         s_key = s_key_list->s_key;
         add_session_key_to_list(s_key, existing_s_key_list);

@@ -30,6 +30,13 @@ int main(int argc, char *argv[]) {
         // s_key_list.
         get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
                               s_key_list);
+        // printf("Testing if resending exception is working..\n");
+        // session_key_list_t *temp_s_key_list = init_empty_session_key_list();
+        // session_key_t* session_key = get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
+        //                       temp_s_key_list);
+        // if (session_key == NULL) {
+        //     printf("Yeah it worked\n");
+        // }
         char encrypted_filename[15];
         sprintf(encrypted_filename, "encrypted%d.txt", i);
         char plaintext_filename[15];

@@ -524,6 +524,9 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             close(sock);
             state = FINISHED;
             return session_key_list;
+        } else if (message_type == AUTH_ALERT) {
+            // session_key_list->num_key = 0;
+            return NULL;
         }
     }
 }
