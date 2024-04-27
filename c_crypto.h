@@ -12,6 +12,7 @@
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
+#include <openssl/crypto.h>
 
 #include "c_common.h"
 

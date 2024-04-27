@@ -5,6 +5,7 @@ extern unsigned char entity_client_state;
 extern unsigned char entity_server_state;
 
 SST_ctx_t *init_SST(const char *config_path) {
+    OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
     ctx->config = load_config(config_path);
     int numkey = ctx->config->numkey;
