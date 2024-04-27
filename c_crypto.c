@@ -184,8 +184,7 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
 }
 
 int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
-                        unsigned char *key, unsigned int key_length,
-                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *key, unsigned char *iv,
                         unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)) {
@@ -213,8 +212,7 @@ int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
 }
 
 int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
-                        unsigned char *key, unsigned int key_length,
-                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *key, unsigned char *iv,
                         unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
     if (!EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv)) {
@@ -254,15 +252,29 @@ int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
     generate_nonce(iv_size, *ret);
     unsigned int count = iv_size;
     // Attach encrypted buffer
-    if (AES_CBC_128_encrypt(buf, buf_length, cipher_key, cipher_key_size, *ret,
-                            iv_size, *ret + count, &encrypted_length)) {
-        printf("AES_CBC_128_encrypt failed!");
+    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+        if (AES_CBC_128_encrypt(buf, buf_length, cipher_key, *ret, *ret + count,
+                                &encrypted_length)) {
+            printf("AES_CBC_128_encrypt failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
         return 1;
     }
-    // Attach HMAC tag
     count += encrypted_length;
-    HMAC(EVP_sha256(), mac_key, mac_key_size, *ret, iv_size + encrypted_length,
-         *ret + count, &mac_key_size);
+    // Attach HMAC tag
+    if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+        HMAC(EVP_sha256(), mac_key, mac_key_size, *ret,
+             iv_size + encrypted_length, *ret + count, &mac_key_size);
+    }
+    // Add other MAC key sizes in future.
+    else {
+        printf("HMAC_key_size is not supported.");
+        return 1;
+    }
     return 0;
 }
 
@@ -277,8 +289,13 @@ int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
     *ret_length = encrypted_length / iv_size * iv_size;
     *ret = (unsigned char *)malloc(*ret_length);
     unsigned char reproduced_tag[mac_key_size];
-    HMAC(EVP_sha256(), mac_key, mac_key_size, buf, encrypted_length,
-         reproduced_tag, &mac_key_size);
+    if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+        HMAC(EVP_sha256(), mac_key, mac_key_size, buf, encrypted_length,
+             reproduced_tag, &mac_key_size);
+    } else {
+        printf("HMAC_key_size is not supported.");
+        return 1;
+    }
     if (memcmp(reproduced_tag, buf + encrypted_length, mac_key_size) != 0) {
         // printf("Received tag: ");
         // print_buf(received_tag, mac_key_size);
@@ -288,11 +305,16 @@ int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
     } else {
         // printf("MAC verified!\n");
     }
-
-    if (AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size,
-                            cipher_key, cipher_key_size, buf, iv_size, *ret,
-                            ret_length)) {
-        printf("AES_CBC_128_decrypt failed!");
+    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+        if (AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size,
+                                cipher_key, buf, *ret, ret_length)) {
+            printf("AES_CBC_128_decrypt failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
         return 1;
     }
     return 0;

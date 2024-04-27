@@ -56,7 +56,7 @@ void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
                            unsigned int *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
-    for (int i = 0; i < buf_length; i++) {
+    for (unsigned int i = 0; i < buf_length; i++) {
         *num |= (buf[i] & 127) << (7 * i);
         if ((buf[i] & 128) == 0) {
             *var_len_int_buf_size = i + 1;
@@ -69,7 +69,7 @@ void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
                            unsigned int *var_len_int_buf_size) {
     *var_len_int_buf_size = 1;
     while (num > 127) {
-        var_len_int_buf[*var_len_int_buf_size - 1] = 128 | num & 127;
+        var_len_int_buf[*var_len_int_buf_size - 1] = 128 | (num & 127);
         *var_len_int_buf_size += 1;
         num >>= 7;
     }
@@ -154,7 +154,6 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
 
 int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     struct sockaddr_in serv_addr;
-    int str_len;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
         error_exit("socket() error");
@@ -177,7 +176,6 @@ int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
         }
     }
     return ret;
-    // printf("\n\n------------Connected-------------\n");
 }
 
 void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,

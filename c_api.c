@@ -43,7 +43,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
                0) {
-        earned_s_key_list = send_session_key_req_via_UDP(ctx);
+        // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
 
     if (existing_s_key_list == NULL) {
@@ -260,7 +260,7 @@ SST_session_ctx_t *server_secure_comm_setup(
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    unsigned int received_buf_length = 0;
+    ssize_t received_buf_length = 0;
     while (1) {
         received_buf_length =
             read(session_ctx->sock, received_buf, sizeof(received_buf));

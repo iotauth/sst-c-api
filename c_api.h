@@ -53,8 +53,8 @@ typedef struct {
 typedef struct {
     int sock;
     session_key_t s_key;
-    int sent_seq_num;
-    int received_seq_num;
+    unsigned int sent_seq_num;
+    unsigned int received_seq_num;
 } SST_session_ctx_t;
 
 // This struct is a session_key_list. It can be easily initialized with macro

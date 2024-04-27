@@ -63,16 +63,14 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
 // Must free distribution_key.mac_key, distribution_key.cipher_key
 // @param parsed_distribution_key distribution key struct to save information
 // @param buf input buffer with distribution key
-// @param buf_length length of buf
 void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                            unsigned char *buf, unsigned int buf_length);
+                            unsigned char *buf);
 
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
-// @param data_buf_length length of data buffer
 // @param ctx config struct obtained from load_config()
 // @param key_size size of the public crypto key
-void save_distribution_key(unsigned char *data_buf, int data_buf_length,
+void save_distribution_key(unsigned char *data_buf,
                            SST_ctx_t *ctx, size_t key_size);
 
 // Used in parse_session_key_response() for index.
@@ -88,10 +86,8 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
 // Must free when session_key expired or usage finished.
 // @param ret session key struct to save key info
 // @param buf input buffer with session key
-// @param buf_length length of buf
 // @return index number for another session key
-unsigned int parse_session_key(session_key_t *ret, unsigned char *buf,
-                               unsigned int buf_length);
+unsigned int parse_session_key(session_key_t *ret, unsigned char *buf);
 
 // Separate the session key, nonce, and crypto spec from the message.
 // @param buf input buffer with session key, nonce, and crypto spec
@@ -189,7 +185,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx);
 // connection.
 // @param
 // @return session key struct according to key id
-session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx);
+// session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx);
 
 // Check the nonce obtained in decryption with own nonce and
 // make the encrypted message with other entity's nonce.

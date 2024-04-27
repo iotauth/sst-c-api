@@ -21,6 +21,12 @@ add_library(SSTLIB SHARED
 
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
+if(MSVC)
+  target_compile_options(SSTLIB PRIVATE /W4 /WX)
+else()
+  target_compile_options(SSTLIB PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
 install(TARGETS SSTLIB DESTINATION lib)
 
 install(FILES c_api.h DESTINATION include/sst-c-api)

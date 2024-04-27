@@ -16,10 +16,12 @@
 #include "c_common.h"
 
 #define AES_CBC_128_KEY_SIZE 128
+#define AES_CBC_128_KEY_SIZE_IN_BYTES 16
 #define AES_CBC_128_IV_SIZE 16
 #define ABS_VALIDITY_SIZE 6
 #define REL_VALIDITY_SIZE 6
 #define MAX_MAC_KEY_SIZE 32
+#define MAC_KEY_SHA256_SIZE 32
 #define CIPHER_KEY_SIZE 16  // FIXME: To be replaced by config.
 #define RSA_KEY_SIZE 256
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
@@ -30,7 +32,6 @@ typedef struct {
     unsigned char data[RSA_KEY_SIZE];
     unsigned char sign[RSA_KEY_SIZE];
 } signed_data_t;
-
 
 // Print error message when the code has error.
 // @param msg message to print the error
@@ -104,15 +105,12 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
 // @param plaintext data to encrypt
 // @param plaintext_length length of plaintext
 // @param key cipher key of session key to be used in CBC encryption
-// @param key_length length of cipher key
 // @param iv initialize vector to be used in first encryption of CBC encryption
-// @param iv_length length of iv buffer
 // @param ret decrypted message received from CBC encryption
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
 int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
-                        unsigned char *key, unsigned int key_length,
-                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *key, unsigned char *iv,
                         unsigned char *ret, unsigned int *ret_length);
 
 // Decrypt the message with the cipher key of the session key obtained from Auth
@@ -120,15 +118,12 @@ int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
 // @param encrypted encrypted data
 // @param encrypted_length length of encrypted data
 // @param key cipher key of session key to be used in CBC decryption
-// @param key_length length of cipher key
 // @param iv initialize vector to be used in first decryption of CBC decryption
-// @param iv_length length of iv buffer
 // @param ret decrypted message received from CBC decryption
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
 int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
-                        unsigned char *key, unsigned int key_length,
-                        unsigned char *iv, unsigned int iv_length,
+                        unsigned char *key, unsigned char *iv,
                         unsigned char *ret, unsigned int *ret_length);
 
 // Encrypt the message with cipher key and

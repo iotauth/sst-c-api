@@ -112,7 +112,7 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     return message;
 }
 
-void save_distribution_key(unsigned char *data_buf, int data_buf_length,
+void save_distribution_key(unsigned char *data_buf,
                            SST_ctx_t *ctx, size_t key_size) {
     signed_data_t signed_data;
 
@@ -132,13 +132,12 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,
                         (EVP_PKEY *) ctx->priv_key, &decrypted_dist_key_buf_length);
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
-    parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,
-                           decrypted_dist_key_buf_length);
+    parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
     OPENSSL_free(decrypted_dist_key_buf);
 }
 
 void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                            unsigned char *buf, unsigned int buf_length) {
+                            unsigned char *buf) {
     memcpy(parsed_distribution_key->abs_validity, buf,
            DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
@@ -169,8 +168,7 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
     return return_to;
 }
 
-unsigned int parse_session_key(session_key_t *ret, unsigned char *buf,
-                               unsigned int buf_length) {
+unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
     memcpy(ret->abs_validity, buf + cur_idx, ABS_VALIDITY_SIZE);
@@ -209,10 +207,10 @@ void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
         read_unsigned_int_BE(&buf[buf_idx], 4);
 
     buf_idx += 4;
-    for (int i = 0; i < session_key_list_length; i++) {
+    for (unsigned int i = 0; i < session_key_list_length; i++) {
         buf = buf + buf_idx;
         buf_idx =
-            parse_session_key(&session_key_list->s_key[i], buf, buf_length);
+            parse_session_key(&session_key_list->s_key[i], buf);
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
@@ -269,7 +267,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     memcpy(ret + KEY_ID_SIZE, encrypted, encrypted_length);
     OPENSSL_free(encrypted);
     return ret;
-};
+}
 
 unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                                                   unsigned int data_buf_length,
@@ -300,7 +298,6 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     }
 
     // send handshake_3
-    unsigned int buf_length = HS_INDICATOR_SIZE;
     unsigned char buf[HS_INDICATOR_SIZE];
     memset(buf, 0, HS_INDICATOR_SIZE);
     serialize_handshake(entity_nonce, hs.nonce, buf);
@@ -354,7 +351,7 @@ int check_session_key_validity(session_key_t *session_key) {
 }
 
 int check_validity(unsigned char *validity) {
-    if (time(NULL) >
+    if ((uint64_t) time(NULL) >
         read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
         return 1;
     } else {
@@ -399,8 +396,8 @@ session_key_list_t *send_session_key_request_check_protocol(
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
                0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
-        session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
-        return s_key_list;
+        // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
+        // return s_key_list;
     }
     return error_return_null("Invalid network protocol name.\n");
 }
@@ -435,9 +432,9 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
-            unsigned int auth_Id;
+            // unsigned int auth_Id;
             unsigned char auth_nonce[NONCE_SIZE];
-            auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            // auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN); // Used in future.
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
@@ -489,7 +486,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char encrypted_session_key[encrypted_session_key_length];
             memcpy(encrypted_session_key, data_buf + key_size * 2,
                    encrypted_session_key_length);
-            save_distribution_key(data_buf, data_buf_length, ctx, key_size);
+            save_distribution_key(data_buf, ctx, key_size);
 
             // decrypt session_key with decrypted_dist_key_buf
             unsigned int decrypted_session_key_response_length;
@@ -529,14 +526,16 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             return NULL;
         }
     }
+    // Should not come here.
+    return NULL;
 }
 
-session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
-    session_key_list_t *s_key_list;
-    return s_key_list;
-    // TODO:(Dongha Kim) Implement this function.
-    error_exit("This function is not implemented yet.");
-}
+// session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
+//     session_key_list_t *s_key_list;
+//     return s_key_list;
+//     // TODO:(Dongha Kim) Implement this function.
+//     error_exit("This function is not implemented yet.");
+// }
 
 unsigned char *check_handshake1_send_handshake2(
     unsigned char *received_buf, unsigned int received_buf_length,
@@ -564,7 +563,6 @@ unsigned char *check_handshake1_send_handshake2(
     print_buf(server_nonce, HS_NONCE_SIZE);
 
     // send handshake 2
-    unsigned int buf_length = HS_INDICATOR_SIZE;
     unsigned char buf[HS_INDICATOR_SIZE];
     memset(buf, 0, HS_INDICATOR_SIZE);
     serialize_handshake(server_nonce, hs.nonce, buf);
