@@ -58,17 +58,21 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx) {
+    int sock;
+    connect_as_client((const char *)ctx->config->entity_server_ip_addr,
+                      (const char *)ctx->config->entity_server_port_num, &sock);
+    SST_session_ctx_t *session_ctx =
+        secure_connect_to_server_with_socket(s_key, sock);
+    return session_ctx;
+}
+
+SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
+                                                        int sock) {
     // Initialize SST_session_ctx_t
     SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));
     session_ctx->received_seq_num = 0;
     session_ctx->sent_seq_num = 0;
 
-    int sock;
-    if(connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                      (const char *)ctx->config->entity_server_port_num, &sock) < 0) {
-                        perror("Connect_as_client failed:");
-                        error_exit("");
-                      }
     unsigned char entity_nonce[HS_NONCE_SIZE];
     unsigned int parsed_buf_length;
     unsigned char *parsed_buf =

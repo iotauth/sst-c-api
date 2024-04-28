@@ -96,9 +96,15 @@ session_key_list_t *init_empty_session_key_list();
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list);
 
-// Connect with other entity such as entity servers using secure session key.
+// Connect to entity_server using the session key. This function can be called
+// after the connect() function, and uses the user's socket.
+SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
+                                                        int sock);
+
+// Connect with other entity such as entity servers using the session key. This
+// function contains the connect() function, and uses the
+// secure_connect_to_server_with_socket() function.
 // @param s_key session key struct received by Auth
-// @param ctx config struct obtained from load_config()
 // @return secure socket number
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
