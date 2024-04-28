@@ -191,6 +191,10 @@ SST_session_ctx_t *server_secure_comm_setup(
 
             s_key = get_session_key_by_ID(target_session_key_id, ctx,
                                           existing_s_key_list);
+            if(s_key == NULL) {
+                error_exit(
+                    "FAILED to get session key by ID.");
+            }
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
                 error_exit(
                     "Error during comm init - in wrong state, expected: "
