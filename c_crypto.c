@@ -10,7 +10,6 @@ void print_last_error(char *msg) {
 }
 
 EVP_PKEY *load_auth_public_key(const char *path) {
-    errno = 0;
     FILE *pemFile = fopen(path, "rb");
     if (pemFile == NULL) {
         printf("Error %d \n", errno);
@@ -32,9 +31,13 @@ EVP_PKEY *load_auth_public_key(const char *path) {
 
 EVP_PKEY *load_entity_private_key(const char *path) {
     FILE *keyfile = fopen(path, "rb");
-        EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
-        fclose(keyfile);
-        return priv_key;
+    if (keyfile == NULL) {
+        printf("Error %d \n", errno);
+        print_last_error("Loading entity_priv_key_path failed");
+    }
+    EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+    fclose(keyfile);
+    return priv_key;
 }
 
 unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
