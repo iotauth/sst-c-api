@@ -26,15 +26,15 @@ EVP_PKEY *load_auth_public_key(const char *path) {
         print_last_error("is not RSA Encryption file");
     }
     fclose(pemFile);
-    OPENSSL_free(cert);
+    X509_free(cert);
     return pub_key;
 }
 
 EVP_PKEY *load_entity_private_key(const char *path) {
     FILE *keyfile = fopen(path, "rb");
-    EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
-    fclose(keyfile);
-    return priv_key;
+        EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+        fclose(keyfile);
+        return priv_key;
 }
 
 unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
@@ -63,7 +63,7 @@ unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
     if (EVP_PKEY_encrypt(ctx, out, ret_len, data, data_len) <= 0) {
         print_last_error("EVP_PKEY_encrypt failed");
     }
-    OPENSSL_free(ctx);
+    EVP_PKEY_CTX_free(ctx);
     return out;
 }
 
@@ -92,7 +92,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
     if (EVP_PKEY_decrypt(ctx, out, ret_len, enc_data, enc_data_len) <= 0) {
         print_last_error("EVP_PKEY_decrypt failed");
     }
-    OPENSSL_free(ctx);
+    EVP_PKEY_CTX_free(ctx);
     return out;
 }
 
@@ -128,8 +128,8 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     if (EVP_PKEY_sign(ctx, sig, sig_length, md, md_length) <= 0) {
         print_last_error("EVP_PKEY_sign failed");
     }
-    OPENSSL_free(ctx);
-    OPENSSL_free(md);
+    EVP_PKEY_CTX_free(ctx);
+    free(md);
 
     return sig;
 }
@@ -156,8 +156,8 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
     if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_length) != 1) {
         print_last_error("EVP_PKEY_verify failed");
     }
-    OPENSSL_free(ctx);
-    OPENSSL_free(md);
+    EVP_PKEY_CTX_free(ctx);
+    free(md);
 }
 
 unsigned char *digest_message_SHA_256(unsigned char *message,

@@ -418,9 +418,10 @@ void free_session_key_list_t(session_key_list_t *session_key_list) {
 }
 
 void free_SST_ctx_t(SST_ctx_t *ctx) {
-    OPENSSL_free((EVP_PKEY*) ctx->priv_key);
-    OPENSSL_free((EVP_PKEY*)ctx->pub_key);
+    EVP_PKEY_free((EVP_PKEY*) ctx->priv_key);
+    EVP_PKEY_free((EVP_PKEY*)ctx->pub_key);
     free_config_t(ctx->config);
+    free(ctx);
 }
 
 int save_session_key_list(session_key_list_t *session_key_list,

@@ -157,4 +157,5 @@ config_t *load_config(const char *path) {
 void free_config_t(config_t *config) {
     free(config->auth_pubkey_path);
     free(config->entity_privkey_path);
+    free(config);
 }

@@ -464,7 +464,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char reply_nonce[NONCE_SIZE];
             parse_session_key_response(decrypted, decrypted_length, reply_nonce,
                                        session_key_list);
-            OPENSSL_free(decrypted);
+            free(decrypted);
             printf("Reply_nonce in sessionKeyResp: ");
             print_buf(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
@@ -508,7 +508,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             parse_session_key_response(decrypted_session_key_response,
                                        decrypted_session_key_response_length,
                                        reply_nonce, session_key_list);
-
+            free(decrypted_session_key_response);
             printf("Reply_nonce in sessionKeyResp: ");
             print_buf(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
