@@ -322,3 +322,56 @@ int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
     }
     return 0;
 }
+
+int symmetric_encrypt_authenticate_no_hmac(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
+    unsigned int *ret_length) {
+    unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
+    *ret_length = iv_size + encrypted_length;
+    *ret = (unsigned char *)malloc(*ret_length);
+    // ret = IV (16) + encrypted(IV+buf)
+    // First attach IV.
+    generate_nonce(iv_size, *ret);
+    unsigned int count = iv_size;
+    // Attach encrypted buffer
+    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+        if (AES_CBC_128_encrypt(buf, buf_length, cipher_key, *ret, *ret + count,
+                                &encrypted_length)) {
+            printf("AES_CBC_128_encrypt failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
+        return 1;
+    }
+    return 0;
+}
+
+int symmetric_decrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length) {
+    unsigned int encrypted_length = buf_length;
+    *ret_length = encrypted_length / iv_size * iv_size;
+    *ret = (unsigned char *)malloc(*ret_length);
+    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+        if (AES_CBC_128_decrypt(buf + iv_size, encrypted_length - iv_size,
+                                cipher_key, buf, *ret, ret_length)) {
+            printf("AES_CBC_128_decrypt failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
+        return 1;
+    }
+    return 0;
+}

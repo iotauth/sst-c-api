@@ -32,7 +32,8 @@ int main(int argc, char *argv[]) {
                               s_key_list);
         // printf("Testing if resending exception is working..\n");
         // session_key_list_t *temp_s_key_list = init_empty_session_key_list();
-        // session_key_t* session_key = get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
+        // session_key_t* session_key =
+        // get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
         //                       temp_s_key_list);
         // if (session_key == NULL) {
         //     printf("Yeah it worked\n");
@@ -72,7 +73,15 @@ int main(int argc, char *argv[]) {
 
             unsigned int decrypted_length;
             unsigned char *decrypted;
-            if (decrypt_buf_with_session_key(
+            // if (decrypt_buf_with_session_key(
+            //         &s_key_list->s_key[i], read_encrypted_buf,
+            //         encrypted_file_metadata[i].block_metadata[j].length,
+            //         &decrypted, &decrypted_length)) {
+            //     printf("Decryption failed!\n");
+            //     break;
+            // }
+            // No HMAC mode.
+            if (decrypt_buf_with_session_key_no_hmac(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
                     &decrypted, &decrypted_length)) {

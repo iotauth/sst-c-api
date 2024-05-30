@@ -3,6 +3,7 @@
 
 #include <openssl/aes.h>
 #include <openssl/bio.h>
+#include <openssl/crypto.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
@@ -12,7 +13,6 @@
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
-#include <openssl/crypto.h>
 
 #include "c_common.h"
 
@@ -158,6 +158,44 @@ int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
 // @param ret_length length of return buffer
 // @return 0 for success, 1 for error.
 int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length);
+
+// Encrypt the message with cipher key and
+// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
+// @param buf input message
+// @param buf_length length of buf
+// @param mac_key mac key of session key to be used in HMAC
+// @param mac_key_size size of mac key
+// @param cipher_key cipher key of session key to be used in CBC encryption
+// @param cipher_key_size size of cipher key
+// @param iv_size size of iv(initialize vector)
+// @param ret_length length of return buffer
+// @return 0 for success, 1 for error.
+int symmetric_encrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
+                                   unsigned char *mac_key,
+                                   unsigned int mac_key_size,
+                                   unsigned char *cipher_key,
+                                   unsigned int cipher_key_size,
+                                   unsigned int iv_size, unsigned char **ret,
+                                   unsigned int *ret_length);
+
+// Decrypt the encrypted message with cipher key and
+// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
+// @param buf input message
+// @param buf_length length of buf
+// @param mac_key mac key of session key to be used in HMAC
+// @param mac_key_size size of mac key
+// @param cipher_key cipher key of session key to be used in CBC decryption
+// @param cipher_key_size size of cipher key
+// @param iv_size size of iv(initialize vector)
+// @param ret_length length of return buffer
+// @return 0 for success, 1 for error.
+int symmetric_decrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
                                    unsigned char *mac_key,
                                    unsigned int mac_key_size,
                                    unsigned char *cipher_key,

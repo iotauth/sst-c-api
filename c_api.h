@@ -5,11 +5,10 @@
 
 #include <pthread.h>
 
-
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
 #define SESSION_KEY_ID_SIZE 8
-#define MAC_KEY_SIZE 32  
+#define MAC_KEY_SIZE 32
 #define MAX_CIPHER_KEY_SIZE 32
 #define MAX_SESSION_KEY 10
 
@@ -85,8 +84,9 @@ typedef struct {
 // distribution key.
 SST_ctx_t *init_SST(const char *config_path);
 
-// Initializes empty session_key_list. 
-// Mallocs session_key_list_t and the session_key_t as much as the MAX_SESSION_KEY.
+// Initializes empty session_key_list.
+// Mallocs session_key_list_t and the session_key_t as much as the
+// MAX_SESSION_KEY.
 session_key_list_t *init_empty_session_key_list();
 
 // Request and get session key from Auth according to secure connection
@@ -165,7 +165,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 // @param msg_length length of message
 // @param SST_session_ctx_t session ctx struct
 int send_secure_message(char *msg, unsigned int msg_length,
-                         SST_session_ctx_t *session_ctx);
+                        SST_session_ctx_t *session_ctx);
 
 // Encrypt buffer with session key.
 // @param s_key session key to encrypt
@@ -191,6 +191,30 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length);
 
+// Encrypt buffer with session key.
+// @param s_key session key to encrypt
+// @param plaintext plaintext to be encrypted
+// @param plaintext_length length of plaintext to be encrypted
+// @param encrypted double pointer of returned encrypted buffer
+// @param encrypted_length length of returned encrypted buffer
+// @return 0 for success, 1 for fail
+int encrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *plaintext,
+                                 unsigned int plaintext_length,
+                                 unsigned char **encrypted,
+                                 unsigned int *encrypted_length);
+
+// Decrypt buffer with session key.
+// @param s_key session key to decrypt
+// @param encrypted encrypted buffer to be decrypted
+// @param encrypted_length length of encrypted buffer to be decrypted
+// @param decrypted double pointer of returned decrypted buffer
+// @param decrypted_length length of returned decrypted buffer
+// @return 0 for success, 1 for fail
+int decrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *encrypted,
+                                 unsigned int encrypted_length,
+                                 unsigned char **decrypted,
+                                 unsigned int *decrypted_length);
+
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);
@@ -204,13 +228,13 @@ void free_SST_ctx_t(SST_ctx_t *ctx);
 // @param file_path file_path to save
 // @return 0 for success, 1 for fail
 int save_session_key_list(session_key_list_t *session_key_list,
-                           const char *file_path);
+                          const char *file_path);
 
 // Load session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
 // @return 0 for success, 1 for fail
 int load_session_key_list(session_key_list_t *session_key_list,
-                           const char *file_path);
+                          const char *file_path);
 
 #endif  // C_API_H
