@@ -418,8 +418,7 @@ int encrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *pl
                                  unsigned int *encrypted_length) {
     if (!check_session_key_validity(s_key)) {
         if (symmetric_encrypt_authenticate_no_hmac(
-                plaintext, plaintext_length, s_key->mac_key,
-                s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
+                plaintext, plaintext_length, s_key->cipher_key, s_key->cipher_key_size,
                 AES_CBC_128_IV_SIZE, encrypted, encrypted_length)) {
             error_exit("Error during encrypting buffer with session key.\n");
         }
@@ -436,8 +435,7 @@ int decrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *en
                                  unsigned int *decrypted_length) {
     if (!check_session_key_validity(s_key)) {
         if (symmetric_decrypt_authenticate_no_hmac(
-                encrypted, encrypted_length, s_key->mac_key,
-                s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
+                encrypted, encrypted_length, s_key->cipher_key, s_key->cipher_key_size,
                 AES_CBC_128_IV_SIZE, decrypted, decrypted_length)) {
             error_exit("Error during decrypting buffer with session key.\n");
         }

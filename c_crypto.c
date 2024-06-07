@@ -324,8 +324,7 @@ int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
 }
 
 int symmetric_encrypt_authenticate_no_hmac(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned char *buf, unsigned int buf_length, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
     unsigned int *ret_length) {
     unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
@@ -351,13 +350,10 @@ int symmetric_encrypt_authenticate_no_hmac(
     return 0;
 }
 
-int symmetric_decrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
-                                   unsigned char *mac_key,
-                                   unsigned int mac_key_size,
-                                   unsigned char *cipher_key,
-                                   unsigned int cipher_key_size,
-                                   unsigned int iv_size, unsigned char **ret,
-                                   unsigned int *ret_length) {
+int symmetric_decrypt_authenticate_no_hmac(
+    unsigned char *buf, unsigned int buf_length, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, unsigned char **ret,
+    unsigned int *ret_length) {
     unsigned int encrypted_length = buf_length;
     *ret_length = encrypted_length / iv_size * iv_size;
     *ret = (unsigned char *)malloc(*ret_length);
