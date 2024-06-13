@@ -264,7 +264,7 @@ int symmetric_encrypt_authenticate(
     generate_nonce(iv_size, *ret);
     unsigned int count = iv_size;
     // Attach encrypted buffer
-    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+    if (cipher_key_size == AES_128_CBC_KEY_SIZE_IN_BYTES) {
         if (encrypt_AES(buf, buf_length, cipher_key, *ret, enc_mode,
                         *ret + count, &encrypted_length)) {
             printf("AES encryption failed!");
@@ -324,7 +324,7 @@ int symmetric_decrypt_authenticate(
             // printf("MAC verified!\n");
         }
     }
-    if (cipher_key_size == AES_CBC_128_KEY_SIZE_IN_BYTES) {
+    if (cipher_key_size == AES_128_CBC_KEY_SIZE_IN_BYTES) {
         if (decrypt_AES(buf + iv_size, encrypted_length - iv_size, cipher_key,
                         buf, enc_mode, *ret, ret_length)) {
             printf("AES_CBC_128_decrypt failed!");

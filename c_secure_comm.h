@@ -94,7 +94,7 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf);
 // @param buf_length length of buf
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
-void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
+void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf, unsigned int buf_length,
                                 unsigned char *reply_nonce,
                                 session_key_list_t *session_key_list);
 

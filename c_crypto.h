@@ -16,9 +16,8 @@
 
 #include "c_common.h"
 
-#define AES_CBC_128_KEY_SIZE 128
-#define AES_CBC_128_KEY_SIZE_IN_BYTES 16
-#define AES_CBC_128_IV_SIZE 16
+#define AES_128_CBC_KEY_SIZE_IN_BYTES 16
+#define AES_128_CBC_IV_SIZE 16
 #define ABS_VALIDITY_SIZE 6
 #define REL_VALIDITY_SIZE 6
 #define MAX_MAC_KEY_SIZE 32

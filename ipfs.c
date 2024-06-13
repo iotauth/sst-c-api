@@ -110,12 +110,12 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     get_file_content(fin, file_buf, bufsize);
     fclose(fin);
 
-    unsigned char iv[AES_CBC_128_IV_SIZE];
+    unsigned char iv[AES_128_CBC_IV_SIZE];
     int provider_len = sizeof(ctx->config->name);
     unsigned int encrypted_length =
-        (((bufsize) / AES_CBC_128_IV_SIZE) + 1) * AES_CBC_128_IV_SIZE;
+        (((bufsize) / AES_128_CBC_IV_SIZE) + 1) * AES_128_CBC_IV_SIZE;
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
-    generate_nonce(AES_CBC_128_IV_SIZE, iv);
+    generate_nonce(AES_128_CBC_IV_SIZE, iv);
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
                     encrypted, &encrypted_length)) {
         printf("Encryption failed!\n");
@@ -130,16 +130,16 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     // File descriptor for the encrypted file.
     fenc = fopen(file_name_buffer, "w");
     unsigned char *enc_save = (unsigned char *)malloc(
-        encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len);
+        encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
     memcpy(enc_save + 1, ctx->config->name, provider_len);
-    enc_save[provider_len + 1] = AES_CBC_128_IV_SIZE;
-    memcpy(enc_save + 1 + provider_len + 1, iv, AES_CBC_128_IV_SIZE);
-    memcpy(enc_save + 1 + provider_len + 1 + AES_CBC_128_IV_SIZE, encrypted,
+    enc_save[provider_len + 1] = AES_128_CBC_IV_SIZE;
+    memcpy(enc_save + 1 + provider_len + 1, iv, AES_128_CBC_IV_SIZE);
+    memcpy(enc_save + 1 + provider_len + 1 + AES_128_CBC_IV_SIZE, encrypted,
            encrypted_length);
     free(encrypted);
     fwrite(enc_save, 1,
-           encrypted_length + 1 + AES_CBC_128_IV_SIZE + 1 + provider_len, fenc);
+           encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len, fenc);
     free(enc_save);
     printf("File was saved: %s.\n", file_name_buffer);
     fclose(fenc);
@@ -165,15 +165,15 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     unsigned int owner_name_len = file_buf[0];
     unsigned char owner_name[owner_name_len];
     memcpy(owner_name, file_buf + 1, owner_name_len);
-    unsigned char iv[AES_CBC_128_IV_SIZE];
-    memcpy(iv, file_buf + 1 + owner_name_len + 1, AES_CBC_128_IV_SIZE);
+    unsigned char iv[AES_128_CBC_IV_SIZE];
+    memcpy(iv, file_buf + 1 + owner_name_len + 1, AES_128_CBC_IV_SIZE);
 
     unsigned long int enc_length =
-        bufsize - (1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len);
-    unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) /
-                              AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
+        bufsize - (1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len);
+    unsigned int ret_length = (enc_length + AES_128_CBC_IV_SIZE) /
+                              AES_128_CBC_IV_SIZE * AES_128_CBC_IV_SIZE;
     unsigned char *ret = (unsigned char *)malloc(ret_length);
-    if (decrypt_AES(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len,
+    if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
                     &ret_length)) {
         printf("Error while decrypting.\n");
@@ -353,7 +353,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_CBC_128_IV_SIZE, ctx->dist_key.enc_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->dist_key.enc_mode, 0,
                     &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
                 error_exit(
                     "Error during decryption after receiving "
@@ -376,7 +376,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
-                    ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
+                    ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
                     ctx->dist_key.enc_mode, 0, &decrypted_entity_nonce,
                     &decrypted_entity_nonce_length)) {
                 error_exit(

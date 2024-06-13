@@ -7,7 +7,7 @@
 #include <openssl/rand.h>
 
 #define MAX_SIZE 1000
-#define IV_SIZE AES_CBC_128_IV_SIZE
+#define IV_SIZE AES_128_CBC_IV_SIZE
 
 #define MAX_PLAINTEXT_BLOCK_SIZE 32768  // 32kbytes
 #define MAX_KEY_VALUE_SIZE 144

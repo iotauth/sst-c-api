@@ -192,7 +192,16 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     return cur_idx;
 }
 
-void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
+void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx, session_key_t *s_key) {
+    if(strcmp(ctx->config->encryption_mode, "AES_128_CBC") == 0) {
+        s_key->enc_mode = AES_128_CBC;
+    } else if(strcmp(ctx->config->encryption_mode, "AES_128_CTR") == 0) {
+        s_key->enc_mode = AES_128_CTR;
+    }
+    s_key->no_hmac_mode = ctx->config->no_hmac_mode;
+}
+
+void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf, unsigned int buf_length,
                                 unsigned char *reply_nonce,
                                 session_key_list_t *session_key_list) {
     memcpy(reply_nonce, buf, NONCE_SIZE);
@@ -211,6 +220,7 @@ void parse_session_key_response(unsigned char *buf, unsigned int buf_length,
     for (unsigned int i = 0; i < session_key_list_length; i++) {
         buf = buf + buf_idx;
         buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
+        update_enc_mode_and_no_hmac_to_session_key(ctx, &session_key_list->s_key[i]);
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
@@ -224,7 +234,7 @@ unsigned char *serialize_session_key_req_with_distribution_key(
     if (symmetric_encrypt_authenticate(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
-            dist_key->cipher_key_size, AES_CBC_128_IV_SIZE, dist_key->enc_mode, 0, &temp,
+            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, AES_128_CBC, 0, &temp,
             &temp_length)) {
         error_exit(
             "Error during encryption while "
@@ -257,7 +267,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     if (symmetric_encrypt_authenticate(
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_CBC_128_IV_SIZE, s_key->enc_mode, 0, &encrypted, &encrypted_length)) {
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &encrypted, &encrypted_length)) {
         error_exit("Error during encryption while parse_handshake_1\n");
     }
 
@@ -279,7 +289,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     unsigned char *decrypted;
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
-            s_key->cipher_key, CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE,
+            s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
         error_exit("Error during decryption in checking handshake2.\n");
     }
@@ -305,7 +315,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     unsigned char *ret;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
-                                       CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE, s_key->enc_mode, 0,
+                                       CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE, s_key->enc_mode, 0,
                                        &ret, ret_length)) {
         error_exit("Error during encryption while send_handshake_3.\n");
     }
@@ -328,7 +338,7 @@ unsigned char *decrypt_received_message(unsigned char *data,
     unsigned char *decrypted;
     if (symmetric_decrypt_authenticate(
             data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
-            session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE,
+            session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             session_ctx->s_key.enc_mode, session_ctx->s_key.no_hmac_mode,
             &decrypted, decrypted_buf_length)) {
         error_exit("Error during decrypting received message.\n");
@@ -459,14 +469,14 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
-                    ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
+                    ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
                     ctx->dist_key.enc_mode, 0, &decrypted, &decrypted_length)) {
                 error_exit(
                     "Error during decryption after receiving "
                     "SESSION_KEY_RESP.\n");
             }
             unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(decrypted, decrypted_length, reply_nonce,
+            parse_session_key_response(ctx, decrypted, decrypted_length, reply_nonce,
                                        session_key_list);
             free(decrypted);
             printf("Reply_nonce in sessionKeyResp: ");
@@ -500,7 +510,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_CBC_128_IV_SIZE, ctx->dist_key.enc_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->dist_key.enc_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length)) {
                 error_exit(
@@ -511,7 +521,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             // parse decrypted_session_key_response for nonce comparison &
             // session_key.
             unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(decrypted_session_key_response,
+            parse_session_key_response(ctx, decrypted_session_key_response,
                                        decrypted_session_key_response_length,
                                        reply_nonce, session_key_list);
             free(decrypted_session_key_response);
@@ -553,7 +563,7 @@ unsigned char *check_handshake1_send_handshake2(
             received_buf + SESSION_KEY_ID_SIZE,
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_CBC_128_IV_SIZE, s_key->enc_mode, 0, &decrypted,
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &decrypted,
             &decrypted_length)) {
         error_exit("Error during decrypting handshake1.\n");
     }
@@ -577,7 +587,7 @@ unsigned char *check_handshake1_send_handshake2(
     unsigned char *ret;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
-                                       CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE, s_key->enc_mode, 0,
+                                       CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE, s_key->enc_mode, 0,
                                        &ret, ret_length)) {
         error_exit("Error during encryption while send_handshake2.\n");
     }

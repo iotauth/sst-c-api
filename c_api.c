@@ -240,7 +240,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned char *decrypted;
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
-                    s_key->cipher_key, CIPHER_KEY_SIZE, AES_CBC_128_IV_SIZE,
+                    s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                     s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
                 error_exit(
                     "Error during decryption in HANDSHAKE_2_SENT state.\n");
@@ -389,7 +389,7 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
         if (symmetric_encrypt_authenticate(
                 plaintext, plaintext_length, s_key->mac_key,
                 s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
-                AES_CBC_128_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
                 encrypted, encrypted_length)) {
             error_exit("Error during encrypting buffer with session key.\n");
         }
@@ -408,7 +408,7 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
         if (symmetric_decrypt_authenticate(
                 encrypted, encrypted_length, s_key->mac_key,
                 s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
-                AES_CBC_128_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
                 decrypted, decrypted_length)) {
             error_exit("Error during decrypting buffer with session key.\n");
         }
