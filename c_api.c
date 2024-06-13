@@ -241,7 +241,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                    s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
+                    AES_128_CBC, 0, &decrypted, &decrypted_length)) {
                 error_exit(
                     "Error during decryption in HANDSHAKE_2_SENT state.\n");
             }

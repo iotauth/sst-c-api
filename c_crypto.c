@@ -257,7 +257,11 @@ int symmetric_encrypt_authenticate(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
     unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
-    *ret_length = iv_size + encrypted_length + mac_key_size;
+    if (no_hmac_mode == 0) {
+        *ret_length = iv_size + encrypted_length + mac_key_size;
+    } else {
+        *ret_length = iv_size + encrypted_length;
+    }
     *ret = (unsigned char *)malloc(*ret_length);
     // ret = IV (16) + encrypted(IV+buf) + HMAC((IV + encrypted)32)
     // First attach IV.
