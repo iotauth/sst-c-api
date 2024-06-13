@@ -28,6 +28,9 @@
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
 #define SHA256_DIGEST_LENGTH 32
 
+#define AES_128_CBC 101
+#define AES_128_CTR 102
+
 // Struct for digital signature
 typedef struct {
     unsigned char data[RSA_KEY_SIZE];
@@ -110,9 +113,9 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
 // @param ret decrypted message received from CBC encryption
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
-int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
-                        unsigned char *key, unsigned char *iv,
-                        unsigned char *ret, unsigned int *ret_length);
+int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
+                unsigned char *key, unsigned char *iv, char enc_mode,
+                unsigned char *ret, unsigned int *ret_length);
 
 // Decrypt the message with the cipher key of the session key obtained from Auth
 // by using Cipher Block Chaining(CBC) decryption of OpenSSL.
@@ -123,9 +126,9 @@ int AES_CBC_128_encrypt(unsigned char *plaintext, unsigned int plaintext_length,
 // @param ret decrypted message received from CBC decryption
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
-int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
-                        unsigned char *key, unsigned char *iv,
-                        unsigned char *ret, unsigned int *ret_length);
+int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
+                unsigned char *key, unsigned char *iv, char enc_mode,
+                unsigned char *ret, unsigned int *ret_length);
 
 // Encrypt the message with cipher key and
 // make HMAC(Hashed Message Authenticate Code) with mac key from session key.
@@ -138,13 +141,11 @@ int AES_CBC_128_decrypt(unsigned char *encrypted, unsigned int encrypted_length,
 // @param iv_size size of iv(initialize vector)
 // @param ret_length length of return buffer
 // @return 0 for success, 1 for error.
-int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
-                                   unsigned char *mac_key,
-                                   unsigned int mac_key_size,
-                                   unsigned char *cipher_key,
-                                   unsigned int cipher_key_size,
-                                   unsigned int iv_size, unsigned char **ret,
-                                   unsigned int *ret_length);
+int symmetric_encrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
 
 // Decrypt the encrypted message with cipher key and
 // make HMAC(Hashed Message Authenticate Code) with mac key from session key.
@@ -157,42 +158,10 @@ int symmetric_encrypt_authenticate(unsigned char *buf, unsigned int buf_length,
 // @param iv_size size of iv(initialize vector)
 // @param ret_length length of return buffer
 // @return 0 for success, 1 for error.
-int symmetric_decrypt_authenticate(unsigned char *buf, unsigned int buf_length,
-                                   unsigned char *mac_key,
-                                   unsigned int mac_key_size,
-                                   unsigned char *cipher_key,
-                                   unsigned int cipher_key_size,
-                                   unsigned int iv_size, unsigned char **ret,
-                                   unsigned int *ret_length);
-
-// Encrypt the message with cipher key and
-// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
-// @param buf input message
-// @param buf_length length of buf
-// @param cipher_key cipher key of session key to be used in CBC encryption
-// @param cipher_key_size size of cipher key
-// @param iv_size size of iv(initialize vector)
-// @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
-int symmetric_encrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
-                                   unsigned char *cipher_key,
-                                   unsigned int cipher_key_size,
-                                   unsigned int iv_size, unsigned char **ret,
-                                   unsigned int *ret_length);
-
-// Decrypt the encrypted message with cipher key and
-// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
-// @param buf input message
-// @param buf_length length of buf
-// @param cipher_key cipher key of session key to be used in CBC decryption
-// @param cipher_key_size size of cipher key
-// @param iv_size size of iv(initialize vector)
-// @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
-int symmetric_decrypt_authenticate_no_hmac(unsigned char *buf, unsigned int buf_length,
-                                   unsigned char *cipher_key,
-                                   unsigned int cipher_key_size,
-                                   unsigned int iv_size, unsigned char **ret,
-                                   unsigned int *ret_length);
+int symmetric_decrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
 
 #endif  // C_CRYPTO_H

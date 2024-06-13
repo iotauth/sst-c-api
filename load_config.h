@@ -7,24 +7,28 @@
 #include "c_api.h"
 
 #define MAX 256
-#define ENTITY_INFO_NAME 1
-#define ENTITY_INFO_PURPOSE 2
-#define ENTITY_INFO_NUMKEY 3
-#define AUTH_INFO_PUBKEY_PATH 4
-#define ENTITY_INFO_PRIVKEY_PATH 5
-#define AUTH_INFO_IP_ADDRESS 6
-#define AUTH_INFO_PORT 7
-#define ENTITY_SERVER_INFO_IP_ADDRESS 8
-#define ENTITY_SERVER_INFO_PORT_NUMBER 9
-#define FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS 10
-#define FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER 11
-#define NETWORK_PROTOCOL 12
+typedef enum {
+    ENTITY_INFO_NAME = 1,
+    ENTITY_INFO_PURPOSE,
+    ENTITY_INFO_NUMKEY,
+    ENCRYPTION_MODE,
+    NO_HMAC_MODE,
+    AUTH_INFO_PUBKEY_PATH,
+    ENTITY_INFO_PRIVKEY_PATH,
+    AUTH_INFO_IP_ADDRESS,
+    AUTH_INFO_PORT,
+    ENTITY_SERVER_INFO_IP_ADDRESS,
+    ENTITY_SERVER_INFO_PORT_NUMBER,
+    FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS,
+    FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER,
+    NETWORK_PROTOCOL
+} config_type_t;
 
 
 // Get a value by comparing a string of conditional statement with a variable.
 // @param ptr input variable to compare with string
 // @return value
-int get_key_value(char *ptr);
+config_type_t get_key_value(char *ptr);
 
 // Load config file from path and save the information in config struct.
 // @param path config file path

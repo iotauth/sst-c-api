@@ -116,8 +116,8 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
         (((bufsize) / AES_CBC_128_IV_SIZE) + 1) * AES_CBC_128_IV_SIZE;
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
     generate_nonce(AES_CBC_128_IV_SIZE, iv);
-    if (AES_CBC_128_encrypt(file_buf, bufsize, s_key->cipher_key, iv, encrypted,
-                            &encrypted_length)) {
+    if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
+                    encrypted, &encrypted_length)) {
         printf("Encryption failed!\n");
     }
     free(file_buf);
@@ -173,9 +173,9 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     unsigned int ret_length = (enc_length + AES_CBC_128_IV_SIZE) /
                               AES_CBC_128_IV_SIZE * AES_CBC_128_IV_SIZE;
     unsigned char *ret = (unsigned char *)malloc(ret_length);
-    if (AES_CBC_128_decrypt(
-            file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len, enc_length,
-            s_key.cipher_key, iv, ret, &ret_length)) {
+    if (decrypt_AES(file_buf + 1 + AES_CBC_128_IV_SIZE + 1 + owner_name_len,
+                    enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
+                    &ret_length)) {
         printf("Error while decrypting.\n");
     }
     free(file_buf);
@@ -353,8 +353,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_CBC_128_IV_SIZE, &decrypted_entity_nonce,
-                    &decrypted_entity_nonce_length)) {
+                    AES_CBC_128_IV_SIZE, ctx->dist_key.enc_mode, 0,
+                    &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
                 error_exit(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP_WITH_DIST_KEY.\n");
@@ -377,7 +377,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_CBC_128_IV_SIZE,
-                    &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
+                    ctx->dist_key.enc_mode, 0, &decrypted_entity_nonce,
+                    &decrypted_entity_nonce_length)) {
                 error_exit(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP.\n");

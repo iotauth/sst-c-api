@@ -1,8 +1,6 @@
 #ifndef C_API_H
 #define C_API_H
 
-// #include "c_secure_comm.h"
-
 #include <pthread.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
@@ -13,6 +11,8 @@
 #define MAX_SESSION_KEY 10
 
 #define SECURE_COMM_MSG 33
+
+
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
@@ -21,6 +21,8 @@ typedef struct {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
+    char enc_mode;
+    char no_hmac_mode;
 } session_key_t;
 
 typedef struct {
@@ -29,6 +31,7 @@ typedef struct {
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
     unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
+    char enc_mode;
 } distribution_key_t;
 
 typedef struct {
@@ -37,6 +40,8 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][36];
     int numkey;
+    char encryption_mode[12];
+    char no_hmac_mode;
     char *auth_pubkey_path;
     char *entity_privkey_path;
     char auth_ip_addr[17];
@@ -54,6 +59,7 @@ typedef struct {
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
+
 } SST_session_ctx_t;
 
 // This struct is a session_key_list. It can be easily initialized with macro
@@ -187,30 +193,6 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param decrypted_length length of returned decrypted buffer
 // @return 0 for success, 1 for fail
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
-                                 unsigned int encrypted_length,
-                                 unsigned char **decrypted,
-                                 unsigned int *decrypted_length);
-
-// Encrypt buffer with session key.
-// @param s_key session key to encrypt
-// @param plaintext plaintext to be encrypted
-// @param plaintext_length length of plaintext to be encrypted
-// @param encrypted double pointer of returned encrypted buffer
-// @param encrypted_length length of returned encrypted buffer
-// @return 0 for success, 1 for fail
-int encrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *plaintext,
-                                 unsigned int plaintext_length,
-                                 unsigned char **encrypted,
-                                 unsigned int *encrypted_length);
-
-// Decrypt buffer with session key.
-// @param s_key session key to decrypt
-// @param encrypted encrypted buffer to be decrypted
-// @param encrypted_length length of encrypted buffer to be decrypted
-// @param decrypted double pointer of returned decrypted buffer
-// @param decrypted_length length of returned decrypted buffer
-// @return 0 for success, 1 for fail
-int decrypt_buf_with_session_key_no_hmac(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned int encrypted_length,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length);

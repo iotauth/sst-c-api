@@ -1,11 +1,15 @@
 
 #include "load_config.h"
-#include "c_common.h"
+
 #include <errno.h>
+
+#include "c_common.h"
 
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
+const char encryption_mode[] = "encryptionMode";
+const char no_hmac_mode[] = "noHmacMode";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
 const char authInfo_ip_address[] = "auth.ip.address";
@@ -16,13 +20,17 @@ const char file_system_manager_ip_address[] = "fileSystemManager.ip.address";
 const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
 
-int get_key_value(char *ptr) {
+config_type_t get_key_value(char *ptr) {
     if (strcmp(ptr, entity_info_name) == 0) {
         return ENTITY_INFO_NAME;
     } else if (strcmp(ptr, entity_info_purpose) == 0) {
         return ENTITY_INFO_PURPOSE;
     } else if (strcmp(ptr, entity_info_numkey) == 0) {
         return ENTITY_INFO_NUMKEY;
+    } else if (strcmp(ptr, encryption_mode) == 0) {
+        return ENCRYPTION_MODE;
+    } else if (strcmp(ptr, no_hmac_mode) == 0) {
+        return NO_HMAC_MODE;
     } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
         return AUTH_INFO_PUBKEY_PATH;
     } else if (strcmp(ptr, entity_info_privkey_path) == 0) {
@@ -54,7 +62,8 @@ config_t *load_config(const char *path) {
         if (errno == ENOENT) {
             printf("Error: SST Config file not found on path %s.\n", path);
         } else if (errno == EACCES) {
-            printf("Error: SST Config file permission denied on path %s.\n", path);
+            printf("Error: SST Config file permission denied on path %s.\n",
+                   path);
         } else {
             printf("Error: SST Config file open failed on path %s.\n", path);
         }
@@ -69,6 +78,8 @@ config_t *load_config(const char *path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0;
     c->purpose_index = 0;
+    c->no_hmac_mode = 0;
+    strcpy(c->encryption_mode, "AES_128_CBC"); // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);
@@ -99,6 +110,25 @@ config_t *load_config(const char *path) {
                     ptr = strtok(NULL, delimiters);
                     printf("Numkey: %s\n", ptr);
                     c->numkey = atoi((const char *)ptr);
+                    break;
+                case ENCRYPTION_MODE:
+                    ptr = strtok(NULL, delimiters);
+                    printf("Encryption mode: %s\n", ptr);
+                    strcpy(c->encryption_mode, ptr);
+                    break;
+                case NO_HMAC_MODE:
+                    ptr = strtok(NULL, delimiters);
+                    if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
+                        c->no_hmac_mode = 0;
+                    } else if (strcmp(ptr, "on") == 0 ||
+                               strcmp(ptr, "1") == 0) {
+                        c->no_hmac_mode = 1;
+                    } else {
+                        error_exit(
+                            "Wrong input for no_hmac_mode.\n Please type "
+                            "\"off\" or \"0\" to use HMAC mode.\n Please type "
+                            "\"on\" or \"1\" to not use HMAC mode.");
+                    }
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
                     ptr = strtok(NULL, delimiters);
