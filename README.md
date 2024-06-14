@@ -101,6 +101,12 @@ Execute
 
 on each terminal
 
+To test AES_128_CTR mode, with noHMAC when exchanging messages, execute
+
+`$./entity_client ../c_client_CTR_noHMAC.config`
+
+`$./entity_server ../c_server_CTR_noHMAC.config`
+
 # For Developers
 
 -   For C language indentation, we use the Google style.
