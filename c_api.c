@@ -48,7 +48,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
                0) {
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
-    if(earned_s_key_list == NULL) {
+    if (earned_s_key_list == NULL) {
         printf("Failed to get session key. Returning NULL.");
         return NULL;
     }
@@ -277,8 +277,8 @@ void *receive_thread(void *SST_session_ctx) {
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length;
     while (1) {
-        received_buf_length =
-            read_from_socket(session_ctx->sock, received_buf, sizeof(received_buf));
+        received_buf_length = read_from_socket(session_ctx->sock, received_buf,
+                                               sizeof(received_buf));
         receive_message(received_buf, received_buf_length, session_ctx);
     }
 }
@@ -457,4 +457,12 @@ int load_session_key_list(session_key_list_t *session_key_list,
         fclose(load_file_fp);
         return 0;
     }
+}
+
+unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
+    int num = 0;
+    for (int i = 0; i < byte_length; i++) {
+        num |= buf[i] << 8 * (byte_length - 1 - i);
+    }
+    return num;
 }

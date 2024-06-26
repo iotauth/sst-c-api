@@ -12,7 +12,6 @@
 
 #define SECURE_COMM_MSG 33
 
-
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
@@ -218,5 +217,7 @@ int save_session_key_list(session_key_list_t *session_key_list,
 // @return 0 for success, 1 for fail
 int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
+
+unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 
 #endif  // C_API_H
