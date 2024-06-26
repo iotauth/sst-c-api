@@ -62,6 +62,12 @@
 #define MAC_SIZE 32
 #define KEY_ID_SIZE 8
 
+typedef enum {
+    INVALID_DISTRIBUTION_KEY,
+    INVALID_SESSION_KEY_REQ,
+    UNKNOWN_INTERNAL_ERROR,
+} auth_alert_code;
+
 // Handshake struct including nonce, reply_nonce(received),
 // and Diffie Helman parameter
 
@@ -217,5 +223,8 @@ void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
 void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 
 int mod(int a, int b);
+
+unsigned int read_from_socket(int socket, unsigned char *buf,
+                              unsigned int buf_length);
 
 #endif  // C_COMMON_H

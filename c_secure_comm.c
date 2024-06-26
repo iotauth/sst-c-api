@@ -440,7 +440,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
-            read(sock, received_buf, sizeof(received_buf));
+            read_from_socket(sock, received_buf, sizeof(received_buf));
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -542,7 +542,21 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             state = FINISHED;
             return session_key_list;
         } else if (message_type == AUTH_ALERT) {
-            // session_key_list->num_key = 0;
+            session_key_list->num_key = 0;
+            switch (data_buf[0]) {
+                case INVALID_DISTRIBUTION_KEY:
+                    printf("Error: Invalid Distribution Key\n");
+                    break;
+                case INVALID_SESSION_KEY_REQ:
+                    printf("Error: Invalid Session Key Request\n");
+                    break;
+                case UNKNOWN_INTERNAL_ERROR:
+                    printf("Error: Unknown Internal Error\n");
+                    break;
+                default:
+                    printf("Error: Unknown Code\n");
+                    break;
+            }
             return NULL;
         }
     }

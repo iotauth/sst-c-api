@@ -48,6 +48,10 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
                0) {
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
+    if(earned_s_key_list == NULL) {
+        printf("Failed to get session key. Returning NULL.");
+        return NULL;
+    }
 
     if (existing_s_key_list == NULL) {
         return earned_s_key_list;
@@ -90,7 +94,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
     unsigned int received_buf_length =
-        read(sock, received_buf, sizeof(received_buf));
+        read_from_socket(sock, received_buf, sizeof(received_buf));
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
@@ -148,6 +152,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
+            printf("Getting target session key by id failed. Returning NULL.");
             return NULL;
         }
         s_key = s_key_list->s_key;
@@ -175,7 +180,7 @@ SST_session_ctx_t *server_secure_comm_setup(
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
         // memset(received_buf, 0, MAX_HS_BUF_LENGTH);
         int received_buf_length =
-            read(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+            read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             perror("Read Error:");
         }
@@ -222,8 +227,8 @@ SST_session_ctx_t *server_secure_comm_setup(
     }
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length =
-            read(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+        unsigned int received_buf_length =
+            read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -270,19 +275,10 @@ SST_session_ctx_t *server_secure_comm_setup(
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    ssize_t received_buf_length = 0;
+    unsigned int received_buf_length;
     while (1) {
         received_buf_length =
-            read(session_ctx->sock, received_buf, sizeof(received_buf));
-        if (received_buf_length == 0) {
-            printf("Socket closed!\n");
-            close(session_ctx->sock);
-            return 0;
-        }
-        if (received_buf_length == -1) {
-            printf("Connection error!\n");
-            return 0;
-        }
+            read_from_socket(session_ctx->sock, received_buf, sizeof(received_buf));
         receive_message(received_buf, received_buf_length, session_ctx);
     }
 }
