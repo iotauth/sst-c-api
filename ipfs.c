@@ -269,7 +269,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     write(sock, data, 2 + name_size);
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length =
-        read(sock, received_buf, sizeof(received_buf));
+        read_from_socket(sock, received_buf, sizeof(received_buf));
     printf("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
@@ -322,7 +322,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
-            read(sock, received_buf, sizeof(received_buf));
+            read_from_socket(sock, received_buf, sizeof(rec`eived_buf));
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
