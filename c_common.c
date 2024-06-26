@@ -81,6 +81,9 @@ unsigned char *parse_received_message(unsigned char *received_buf,
                                       unsigned char *message_type,
                                       unsigned int *data_buf_length) {
     *message_type = received_buf[0];
+    if (*message_type == AUTH_ALERT) {
+        return received_buf + 1;
+    }
     unsigned int var_length_buf_size;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, received_buf_length,
                           data_buf_length, &var_length_buf_size);
@@ -89,7 +92,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 
 uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
-    read(socket, buf, 1);
+    read_from_socket(socket, buf, 1);
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
     } else {
@@ -101,16 +104,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
                                         unsigned char *ret,
                                         unsigned int *ret_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
-    int socket_read = read(socket, received_buf, MESSAGE_TYPE_SIZE);
-    if (socket_read == 0) {
-        printf("Socket closed!\n");
-        close(socket);
-        return 0;
-    }
-    if (socket_read == -1) {
-        printf("Connection error!\n");
-        return 0;
-    }
+    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     *message_type = received_buf[0];
     unsigned int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
@@ -120,7 +114,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     if (var_length_buf_size != var_length_buf_size_checked) {
         error_exit("Wrong header calculation... Exiting...");
     }
-    read(socket, ret, *ret_length);
+    read_from_socket(socket, ret, *ret_length);
     return 1;
 }
 
@@ -163,16 +157,16 @@ int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     serv_addr.sin_addr.s_addr =
         inet_addr(ip_addr);  // the ip_address to connect to
     serv_addr.sin_port = htons(atoi(port_num));
-    
+
     int count_retries = 0;
     int ret = -1;
     while (count_retries++ < 100) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-          usleep(500);
-          continue;
+            usleep(500);
+            continue;
         } else {
-          break;
+            break;
         }
     }
     return ret;
@@ -211,4 +205,20 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret) {
 int mod(int a, int b) {
     int r = a % b;
     return r < 0 ? r + b : r;
+}
+
+unsigned int read_from_socket(int socket, unsigned char *buf,
+                              unsigned int buf_length) {
+    if (socket < 0) {
+        // Socket is not open.
+        errno = EBADF;
+        return -1;
+    }
+    ssize_t length_read = read(socket, buf, buf_length);
+    if (length_read < 0) {
+        error_exit("Reading from socket failed.");
+    } else if (length_read == 0) {
+        error_exit("Connection closed.");
+    }
+    return (unsigned int) length_read;
 }
