@@ -35,7 +35,7 @@ void write_in_n_bytes(uint64_t num, int n, unsigned char *buf) {
 }
 
 unsigned int read_unsigned_int_BE(unsigned char *buf, int byte_length) {
-    int num = 0;
+    unsigned int num = 0;
     for (int i = 0; i < byte_length; i++) {
         num |= buf[i] << 8 * (byte_length - 1 - i);
     }

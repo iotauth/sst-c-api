@@ -218,6 +218,9 @@ int save_session_key_list(session_key_list_t *session_key_list,
 int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
+// Returns the session key id buffer to be saved in unsigned integer.
+// @param buf session key id buffer to convert to int
+// @param byte_length length of session key id buffer
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 
 #endif  // C_API_H
