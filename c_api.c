@@ -272,6 +272,24 @@ SST_session_ctx_t *server_secure_comm_setup(
     return error_return_null("Unrecognized or invalid state for server.\n");
 }
 
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length) {
+    unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
+    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    *message_type = received_buf[0];
+    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
+        socket, received_buf + MESSAGE_TYPE_SIZE);
+    unsigned int var_length_buf_size_checked;
+    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
+                          ret_length, &var_length_buf_size_checked);
+    if (var_length_buf_size != var_length_buf_size_checked) {
+        error_exit("Wrong header calculation... Exiting...");
+    }
+    read_from_socket(socket, ret, *ret_length);
+    return 1;
+}
+
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];

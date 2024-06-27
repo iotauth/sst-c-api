@@ -134,6 +134,16 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
+// Reads the SST header, and returns the message type, start pointer of the
+// SST's payload, and the payload's length.
+// @param socket socket to read
+// @param message_type SST message type
+// @param ret Return buffer
+// @param ret_length Return buffer's length
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *ret,
+                                        unsigned int *ret_length);
+
 // Creates a thread to receive messages.
 // Max buffer length is 1000 bytes currently.
 // Use function receive_message() below for longer read buffer.
