@@ -272,22 +272,17 @@ SST_session_ctx_t *server_secure_comm_setup(
     return error_return_null("Unrecognized or invalid state for server.\n");
 }
 
-int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
-                                        unsigned char *ret,
-                                        unsigned int *ret_length) {
-    unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
-    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-    *message_type = received_buf[0];
-    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
-        socket, received_buf + MESSAGE_TYPE_SIZE);
-    unsigned int var_length_buf_size_checked;
-    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
-                          ret_length, &var_length_buf_size_checked);
-    if (var_length_buf_size != var_length_buf_size_checked) {
-        error_exit("Wrong header calculation... Exiting...");
+int read_secure_message(int socket, unsigned char *buf,
+                        unsigned int buf_length) {
+    unsigned char message_type;
+    unsigned int bytes_read;
+    bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
+                                                     buf_length);
+    if (message_type == SECURE_COMM_MSG) {
+        return bytes_read;
+    } else {
+        error_exit("Wrong message_type.");
     }
-    read_from_socket(socket, ret, *ret_length);
-    return 1;
 }
 
 void *receive_thread(void *SST_session_ctx) {
@@ -307,11 +302,9 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         unsigned char message_type;
-        if (1 != read_header_return_data_buf_pointer(session_ctx->sock,
-                                                     &message_type, data_buf,
-                                                     &data_buf_length)) {
-            return 0;
-        }
+
+        data_buf_length = read_header_return_data_buf_pointer(
+            session_ctx->sock, &message_type, data_buf, MAX_PAYLOAD_LENGTH);
         if (message_type == SECURE_COMM_MSG) {
             print_received_message(data_buf, data_buf_length, session_ctx);
         }

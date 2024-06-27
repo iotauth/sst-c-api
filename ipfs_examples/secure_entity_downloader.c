@@ -40,8 +40,8 @@ int main(int argc, char *argv[]) {
     unsigned char message_type;
     unsigned char session_key_id[8];
     int command_size;
-    read_header_return_data_buf_pointer(session_ctx->sock, 
-                                        &message_type, data_buf, &data_buf_length);
+    data_buf_length = read_header_return_data_buf_pointer(session_ctx->sock, 
+                                        &message_type, data_buf, MAX_PAYLOAD_LENGTH);
     unsigned char *decrypted;
     unsigned int decrypted_length;
     if (message_type == SECURE_COMM_MSG) {

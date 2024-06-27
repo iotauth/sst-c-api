@@ -100,7 +100,33 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     }
 }
 
-
+int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
+                                        unsigned char *buf,
+                                        unsigned int buf_length) {
+    unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
+    // Read the first byte.
+    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    *message_type = received_buf[0];
+    // Read one bytes each, until the variable length buffer ends.
+    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
+        socket, received_buf + MESSAGE_TYPE_SIZE);
+    unsigned int var_length_buf_size_checked;
+    unsigned int ret_length;
+    // Decode the variable length buffer and get the bytes to read.
+    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
+                          &ret_length, &var_length_buf_size_checked);
+    if (var_length_buf_size != var_length_buf_size_checked) {
+        error_exit("Wrong header calculation... Exiting...");
+    }
+    if (ret_length > buf_length) {
+        error_exit("Larger buffer size required.");
+    }
+    unsigned int bytes_read = read_from_socket(socket, buf, buf_length);
+    if (ret_length != bytes_read) {
+        error_exit("Wrong read... Exiting..");
+    }
+    return bytes_read;
+}
 
 void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
                         unsigned char *header, unsigned int *header_length) {
