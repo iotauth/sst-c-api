@@ -278,11 +278,10 @@ int read_secure_message(int socket, unsigned char *buf,
     unsigned int bytes_read;
     bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
                                                      buf_length);
-    if (message_type == SECURE_COMM_MSG) {
-        return bytes_read;
-    } else {
+    if (message_type != SECURE_COMM_MSG) {
         error_exit("Wrong message_type.");
     }
+    return bytes_read;
 }
 
 void *receive_thread(void *SST_session_ctx) {
