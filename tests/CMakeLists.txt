@@ -19,7 +19,9 @@ add_library(SSTLIB
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
 add_executable(aes_test aes_test.c)
+add_executable(test test.c)
 
+target_link_libraries(test SSTLIB)
 target_link_libraries(aes_test SSTLIB)
 
 if(MSVC)
