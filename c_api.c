@@ -391,36 +391,36 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned int plaintext_length,
                                  unsigned char **encrypted,
                                  unsigned int *encrypted_length) {
-    return encrypt_or_decrypt_buf_with_session_key(s_key, plaintext, plaintext_length,
-                                            encrypted, encrypted_length, 1);
+    return encrypt_or_decrypt_buf_with_session_key(
+        s_key, plaintext, plaintext_length, encrypted, encrypted_length, 1);
 }
 
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned int encrypted_length,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length) {
-    return encrypt_or_decrypt_buf_with_session_key(s_key, encrypted, encrypted_length,
-                                            decrypted, decrypted_length, 0);
+    return encrypt_or_decrypt_buf_with_session_key(
+        s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
 
 int CTR_encrypt_buf_with_session_key(
     session_key_t *s_key, const uint64_t initial_iv_high,
     const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, unsigned char *out_data, size_t data_size,
-    size_t out_data_size, unsigned int *processed_size) {
+    const unsigned char *data, size_t data_size, unsigned char *out_data,
+    size_t out_data_buf_length, unsigned int *processed_size) {
     return CTR_encrypt_or_decrypt_buf_with_session_key(
         s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-        data_size, out_data_size, processed_size, 1);
+        data_size, out_data_buf_length, processed_size, 1);
 }
 
 int CTR_decrypt_buf_with_session_key(
     session_key_t *s_key, const uint64_t initial_iv_high,
     const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, unsigned char *out_data, size_t data_size,
-    size_t out_data_size, unsigned int *processed_size) {
+    const unsigned char *data, size_t data_size, unsigned char *out_data,
+    size_t out_data_buf_length, unsigned int *processed_size) {
     return CTR_encrypt_or_decrypt_buf_with_session_key(
         s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-        data_size, out_data_size, processed_size, 0);
+        data_size, out_data_buf_length, processed_size, 0);
 }
 
 void free_session_key_list_t(session_key_list_t *session_key_list) {
