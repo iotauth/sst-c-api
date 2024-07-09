@@ -391,38 +391,36 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned int plaintext_length,
                                  unsigned char **encrypted,
                                  unsigned int *encrypted_length) {
-    if (!check_session_key_validity(s_key)) {
-        if (symmetric_encrypt_authenticate(
-                plaintext, plaintext_length, s_key->mac_key,
-                s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
-                AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
-                encrypted, encrypted_length)) {
-            error_exit("Error during encrypting buffer with session key.\n");
-        }
-        return 0;
-    } else {
-        printf("Session key is expired.\n");
-        return 1;
-    }
+    return encrypt_or_decrypt_buf_with_session_key(s_key, plaintext, plaintext_length,
+                                            encrypted, encrypted_length, 1);
 }
 
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned int encrypted_length,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length) {
-    if (!check_session_key_validity(s_key)) {
-        if (symmetric_decrypt_authenticate(
-                encrypted, encrypted_length, s_key->mac_key,
-                s_key->mac_key_size, s_key->cipher_key, s_key->cipher_key_size,
-                AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
-                decrypted, decrypted_length)) {
-            error_exit("Error during decrypting buffer with session key.\n");
-        }
-        return 0;
-    } else {
-        printf("Session key is expired.\n");
-        return 1;
-    }
+    return encrypt_or_decrypt_buf_with_session_key(s_key, encrypted, encrypted_length,
+                                            decrypted, decrypted_length, 0);
+}
+
+int CTR_encrypt_buf_with_session_key(
+    session_key_t *s_key, const uint64_t initial_iv_high,
+    const uint64_t initial_iv_low, uint64_t file_offset,
+    const unsigned char *data, unsigned char *out_data, size_t data_size,
+    size_t out_data_size, unsigned int *processed_size) {
+    return CTR_encrypt_or_decrypt_buf_with_session_key(
+        s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
+        data_size, out_data_size, processed_size, 1);
+}
+
+int CTR_decrypt_buf_with_session_key(
+    session_key_t *s_key, const uint64_t initial_iv_high,
+    const uint64_t initial_iv_low, uint64_t file_offset,
+    const unsigned char *data, unsigned char *out_data, size_t data_size,
+    size_t out_data_size, unsigned int *processed_size) {
+    return CTR_encrypt_or_decrypt_buf_with_session_key(
+        s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
+        data_size, out_data_size, processed_size, 0);
 }
 
 void free_session_key_list_t(session_key_list_t *session_key_list) {
@@ -471,22 +469,4 @@ int load_session_key_list(session_key_list_t *session_key_list,
 
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
-}
-
-int CTR_Encrypt(const unsigned char *key, const uint64_t initial_iv_high,
-                const uint64_t initial_iv_low, uint64_t file_offset,
-                const unsigned char *data, unsigned char *out_data,
-                size_t data_size, size_t out_data_size,
-                unsigned int *processed_size) {
-    return CTR_Cipher(key, initial_iv_high, initial_iv_low, file_offset, data,
-                      out_data, data_size, out_data_size, 1, processed_size);
-}
-
-int CTR_Decrypt(const unsigned char *key, const uint64_t initial_iv_high,
-                const uint64_t initial_iv_low, uint64_t file_offset,
-                const unsigned char *data, unsigned char *out_data,
-                size_t data_size, size_t out_data_size,
-                unsigned int *processed_size) {
-    return CTR_Cipher(key, initial_iv_high, initial_iv_low, file_offset, data,
-                      out_data, data_size, out_data_size, 0, processed_size);
 }
