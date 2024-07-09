@@ -240,4 +240,6 @@ int CTR_decrypt_buf_with_session_key(
     const unsigned char *data, unsigned char *out_data, size_t data_size,
     size_t out_data_size, unsigned int *processed_size);
 
+void generate_random_nonce(int length, unsigned char *buf);
+
 #endif  // C_API_H

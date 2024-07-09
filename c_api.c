@@ -470,3 +470,7 @@ int load_session_key_list(session_key_list_t *session_key_list,
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
 }
+
+void generate_random_nonce(int length, unsigned char *buf) {
+    generate_nonce(length, buf);
+}
