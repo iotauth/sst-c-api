@@ -1,9 +1,10 @@
 #ifndef C_SECURE_COMM_H
 #define C_SECURE_COMM_H
 
+#include "c_api.h"
+#include "c_common.h"
 #include "c_crypto.h"
 #include "load_config.h"
-#include "c_api.h"
 
 // This file includes functions that uses the struct "session_key"
 
@@ -19,7 +20,6 @@
 #define HANDSHAKE_3_LENGTH 82
 
 #define MAX_SESSION_KEY 10
-
 
 // Parses the the reply message sending to Auth.
 // Concat entity, auth nonce and information such as sender
@@ -70,8 +70,8 @@ void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // @param data_buf total data buffer
 // @param ctx config struct obtained from load_config()
 // @param key_size size of the public crypto key
-void save_distribution_key(unsigned char *data_buf,
-                           SST_ctx_t *ctx, size_t key_size);
+void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
+                           size_t key_size);
 
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec
@@ -94,7 +94,8 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf);
 // @param buf_length length of buf
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
-void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf, unsigned int buf_length,
+void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
+                                unsigned int buf_length,
                                 unsigned char *reply_nonce,
                                 session_key_list_t *session_key_list);
 
@@ -215,7 +216,7 @@ int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
 // @param dest Session key destination pointer to copy to.
 // @param src Session key src pointer to copy.
 void copy_session_key(session_key_t *dest, session_key_t *src);
-                  
+
 // Adds session key to the list.
 // Appends at the destination list's rear_idx.
 // @param s_key Session key to add

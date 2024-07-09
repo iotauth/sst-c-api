@@ -227,4 +227,6 @@ int mod(int a, int b);
 unsigned int read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
+void PutBigEndian64(uint64_t value, unsigned char *output);
+
 #endif  // C_COMMON_H

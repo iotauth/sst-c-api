@@ -230,5 +230,13 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     } else if (length_read == 0) {
         error_exit("Connection closed.");
     }
-    return (unsigned int) length_read;
+    return (unsigned int)length_read;
+}
+
+// Function to convert uint64_t to big endian and store in buffer
+void PutBigEndian64(uint64_t value, unsigned char *output) {
+    for (int i = 0; i < 8; ++i) {
+        output[7 - i] = value & 0xff;
+        value >>= 8;
+    }
 }

@@ -261,7 +261,7 @@ int symmetric_encrypt_authenticate(
         // This requires, paddings, making the encrypted length multiples of the
         // block size (key size)
         encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
-    } else if (enc_mode == AES_128_CTR) {  
+    } else if (enc_mode == AES_128_CTR) {
         // The encrypted length is same on CTR mode.
         encrypted_length = buf_length;
     }
@@ -348,5 +348,117 @@ int symmetric_decrypt_authenticate(
         printf("Cipher_key_size is not supported.");
         return 1;
     }
+    return 0;
+}
+
+int CTR_Cipher(const unsigned char *key, const uint64_t initial_iv_high,
+               const uint64_t initial_iv_low, uint64_t file_offset,
+               const unsigned char *data, unsigned char *out_data,
+               size_t data_size, size_t out_data_size, int encrypt,
+               unsigned int *processed_size) {
+    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
+    if (ctx == NULL) {
+        error_exit("Failed to create EVP_CIPHER_CTX");
+    }
+
+    const size_t kBlockSize = 16;  // AES block size
+    if (out_data_size < data_size) {
+        fprintf(stderr,
+                "Output buffer is too small, required: %zu, provided: %zu\n",
+                data_size, out_data_size);
+        EVP_CIPHER_CTX_free(ctx);
+        return -1;
+    }
+
+    uint64_t block_index = file_offset / kBlockSize;
+    uint64_t block_offset = file_offset % kBlockSize;
+
+    uint64_t iv_high = initial_iv_high;
+    uint64_t iv_low = initial_iv_low + block_index;
+    if (ULLONG_MAX - block_index < initial_iv_low) {
+        iv_high++;
+    }
+
+    unsigned char iv[kBlockSize];
+    PutBigEndian64(iv_high, iv);
+    PutBigEndian64(iv_low, iv + sizeof(uint64_t));
+
+    if (EVP_CipherInit_ex(ctx, EVP_aes_128_ctr(), NULL, key, iv, encrypt) !=
+        1) {
+        error_exit("Failed to initialize cipher");
+    }
+
+    EVP_CIPHER_CTX_set_padding(ctx, 0);
+
+    unsigned char partial_block[kBlockSize];
+    size_t data_offset = 0;
+    size_t remaining_data_size = data_size;
+    int output_size = 0;
+    *processed_size = 0;
+
+    if (block_offset > 0) {
+        size_t partial_block_size =
+            kBlockSize - block_offset < remaining_data_size
+                ? kBlockSize - block_offset
+                : remaining_data_size;
+        memcpy(partial_block + block_offset, data, partial_block_size);
+        if (EVP_CipherUpdate(ctx, partial_block, &output_size, partial_block,
+                             kBlockSize) != 1) {
+            error_exit("Failed to update cipher");
+        }
+        if (output_size != (int)kBlockSize) {
+            fprintf(stderr,
+                    "Unexpected output size for first block, expected %zu vs "
+                    "actual %d\n",
+                    kBlockSize, output_size);
+            EVP_CIPHER_CTX_free(ctx);
+            return -1;
+        }
+        memcpy(out_data, partial_block + block_offset, partial_block_size);
+        data_offset += partial_block_size;
+        remaining_data_size -= partial_block_size;
+        *processed_size += partial_block_size;
+    }
+
+    while (remaining_data_size >= kBlockSize) {
+        const unsigned char *full_blocks = data + data_offset;
+        unsigned char *full_blocks_out = out_data + data_offset;
+        size_t actual_data_size =
+            remaining_data_size - (remaining_data_size % kBlockSize);
+        if (EVP_CipherUpdate(ctx, full_blocks_out, &output_size, full_blocks,
+                             actual_data_size) != 1) {
+            error_exit("Failed to update cipher");
+        }
+        if (output_size != (int)actual_data_size) {
+            fprintf(stderr,
+                    "Unexpected output size, expected %zu vs actual %d\n",
+                    actual_data_size, output_size);
+            EVP_CIPHER_CTX_free(ctx);
+            return -1;
+        }
+        data_offset += actual_data_size;
+        remaining_data_size -= actual_data_size;
+        *processed_size += actual_data_size;
+    }
+
+    if (remaining_data_size > 0) {
+        memcpy(partial_block, data + data_offset, remaining_data_size);
+        if (EVP_CipherUpdate(ctx, partial_block, &output_size, partial_block,
+                             kBlockSize) != 1) {
+            error_exit("Failed to update cipher");
+        }
+        if (output_size != (int)kBlockSize) {
+            fprintf(stderr,
+                    "Unexpected output size for last block, expected %zu vs "
+                    "actual %d\n",
+                    kBlockSize, output_size);
+            EVP_CIPHER_CTX_free(ctx);
+            return -1;
+        }
+        memcpy(out_data + data_offset, partial_block, remaining_data_size);
+        *processed_size += remaining_data_size;
+    }
+
+    EVP_CIPHER_CTX_free(ctx);
     return 0;
 }

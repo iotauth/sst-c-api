@@ -472,3 +472,21 @@ int load_session_key_list(session_key_list_t *session_key_list,
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
 }
+
+int CTR_Encrypt(const unsigned char *key, const uint64_t initial_iv_high,
+                const uint64_t initial_iv_low, uint64_t file_offset,
+                const unsigned char *data, unsigned char *out_data,
+                size_t data_size, size_t out_data_size,
+                unsigned int *processed_size) {
+    return CTR_Cipher(key, initial_iv_high, initial_iv_low, file_offset, data,
+                      out_data, data_size, out_data_size, 1, processed_size);
+}
+
+int CTR_Decrypt(const unsigned char *key, const uint64_t initial_iv_high,
+                const uint64_t initial_iv_low, uint64_t file_offset,
+                const unsigned char *data, unsigned char *out_data,
+                size_t data_size, size_t out_data_size,
+                unsigned int *processed_size) {
+    return CTR_Cipher(key, initial_iv_high, initial_iv_low, file_offset, data,
+                      out_data, data_size, out_data_size, 0, processed_size);
+}

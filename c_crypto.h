@@ -164,4 +164,10 @@ int symmetric_decrypt_authenticate(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
 
+int CTR_Cipher(const unsigned char *key, const uint64_t initial_iv_high,
+               const uint64_t initial_iv_low, uint64_t file_offset,
+               const unsigned char *data, unsigned char *out_data,
+               size_t data_size, size_t out_data_size, int encrypt,
+               unsigned int *processed_size);
+
 #endif  // C_CRYPTO_H

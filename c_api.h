@@ -2,6 +2,7 @@
 #define C_API_H
 
 #include <pthread.h>
+#include <stdint.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
@@ -226,5 +227,17 @@ int load_session_key_list(session_key_list_t *session_key_list,
 // @param buf session key id buffer to convert to int
 // @param byte_length length of session key id buffer
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
+
+int CTR_Encrypt(const unsigned char *key, const uint64_t initial_iv_high,
+                const uint64_t initial_iv_low, uint64_t file_offset,
+                const unsigned char *data, unsigned char *out_data,
+                size_t data_size, size_t out_data_size,
+                unsigned int *processed_size);
+
+int CTR_Decrypt(const unsigned char *key, const uint64_t initial_iv_high,
+                const uint64_t initial_iv_low, uint64_t file_offset,
+                const unsigned char *data, unsigned char *out_data,
+                size_t data_size, size_t out_data_size,
+                unsigned int *processed_size);
 
 #endif  // C_API_H
