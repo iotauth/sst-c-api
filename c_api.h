@@ -232,7 +232,7 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
 
 int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
-                                        const unsigned char *password,
+                                        const char *password,
                                         unsigned int password_len,
                                         const unsigned char *salt,
                                         unsigned int salt_len);
