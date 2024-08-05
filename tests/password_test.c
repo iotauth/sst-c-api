@@ -13,8 +13,8 @@ int main(int argc, char *argv[]) {
     // Request one session key.
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
 
-    unsigned char password[] = "examplepassword";
-    unsigned char salt[] = "randomsalt";
+    char password[] = "examplepassword";
+    char salt[] = "randomsalt";
 
     save_session_key_list_with_password(s_key_list, "./sessionkey", password, sizeof(password), salt, sizeof(salt));
 
