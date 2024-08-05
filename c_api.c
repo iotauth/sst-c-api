@@ -516,7 +516,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
                                         const char *password,
                                         unsigned int password_len,
-                                        const unsigned char *salt,
+                                        const char *salt,
                                         unsigned int salt_len) {
     unsigned char salted_password[password_len + salt_len];
     unsigned char temp_hash[MD5_DIGEST_LENGTH];
