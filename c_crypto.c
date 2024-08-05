@@ -331,7 +331,7 @@ int symmetric_decrypt_authenticate(
             // print_buf(buf + encrypted_length, mac_key_size);
             // printf("Hmac tag: ");
             // print_buf(reproduced_tag, mac_key_size);
-            error_exit("Invalid MAC error!");
+            return 1;
         } else {
             // printf("MAC verified!\n");
         }
