@@ -351,6 +351,26 @@ int symmetric_decrypt_authenticate(
     return 0;
 }
 
+void generate_md5_hash(unsigned char *data, size_t data_len,
+                       unsigned char *md5_hash) {
+    EVP_MD_CTX *mdctx;
+    unsigned int md_len;
+
+    if ((mdctx = EVP_MD_CTX_create()) == NULL) {
+        print_last_error("EVP_MD_CTX_create() failed");
+    }
+    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
+        print_last_error("EVP_DigestInit_ex failed");
+    }
+    if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
+        print_last_error("EVP_DigestUpdate failed");
+    }
+    if (EVP_DigestFinal_ex(mdctx, md5_hash, &md_len) != 1) {
+        print_last_error("failed");
+    }
+    EVP_MD_CTX_destroy(mdctx);
+}
+
 int CTR_Cipher(const unsigned char *key, const uint64_t initial_iv_high,
                const uint64_t initial_iv_low, uint64_t file_offset,
                const unsigned char *data, unsigned char *out_data,

@@ -444,7 +444,7 @@ int save_session_key_list(session_key_list_t *session_key_list,
     fwrite(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
            saved_file_fp);
     fclose(saved_file_fp);
-    return 1;
+    return 0;
 }
 
 int load_session_key_list(session_key_list_t *session_key_list,
@@ -465,6 +465,113 @@ int load_session_key_list(session_key_list_t *session_key_list,
         fclose(load_file_fp);
         return 0;
     }
+}
+
+int save_session_key_list_with_password(session_key_list_t *session_key_list,
+                                        const char *file_path,
+                                        const unsigned char *password,
+                                        unsigned int password_len,
+                                        const char *salt,
+                                        unsigned int salt_len) {
+    unsigned char salted_password[password_len + salt_len];
+    // Combine the password with the salt
+    memcpy(salted_password, password, password_len);
+    memcpy(salted_password + password_len, salt, salt_len);
+
+    // Create SHA256 HMAC.
+    unsigned char temp_hash[MD5_DIGEST_LENGTH];
+    generate_md5_hash(salted_password, sizeof(salted_password), temp_hash);
+
+    // Generate IV.
+    unsigned char iv[AES_BLOCK_SIZE];
+    generate_nonce(AES_BLOCK_SIZE, iv);
+
+    // Serialize session_key_list into buffer.
+    unsigned int buffer_len =
+        sizeof(session_key_list_t) + sizeof(session_key_t) * MAX_SESSION_KEY;
+    unsigned char buffer[buffer_len];
+    memcpy(buffer, session_key_list, sizeof(session_key_list_t));
+    memcpy(buffer + sizeof(session_key_list_t), session_key_list->s_key,
+           sizeof(session_key_t) * MAX_SESSION_KEY);
+
+    unsigned char ciphertext[sizeof(buffer)];
+    unsigned int ciphertext_len;
+    // Encrypt in CTR mode.
+    if (encrypt_AES(buffer, buffer_len, temp_hash, iv, AES_128_CTR, ciphertext,
+                    &ciphertext_len)) {
+        printf("AES encryption failed!");
+        return 1;
+    }
+
+    FILE *saved_file_fp = fopen(file_path, "wb");
+    // Write the IV
+    fwrite(iv, 1, sizeof(iv), saved_file_fp);
+    // Write the encrypted data
+    fwrite(ciphertext, 1, ciphertext_len, saved_file_fp);
+    fclose(saved_file_fp);
+    return 0;
+}
+
+int load_session_key_list_with_password(session_key_list_t *session_key_list,
+                                        const char *file_path,
+                                        const unsigned char *password,
+                                        unsigned int password_len,
+                                        const unsigned char *salt,
+                                        unsigned int salt_len) {
+    unsigned char salted_password[password_len + salt_len];
+    unsigned char temp_hash[MD5_DIGEST_LENGTH];
+    unsigned char iv[AES_BLOCK_SIZE];
+    unsigned char ciphertext[sizeof(session_key_list_t) +
+                             sizeof(session_key_t) * MAX_SESSION_KEY];
+    unsigned char buffer[sizeof(session_key_list_t) +
+                         sizeof(session_key_t) * MAX_SESSION_KEY];
+    FILE *saved_file_fp;
+    int ciphertext_len;
+
+    // Combine the password with the salt
+    memcpy(salted_password, password, password_len);
+    memcpy(salted_password + password_len, salt, salt_len);
+
+    // Create MD5 hash of the salted password
+    generate_md5_hash(salted_password, sizeof(salted_password), temp_hash);
+
+    saved_file_fp = fopen(file_path, "rb");
+    if (!saved_file_fp) {
+        printf("Failed to open file for reading!\n");
+        return 1;
+    }
+
+    // Read the IV
+    fread(iv, 1, sizeof(iv), saved_file_fp);
+
+    // Read the encrypted data
+    ciphertext_len = fread(ciphertext, 1, sizeof(ciphertext), saved_file_fp);
+    fclose(saved_file_fp);
+
+    if (ciphertext_len <= 0) {
+        printf("Failed to read encrypted data!\n");
+        return 1;
+    }
+
+    // Decrypt the data
+    unsigned int plaintext_len;
+    if (decrypt_AES(ciphertext, ciphertext_len, temp_hash, iv, AES_128_CTR,
+                    buffer, &plaintext_len)) {
+        printf("AES decryption failed!\n");
+        return 1;
+    }
+
+    // Deserialize the buffer into session_key_list
+    memcpy(session_key_list, buffer, sizeof(session_key_list_t));
+    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+    if (!session_key_list->s_key) {
+        printf("Memory allocation failed!\n");
+        return 1;
+    }
+    memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
+           sizeof(session_key_t) * MAX_SESSION_KEY);
+
+    return 0;
 }
 
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {

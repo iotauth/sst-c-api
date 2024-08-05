@@ -7,6 +7,7 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
+#include <openssl/md5.h>
 #include <openssl/pem.h>
 #include <openssl/rand.h>
 #include <openssl/rsa.h>
@@ -163,6 +164,9 @@ int symmetric_decrypt_authenticate(
     unsigned int mac_key_size, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
+
+void generate_md5_hash(unsigned char *data, size_t data_len,
+                       unsigned char *md5_hash);
 
 int CTR_Cipher(const unsigned char *key, const uint64_t initial_iv_high,
                const uint64_t initial_iv_low, uint64_t file_offset,

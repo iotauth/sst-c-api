@@ -223,6 +223,20 @@ int save_session_key_list(session_key_list_t *session_key_list,
 int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
+int save_session_key_list_with_password(session_key_list_t *session_key_list,
+                                        const char *file_path,
+                                        const unsigned char *password,
+                                        unsigned int password_len,
+                                        const char *salt,
+                                        unsigned int salt_len);
+
+int load_session_key_list_with_password(session_key_list_t *session_key_list,
+                                        const char *file_path,
+                                        const unsigned char *password,
+                                        unsigned int password_len,
+                                        const unsigned char *salt,
+                                        unsigned int salt_len);
+
 // Returns the session key id buffer to be saved in unsigned integer.
 // @param buf session key id buffer to convert to int
 // @param byte_length length of session key id buffer

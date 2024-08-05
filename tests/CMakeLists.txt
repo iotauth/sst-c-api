@@ -18,11 +18,11 @@ add_library(SSTLIB
 
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
-add_executable(aes_test aes_test.c)
+add_executable(c_crypto_test c_crypto_test.c)
 add_executable(test test.c)
 add_executable(multi_thread_get_session_key multi_thread_get_session_key.c)
 
-target_link_libraries(aes_test SSTLIB)
+target_link_libraries(c_crypto_test SSTLIB)
 target_link_libraries(test SSTLIB)
 target_link_libraries(multi_thread_get_session_key SSTLIB)
 
