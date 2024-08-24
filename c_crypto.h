@@ -20,6 +20,8 @@
 #define AES_128_KEY_SIZE_IN_BYTES 16
 #define AES_128_CBC_IV_SIZE 16
 #define AES_128_CTR_IV_SIZE 16
+#define AES_128_GCM_IV_SIZE 16
+#define AES_GCM_TAG_SIZE 16
 #define ABS_VALIDITY_SIZE 6
 #define REL_VALIDITY_SIZE 6
 #define MAX_MAC_KEY_SIZE 32
@@ -31,6 +33,7 @@
 
 #define AES_128_CBC 101
 #define AES_128_CTR 102
+#define AES_128_GCM 103
 
 // Struct for digital signature
 typedef struct {

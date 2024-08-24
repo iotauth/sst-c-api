@@ -191,6 +191,8 @@ const EVP_CIPHER *get_EVP_CIPHER(char enc_mode) {
         return EVP_aes_128_cbc();
     } else if (enc_mode == AES_128_CTR) {
         return EVP_aes_128_ctr();
+    } else if (enc_mode == AES_128_GCM) {
+        return EVP_aes_128_gcm();
     } else {
         error_exit("Encryption type not supported.");
     }
@@ -208,12 +210,23 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
         return 1;
     }
 
+    if (enc_mode == AES_128_GCM) {
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
+                                 AES_128_GCM_IV_SIZE,
+                                 NULL)) {  // Set IV length to 16 bytes
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
+            return 1;
+        }
+    }
+
     if (!EVP_EncryptUpdate(ctx, ret, (int *)ret_length, plaintext,
                            plaintext_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptUpdate failed");
         return 1;
     }
+
     unsigned int temp_len;
     if (!EVP_EncryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
@@ -221,6 +234,18 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
         return 1;
     }
     *ret_length += temp_len;
+
+    if (enc_mode == AES_128_GCM) {
+        // Append the GCM authentication tag to the end of the ciphertext
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE,
+                                 ret + *ret_length)) {  // 16 bytes tag
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (GET_TAG) failed");
+            return 1;
+        }
+        *ret_length += AES_GCM_TAG_SIZE;  // Increase the length by the tag size
+    }
+
     EVP_CIPHER_CTX_free(ctx);
     return 0;
 }
@@ -234,12 +259,39 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
         print_last_error("EVP_DecryptInit_ex failed");
         return 1;
     }
+
+    if (enc_mode == AES_128_GCM) {
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
+                                 AES_128_GCM_IV_SIZE,
+                                 NULL)) {  // Set IV length to 16 bytes
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
+            return 1;
+        }
+
+        // Set the expected tag value by extracting it from the end of the
+        // ciphertext
+        unsigned char *tag =
+            encrypted + encrypted_length -
+            AES_GCM_TAG_SIZE;  // Get the last 16 bytes as the tag
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE,
+                                 tag)) {
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_TAG) failed");
+            return 1;
+        }
+
+        encrypted_length -=
+            AES_GCM_TAG_SIZE;  // Adjust the encrypted length to exclude the tag
+    }
+
     if (!EVP_DecryptUpdate(ctx, ret, (int *)ret_length, encrypted,
                            encrypted_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptUpdate failed");
         return 1;
     }
+
     unsigned int temp_len;
     if (!EVP_DecryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
@@ -247,6 +299,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
         return 1;
     }
     *ret_length += temp_len;
+
     EVP_CIPHER_CTX_free(ctx);
     return 0;
 }
@@ -264,6 +317,9 @@ int symmetric_encrypt_authenticate(
     } else if (enc_mode == AES_128_CTR) {
         // The encrypted length is same on CTR mode.
         encrypted_length = buf_length;
+    } else if (enc_mode == AES_128_GCM) {
+        // The encrypted length is same on CTR mode.
+        encrypted_length = buf_length + 16;
     }
     if (no_hmac_mode == 0) {
         *ret_length = iv_size + encrypted_length + mac_key_size;

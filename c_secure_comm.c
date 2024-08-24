@@ -198,7 +198,10 @@ void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
         s_key->enc_mode = AES_128_CBC;
     } else if (strcmp(ctx->config->encryption_mode, "AES_128_CTR") == 0) {
         s_key->enc_mode = AES_128_CTR;
+    } else if (strcmp(ctx->config->encryption_mode, "AES_128_GCM") == 0) {
+        s_key->enc_mode = AES_128_GCM;
     }
+
     s_key->no_hmac_mode = ctx->config->no_hmac_mode;
 }
 
@@ -733,15 +736,17 @@ int CTR_encrypt_or_decrypt_buf_with_session_key(
     size_t out_data_size, unsigned int *processed_size, int encrypt) {
     if (!check_session_key_validity(s_key)) {
         if (encrypt) {
-            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low, file_offset, data,
-                      out_data, data_size, out_data_size, 1, processed_size)) {
+            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low,
+                           file_offset, data, out_data, data_size,
+                           out_data_size, 1, processed_size)) {
                 error_exit(
                     "Error during encrypting buffer with session key.\n");
             }
             return 0;
         } else {
-            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low, file_offset, data,
-                      out_data, data_size, out_data_size, 0, processed_size)) {
+            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low,
+                           file_offset, data, out_data, data_size,
+                           out_data_size, 0, processed_size)) {
                 error_exit(
                     "Error during decrypting buffer with session key.\n");
             }

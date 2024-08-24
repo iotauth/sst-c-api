@@ -1,6 +1,6 @@
-#include <assert.h>
-
 #include "../c_crypto.h"
+
+#include <assert.h>
 
 void AES_test_common(unsigned char mode) {
     unsigned char iv[AES_128_CBC_IV_SIZE];    // 16 bytes
@@ -46,6 +46,11 @@ void AES_CTR_test() {
     AES_test_common(AES_128_CTR);
 }
 
+void AES_GCM_test() {
+    printf("**** STARTING AES_GCM_TEST\n");
+    AES_test_common(AES_128_GCM);
+}
+
 void AES_multiple_block_test_common(unsigned char mode) {}
 
 void AES_CBC_multiple_block_test() {
@@ -58,11 +63,18 @@ void AES_CTR_multiple_block_test() {
     AES_multiple_block_test_common(AES_128_CTR);
 }
 
+void AES_GCM_multiple_block_test() {
+    printf("**** STARTING AES_GCM_MULTIPLE_BLOCK_TEST\n");
+    AES_multiple_block_test_common(AES_128_GCM);
+}
+
 void AES_test() {
     AES_CBC_test();
     AES_CTR_test();
+    AES_GCM_test();
     AES_CBC_multiple_block_test();
     AES_CTR_multiple_block_test();
+    AES_GCM_multiple_block_test();
 }
 
 void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
@@ -113,6 +125,11 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test() {
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 0);
 }
 
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test() {
+    printf("**** STARTING symmetric_encrypt_authenticate_AES_128_GCM_test\n");
+    symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 0);
+}
+
 void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_test() {
     printf(
         "**** STARTING "
@@ -127,16 +144,23 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_test() {
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 1);
 }
 
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test() {
+    printf(
+        "**** STARTING "
+        "symmetric_encrypt_authenticate_AES_128_GCM_noHMAC_test\n");
+    symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 1);
+}
+
 void symmetric_encrypt_decrypt_authenticate_test() {
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test();
 }
 
 int main() {
-    // AES_CBC_test();
-    // AES_CTR_test();
     AES_test();
     symmetric_encrypt_decrypt_authenticate_test();
 }
