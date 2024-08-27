@@ -114,7 +114,6 @@ config_t *load_config(const char *path) {
                 case ENCRYPTION_MODE:
                     ptr = strtok(NULL, delimiters);
                     printf("Encryption mode: %s\n", ptr);
-                    strcpy(c->encryption_mode, ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
                         c->encryption_mode = AES_128_CBC;
                     } else if (strcmp(ptr, "AES_128_CTR") == 0) {
