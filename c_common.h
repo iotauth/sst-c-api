@@ -62,6 +62,11 @@
 #define MAC_SIZE 32
 #define KEY_ID_SIZE 8
 
+// Encryption Mode //
+#define AES_128_CBC 101
+#define AES_128_CTR 102
+#define AES_128_GCM 103
+
 typedef enum {
     INVALID_DISTRIBUTION_KEY,
     INVALID_SESSION_KEY_REQ,

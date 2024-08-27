@@ -40,7 +40,7 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][36];
     int numkey;
-    char encryption_mode[12];
+    char encryption_mode;
     char no_hmac_mode;
     char *auth_pubkey_path;
     char *entity_privkey_path;

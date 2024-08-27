@@ -79,7 +79,7 @@ config_t *load_config(const char *path) {
     unsigned short purpose_count = 0;
     c->purpose_index = 0;
     c->no_hmac_mode = 0;
-    strcpy(c->encryption_mode, "AES_128_CBC"); // Default encryption mode.
+    c->encryption_mode = AES_128_CBC; // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);
@@ -115,6 +115,13 @@ config_t *load_config(const char *path) {
                     ptr = strtok(NULL, delimiters);
                     printf("Encryption mode: %s\n", ptr);
                     strcpy(c->encryption_mode, ptr);
+                    if (strcmp(ptr, "AES_128_CBC") == 0) {
+                        c->encryption_mode = AES_128_CBC;
+                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
+                        c->encryption_mode = AES_128_CTR;
+                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
+                        c->encryption_mode = AES_128_GCM;
+                    }
                     break;
                 case NO_HMAC_MODE:
                     ptr = strtok(NULL, delimiters);

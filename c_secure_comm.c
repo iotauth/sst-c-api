@@ -194,14 +194,7 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
 
 void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
                                                 session_key_t *s_key) {
-    if (strcmp(ctx->config->encryption_mode, "AES_128_CBC") == 0) {
-        s_key->enc_mode = AES_128_CBC;
-    } else if (strcmp(ctx->config->encryption_mode, "AES_128_CTR") == 0) {
-        s_key->enc_mode = AES_128_CTR;
-    } else if (strcmp(ctx->config->encryption_mode, "AES_128_GCM") == 0) {
-        s_key->enc_mode = AES_128_GCM;
-    }
-
+    s_key->enc_mode = ctx->config->encryption_mode;
     s_key->no_hmac_mode = ctx->config->no_hmac_mode;
 }
 
@@ -477,7 +470,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    AES_128_CBC, 0, &decrypted, &decrypted_length)) {
+                    ctx->config->encryption_mode, 0, &decrypted, &decrypted_length)) {
                 error_exit(
                     "Error during decryption after receiving "
                     "SESSION_KEY_RESP.\n");
