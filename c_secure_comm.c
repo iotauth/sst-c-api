@@ -510,7 +510,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, AES_128_CBC, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length)) {
                 error_exit(
