@@ -103,9 +103,11 @@ on each terminal
 
 To test AES_128_CTR mode, with noHMAC when exchanging messages, execute
 
-`$./entity_client ../c_client_CTR_noHMAC.config`
+`$./entity_client ../c_computenode_CTR_noHMAC.config`
 
-`$./entity_server ../c_server_CTR_noHMAC.config`
+`$./entity_server ../c_compactionnode_CTR_noHMAC.config`
+
+This will get all keys encrypted in AES_128_CTR mode, and send all messages in CTR mode, with no HMAC.
 
 # For Developers
 
