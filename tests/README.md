@@ -13,3 +13,7 @@ $ cmake ../
 $ make
 ```
 
+## Execute tests
+```
+$ ./TEST ../client.config
+```
