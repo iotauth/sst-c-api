@@ -403,6 +403,22 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
 
+int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key, unsigned char *plaintext,
+                                 unsigned int plaintext_length,
+                                 unsigned char *encrypted,
+                                 unsigned int *encrypted_length) {
+    return encrypt_or_decrypt_buf_with_session_key_without_malloc(
+        s_key, plaintext, plaintext_length, encrypted, encrypted_length, 1);
+}
+
+int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key, unsigned char *encrypted,
+                                 unsigned int encrypted_length,
+                                 unsigned char *decrypted,
+                                 unsigned int *decrypted_length) {
+    return encrypt_or_decrypt_buf_with_session_key_without_malloc(
+        s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
+}
+
 int CTR_encrypt_buf_with_session_key(
     session_key_t *s_key, const uint64_t initial_iv_high,
     const uint64_t initial_iv_low, uint64_t file_offset,

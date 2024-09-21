@@ -201,6 +201,18 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length);
 
+int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
+                                                unsigned char *plaintext,
+                                                unsigned int plaintext_length,
+                                                unsigned char *encrypted,
+                                                unsigned int *encrypted_length);
+                                                
+int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
+                                                unsigned char *encrypted,
+                                                unsigned int encrypted_length,
+                                                unsigned char *decrypted,
+                                                unsigned int *decrypted_length);
+
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);

@@ -722,6 +722,37 @@ int encrypt_or_decrypt_buf_with_session_key(
     }
 }
 
+int encrypt_or_decrypt_buf_with_session_key_without_malloc(
+    session_key_t *s_key, unsigned char *input, unsigned int input_length,
+    unsigned char *output, unsigned int *output_length, int encrypt) {
+    if (!check_session_key_validity(s_key)) {
+        if (encrypt) {
+            if (symmetric_encrypt_authenticate_without_malloc(
+                    input, input_length, s_key->mac_key, s_key->mac_key_size,
+                    s_key->cipher_key, s_key->cipher_key_size,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    output, output_length)) {
+                error_exit(
+                    "Error during encrypting buffer with session key.\n");
+            }
+            return 0;
+        } else {
+            if (symmetric_decrypt_authenticate_without_malloc(
+                    input, input_length, s_key->mac_key, s_key->mac_key_size,
+                    s_key->cipher_key, s_key->cipher_key_size,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    output, output_length)) {
+                error_exit(
+                    "Error during decrypting buffer with session key.\n");
+            }
+            return 0;
+        }
+    } else {
+        printf("Session key is expired.\n");
+        return 1;
+    }
+}
+
 int CTR_encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, const uint64_t initial_iv_high,
     const uint64_t initial_iv_low, uint64_t file_offset,

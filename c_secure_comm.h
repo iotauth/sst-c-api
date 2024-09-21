@@ -247,6 +247,10 @@ int encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char **output, unsigned int *output_length, int encrypt);
 
+int encrypt_or_decrypt_buf_with_session_key_without_malloc(
+    session_key_t *s_key, unsigned char *input, unsigned int input_length,
+    unsigned char *output, unsigned int *output_length, int encrypt);
+
 int CTR_encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, const uint64_t initial_iv_high,
     const uint64_t initial_iv_low, uint64_t file_offset,

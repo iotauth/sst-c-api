@@ -318,7 +318,6 @@ int symmetric_encrypt_authenticate(
         // The encrypted length is same on CTR mode.
         encrypted_length = buf_length;
     } else if (enc_mode == AES_128_GCM) {
-        // The encrypted length is same on CTR mode.
         encrypted_length = buf_length + 16;
     }
     if (no_hmac_mode == 0) {
@@ -395,6 +394,106 @@ int symmetric_decrypt_authenticate(
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
         if (decrypt_AES(buf + iv_size, encrypted_length - iv_size, cipher_key,
                         buf, enc_mode, *ret, ret_length)) {
+            printf("AES_CBC_128_decrypt failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
+        return 1;
+    }
+    return 0;
+}
+
+int symmetric_encrypt_authenticate_without_malloc(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
+    unsigned int encrypted_length;
+    if (enc_mode == AES_128_CBC) {
+        // This requires, paddings, making the encrypted length multiples of the
+        // block size (key size)
+        encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
+    } else if (enc_mode == AES_128_CTR) {
+        // The encrypted length is same on CTR mode.
+        encrypted_length = buf_length;
+    } else if (enc_mode == AES_128_GCM) {
+        encrypted_length = buf_length + 16;
+    }
+    if (no_hmac_mode == 0) {
+        *ret_length = iv_size + encrypted_length + mac_key_size;
+    } else {
+        *ret_length = iv_size + encrypted_length;
+    }
+    // ret = IV (16) + encrypted(IV+buf) + HMAC((IV + encrypted)32)
+    // First attach IV.
+    generate_nonce(iv_size, ret);
+    unsigned int count = iv_size;
+    // Attach encrypted buffer
+    if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
+        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
+                        ret + count, &encrypted_length)) {
+            printf("AES encryption failed!");
+            return 1;
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.");
+        return 1;
+    }
+    if (no_hmac_mode == 0) {
+        count += encrypted_length;
+        // Attach HMAC tag
+        if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+            HMAC(EVP_sha256(), mac_key, mac_key_size, ret,
+                 iv_size + encrypted_length, ret + count, &mac_key_size);
+        }
+        // Add other MAC key sizes in future.
+        else {
+            printf("HMAC_key_size is not supported.");
+            return 1;
+        }
+    }
+    return 0;
+}
+
+int symmetric_decrypt_authenticate_without_malloc(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
+    unsigned int encrypted_length;
+    if (no_hmac_mode == 0) {
+        encrypted_length = buf_length - mac_key_size;
+    } else {
+        encrypted_length = buf_length;
+    }
+    *ret_length = encrypted_length / iv_size * iv_size;
+    if (no_hmac_mode == 0) {
+        unsigned char reproduced_tag[mac_key_size];
+        if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+            HMAC(EVP_sha256(), mac_key, mac_key_size, buf, encrypted_length,
+                 reproduced_tag, &mac_key_size);
+        } else {
+            printf("HMAC_key_size is not supported.");
+            return 1;
+        }
+        if (memcmp(reproduced_tag, buf + encrypted_length, mac_key_size) != 0) {
+            // printf("Received tag: ");
+            // print_buf(buf + encrypted_length, mac_key_size);
+            // printf("Hmac tag: ");
+            // print_buf(reproduced_tag, mac_key_size);
+            return 1;
+        } else {
+            // printf("MAC verified!\n");
+        }
+    }
+    if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
+        if (decrypt_AES(buf + iv_size, encrypted_length - iv_size, cipher_key,
+                        buf, enc_mode, ret, ret_length)) {
             printf("AES_CBC_128_decrypt failed!");
             return 1;
         }
