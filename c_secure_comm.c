@@ -134,6 +134,7 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
+    ctx->dist_key.enc_mode = ctx->config->encryption_mode;
     OPENSSL_free(decrypted_dist_key_buf);
 }
 
@@ -233,7 +234,7 @@ unsigned char *serialize_session_key_req_with_distribution_key(
     if (symmetric_encrypt_authenticate(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
-            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, AES_128_CBC, 0,
+            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode, 0,
             &temp, &temp_length)) {
         error_exit(
             "Error during encryption while "
