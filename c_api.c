@@ -49,7 +49,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
     if (earned_s_key_list == NULL) {
-        printf("Failed to get session key. Returning NULL.");
+        printf("Failed to get session key. Returning NULL.\n");
         return NULL;
     }
 
