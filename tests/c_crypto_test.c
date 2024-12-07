@@ -12,14 +12,14 @@ void AES_test_common(unsigned char mode) {
 
     // Generate buffer
     unsigned char plaintext[] = "Hello World!";
-    printf("Plaintext Length: %ld, Plaintext: %s\n", strlen(plaintext),
+    printf("Plaintext Length: %ld, Plaintext: %s\n", strlen((const char *)plaintext),
            plaintext);
 
     // Encrypt Cipher
     unsigned char cipher[100];
     unsigned int length;
     memset(cipher, 0, 100);  // Set to 0 for visibility.
-    encrypt_AES(plaintext, strlen(plaintext), key, iv, mode, cipher, &length);
+    encrypt_AES(plaintext, strlen((const char *)plaintext), key, iv, mode, cipher, &length);
 
     // Returns IV(16) + cipher + (HMAC(32))
     printf("Cipher Length: %d, Cipher Text: ", length);
@@ -31,8 +31,8 @@ void AES_test_common(unsigned char mode) {
     decrypt_AES(cipher, length, key, iv, mode, decrypted, &decrypted_length);
     printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
            decrypted);
-    assert(decrypted_length == strlen(plaintext));
-    assert(strncmp(decrypted, plaintext, decrypted_length) == 0);
+    assert(decrypted_length == strlen((const char *)plaintext));
+    assert(strncmp((const char *)decrypted, (const char *)plaintext, decrypted_length) == 0);
     printf("\n");
 }
 
@@ -89,13 +89,13 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
 
     // Generate buffer
     unsigned char plaintext[] = "Hello World!";
-    printf("Plaintext Length: %ld, Plaintext: %s\n", strlen(plaintext),
+    printf("Plaintext Length: %ld, Plaintext: %s\n", strlen((const char *)plaintext),
            plaintext);
     int s;
     unsigned int encrypted_length;
     unsigned char *encrypted;
     s = symmetric_encrypt_authenticate(
-        plaintext, strlen(plaintext), mac_key, MAC_KEY_SHA256_SIZE, cipher_key,
+        plaintext, strlen((const char *)plaintext), mac_key, MAC_KEY_SHA256_SIZE, cipher_key,
         AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE, enc_mode, no_hmac_mode,
         &encrypted, &encrypted_length);
     assert(s == 0);
@@ -110,8 +110,8 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
     printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
            decrypted);
     assert(s == 0);
-    assert(decrypted_length == strlen(plaintext));
-    assert(strncmp(decrypted, plaintext, decrypted_length) == 0);
+    assert(decrypted_length == strlen((const char *)plaintext));
+    assert(strncmp((const char *)decrypted, (const char *)plaintext, decrypted_length) == 0);
     printf("\n");
 }
 
