@@ -433,8 +433,8 @@ int symmetric_encrypt_authenticate_without_malloc(
     unsigned int count = iv_size;
     // Attach encrypted buffer
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
-        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
-                        ret + count, &encrypted_length)) {
+        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode, ret + count,
+                        &encrypted_length)) {
             printf("AES encryption failed!");
             return 1;
         }

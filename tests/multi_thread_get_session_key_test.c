@@ -8,12 +8,13 @@
 void *send_request(void *SST_ctx) {
     SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
     session_key_list_t *s_key_list;
-    for(int i = 0; i < MAX_SESSION_KEY; i ++) {
+    for (int i = 0; i < MAX_SESSION_KEY; i++) {
         pthread_mutex_lock(&ctx->mutex);
         s_key_list = get_session_key(ctx, s_key_list);
         pthread_mutex_unlock(&ctx->mutex);
     }
     free_session_key_list_t(s_key_list);
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -28,7 +29,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 100; i++) {
         pthread_create(&thread[i], NULL, &send_request, (void *)ctx);
     }
-    for (int i = 0; i< 100; i++) {
+    for (int i = 0; i < 100; i++) {
         pthread_join(thread[i], NULL);
     }
     free_session_key_list_t(s_key_list);
