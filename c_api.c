@@ -24,7 +24,7 @@ SST_ctx_t *init_SST(const char *config_path) {
     return ctx;
 }
 
-session_key_list_t *init_empty_session_key_list() {
+session_key_list_t *init_empty_session_key_list(void) {
     session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
     session_key_list->num_key = 0;
     session_key_list->rear_idx = 0;
@@ -41,7 +41,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
             return existing_s_key_list;
         }
     }
-    session_key_list_t *earned_s_key_list;
+    session_key_list_t *earned_s_key_list = NULL;
     if (strcmp((const char *)ctx->config->network_protocol, "TCP") == 0) {
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
@@ -126,7 +126,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
 session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
                                      SST_ctx_t *ctx,
                                      session_key_list_t *existing_s_key_list) {
-    session_key_t *s_key;
+    session_key_t *s_key = NULL;
     // TODO: Fix integer size 32 or 64
     unsigned int target_session_key_id_int =
         read_unsigned_int_BE(target_session_key_id, SESSION_KEY_ID_SIZE);
