@@ -24,7 +24,7 @@ SST_ctx_t *init_SST(const char *config_path) {
     return ctx;
 }
 
-session_key_list_t *init_empty_session_key_list() {
+session_key_list_t *init_empty_session_key_list(void) {
     session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
     session_key_list->num_key = 0;
     session_key_list->rear_idx = 0;
@@ -41,7 +41,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
             return existing_s_key_list;
         }
     }
-    session_key_list_t *earned_s_key_list;
+    session_key_list_t *earned_s_key_list = NULL;
     if (strcmp((const char *)ctx->config->network_protocol, "TCP") == 0) {
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
@@ -126,7 +126,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
 session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
                                      SST_ctx_t *ctx,
                                      session_key_list_t *existing_s_key_list) {
-    session_key_t *s_key;
+    session_key_t *s_key = NULL;
     // TODO: Fix integer size 32 or 64
     unsigned int target_session_key_id_int =
         read_unsigned_int_BE(target_session_key_id, SESSION_KEY_ID_SIZE);
@@ -403,18 +403,18 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
 
-int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key, unsigned char *plaintext,
-                                 unsigned int plaintext_length,
-                                 unsigned char *encrypted,
-                                 unsigned int *encrypted_length) {
+int encrypt_buf_with_session_key_without_malloc(
+    session_key_t *s_key, unsigned char *plaintext,
+    unsigned int plaintext_length, unsigned char *encrypted,
+    unsigned int *encrypted_length) {
     return encrypt_or_decrypt_buf_with_session_key_without_malloc(
         s_key, plaintext, plaintext_length, encrypted, encrypted_length, 1);
 }
 
-int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key, unsigned char *encrypted,
-                                 unsigned int encrypted_length,
-                                 unsigned char *decrypted,
-                                 unsigned int *decrypted_length) {
+int decrypt_buf_with_session_key_without_malloc(
+    session_key_t *s_key, unsigned char *encrypted,
+    unsigned int encrypted_length, unsigned char *decrypted,
+    unsigned int *decrypted_length) {
     return encrypt_or_decrypt_buf_with_session_key_without_malloc(
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
@@ -489,10 +489,10 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int password_len,
                                         const char *salt,
                                         unsigned int salt_len) {
-    unsigned char salted_password[password_len + salt_len];
+    unsigned char salted_password[password_len - 1 + salt_len];  // Exclude NULL
     // Combine the password with the salt
-    memcpy(salted_password, password, password_len);
-    memcpy(salted_password + password_len, salt, salt_len);
+    memcpy(salted_password, password, password_len - 1);
+    memcpy(salted_password + password_len - 1, salt, salt_len);  // Exclude NULL
 
     // Create SHA256 HMAC.
     unsigned char temp_hash[MD5_DIGEST_LENGTH];
@@ -503,12 +503,12 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     generate_nonce(AES_BLOCK_SIZE, iv);
 
     // Serialize session_key_list into buffer.
-    unsigned int buffer_len =
-        sizeof(session_key_list_t) + sizeof(session_key_t) * MAX_SESSION_KEY;
+    unsigned int buffer_len = sizeof(session_key_list_t) +
+                              sizeof(session_key_t) * session_key_list->num_key;
     unsigned char buffer[buffer_len];
     memcpy(buffer, session_key_list, sizeof(session_key_list_t));
     memcpy(buffer + sizeof(session_key_list_t), session_key_list->s_key,
-           sizeof(session_key_t) * MAX_SESSION_KEY);
+           sizeof(session_key_t) * session_key_list->num_key);
 
     unsigned char ciphertext[sizeof(buffer)];
     unsigned int ciphertext_len;
@@ -520,6 +520,10 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     }
 
     FILE *saved_file_fp = fopen(file_path, "wb");
+    if (!saved_file_fp) {
+        printf("Failed to open file: %s\n", file_path);
+        return 1;
+    }
     // Write the IV
     fwrite(iv, 1, sizeof(iv), saved_file_fp);
     // Write the encrypted data
@@ -534,7 +538,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int password_len,
                                         const char *salt,
                                         unsigned int salt_len) {
-    unsigned char salted_password[password_len + salt_len];
+    unsigned char salted_password[password_len - 1 + salt_len];
     unsigned char temp_hash[MD5_DIGEST_LENGTH];
     unsigned char iv[AES_BLOCK_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
@@ -546,7 +550,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     // Combine the password with the salt
     memcpy(salted_password, password, password_len);
-    memcpy(salted_password + password_len, salt, salt_len);
+    memcpy(salted_password + password_len - 1, salt, salt_len);
 
     // Create MD5 hash of the salted password
     generate_md5_hash(salted_password, sizeof(salted_password), temp_hash);
