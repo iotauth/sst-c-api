@@ -62,17 +62,6 @@
 #define MAC_SIZE 32
 #define KEY_ID_SIZE 8
 
-// Encryption Mode //
-#define AES_128_CBC 101
-#define AES_128_CTR 102
-#define AES_128_GCM 103
-
-typedef enum {
-    INVALID_DISTRIBUTION_KEY,
-    INVALID_SESSION_KEY_REQ,
-    UNKNOWN_INTERNAL_ERROR,
-} auth_alert_code;
-
 // Handshake struct including nonce, reply_nonce(received),
 // and Diffie Helman parameter
 
@@ -227,11 +216,27 @@ void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
 // @param ret return buffer
 void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 
+// Computes the positive remainder of a modulo operation.
+// This function ensures that the result is always non-negative, even if the
+// first operand (a) is negative. It adjusts the result by adding the modulus
+// (b) when the computed remainder is negative.
+// @param a The dividend (integer to be divided).
+// @param b The divisor (modulus).
+// @return The positive remainder when a is divided by b.
 int mod(int a, int b);
 
+// Reads data from a socket into a buffer.
+// This function reads up to `buf_length` bytes from the specified socket into
+// the provided buffer. It handles error cases, including invalid sockets, read
+// failures, and connection closures.
+// @param socket The socket file descriptor to read from.
+// @param buf A pointer to the buffer where the data will be stored.
+// @param buf_length The maximum number of bytes to read into the buffer.
+// @return The number of bytes successfully read, or -1 if an error occurred.
 unsigned int read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
-void PutBigEndian64(uint64_t value, unsigned char *output);
+// TODO: Erase.
+//  void PutBigEndian64(uint64_t value, unsigned char *output);
 
 #endif  // C_COMMON_H

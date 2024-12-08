@@ -31,6 +31,11 @@
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
 #define SHA256_DIGEST_LENGTH 32
 
+// Encryption Mode //
+#define AES_128_CBC 101
+#define AES_128_CTR 102
+#define AES_128_GCM 103
+
 // Struct for digital signature
 typedef struct {
     unsigned char data[RSA_KEY_SIZE];

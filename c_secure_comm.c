@@ -234,8 +234,8 @@ unsigned char *serialize_session_key_req_with_distribution_key(
     if (symmetric_encrypt_authenticate(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
-            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode, 0,
-            &temp, &temp_length)) {
+            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
+            0, &temp, &temp_length)) {
         error_exit(
             "Error during encryption while "
             "serialize_session_key_req_with_distribution_key\n");
@@ -267,7 +267,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     if (symmetric_encrypt_authenticate(
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_128_CBC_IV_SIZE, AES_128_CBC, 0, &encrypted,
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &encrypted,
             &encrypted_length)) {
         error_exit("Error during encryption while parse_handshake_1\n");
     }
@@ -291,7 +291,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            AES_128_CBC, 0, &decrypted, &decrypted_length)) {
+            s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
         error_exit("Error during decryption in checking handshake2.\n");
     }
     HS_nonce_t hs;
@@ -317,7 +317,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                                       AES_128_CBC, 0, &ret, ret_length)) {
+                                       s_key->enc_mode, 0, &ret, ret_length)) {
         error_exit("Error during encryption while send_handshake_3.\n");
     }
     return ret;
@@ -471,7 +471,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config->encryption_mode, 0, &decrypted, &decrypted_length)) {
+                    ctx->config->encryption_mode, 0, &decrypted,
+                    &decrypted_length)) {
                 error_exit(
                     "Error during decryption after receiving "
                     "SESSION_KEY_RESP.\n");
@@ -578,7 +579,7 @@ unsigned char *check_handshake1_send_handshake2(
             received_buf + SESSION_KEY_ID_SIZE,
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_128_CBC_IV_SIZE, AES_128_CBC, 0, &decrypted,
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &decrypted,
             &decrypted_length)) {
         error_exit("Error during decrypting handshake1.\n");
     }
@@ -603,7 +604,7 @@ unsigned char *check_handshake1_send_handshake2(
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                                       AES_128_CBC, 0, &ret, ret_length)) {
+                                       s_key->enc_mode, 0, &ret, ret_length)) {
         error_exit("Error during encryption while send_handshake2.\n");
     }
     return ret;
@@ -754,31 +755,34 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     }
 }
 
-int CTR_encrypt_or_decrypt_buf_with_session_key(
-    session_key_t *s_key, const uint64_t initial_iv_high,
-    const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, unsigned char *out_data, size_t data_size,
-    size_t out_data_size, unsigned int *processed_size, int encrypt) {
-    if (!check_session_key_validity(s_key)) {
-        if (encrypt) {
-            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low,
-                           file_offset, data, out_data, data_size,
-                           out_data_size, 1, processed_size)) {
-                error_exit(
-                    "Error during encrypting buffer with session key.\n");
-            }
-            return 0;
-        } else {
-            if (CTR_Cipher(s_key->cipher_key, initial_iv_high, initial_iv_low,
-                           file_offset, data, out_data, data_size,
-                           out_data_size, 0, processed_size)) {
-                error_exit(
-                    "Error during decrypting buffer with session key.\n");
-            }
-            return 0;
-        }
-    } else {
-        printf("Session key is expired.\n");
-        return 1;
-    }
-}
+// TODO:Erase
+// int CTR_encrypt_or_decrypt_buf_with_session_key(
+//     session_key_t *s_key, const uint64_t initial_iv_high,
+//     const uint64_t initial_iv_low, uint64_t file_offset,
+//     const unsigned char *data, unsigned char *out_data, size_t data_size,
+//     size_t out_data_size, unsigned int *processed_size, int encrypt) {
+//     if (!check_session_key_validity(s_key)) {
+//         if (encrypt) {
+//             if (CTR_Cipher(s_key->cipher_key, initial_iv_high,
+//             initial_iv_low,
+//                            file_offset, data, out_data, data_size,
+//                            out_data_size, 1, processed_size)) {
+//                 error_exit(
+//                     "Error during encrypting buffer with session key.\n");
+//             }
+//             return 0;
+//         } else {
+//             if (CTR_Cipher(s_key->cipher_key, initial_iv_high,
+//             initial_iv_low,
+//                            file_offset, data, out_data, data_size,
+//                            out_data_size, 0, processed_size)) {
+//                 error_exit(
+//                     "Error during decrypting buffer with session key.\n");
+//             }
+//             return 0;
+//         }
+//     } else {
+//         printf("Session key is expired.\n");
+//         return 1;
+//     }
+// }
