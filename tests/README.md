@@ -15,5 +15,5 @@ $ make
 
 ## Execute tests
 ```
-$ ./TEST ../client.config
+$ ./TEST ../test_configs/client.config
 ```

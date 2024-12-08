@@ -135,15 +135,18 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
-// Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
-int read_secure_message(int socket, unsigned char *buf,
-                        unsigned int buf_length);
-
 // Creates a thread to receive messages.
 // Max buffer length is 1000 bytes currently.
 // Use function receive_message() below for longer read buffer.
 // @param arguments struct including session key and socket number
 void *receive_thread(void *SST_session_ctx);
+
+// Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
+// @param socket socket connected with the server
+// @param buf buffer to fill the received message.
+// @param buf_length the maximum length of the buffer
+int read_secure_message(int socket, unsigned char *buf,
+                        unsigned int buf_length);
 
 // Creates a thread to receive messages, by reading one bytes each at the SST
 // header. Max buffer length is 1000 bytes currently.
@@ -201,40 +204,59 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length);
 
+// Encrypts buffer with session key with mallocing the return buffer. The user
+// must provide the ciphertext buffer.
+// @param s_key session key to encrypt
+// @param plaintext plaintext to be encrypted
+// @param plaintext_length length of plaintext to be encrypted
+// @param encrypted pointer the user should provide to get the encrypted buffer
+// filled
+// @param encrypted_length length of returned encrypted buffer
+// @return 0 for success, 1 for fail
 int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
                                                 unsigned char *plaintext,
                                                 unsigned int plaintext_length,
                                                 unsigned char *encrypted,
                                                 unsigned int *encrypted_length);
-                                                
+
+// Decrypt buffer with session key with mallocing the return buffer. The user
+// must provide the plaintext buffer.
+// @param s_key session key to decrypt
+// @param encrypted encrypted buffer to be decrypted
+// @param encrypted_length length of encrypted buffer to be decrypted
+// @param decrypted pointer the user should provide to get the encrypted buffer
+// filled
+// @param decrypted_length length of returned decrypted buffer
+// @return 0 for success, 1 for fail
 int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
                                                 unsigned char *encrypted,
                                                 unsigned int encrypted_length,
                                                 unsigned char *decrypted,
                                                 unsigned int *decrypted_length);
 
-// Frees memory used in session_key_list recursively.
-// @param session_key_list_t session_key_list to free
-void free_session_key_list_t(session_key_list_t *session_key_list);
-
-// Free memory used in SST_ctx recursively.
-// @param SST_ctx_t loaded SST_ctx_t to free
-void free_SST_ctx_t(SST_ctx_t *ctx);
-
-// Save session key list recursively.
+// Saves session key list recursively.
 // @param session_key_list_t session_key_list to save
 // @param file_path file_path to save
 // @return 0 for success, 1 for fail
 int save_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
-// Load session key list recursively.
+// Loads session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
 // @return 0 for success, 1 for fail
 int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
+// Saves session key list using a password and salt, additionally encrypting the
+// session_key_list
+// @param session_key_list_t session_key_list to save
+// @param file_path file_path to save
+// @param password password to encrypt the session_key_list
+// @param password_len length of the password
+// @param salt salt char to salt the password
+// @param salt_len length of the salt
+// @return 0 for success, 1 for fail
 int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
                                         const char *password,
@@ -242,6 +264,15 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *salt,
                                         unsigned int salt_len);
 
+// Loads session key list using a password and salt, additionally encrypting the
+// session_key_list
+// @param session_key_list_t session_key_list to save
+// @param file_path file_path to save
+// @param password password to encrypt the session_key_list
+// @param password_len length of the password
+// @param salt salt char to salt the password
+// @param salt_len length of the salt
+// @return 0 for success, 1 for fail
 int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
                                         const char *password,
@@ -254,18 +285,31 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 // @param byte_length length of session key id buffer
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 
-int CTR_encrypt_buf_with_session_key(
-    session_key_t *s_key, const uint64_t initial_iv_high,
-    const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, size_t data_size, unsigned char *out_data,
-    size_t out_data_buf_length, unsigned int *processed_size);
-
-int CTR_decrypt_buf_with_session_key(
-    session_key_t *s_key, const uint64_t initial_iv_high,
-    const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, size_t data_size, unsigned char *out_data,
-    size_t out_data_buf_length, unsigned int *processed_size);
-
+// Generates a random nonce.
+// This is used not to directly #include OpenSSL libraries.
+// @param length Length of the nonce
+// @param buf Pointer of the buffer with the random nonce.
 void generate_random_nonce(int length, unsigned char *buf);
+
+// Frees memory used in session_key_list recursively.
+// @param session_key_list_t session_key_list to free
+void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Free memory used in SST_ctx recursively.
+// @param SST_ctx_t loaded SST_ctx_t to free
+void free_SST_ctx_t(SST_ctx_t *ctx);
+
+// TODO: Remove after checking.
+//  int CTR_encrypt_buf_with_session_key(
+//      session_key_t *s_key, const uint64_t initial_iv_high,
+//      const uint64_t initial_iv_low, uint64_t file_offset,
+//      const unsigned char *data, size_t data_size, unsigned char *out_data,
+//      size_t out_data_buf_length, unsigned int *processed_size);
+
+// int CTR_decrypt_buf_with_session_key(
+//     session_key_t *s_key, const uint64_t initial_iv_high,
+//     const uint64_t initial_iv_low, uint64_t file_offset,
+//     const unsigned char *data, size_t data_size, unsigned char *out_data,
+//     size_t out_data_buf_length, unsigned int *processed_size);
 
 #endif  // C_API_H

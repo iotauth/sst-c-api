@@ -28,17 +28,26 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 -   It initializes important settings, at once.
 -   Returns struct SST_ctx_t
 
+
+**session_key_list_t \*init_empty_session_key_list(void)**
+- `init_empty_session_key_list` initializes anempty session_key_list.
+- Mallocs session_key_list_t and the session_key_t as much as the MAX_SESSION_KEY.
+
 **session_key_list_t \* get_session_key()**
 
 -   `get_session_key()` is a function to get secure session key from Auth.
 -   Input is the struct config returned from the `init_SST()`, and the existing session key list. It can be NULL, if there were no list.
 -   Returns struct session_key_list_t.
 
-**SST_session_ctx_t secure_connect_to_server()**
+**SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key, SST_ctx_t *ctx)**
 
 -   `secure_connect_to_server()` is a function that establishes a secure connection with the entity server in the struct config.
 -   Input is the session key received from `get_session_key()` and struct config returned from `load_config()`.
 -   Returns struct SST_session_ctx_t
+
+**SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key, int sock)**
+- `secure_connect_to_server_with_socket` is a function that establishes a secure connection **using the connected socket with the target server**.
+- Input is the session key received from `get_session_key()` and socket connected using `connect()`.
 
 **SST_session_ctx_t \* server_secure_comm_setup()**
 
@@ -48,7 +57,7 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 
 **void \*receive_thread()**
 
--   Creates a receive_thread.
+-   Creates a receive_thread and prints the received messages.
 -   Usage:
 
 ```
@@ -58,16 +67,53 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 
 **void receive_message()**
 
--   Enables receiving messages.
+-   Receives messages and print them.
+
+**int read_secure_message(int socket, unsigned char *buf, unsigned int buf_length)**
+
+- `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received message.
+- Input is the connected socket, pointer of the buffer, and the given buffer's length (not the received message)
+- This function does not decrypt the message, returns the message as **not decrypted.**
+- Returns the length of the not decrypted message.
+
 
 **unsigned char * return_decrypted_buf()**
 
--   Returns the buffer of the decrypted message or returns NULL when an error occurs.
+-   The user can 
+- Returns the decrypted buffer, and must free() after use.
 
 **int send_secure_message()**
 
--   `secure send_secure_message()` is a function that send a message with secure communication to the server by encrypting it with the session key.
--   Input includes message, session_ctx struct.
+-   `send_secure_message()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
+- It recursively `write()`s until it sends the total message length.
+- Input includes message, length of message, and session_ctx struct.
+- Returns the bytes written if success, and -1 if failure.
+
+The four functions below are for encrypting and decrypting buffers with the session key.
+
+**int encrypt_buf_with_session_key()**
+**int decrypt_buf_with_session_key()**
+- These functions encrypt/decrypt the given plaintext/ciphertext with the given session key.
+- It mallocs a buffer for the encrypted/decrypted result, and returns the double pointer of the encrypted/decrypted buffer.
+- Returns 0 if success, 1 if failure.
+
+**int encrypt_buf_with_session_key_without_malloc()**
+**int decrypt_buf_with_session_key_without_malloc()**
+- These two functions encrypt/decrypt the given plaintext/ciphertext with the given session key.
+- Unlike the function above, they do not allocate memory, the user should provide the buffer with enough length.
+- Returns 0 if success, 1 if failure.
+
+The four functions below are for saving and the `session_key_list_t`,
+**int save_session_key_list()**
+**int load_session_key_list()**
+- These two functions save/load the `session_key_list` to the `session_key_list_t` pointer.
+- Before loading, `init_empty_session_key_list()` can be used to provide an empty session key list.
+- Input includes the `session_key_list` to save/load, abd the file_path to save/load.
+
+**int save_session_key_list_with_password()**
+**int load_session_key_list_with_password()**
+- These functions additionally get a password and salt as a `char *`, to encrypt/decrypt the `session_key_list`. 
+
 
 **void free_session_key_list_t()**
 
@@ -87,6 +133,16 @@ $cd $SST_ROOT/entity/c/examples
 $mkdir build && cd build
 $cmake ../
 $make
+```
+
+# Compile as Shared Library
+The command below will install the shared library under `usr/local/lib/`, and `c_api.h` will be included in `usr/local/lib/include/sst-c-api/c_api.h`.
+
+```
+$mkdir build && cd build
+$cmake ../
+$make
+$sudo make install
 ```
 
 # Example

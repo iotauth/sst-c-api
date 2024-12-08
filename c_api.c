@@ -7,6 +7,12 @@ extern unsigned char entity_server_state;
 
 SST_ctx_t *init_SST(const char *config_path) {
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
+    // By default OpenSSL will attempt to clean itself up when the process exits
+    // via an "atexit" handler. Using this option suppresses that behaviour.
+    // This means that the application will have to clean up OpenSSL explicitly
+    // using OPENSSL_cleanup().
+    // This is needed because, Lingua Franca uses the "atexit" handler, and
+    // there are still messages to be sent after the atexit handler.
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
     ctx->config = load_config(config_path);
     int numkey = ctx->config->numkey;
@@ -20,6 +26,7 @@ SST_ctx_t *init_SST(const char *config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
+    // TODO: Remove when unneeded.
     bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
@@ -272,18 +279,6 @@ SST_session_ctx_t *server_secure_comm_setup(
     return error_return_null("Unrecognized or invalid state for server.\n");
 }
 
-int read_secure_message(int socket, unsigned char *buf,
-                        unsigned int buf_length) {
-    unsigned char message_type;
-    unsigned int bytes_read;
-    bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
-                                                     buf_length);
-    if (message_type != SECURE_COMM_MSG) {
-        error_exit("Wrong message_type.");
-    }
-    return bytes_read;
-}
-
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
@@ -320,6 +315,21 @@ void receive_message(unsigned char *received_buf,
     if (message_type == SECURE_COMM_MSG) {
         print_received_message(data_buf, data_buf_length, session_ctx);
     }
+}
+
+// TODO: Check read_secure_message and return_decrypted_buf. They are used for
+// LF, but need to check.
+
+int read_secure_message(int socket, unsigned char *buf,
+                        unsigned int buf_length) {
+    unsigned char message_type;
+    unsigned int bytes_read;
+    bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
+                                                     buf_length);
+    if (message_type != SECURE_COMM_MSG) {
+        error_exit("Wrong message_type.");
+    }
+    return bytes_read;
 }
 
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
@@ -417,38 +427,6 @@ int decrypt_buf_with_session_key_without_malloc(
     unsigned int *decrypted_length) {
     return encrypt_or_decrypt_buf_with_session_key_without_malloc(
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
-}
-
-int CTR_encrypt_buf_with_session_key(
-    session_key_t *s_key, const uint64_t initial_iv_high,
-    const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, size_t data_size, unsigned char *out_data,
-    size_t out_data_buf_length, unsigned int *processed_size) {
-    return CTR_encrypt_or_decrypt_buf_with_session_key(
-        s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-        data_size, out_data_buf_length, processed_size, 1);
-}
-
-int CTR_decrypt_buf_with_session_key(
-    session_key_t *s_key, const uint64_t initial_iv_high,
-    const uint64_t initial_iv_low, uint64_t file_offset,
-    const unsigned char *data, size_t data_size, unsigned char *out_data,
-    size_t out_data_buf_length, unsigned int *processed_size) {
-    return CTR_encrypt_or_decrypt_buf_with_session_key(
-        s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-        data_size, out_data_buf_length, processed_size, 0);
-}
-
-void free_session_key_list_t(session_key_list_t *session_key_list) {
-    free(session_key_list->s_key);
-    free(session_key_list);
-}
-
-void free_SST_ctx_t(SST_ctx_t *ctx) {
-    EVP_PKEY_free((EVP_PKEY *)ctx->priv_key);
-    EVP_PKEY_free((EVP_PKEY *)ctx->pub_key);
-    free_config_t(ctx->config);
-    free(ctx);
 }
 
 int save_session_key_list(session_key_list_t *session_key_list,
@@ -601,3 +579,36 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
 void generate_random_nonce(int length, unsigned char *buf) {
     generate_nonce(length, buf);
 }
+
+void free_session_key_list_t(session_key_list_t *session_key_list) {
+    free(session_key_list->s_key);
+    free(session_key_list);
+}
+
+void free_SST_ctx_t(SST_ctx_t *ctx) {
+    EVP_PKEY_free((EVP_PKEY *)ctx->priv_key);
+    EVP_PKEY_free((EVP_PKEY *)ctx->pub_key);
+    free_config_t(ctx->config);
+    free(ctx);
+}
+// TODO: Almost deprecated. Not even used in RocksDB. Delete all subfunctions
+// also after final check.
+//  int CTR_encrypt_buf_with_session_key(
+//      session_key_t *s_key, const uint64_t initial_iv_high,
+//      const uint64_t initial_iv_low, uint64_t file_offset,
+//      const unsigned char *data, size_t data_size, unsigned char *out_data,
+//      size_t out_data_buf_length, unsigned int *processed_size) {
+//      return CTR_encrypt_or_decrypt_buf_with_session_key(
+//          s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
+//          data_size, out_data_buf_length, processed_size, 1);
+//  }
+
+// int CTR_decrypt_buf_with_session_key(
+//     session_key_t *s_key, const uint64_t initial_iv_high,
+//     const uint64_t initial_iv_low, uint64_t file_offset,
+//     const unsigned char *data, size_t data_size, unsigned char *out_data,
+//     size_t out_data_buf_length, unsigned int *processed_size) {
+//     return CTR_encrypt_or_decrypt_buf_with_session_key(
+//         s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
+//         data_size, out_data_buf_length, processed_size, 0);
+// }
