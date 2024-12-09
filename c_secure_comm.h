@@ -217,18 +217,18 @@ unsigned char *check_handshake1_send_handshake2(
 int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
                       int idx);
 
-// Copys session key from src to dest.
-// Does not free the src's session key. Free must needed.
-// @param dest Session key destination pointer to copy to.
-// @param src Session key src pointer to copy.
-void copy_session_key(session_key_t *dest, session_key_t *src);
-
 // Adds session key to the list.
 // Appends at the destination list's rear_idx.
 // @param s_key Session key to add
 // @param existing_s_key_list Destination session_key_list
 void add_session_key_to_list(session_key_t *s_key,
                              session_key_list_t *existing_s_key_list);
+
+// Copys session key from src to dest.
+// Does not free the src's session key. Free must needed.
+// @param dest Session key destination pointer to copy to.
+// @param src Session key src pointer to copy.
+void copy_session_key(session_key_t *dest, session_key_t *src);
 
 // Appends src list to dest list.
 // Appends at the destination list's rear_idx.
