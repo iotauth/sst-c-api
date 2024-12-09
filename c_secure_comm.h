@@ -2,9 +2,6 @@
 #define C_SECURE_COMM_H
 
 #include "c_api.h"
-#include "c_common.h"
-#include "c_crypto.h"
-#include "load_config.h"
 
 // This file includes functions that uses the struct "session_key"
 

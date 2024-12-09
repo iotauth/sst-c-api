@@ -1,9 +1,9 @@
-
 #include "load_config.h"
 
 #include <errno.h>
 
 #include "c_common.h"
+#include "c_crypto.h"
 
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
@@ -79,7 +79,7 @@ config_t *load_config(const char *path) {
     unsigned short purpose_count = 0;
     c->purpose_index = 0;
     c->no_hmac_mode = 0;
-    c->encryption_mode = AES_128_CBC; // Default encryption mode.
+    c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX, fp);

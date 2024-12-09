@@ -1,5 +1,7 @@
 #include "c_crypto.h"
 
+#include "c_common.h"
+
 void print_last_error(char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 

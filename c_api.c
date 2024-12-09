@@ -1,6 +1,9 @@
 #include "c_api.h"
 
+#include "c_common.h"
+#include "c_crypto.h"
 #include "c_secure_comm.h"
+#include "load_config.h"
 
 extern unsigned char entity_client_state;
 extern unsigned char entity_server_state;
