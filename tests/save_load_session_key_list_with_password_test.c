@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
     // Request one session key.
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
 
-    char password[] = "examplepassword";
-    char salt[] = "randomsalt";
+    const char password[] = "examplepassword";
+    const char salt[] = "randomsalt";
 
     // Save the session key list with a password, and salt it.
     save_session_key_list_with_password(s_key_list, "./sessionkey", password,
