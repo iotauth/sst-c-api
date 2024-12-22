@@ -470,14 +470,23 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int password_len,
                                         const char *salt,
                                         unsigned int salt_len) {
-    unsigned char salted_password[password_len - 1 + salt_len];  // Exclude NULL
+    // TODO: Need to think about this. How should we pass the length? Is
+    // strlen() better or sizeof() better? Should we handle it inside the
+    // function or should it be a argument? Leaving it as argument to pass the
+    // char * and the length using sizeof(). Then, when salting the password, it
+    // should exclude the NULL terminator when salting the password.
+
+    // Exclude NULL for both password and salt.
+    unsigned int salted_password_length = password_len - 1 + salt_len - 1;
+    unsigned char salted_password[salted_password_length];
     // Combine the password with the salt
     memcpy(salted_password, password, password_len - 1);
-    memcpy(salted_password + password_len - 1, salt, salt_len);  // Exclude NULL
+    memcpy(salted_password + password_len - 1, salt,
+           salt_len - 1);  // Exclude NULL
 
     // Create SHA256 HMAC.
     unsigned char temp_hash[MD5_DIGEST_LENGTH];
-    generate_md5_hash(salted_password, sizeof(salted_password), temp_hash);
+    generate_md5_hash(salted_password, salted_password_length, temp_hash);
 
     // Generate IV.
     unsigned char iv[AES_BLOCK_SIZE];
@@ -493,8 +502,10 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
 
     unsigned char ciphertext[sizeof(buffer)];
     unsigned int ciphertext_len;
-    // Encrypt in CTR mode.
-    if (encrypt_AES(buffer, buffer_len, temp_hash, iv, AES_128_CTR, ciphertext,
+    // Encrypt using the session key's encryption mode. 
+    // The hashed salt will be the encryption key.
+    if (encrypt_AES(buffer, buffer_len, temp_hash, iv,
+                    session_key_list->s_key->enc_mode, ciphertext,
                     &ciphertext_len)) {
         printf("AES encryption failed!");
         return 1;
