@@ -299,17 +299,4 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
 
-// TODO: Remove after checking.
-//  int CTR_encrypt_buf_with_session_key(
-//      session_key_t *s_key, const uint64_t initial_iv_high,
-//      const uint64_t initial_iv_low, uint64_t file_offset,
-//      const unsigned char *data, size_t data_size, unsigned char *out_data,
-//      size_t out_data_buf_length, unsigned int *processed_size);
-
-// int CTR_decrypt_buf_with_session_key(
-//     session_key_t *s_key, const uint64_t initial_iv_high,
-//     const uint64_t initial_iv_low, uint64_t file_offset,
-//     const unsigned char *data, size_t data_size, unsigned char *out_data,
-//     size_t out_data_buf_length, unsigned int *processed_size);
-
 #endif  // C_API_H

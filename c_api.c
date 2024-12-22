@@ -594,24 +594,3 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     free_config_t(ctx->config);
     free(ctx);
 }
-// TODO: Almost deprecated. Not even used in RocksDB. Delete all subfunctions
-// also after final check.
-//  int CTR_encrypt_buf_with_session_key(
-//      session_key_t *s_key, const uint64_t initial_iv_high,
-//      const uint64_t initial_iv_low, uint64_t file_offset,
-//      const unsigned char *data, size_t data_size, unsigned char *out_data,
-//      size_t out_data_buf_length, unsigned int *processed_size) {
-//      return CTR_encrypt_or_decrypt_buf_with_session_key(
-//          s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-//          data_size, out_data_buf_length, processed_size, 1);
-//  }
-
-// int CTR_decrypt_buf_with_session_key(
-//     session_key_t *s_key, const uint64_t initial_iv_high,
-//     const uint64_t initial_iv_low, uint64_t file_offset,
-//     const unsigned char *data, size_t data_size, unsigned char *out_data,
-//     size_t out_data_buf_length, unsigned int *processed_size) {
-//     return CTR_encrypt_or_decrypt_buf_with_session_key(
-//         s_key, initial_iv_high, initial_iv_low, file_offset, data, out_data,
-//         data_size, out_data_buf_length, processed_size, 0);
-// }
