@@ -1,4 +1,5 @@
 #include "../c_crypto.h"
+#include "../c_common.h"
 
 #include <assert.h>
 
