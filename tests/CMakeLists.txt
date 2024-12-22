@@ -20,12 +20,12 @@ target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
 add_executable(c_crypto_test c_crypto_test.c)
 add_executable(multi_thread_get_session_key_test multi_thread_get_session_key_test.c)
-add_executable(password_test password_test.c)
+add_executable(save_load_session_key_list_with_password_test save_load_session_key_list_with_password_test.c)
 add_executable(multi_nonce_test multi_nonce_test.c)
 
 target_link_libraries(c_crypto_test SSTLIB)
 target_link_libraries(multi_thread_get_session_key_test SSTLIB)
-target_link_libraries(password_test SSTLIB)
+target_link_libraries(save_load_session_key_list_with_password_test SSTLIB)
 target_link_libraries(multi_nonce_test SSTLIB)
 
 if(MSVC)
