@@ -10,6 +10,7 @@
 
 #include "../c_api.h"
 #include "../c_crypto.h"
+#include "../c_common.h"
 
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
