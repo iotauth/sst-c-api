@@ -306,37 +306,48 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
     return 0;
 }
 
-int symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
-    unsigned int encrypted_length;
+unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
+                                                 unsigned int iv_size,
+                                                 unsigned int mac_key_size,
+                                                 char enc_mode,
+                                                 char no_hmac_mode) {
+    unsigned int encrypted_total_length;
     if (enc_mode == AES_128_CBC) {
         // This requires, paddings, making the encrypted length multiples of the
         // block size (key size)
-        encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
+        encrypted_total_length = ((buf_length / iv_size) + 1) * iv_size;
     } else if (enc_mode == AES_128_CTR) {
         // The encrypted length is same on CTR mode.
-        encrypted_length = buf_length;
+        encrypted_total_length = buf_length;
     } else if (enc_mode == AES_128_GCM) {
-        encrypted_length = buf_length + 16;
+        encrypted_total_length = buf_length + 16;
     }
     if (no_hmac_mode == 0) {
-        *ret_length = iv_size + encrypted_length + mac_key_size;
+        encrypted_total_length =
+            iv_size + encrypted_total_length + mac_key_size;
     } else {
-        *ret_length = iv_size + encrypted_length;
+        encrypted_total_length = iv_size + encrypted_total_length;
     }
-    *ret = (unsigned char *)malloc(*ret_length);
-    // ret = IV (16) + encrypted(IV+buf) + HMAC((IV + encrypted)32)
+    return encrypted_total_length;
+}
+
+static int get_symmetric_encrypt_authenticate_buffer(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned int expected_encrypted_total_length,
+    unsigned char *ret, unsigned int *ret_length) {
+    // The return of encrypt_AES will look like this.
+    // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
     // First attach IV.
-    generate_nonce(iv_size, *ret);
-    unsigned int count = iv_size;
+    generate_nonce(iv_size, ret);
+    unsigned int total_length;
     // Attach encrypted buffer
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
-        if (encrypt_AES(buf, buf_length, cipher_key, *ret, enc_mode,
-                        *ret + count, &encrypted_length)) {
+        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
+                        ret + iv_size, &total_length)) {
             printf("AES encryption failed!");
+            total_length += iv_size + total_length;
             return 1;
         }
     }
@@ -344,13 +355,13 @@ int symmetric_encrypt_authenticate(
     else {
         printf("Cipher_key_size is not supported.");
         return 1;
-    }
-    if (no_hmac_mode == 0) {
-        count += encrypted_length;
+    };
+    if (!no_hmac_mode) {
         // Attach HMAC tag
         if (mac_key_size == MAC_KEY_SHA256_SIZE) {
-            HMAC(EVP_sha256(), mac_key, mac_key_size, *ret,
-                 iv_size + encrypted_length, *ret + count, &mac_key_size);
+            HMAC(EVP_sha256(), mac_key, mac_key_size, ret, total_length,
+                 ret + total_length, &mac_key_size);
+            total_length += total_length + mac_key_size;
         }
         // Add other MAC key sizes in future.
         else {
@@ -358,7 +369,28 @@ int symmetric_encrypt_authenticate(
             return 1;
         }
     }
+    if (expected_encrypted_total_length != total_length) {
+        printf("Encrypted length does not match. ");
+        return 1;
+    }
+    *ret_length = total_length;
     return 0;
+}
+
+int symmetric_encrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
+    // First, get the expected encrypted length, to assign a buffer size.
+    unsigned int expected_encrypted_total_length =
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
+                                            enc_mode, no_hmac_mode);
+    *ret = (unsigned char *)malloc(expected_encrypted_total_length);
+    return get_symmetric_encrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, *ret,
+        ret_length);
 }
 
 int symmetric_decrypt_authenticate(
@@ -413,53 +445,14 @@ int symmetric_encrypt_authenticate_without_malloc(
     unsigned int mac_key_size, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
-    unsigned int encrypted_length;
-    if (enc_mode == AES_128_CBC) {
-        // This requires, paddings, making the encrypted length multiples of the
-        // block size (key size)
-        encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
-    } else if (enc_mode == AES_128_CTR) {
-        // The encrypted length is same on CTR mode.
-        encrypted_length = buf_length;
-    } else if (enc_mode == AES_128_GCM) {
-        encrypted_length = buf_length + 16;
-    }
-    if (no_hmac_mode == 0) {
-        *ret_length = iv_size + encrypted_length + mac_key_size;
-    } else {
-        *ret_length = iv_size + encrypted_length;
-    }
-    // ret = IV (16) + encrypted(IV+buf) + HMAC((IV + encrypted)32)
-    // First attach IV.
-    generate_nonce(iv_size, ret);
-    unsigned int count = iv_size;
-    // Attach encrypted buffer
-    if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
-        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode, ret + count,
-                        &encrypted_length)) {
-            printf("AES encryption failed!");
-            return 1;
-        }
-    }
-    // Add other ciphers in future.
-    else {
-        printf("Cipher_key_size is not supported.");
-        return 1;
-    }
-    if (no_hmac_mode == 0) {
-        count += encrypted_length;
-        // Attach HMAC tag
-        if (mac_key_size == MAC_KEY_SHA256_SIZE) {
-            HMAC(EVP_sha256(), mac_key, mac_key_size, ret,
-                 iv_size + encrypted_length, ret + count, &mac_key_size);
-        }
-        // Add other MAC key sizes in future.
-        else {
-            printf("HMAC_key_size is not supported.");
-            return 1;
-        }
-    }
-    return 0;
+    unsigned int expected_encrypted_total_length =
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
+                                            enc_mode, no_hmac_mode);
+
+    return get_symmetric_encrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, ret,
+        ret_length);
 }
 
 int symmetric_decrypt_authenticate_without_malloc(

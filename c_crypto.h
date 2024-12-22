@@ -133,6 +133,19 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                 unsigned char *key, unsigned char *iv, char enc_mode,
                 unsigned char *ret, unsigned int *ret_length);
 
+// Get the expected encrypted length depnding on encryption modes and
+// no_hmac_mode.
+// @param buf_length length of buf
+// @param iv_size size of iv(initialize vector)
+// @param mac_key_size size of mac key
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @return expected_encrypted_total_length The expected encrypted length
+
+unsigned int get_expected_encrypted_total_length(unsigned int buf_length, unsigned int iv_size,
+                                  unsigned int mac_key_size, char enc_mode,
+                                  char no_hmac_mode);
+
 // Encrypt the message with cipher key and
 // make HMAC(Hashed Message Authenticate Code) with mac key from session key.
 // @param buf input message
@@ -142,6 +155,9 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
 // @param cipher_key cipher key of session key to be used in CBC encryption
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, 1 for error.
 int symmetric_encrypt_authenticate(
