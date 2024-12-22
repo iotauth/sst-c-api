@@ -1,3 +1,9 @@
+
+/**
+ * @file encrypt_buf_with_session_key_without_malloc_execution_time_test.c
+ * @author Dongha Kim (you@domain.com)
+ * @brief Measure executiontime of encrypt function.
+ */
 #include <openssl/rand.h>
 #include <stdio.h>
 #include <string.h>
