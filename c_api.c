@@ -485,8 +485,9 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
            salt_len - 1);  // Exclude NULL
 
     // Create SHA256 HMAC.
-    unsigned char temp_hash[MD5_DIGEST_LENGTH];
-    generate_md5_hash(salted_password, salted_password_length, temp_hash);
+    unsigned char md[32];
+    unsigned int md_len;
+    digest_message_SHA_256(salted_password, salted_password_length, md, &md_len);
 
     // Generate IV.
     unsigned char iv[AES_BLOCK_SIZE];
@@ -504,7 +505,7 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     unsigned int ciphertext_len;
     // Encrypt using the session key's encryption mode. 
     // The hashed salt will be the encryption key.
-    if (encrypt_AES(buffer, buffer_len, temp_hash, iv,
+    if (encrypt_AES(buffer, buffer_len, md, iv,
                     session_key_list->s_key->enc_mode, ciphertext,
                     &ciphertext_len)) {
         printf("AES encryption failed!");
@@ -545,7 +546,9 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     memcpy(salted_password + password_len - 1, salt, salt_len);
 
     // Create MD5 hash of the salted password
-    generate_md5_hash(salted_password, sizeof(salted_password), temp_hash);
+    unsigned char md[32];
+    unsigned int md_len;
+    digest_message_SHA_256(salted_password, sizeof(salted_password), md, &md_len);
 
     saved_file_fp = fopen(file_path, "rb");
     if (!saved_file_fp) {

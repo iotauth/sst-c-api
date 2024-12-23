@@ -104,9 +104,9 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
 unsigned char *SHA256_sign(unsigned char *encrypted,
                            unsigned int encrypted_length, EVP_PKEY *priv_key,
                            size_t *sig_length) {
+    unsigned char md[MD5_DIGEST_LENGTH];
     unsigned int md_length;
-    unsigned char *md =
-        digest_message_SHA_256(encrypted, encrypted_length, &md_length);
+    digest_message_SHA_256(encrypted, encrypted_length, md, &md_length);
     EVP_PKEY_CTX *ctx;
     unsigned char *sig;
     ctx = EVP_PKEY_CTX_new(priv_key, NULL);
@@ -134,7 +134,6 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
         print_last_error("EVP_PKEY_sign failed");
     }
     EVP_PKEY_CTX_free(ctx);
-    free(md);
 
     return sig;
 }
@@ -142,8 +141,9 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
 void SHA256_verify(unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key) {
     EVP_PKEY_CTX *ctx;
-    unsigned int md_length;
-    unsigned char *md = digest_message_SHA_256(data, data_length, &md_length);
+    unsigned char md[MD5_DIGEST_LENGTH];
+    unsigned int md_len;
+    digest_message_SHA_256(data, data_length, md, &md_len);
 
     ctx = EVP_PKEY_CTX_new(pub_key, NULL);
     if (!ctx) {
@@ -158,16 +158,14 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
     if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
         print_last_error("EVP_PKEY_CTX_set_signature_md failed");
     }
-    if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_length) != 1) {
+    if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_len) != 1) {
         print_last_error("EVP_PKEY_verify failed");
     }
     EVP_PKEY_CTX_free(ctx);
-    free(md);
 }
 
-unsigned char *digest_message_SHA_256(unsigned char *message,
-                                      int message_length,
-                                      unsigned int *digest_len) {
+void digest_message_SHA_256(unsigned char *data, size_t data_len,
+                            unsigned char *md5_hash, unsigned int *md_len) {
     EVP_MD_CTX *mdctx;
 
     if ((mdctx = EVP_MD_CTX_create()) == NULL) {
@@ -176,16 +174,13 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
     if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
         print_last_error("EVP_DigestInit_ex failed");
     }
-    if (EVP_DigestUpdate(mdctx, message, message_length) != 1) {
+    if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
         print_last_error("EVP_DigestUpdate failed");
     }
-    unsigned char *digest =
-        (unsigned char *)OPENSSL_malloc(EVP_MD_size(EVP_sha256()));
-    if (EVP_DigestFinal_ex(mdctx, digest, digest_len) != 1) {
+    if (EVP_DigestFinal_ex(mdctx, md5_hash, md_len) != 1) {
         print_last_error("failed");
     }
     EVP_MD_CTX_destroy(mdctx);
-    return digest;
 }
 
 const EVP_CIPHER *get_EVP_CIPHER(char enc_mode) {
@@ -497,7 +492,7 @@ int symmetric_encrypt_authenticate_without_malloc(
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
     unsigned int expected_encrypted_total_length =
         get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
-                                              enc_mode, no_hmac_mode);
+                                            enc_mode, no_hmac_mode);
 
     return get_symmetric_encrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
@@ -519,22 +514,4 @@ int symmetric_decrypt_authenticate_without_malloc(
         ret_length);
 }
 
-void generate_md5_hash(unsigned char *data, size_t data_len,
-                       unsigned char *md5_hash) {
-    EVP_MD_CTX *mdctx;
-    unsigned int md_len;
 
-    if ((mdctx = EVP_MD_CTX_create()) == NULL) {
-        print_last_error("EVP_MD_CTX_create() failed");
-    }
-    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
-        print_last_error("EVP_DigestInit_ex failed");
-    }
-    if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
-        print_last_error("EVP_DigestUpdate failed");
-    }
-    if (EVP_DigestFinal_ex(mdctx, md5_hash, &md_len) != 1) {
-        print_last_error("failed");
-    }
-    EVP_MD_CTX_destroy(mdctx);
-}

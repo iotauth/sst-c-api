@@ -99,14 +99,14 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
 void SHA256_verify(unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key);
 
-// Digest the encrypted message using the SHA256 digest function from OpenSSL.
-// @param message encrypted data
-// @param message_length length of encrypted data
-// @param digest_len length of the digested message
-// @return digested_message
-unsigned char *digest_message_SHA_256(unsigned char *message,
-                                      int message_length,
-                                      unsigned int *digest_len);
+// Digest the message using the SHA256 digest function.
+// @param data Data to digest
+// @param data_len Length of the data to digest
+// @param md5_hash The pointer of the digested 
+// message
+// @param md_len The length of the message digest. This cannot be given in a integer.
+void digest_message_SHA_256(unsigned char *data, size_t data_len,
+                            unsigned char *md5_hash, unsigned int *md_len);
 
 // Encrypt the message with the cipher key of the session key obtained from Auth
 // by using Cipher Block Chaining(CBC) encryption of OpenSSL.
@@ -262,8 +262,5 @@ int symmetric_decrypt_authenticate_without_malloc(
     unsigned int mac_key_size, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
-
-void generate_md5_hash(unsigned char *data, size_t data_len,
-                       unsigned char *md5_hash);
 
 #endif  // C_CRYPTO_H
