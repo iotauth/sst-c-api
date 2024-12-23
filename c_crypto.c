@@ -320,7 +320,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
         // The encrypted length is same on CTR mode.
         encrypted_total_length = buf_length;
     } else if (enc_mode == AES_128_GCM) {
-        encrypted_total_length = buf_length + 16;
+        encrypted_total_length = buf_length + AES_GCM_TAG_SIZE; //GCM_TAG //TODO: Check. Tag size default is 12.
     }
     if (no_hmac_mode == 0) {
         encrypted_total_length =
@@ -341,15 +341,15 @@ static int get_symmetric_encrypt_authenticate_buffer(
     // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
     // First attach IV.
     generate_nonce(iv_size, ret);
-    unsigned int total_length;
+    unsigned int total_length = 0;
     // Attach encrypted buffer
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
         if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
                         ret + iv_size, &total_length)) {
             printf("AES encryption failed!");
-            total_length += iv_size + total_length;
             return 1;
         }
+        total_length += iv_size;
     }
     // Add other ciphers in future.
     else {
@@ -361,7 +361,7 @@ static int get_symmetric_encrypt_authenticate_buffer(
         if (mac_key_size == MAC_KEY_SHA256_SIZE) {
             HMAC(EVP_sha256(), mac_key, mac_key_size, ret, total_length,
                  ret + total_length, &mac_key_size);
-            total_length += total_length + mac_key_size;
+            total_length += mac_key_size;
         }
         // Add other MAC key sizes in future.
         else {
@@ -374,6 +374,8 @@ static int get_symmetric_encrypt_authenticate_buffer(
         return 1;
     }
     *ret_length = total_length;
+
+    printf("Ret: %d, Total: %d\n", *ret_length, total_length);
     return 0;
 }
 
@@ -391,6 +393,27 @@ int symmetric_encrypt_authenticate(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
         iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, *ret,
         ret_length);
+}
+
+unsigned int get_expected_decrypted_total_length(unsigned int buf_length,
+                                                 unsigned int iv_size,
+                                                 unsigned int mac_key_size,
+                                                 char enc_mode,
+                                                 char no_hmac_mode) {
+    unsigned int encrypted_length;
+    if (!no_hmac_mode) {
+        encrypted_length = buf_length - mac_key_size;
+    } else {
+        encrypted_length = buf_length;
+    }
+    if (enc_mode == AES_128_CBC) {
+        encrypted_length = encrypted_length / iv_size * iv_size;
+    } else if (enc_mode == AES_128_CTR) {
+        // Encrypted_length is same as plaintext on CTR mode.
+    } else if (enc_mode == AES_128_GCM) {
+        encrypted_length = encrypted_length - 16;
+    }
+    return encrypted_length;
 }
 
 int symmetric_decrypt_authenticate(

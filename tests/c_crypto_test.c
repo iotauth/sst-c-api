@@ -95,9 +95,9 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         MAC_KEY_SHA256_SIZE, cipher_key, AES_128_KEY_SIZE_IN_BYTES,
         AES_128_CBC_IV_SIZE, enc_mode, no_hmac_mode, &encrypted,
         &encrypted_length);
-    assert(s == 0);
     printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
     print_buf(encrypted, encrypted_length);
+    assert(s == 0);
     unsigned int decrypted_length;
     unsigned char *decrypted;
     s = symmetric_decrypt_authenticate(

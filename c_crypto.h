@@ -16,6 +16,7 @@
 #include <openssl/x509.h>
 
 #define AES_128_KEY_SIZE_IN_BYTES 16
+#define AES_128_IV_SIZE 16
 #define AES_128_CBC_IV_SIZE 16
 #define AES_128_CTR_IV_SIZE 16
 #define AES_128_GCM_IV_SIZE 16
