@@ -470,25 +470,6 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int password_len,
                                         const char *salt,
                                         unsigned int salt_len) {
-    // TODO: Need to think about this. How should we pass the length? Is
-    // strlen() better or sizeof() better? Should we handle it inside the
-    // function or should it be a argument? Leaving it as argument to pass the
-    // char * and the length using sizeof(). Then, when salting the password, it
-    // should exclude the NULL terminator when salting the password.
-
-    // Exclude NULL for both password and salt.
-    unsigned int salted_password_length = password_len - 1 + salt_len - 1;
-    unsigned char salted_password[salted_password_length];
-    // Combine the password with the salt
-    memcpy(salted_password, password, password_len - 1);
-    memcpy(salted_password + password_len - 1, salt,
-           salt_len - 1);  // Exclude NULL
-
-    // Create SHA256 HMAC.
-    unsigned char md[32];
-    unsigned int md_len;
-    digest_message_SHA_256(salted_password, salted_password_length, md, &md_len);
-
     // Generate IV.
     unsigned char iv[AES_BLOCK_SIZE];
     generate_nonce(AES_BLOCK_SIZE, iv);
@@ -500,14 +481,16 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     memcpy(buffer, session_key_list, sizeof(session_key_list_t));
     memcpy(buffer + sizeof(session_key_list_t), session_key_list->s_key,
            sizeof(session_key_t) * session_key_list->num_key);
-
+    // Create a salted password, and digest it to 32 bytes.
+    unsigned char salted_password[SHA256_DIGEST_LENGTH];
+    create_salted_password_to_32bytes(password, password_len, salt, salt_len,
+                                      salted_password);
     unsigned char ciphertext[sizeof(buffer)];
     unsigned int ciphertext_len;
-    // Encrypt using the session key's encryption mode. 
+    // Encrypt using the session key's encryption mode.
     // The hashed salt will be the encryption key.
-    if (encrypt_AES(buffer, buffer_len, md, iv,
-                    session_key_list->s_key->enc_mode, ciphertext,
-                    &ciphertext_len)) {
+    if (encrypt_AES(buffer, buffer_len, salted_password, iv, AES_128_CBC,
+                    ciphertext, &ciphertext_len)) {
         printf("AES encryption failed!");
         return 1;
     }
@@ -531,7 +514,6 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int password_len,
                                         const char *salt,
                                         unsigned int salt_len) {
-    unsigned char salted_password[password_len - 1 + salt_len];
     unsigned char iv[AES_BLOCK_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
@@ -539,15 +521,6 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
                          sizeof(session_key_t) * MAX_SESSION_KEY];
     FILE *saved_file_fp;
     int ciphertext_len;
-
-    // Combine the password with the salt
-    memcpy(salted_password, password, password_len);
-    memcpy(salted_password + password_len - 1, salt, salt_len);
-
-    // Create MD5 hash of the salted password
-    unsigned char md[32];
-    unsigned int md_len;
-    digest_message_SHA_256(salted_password, sizeof(salted_password), md, &md_len);
 
     saved_file_fp = fopen(file_path, "rb");
     if (!saved_file_fp) {
@@ -567,10 +540,14 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
         return 1;
     }
 
-    // Decrypt the data
+    // Create a salted password, and digest it to 32 bytes.
+    unsigned char salted_password[SHA256_DIGEST_LENGTH];
+    create_salted_password_to_32bytes(password, password_len, salt, salt_len,
+                                      salted_password);
+    // Decrypt the data.
     unsigned int plaintext_len;
-    if (decrypt_AES(ciphertext, ciphertext_len, md, iv, AES_128_CTR,
-                    buffer, &plaintext_len)) {
+    if (decrypt_AES(ciphertext, ciphertext_len, salted_password, iv,
+                    AES_128_CBC, buffer, &plaintext_len)) {
         printf("AES decryption failed!\n");
         return 1;
     }

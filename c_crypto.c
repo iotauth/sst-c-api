@@ -514,4 +514,25 @@ int symmetric_decrypt_authenticate_without_malloc(
         ret_length);
 }
 
+void create_salted_password_to_32bytes(const char *password,
+                                       unsigned int password_len,
+                                       const char *salt, unsigned int salt_len,
+                                       unsigned char *ret) {
+    // TODO: Need to think about this. How should we pass the length? Is
+    // strlen() better or sizeof() better? Should we handle it inside the
+    // function or should it be a argument? Leaving it as argument to pass the
+    // char * and the length using sizeof(). Then, when salting the password, it
+    // should exclude the NULL terminator when salting the password.
 
+    // Exclude NULL for both password and salt.
+    unsigned int salted_password_length = password_len - 1 + salt_len - 1;
+    unsigned char salted_password[salted_password_length];
+    // Combine the password with the salt
+    memcpy(salted_password, password, password_len - 1);
+    memcpy(salted_password + password_len - 1, salt,
+           salt_len - 1);  // Exclude NULL
+    // Create SHA256 HMAC.
+    unsigned int md_len;
+    digest_message_SHA_256(salted_password, salted_password_length, ret,
+                           &md_len);
+}

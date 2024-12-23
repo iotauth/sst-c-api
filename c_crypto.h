@@ -102,9 +102,10 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
 // Digest the message using the SHA256 digest function.
 // @param data Data to digest
 // @param data_len Length of the data to digest
-// @param md5_hash The pointer of the digested 
+// @param md5_hash The pointer of the digested
 // message
-// @param md_len The length of the message digest. This cannot be given in a integer.
+// @param md_len The length of the message digest. This cannot be given in a
+// integer.
 void digest_message_SHA_256(unsigned char *data, size_t data_len,
                             unsigned char *md5_hash, unsigned int *md_len);
 
@@ -262,5 +263,18 @@ int symmetric_decrypt_authenticate_without_malloc(
     unsigned int mac_key_size, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
+
+// @brief Create a 32 byte digested password.
+// @param password password's pointer
+// @param password_len Length of password.
+// @param salt Salt string's pointer.
+// @param salt_len Length of salt.
+// @param ret The pointer assigned by the caller, filled with the digested
+// password.
+//
+void create_salted_password_to_32bytes(const char *password,
+                                       unsigned int password_len,
+                                       const char *salt, unsigned int salt_len,
+                                       unsigned char *ret);
 
 #endif  // C_CRYPTO_H
