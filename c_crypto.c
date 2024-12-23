@@ -381,22 +381,6 @@ static int get_symmetric_encrypt_authenticate_buffer(
     return 0;
 }
 
-int symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
-    // First, get the expected encrypted length, to assign a buffer size.
-    unsigned int expected_encrypted_total_length =
-        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
-                                            enc_mode, no_hmac_mode);
-    *ret = (unsigned char *)malloc(expected_encrypted_total_length);
-    return get_symmetric_encrypt_authenticate_buffer(
-        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, *ret,
-        ret_length);
-}
-
 unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
                                                    unsigned int iv_size,
                                                    unsigned int mac_key_size,
@@ -475,6 +459,22 @@ static int get_symmetric_decrypt_authenticate_buffer(
     return 0;
 }
 
+int symmetric_encrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
+    // First, get the expected encrypted length, to assign a buffer size.
+    unsigned int expected_encrypted_total_length =
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
+                                            enc_mode, no_hmac_mode);
+    *ret = (unsigned char *)malloc(expected_encrypted_total_length);
+    return get_symmetric_encrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, *ret,
+        ret_length);
+}
+
 int symmetric_decrypt_authenticate(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
@@ -538,5 +538,3 @@ void generate_md5_hash(unsigned char *data, size_t data_len,
     }
     EVP_MD_CTX_destroy(mdctx);
 }
-
-
