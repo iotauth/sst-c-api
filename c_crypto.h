@@ -135,7 +135,9 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                 unsigned char *ret, unsigned int *ret_length);
 
 // Get the expected encrypted length depnding on encryption modes and
-// no_hmac_mode.
+// no_hmac_mode. Use it together with
+// symmetric_encrypt_authenticate_without_malloc() function to not dynamically
+// assign memory.
 // @param buf_length length of buf
 // @param iv_size size of iv(initialize vector)
 // @param mac_key_size size of mac key
@@ -143,17 +145,42 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
 // @param no_hmac_mode Boolean to use or not use HMAC
 // @return expected_encrypted_total_length The expected encrypted length
 
-unsigned int get_expected_encrypted_total_length(unsigned int buf_length, unsigned int iv_size,
-                                  unsigned int mac_key_size, char enc_mode,
-                                  char no_hmac_mode);
+unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
+                                                 unsigned int iv_size,
+                                                 unsigned int mac_key_size,
+                                                 char enc_mode,
+                                                 char no_hmac_mode);
 
-// Encrypt the message with cipher key and
-// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
+// Get the expected encrypted length depnding on encryption modes and
+// no_hmac_mode. However, for block ciphers such as CBC mode, it cannot get the
+// exact decrypted length, only the maximum length. Use it together with
+// symmetric_decrypt_authenticate_without_malloc() function to not dynamically
+// assign memory.
+// @param buf_length length of buf
+// @param iv_size size of iv(initialize vector)
+// @param mac_key_size size of mac key
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @return expected_decrypted_maximum_length The expected decrypted length's
+// maximum length.
+unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
+                                                   unsigned int iv_size,
+                                                   unsigned int mac_key_size,
+                                                   char enc_mode,
+                                                   char no_hmac_mode);
+
+// Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
+// Message Authenticate Code) with mac key from session key. This function
+// malloc()s a buffer and returns the pointer. So, if the user does not allocate
+// memory itself, and rely to the API function, the user must free the buffer
+// after use. For not malloc()ing memory, and who want to just assign memory on
+// stack, please use symmetric_encrypt_authenticate_without_malloc(). For more
+// details, check that function.
 // @param buf input message
 // @param buf_length length of buf
 // @param mac_key mac key of session key to be used in HMAC
 // @param mac_key_size size of mac key
-// @param cipher_key cipher key of session key to be used in CBC encryption
+// @param cipher_key cipher key of session key to be used in encryption
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param enc_mode AES encryption mode.
@@ -167,15 +194,23 @@ int symmetric_encrypt_authenticate(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
 
-// Decrypt the encrypted message with cipher key and
-// make HMAC(Hashed Message Authenticate Code) with mac key from session key.
+// Decrypt the ciphertext with cipher key and optionally make HMAC(Hashed
+// Message Authenticate Code) with mac key from session key. This function
+// malloc()s a buffer and returns the pointer. So, if the user does not allocate
+// memory itself, and rely to the API function, the user must free the buffer
+// after use. For not malloc()ing memory, and who want to just assign memory on
+// stack, please use symmetric_decrypt_authenticate_without_malloc(). For more
+// details, check that function.
 // @param buf input message
 // @param buf_length length of buf
 // @param mac_key mac key of session key to be used in HMAC
 // @param mac_key_size size of mac key
-// @param cipher_key cipher key of session key to be used in CBC decryption
+// @param cipher_key cipher key of session key to be used in decryption
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, 1 for error.
 int symmetric_decrypt_authenticate(
@@ -184,12 +219,44 @@ int symmetric_decrypt_authenticate(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
 
+// This works similar with the symmetric_encrypt_authenticate() function,
+// however does not dynamically assign memory. The ret pointer should have been
+// assigned memory. To do this, use the get_expected_encrypted_total_length()
+// function to first get the expected memory size, and assign memory.
+// @param buf input message
+// @param buf_length length of buf
+// @param mac_key mac key of session key to be used in HMAC
+// @param mac_key_size size of mac key
+// @param cipher_key cipher key of session key to be used in encryption
+// @param cipher_key_size size of cipher key
+// @param iv_size size of iv(initialize vector)
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @param ret The pointer of the result of the encrypted buffer
+// @param ret_length length of return buffer
+// @return 0 for success, 1 for error.
 int symmetric_encrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
 
+// This works similar with the symmetric_decrypt_authenticate() function,
+// however does not dynamically assign memory. The ret pointer should have been
+// assigned memory. To do this, use the get_expected_decrypted_maximum_length()
+// function to first get the expected memory size, and assign memory.
+// @param buf input message
+// @param buf_length length of buf
+// @param mac_key mac key of session key to be used in HMAC
+// @param mac_key_size size of mac key
+// @param cipher_key cipher key of session key to be used in decryption
+// @param cipher_key_size size of cipher key
+// @param iv_size size of iv(initialize vector)
+// @param enc_mode AES encryption mode.
+// @param no_hmac_mode Boolean to use or not use HMAC
+// @param ret The pointer of the result of the encrypted buffer
+// @param ret_length length of return buffer
+// @return 0 for success, 1 for error.
 int symmetric_decrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
