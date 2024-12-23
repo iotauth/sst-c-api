@@ -104,7 +104,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
 unsigned char *SHA256_sign(unsigned char *encrypted,
                            unsigned int encrypted_length, EVP_PKEY *priv_key,
                            size_t *sig_length) {
-    unsigned char md[MD5_DIGEST_LENGTH];
+    unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned int md_length;
     digest_message_SHA_256(encrypted, encrypted_length, md, &md_length);
     EVP_PKEY_CTX *ctx;
@@ -141,7 +141,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
 void SHA256_verify(unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key) {
     EVP_PKEY_CTX *ctx;
-    unsigned char md[MD5_DIGEST_LENGTH];
+    unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned int md_len;
     digest_message_SHA_256(data, data_length, md, &md_len);
 

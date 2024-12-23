@@ -532,7 +532,6 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *salt,
                                         unsigned int salt_len) {
     unsigned char salted_password[password_len - 1 + salt_len];
-    unsigned char temp_hash[MD5_DIGEST_LENGTH];
     unsigned char iv[AES_BLOCK_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
@@ -570,7 +569,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     // Decrypt the data
     unsigned int plaintext_len;
-    if (decrypt_AES(ciphertext, ciphertext_len, temp_hash, iv, AES_128_CTR,
+    if (decrypt_AES(ciphertext, ciphertext_len, md, iv, AES_128_CTR,
                     buffer, &plaintext_len)) {
         printf("AES decryption failed!\n");
         return 1;
