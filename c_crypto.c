@@ -496,7 +496,7 @@ int symmetric_encrypt_authenticate_without_malloc(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
     unsigned int expected_encrypted_total_length =
-        get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
                                               enc_mode, no_hmac_mode);
 
     return get_symmetric_encrypt_authenticate_buffer(
@@ -513,7 +513,7 @@ int symmetric_decrypt_authenticate_without_malloc(
     unsigned int expected_decrypted_total_length =
         get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
                                               enc_mode, no_hmac_mode);
-    return get_symmetric_encrypt_authenticate_buffer(
+    return get_symmetric_decrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
         iv_size, enc_mode, no_hmac_mode, expected_decrypted_total_length, ret,
         ret_length);
