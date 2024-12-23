@@ -757,35 +757,3 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
         return 1;
     }
 }
-
-// TODO:Erase
-// int CTR_encrypt_or_decrypt_buf_with_session_key(
-//     session_key_t *s_key, const uint64_t initial_iv_high,
-//     const uint64_t initial_iv_low, uint64_t file_offset,
-//     const unsigned char *data, unsigned char *out_data, size_t data_size,
-//     size_t out_data_size, unsigned int *processed_size, int encrypt) {
-//     if (!check_session_key_validity(s_key)) {
-//         if (encrypt) {
-//             if (CTR_Cipher(s_key->cipher_key, initial_iv_high,
-//             initial_iv_low,
-//                            file_offset, data, out_data, data_size,
-//                            out_data_size, 1, processed_size)) {
-//                 error_exit(
-//                     "Error during encrypting buffer with session key.\n");
-//             }
-//             return 0;
-//         } else {
-//             if (CTR_Cipher(s_key->cipher_key, initial_iv_high,
-//             initial_iv_low,
-//                            file_offset, data, out_data, data_size,
-//                            out_data_size, 0, processed_size)) {
-//                 error_exit(
-//                     "Error during decrypting buffer with session key.\n");
-//             }
-//             return 0;
-//         }
-//     } else {
-//         printf("Session key is expired.\n");
-//         return 1;
-//     }
-// }
