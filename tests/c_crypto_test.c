@@ -243,10 +243,10 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test() {
         "symmetric_encrypt_authenticate_AES_128_with_malloc_tests.\n");
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test();
-    // symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_test();
-    // symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test();
 }
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test() {
@@ -255,10 +255,10 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test() {
         "symmetric_encrypt_authenticate_AES_128_without_malloc_tests.\n");
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_without_malloc_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_without_malloc_test();
-    // symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test();
-    // symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test();
+    symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test();
 }
 
 void symmetric_encrypt_decrypt_authenticate_test() {
