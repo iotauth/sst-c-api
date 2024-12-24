@@ -302,7 +302,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
 
         data_buf_length = read_header_return_data_buf_pointer(
             session_ctx->sock, &message_type, data_buf, MAX_PAYLOAD_LENGTH);
-        if (message_type == SECURE_COMM_MSG) {
+        if (!check_SECURE_COMM_MSG_type(message_type)) {
             print_received_message(data_buf, data_buf_length, session_ctx);
         }
     }
@@ -315,7 +315,7 @@ void receive_message(unsigned char *received_buf,
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (message_type == SECURE_COMM_MSG) {
+    if (!check_SECURE_COMM_MSG_type(message_type)) {
         print_received_message(data_buf, data_buf_length, session_ctx);
     }
 }
@@ -329,7 +329,7 @@ int read_secure_message(int socket, unsigned char *buf,
     unsigned int bytes_read;
     bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
                                                      buf_length);
-    if (message_type != SECURE_COMM_MSG) {
+    if (check_SECURE_COMM_MSG_type(message_type)) {
         error_exit("Wrong message_type.");
     }
     return bytes_read;
@@ -343,7 +343,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
         received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (message_type == SECURE_COMM_MSG) {
+    if (!check_SECURE_COMM_MSG_type(message_type)) {
         // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
         // Must free() after use.
         return decrypt_received_message(data_buf, data_buf_length,
@@ -355,49 +355,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 
 int send_secure_message(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx) {
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        error_exit("Session key expired!\n");
-    }
-    unsigned char buf[SEQ_NUM_SIZE + msg_length];
-    memset(buf, 0, SEQ_NUM_SIZE + msg_length);
-    write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
-    memcpy(buf + SEQ_NUM_SIZE, (unsigned char *)msg, msg_length);
-
-    // encrypt
-    unsigned int encrypted_length;
-    unsigned char *encrypted;
-
-    if (encrypt_buf_with_session_key(&session_ctx->s_key, buf,
-                                     SEQ_NUM_SIZE + msg_length, &encrypted,
-                                     &encrypted_length)) {
-        error_exit("Encryption failed.");
-    }
-
-    session_ctx->sent_seq_num++;
-    unsigned char
-        sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
-                                         // does not support dynamic sizes,
-                                         // the max length is shorter than
-                                         // 1024. Must need to decide static
-                                         // or dynamic buffer size.
-    unsigned int sender_buf_length;
-    make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
-                    &sender_buf_length);
-    free(encrypted);
-
-    ssize_t bytes_written = 0;
-    while (bytes_written < (ssize_t)msg_length) {
-        ssize_t more = write(session_ctx->sock, sender_buf, sender_buf_length);
-        if (more <= 0 &&
-            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-            usleep(100);
-            continue;
-        } else if (more < 0) {
-            return -1;
-        }
-        bytes_written += more;
-    }
-    return bytes_written;
+    return send_SECURE_COMM_message(msg, msg_length, session_ctx);
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,

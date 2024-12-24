@@ -374,6 +374,53 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
+int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
+                             SST_session_ctx_t *session_ctx) {
+    if (check_session_key_validity(&session_ctx->s_key)) {
+        error_exit("Session key expired!\n");
+    }
+    unsigned char buf[SEQ_NUM_SIZE + msg_length];
+    memset(buf, 0, SEQ_NUM_SIZE + msg_length);
+    write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
+    memcpy(buf + SEQ_NUM_SIZE, (unsigned char *)msg, msg_length);
+
+    // encrypt
+    unsigned int encrypted_length;
+    unsigned char *encrypted;
+
+    if (encrypt_buf_with_session_key(&session_ctx->s_key, buf,
+                                     SEQ_NUM_SIZE + msg_length, &encrypted,
+                                     &encrypted_length)) {
+        error_exit("Encryption failed.");
+    }
+
+    session_ctx->sent_seq_num++;
+    unsigned char
+        sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
+                                         // does not support dynamic sizes,
+                                         // the max length is shorter than
+                                         // 1024. Must need to decide static
+                                         // or dynamic buffer size.
+    unsigned int sender_buf_length;
+    make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
+                    &sender_buf_length);
+    free(encrypted);
+
+    ssize_t bytes_written = 0;
+    while (bytes_written < (ssize_t)msg_length) {
+        ssize_t more = write(session_ctx->sock, sender_buf, sender_buf_length);
+        if (more <= 0 &&
+            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            usleep(100);
+            continue;
+        } else if (more < 0) {
+            return -1;
+        }
+        bytes_written += more;
+    }
+    return bytes_written;
+}
+
 void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
     unsigned int decrypted_length;

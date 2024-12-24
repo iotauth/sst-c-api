@@ -233,11 +233,10 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     return (unsigned int)length_read;
 }
 
-// TODO: ERASE.
-//  Function to convert uint64_t to big endian and store in buffer
-//  void PutBigEndian64(uint64_t value, unsigned char *output) {
-//      for (int i = 0; i < 8; ++i) {
-//          output[7 - i] = value & 0xff;
-//          value >>= 8;
-//      }
-//  }
+int check_SECURE_COMM_MSG_type (unsigned char message_type) {
+    if (message_type == SECURE_COMM_MSG) {
+        return 0;
+    } else {
+        return -1;
+    }
+}

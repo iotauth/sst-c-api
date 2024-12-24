@@ -30,7 +30,7 @@
 #define SKEY_HANDSHAKE_1 30
 #define SKEY_HANDSHAKE_2 31
 #define SKEY_HANDSHAKE_3 32
-// #define SECURE_COMM_MSG 33
+#define SECURE_COMM_MSG 33
 #define FIN_SECURE_COMM 34
 #define SECURE_PUB 40
 #define MIGRATION_REQ_WITH_SIGN 50
@@ -236,7 +236,9 @@ int mod(int a, int b);
 unsigned int read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
-// TODO: Erase.
-//  void PutBigEndian64(uint64_t value, unsigned char *output);
+// Checks message type if it is SECURE_COMM_MSG. This is needed as a separate function not to define SECURE_COMM_MSG in c_api.h
+// @param message type to check.
+// @return int 0 for true, -1 for false.
+int check_SECURE_COMM_MSG_type (unsigned char message_type);
 
 #endif  // C_COMMON_H

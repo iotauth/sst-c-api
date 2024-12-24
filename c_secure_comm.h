@@ -101,6 +101,16 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                                                   session_key_t *s_key,
                                                   unsigned int *ret_length);
 
+// Sends a secure communication message using an encrypted session key-based protocol.
+// The function constructs a message with a sequence number prepended, encrypts the
+// message, wraps it into a sender buffer, and writes it to the socket.
+// @param msg pointer to the plaintext message to be sent.
+// @param msg_length length of the plaintext message in bytes.
+// @param session_ctx pointer to the session context containing session key and socket information.
+// @return the total number of bytes written to the socket, or -1 on failure.
+int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
+                             SST_session_ctx_t *session_ctx);
+
 // Decrypts message, reads seq_num, checks validity, and prints message
 // Print the received message and sequence number after check validity of
 // session key.

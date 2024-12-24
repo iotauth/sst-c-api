@@ -11,8 +11,6 @@
 #define MAX_CIPHER_KEY_SIZE 32
 #define MAX_SESSION_KEY 10
 
-#define SECURE_COMM_MSG 33
-
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
@@ -62,8 +60,8 @@ typedef struct {
 
 } SST_session_ctx_t;
 
-// This struct is a session_key_list. It can be easily initialized with macro
-// INIT_SESSION_KEY_LIST(X)
+// This struct is a session_key_list.
+// num_key is the number of keys in this list.
 // rear_idx is a indicator that points the next position to add to the list.
 // The session_key_list as a circular array.
 typedef struct {
