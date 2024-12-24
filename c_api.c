@@ -29,7 +29,6 @@ SST_ctx_t *init_SST(const char *config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
-    // TODO: Remove when unneeded.
     bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
