@@ -6,6 +6,14 @@
 unsigned char entity_client_state;
 unsigned char entity_server_state;
 
+typedef enum {
+    INIT,
+    AUTH_HELLO_RECEIVED,
+    SESSION_KEY_RESP_RECEIVED,
+    SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED,
+    FINISHED,
+} send_state;
+
 unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
                                           unsigned char *auth_nonce,
                                           int num_key, char *sender,
@@ -57,6 +65,81 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
+// Encrypt the message and sign the encrypted message.
+// @param buf input buffer
+// @param buf_len length of buf
+// @param ctx config struct obtained from load_config()
+// @param message message with encrypted message and signature
+// @param message_length length of message
+static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
+                                SST_ctx_t *ctx, unsigned int *message_length) {
+    size_t encrypted_length;
+    unsigned char *encrypted =
+        public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
+                       (EVP_PKEY *)ctx->pub_key, &encrypted_length);
+    size_t sigret_length;
+    unsigned char *sigret = SHA256_sign(
+        encrypted, encrypted_length, (EVP_PKEY *)ctx->priv_key, &sigret_length);
+    *message_length = sigret_length + encrypted_length;
+    unsigned char *message = (unsigned char *)malloc(*message_length);
+    memcpy(message, encrypted, encrypted_length);
+    memcpy(message + encrypted_length, sigret, sigret_length);
+    OPENSSL_free(encrypted);
+    OPENSSL_free(sigret);
+    return message;
+}
+
+// Serializes the session_key request.
+// Symmetric encrypt authenticates the serialize_message_for_auth with the
+// distribution key. Serializes the sender_length, sender_name, and encrypted
+// message above.
+// @param serialized return buffer of serialize_message_for_auth
+// @param serialized_length buffer length of return of
+// serialize_message_for_auth buffer
+// @param dist_key key to symmetric encrypt & authenticate
+// @param name entity_sender name.
+// @param ret_length
+// @return unsigned char * return buffer
+static unsigned char *serialize_session_key_req_with_distribution_key(
+    unsigned char *serialized, unsigned int serialized_length,
+    distribution_key_t *dist_key, char *name, unsigned int *ret_length) {
+    unsigned int temp_length;
+    unsigned char *temp;
+    if (symmetric_encrypt_authenticate(
+            serialized, serialized_length, dist_key->mac_key,
+            dist_key->mac_key_size, dist_key->cipher_key,
+            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
+            0, &temp, &temp_length)) {
+        error_exit(
+            "Error during encryption while "
+            "serialize_session_key_req_with_distribution_key\n");
+    }
+    unsigned int name_length = strlen(name);
+    unsigned char length_buf[] = {name_length};
+    unsigned char *ret = malloc(1 + name_length + temp_length);
+    unsigned int offset = 0;
+    memcpy(ret, length_buf, 1);
+    offset += 1;
+    memcpy(ret + offset, name, name_length);
+    offset += name_length;
+    memcpy(ret + offset, temp, temp_length);
+    OPENSSL_free(temp);
+    *ret_length = 1 + strlen(name) + temp_length;
+    return ret;
+}
+
+// Check the validity of the buffer.
+// @param validity unsigned char buffer to check.
+// @return 1 when expired, 0 when valid
+static int check_validity(unsigned char *validity) {
+    if ((uint64_t)time(NULL) >
+        read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
 void send_auth_request_message(unsigned char *serialized,
                                unsigned int serialized_length, SST_ctx_t *ctx,
                                int sock, int requestIndex) {
@@ -98,22 +181,26 @@ void send_auth_request_message(unsigned char *serialized,
     }
 }
 
-unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
-                                SST_ctx_t *ctx, unsigned int *message_length) {
-    size_t encrypted_length;
-    unsigned char *encrypted =
-        public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
-                       (EVP_PKEY *)ctx->pub_key, &encrypted_length);
-    size_t sigret_length;
-    unsigned char *sigret = SHA256_sign(
-        encrypted, encrypted_length, (EVP_PKEY *)ctx->priv_key, &sigret_length);
-    *message_length = sigret_length + encrypted_length;
-    unsigned char *message = (unsigned char *)malloc(*message_length);
-    memcpy(message, encrypted, encrypted_length);
-    memcpy(message + encrypted_length, sigret, sigret_length);
-    OPENSSL_free(encrypted);
-    OPENSSL_free(sigret);
-    return message;
+// Separate the message received from Auth and
+// store the distribution key in the distribution key struct
+// Must free distribution_key.mac_key, distribution_key.cipher_key
+// @param parsed_distribution_key distribution key struct to save information
+// @param buf input buffer with distribution key
+static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
+                            unsigned char *buf) {
+    memcpy(parsed_distribution_key->abs_validity, buf,
+           DIST_KEY_EXPIRATION_TIME_SIZE);
+    unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
+    unsigned int cipher_key_size = buf[cur_index];
+    parsed_distribution_key->cipher_key_size = cipher_key_size;
+    cur_index += 1;
+    memcpy(parsed_distribution_key->cipher_key, buf + cur_index,
+           cipher_key_size);
+    cur_index += cipher_key_size;
+    unsigned int mac_key_size = buf[cur_index];
+    parsed_distribution_key->mac_key_size = mac_key_size;
+    cur_index += 1;
+    memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
 }
 
 void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
@@ -141,22 +228,6 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     OPENSSL_free(decrypted_dist_key_buf);
 }
 
-void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                            unsigned char *buf) {
-    memcpy(parsed_distribution_key->abs_validity, buf,
-           DIST_KEY_EXPIRATION_TIME_SIZE);
-    unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
-    unsigned int cipher_key_size = buf[cur_index];
-    parsed_distribution_key->cipher_key_size = cipher_key_size;
-    cur_index += 1;
-    memcpy(parsed_distribution_key->cipher_key, buf + cur_index,
-           cipher_key_size);
-    cur_index += cipher_key_size;
-    unsigned int mac_key_size = buf[cur_index];
-    parsed_distribution_key->mac_key_size = mac_key_size;
-    cur_index += 1;
-    memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
-}
 
 unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
                                   int offset, unsigned int *return_to_length) {
@@ -196,13 +267,18 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     return cur_idx;
 }
 
-void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
+static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
                                                 session_key_t *s_key) {
     s_key->enc_mode = ctx->config->encryption_mode;
     s_key->no_hmac_mode = ctx->config->no_hmac_mode;
 }
 
-void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
+// Separate the session key, nonce, and crypto spec from the message.
+// @param buf input buffer with session key, nonce, and crypto spec
+// @param buf_length length of buf
+// @param reply_nonce nonce to compare with
+// @param session_key_list session key list struct
+static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
                                 unsigned int buf_length,
                                 unsigned char *reply_nonce,
                                 session_key_list_t *session_key_list) {
@@ -227,34 +303,6 @@ void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
-}
-
-unsigned char *serialize_session_key_req_with_distribution_key(
-    unsigned char *serialized, unsigned int serialized_length,
-    distribution_key_t *dist_key, char *name, unsigned int *ret_length) {
-    unsigned int temp_length;
-    unsigned char *temp;
-    if (symmetric_encrypt_authenticate(
-            serialized, serialized_length, dist_key->mac_key,
-            dist_key->mac_key_size, dist_key->cipher_key,
-            dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
-            0, &temp, &temp_length)) {
-        error_exit(
-            "Error during encryption while "
-            "serialize_session_key_req_with_distribution_key\n");
-    }
-    unsigned int name_length = strlen(name);
-    unsigned char length_buf[] = {name_length};
-    unsigned char *ret = malloc(1 + name_length + temp_length);
-    unsigned int offset = 0;
-    memcpy(ret, length_buf, 1);
-    offset += 1;
-    memcpy(ret + offset, name, name_length);
-    offset += name_length;
-    memcpy(ret + offset, temp, temp_length);
-    OPENSSL_free(temp);
-    *ret_length = 1 + strlen(name) + temp_length;
-    return ret;
 }
 
 unsigned char *parse_handshake_1(session_key_t *s_key,
@@ -365,15 +413,6 @@ int check_session_key_validity(session_key_t *session_key) {
     return check_validity(session_key->abs_validity);
 }
 
-int check_validity(unsigned char *validity) {
-    if ((uint64_t)time(NULL) >
-        read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        return 1;
-    } else {
-        return 0;
-    }
-}
-
 session_key_list_t *send_session_key_request_check_protocol(
     SST_ctx_t *ctx, unsigned char *target_key_id) {
     // TODO: check if needed
@@ -416,14 +455,6 @@ session_key_list_t *send_session_key_request_check_protocol(
     }
     return error_return_null("Invalid network protocol name.\n");
 }
-
-typedef enum {
-    INIT,
-    AUTH_HELLO_RECEIVED,
-    SESSION_KEY_RESP_RECEIVED,
-    SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED,
-    FINISHED,
-} send_state;
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;

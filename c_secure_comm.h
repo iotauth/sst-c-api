@@ -52,23 +52,6 @@ void send_auth_request_message(unsigned char *serialized,
                                unsigned int serialized_length, SST_ctx_t *ctx,
                                int sock, int requestIndex);
 
-// Encrypt the message and sign the encrypted message.
-// @param buf input buffer
-// @param buf_len length of buf
-// @param ctx config struct obtained from load_config()
-// @param message message with encrypted message and signature
-// @param message_length length of message
-unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
-                                SST_ctx_t *ctx, unsigned int *message_length);
-
-// Separate the message received from Auth and
-// store the distribution key in the distribution key struct
-// Must free distribution_key.mac_key, distribution_key.cipher_key
-// @param parsed_distribution_key distribution key struct to save information
-// @param buf input buffer with distribution key
-void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                            unsigned char *buf);
-
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
 // @param ctx config struct obtained from load_config()
@@ -91,31 +74,6 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
 // @param buf input buffer with session key
 // @return index number for another session key
 unsigned int parse_session_key(session_key_t *ret, unsigned char *buf);
-
-// Separate the session key, nonce, and crypto spec from the message.
-// @param buf input buffer with session key, nonce, and crypto spec
-// @param buf_length length of buf
-// @param reply_nonce nonce to compare with
-// @param session_key_list session key list struct
-void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
-                                unsigned int buf_length,
-                                unsigned char *reply_nonce,
-                                session_key_list_t *session_key_list);
-
-// Serializes the session_key request.
-// Symmetric encrypt authenticates the serialize_message_for_auth with the
-// distribution key. Serializes the sender_length, sender_name, and encrypted
-// message above.
-// @param serialized return buffer of serialize_message_for_auth
-// @param serialized_length buffer length of return of
-// serialize_message_for_auth buffer
-// @param dist_key key to symmetric encrypt & authenticate
-// @param name entity_sender name.
-// @param ret_length
-// @return unsigned char * return buffer
-unsigned char *serialize_session_key_req_with_distribution_key(
-    unsigned char *serialized, unsigned int serialized_length,
-    distribution_key_t *dist_key, char *name, unsigned int *ret_length);
 
 // Parses the handshake1 buffer to send.
 // First generates the entity client's nonce to send to entity server,
@@ -166,11 +124,6 @@ unsigned char *decrypt_received_message(unsigned char *data,
 // @param session_key_t session_key to check validity
 // @return 1 when expired, 0 when valid
 int check_session_key_validity(session_key_t *session_key);
-
-// Check the validity of the buffer.
-// @param validity unsigned char buffer to check.
-// @return 1 when expired, 0 when valid
-int check_validity(unsigned char *validity);
 
 // Check if entity has session key and if not, request the session key to Auth.
 // @param ctx config struct obtained from load_config()
@@ -246,10 +199,32 @@ void update_validity(session_key_t *session_key);
 int check_session_key_list_addable(int requested_num_key,
                                    session_key_list_t *s_ley_list);
 
+// Encrypts or decrypts a buffer using the provided session key. This function
+// dynamically allocates memory for the output buffer based on the input length.
+// @param s_key session_key_t structure containing encryption and authentication
+// keys.
+// @param input pointer to the input buffer to encrypt or decrypt.
+// @param input_length size of the input buffer in bytes.
+// @param output pointer to the dynamically allocated output buffer (allocated
+// inside the function).
+// @param output_length pointer to store the size of the output buffer in bytes.
+// @param encrypt 1 for encryption, 0 for decryption.
+// @return 0 on success, 1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char **output, unsigned int *output_length, int encrypt);
 
+// Encrypts or decrypts a buffer using the provided session key without dynamic
+// memory allocation. The caller must allocate sufficient memory for the output
+// buffer.
+// @param s_key session_key_t structure containing encryption and authentication
+// keys.
+// @param input pointer to the input buffer to encrypt or decrypt.
+// @param input_length size of the input buffer in bytes.
+// @param output pointer to the pre-allocated output buffer.
+// @param output_length pointer to store the size of the output buffer in bytes.
+// @param encrypt 1 for encryption, 0 for decryption.
+// @return 0 on success, 1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char *output, unsigned int *output_length, int encrypt);
