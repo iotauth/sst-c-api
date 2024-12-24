@@ -52,12 +52,16 @@ int main(int argc, char *argv[]) {
         printf("There is no session key.\n");
     } else {
         pthread_t thread;
-        pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
+        pthread_create(&thread, NULL, &receive_thread_read_one_each,
+                       (void *)session_ctx);
         sleep(1);
 
-        send_secure_message("Hello client", strlen("Hello client"), session_ctx);
+        send_secure_message("Hello client", strlen("Hello client"),
+                            session_ctx);
         sleep(1);
-        send_secure_message("Hello client - second message", strlen("Hello client - second message"), session_ctx);
+        send_secure_message("Hello client - second message",
+                            strlen("Hello client - second message"),
+                            session_ctx);
         sleep(2);
         close(clnt_sock);
         pthread_cancel(thread);
@@ -73,12 +77,16 @@ int main(int argc, char *argv[]) {
         server_secure_comm_setup(ctx, clnt_sock2, &s_key_list);
 
     pthread_t thread2;
-    pthread_create(&thread2, NULL, &receive_thread_read_one_each, (void *)session_ctx2);
+    pthread_create(&thread2, NULL, &receive_thread_read_one_each,
+                   (void *)session_ctx2);
     sleep(1);
 
-    send_secure_message("Hello client 2", strlen("Hello client 2"), session_ctx2);
+    send_secure_message("Hello client 2", strlen("Hello client 2"),
+                        session_ctx2);
     sleep(1);
-    send_secure_message("Hello client 2 - second message", strlen("Hello client 2 - second message"), session_ctx2);
+    send_secure_message("Hello client 2 - second message",
+                        strlen("Hello client 2 - second message"),
+                        session_ctx2);
     sleep(1);
 
     sleep(3);

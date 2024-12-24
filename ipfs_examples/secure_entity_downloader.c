@@ -24,22 +24,26 @@ int main(int argc, char *argv[]) {
     unsigned char message_type;
     unsigned char session_key_id[8];
     int command_size;
-    read_header_return_data_buf_pointer(session_ctx->sock, 
-                                        &message_type, data_buf, &data_buf_length);
+    read_header_return_data_buf_pointer(session_ctx->sock, &message_type,
+                                        data_buf, &data_buf_length);
     unsigned char *decrypted;
     if (message_type == SECURE_COMM_MSG) {
-        decrypted = decrypt_received_message(data_buf, data_buf_length, session_ctx);
+        decrypted =
+            decrypt_received_message(data_buf, data_buf_length, session_ctx);
         sleep(1);
         if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
             error_exit("Not download response!!\n");
         }
-        printf("Session key id size: %x\n", decrypted[SEQ_NUM_SIZE+1]);
-        printf("Command size: %d\n", decrypted[SEQ_NUM_SIZE + SESSION_KEY_ID_SIZE +2]);
+        printf("Session key id size: %x\n", decrypted[SEQ_NUM_SIZE + 1]);
+        printf("Command size: %d\n",
+               decrypted[SEQ_NUM_SIZE + SESSION_KEY_ID_SIZE + 2]);
     }
 
-    download_file(&decrypted[SEQ_NUM_SIZE], &received_skey_id[0], &file_name[0]);
+    download_file(&decrypted[SEQ_NUM_SIZE], &received_skey_id[0],
+                  &file_name[0]);
     print_buf(received_skey_id, 8);
-    session_key_t *session_key = get_session_key_by_ID(&received_skey_id[0], ctx, &s_key_list);
+    session_key_t *session_key =
+        get_session_key_by_ID(&received_skey_id[0], ctx, &s_key_list);
     if (session_key == NULL) {
         error_return_null("There is no session key.\n");
     } else {

@@ -4,9 +4,10 @@ unsigned char entity_client_state;
 unsigned char entity_server_state;
 
 unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
-                                        unsigned char *auth_nonce, int num_key,
-                                        char *sender, char *purpose,
-                                        unsigned int *ret_length) {
+                                          unsigned char *auth_nonce,
+                                          int num_key, char *sender,
+                                          char *purpose,
+                                          unsigned int *ret_length) {
     size_t sender_length = strlen(sender);
     size_t purpose_length = strlen(purpose);
 
@@ -53,43 +54,41 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
-void send_auth_request_message(unsigned char *serialized, unsigned int serialized_length, SST_ctx_t* ctx, int sock, int requestIndex) {
-    if (check_validity(
-        ctx->dist_key.abs_validity)) {  // when dist_key expired
+void send_auth_request_message(unsigned char *serialized,
+                               unsigned int serialized_length, SST_ctx_t *ctx,
+                               int sock, int requestIndex) {
+    if (check_validity(ctx->dist_key.abs_validity)) {  // when dist_key expired
         printf(
             "Current distribution key expired, requesting new "
             "distribution key as well...\n");
         unsigned int enc_length;
-        unsigned char *enc = encrypt_and_sign(
-            serialized, serialized_length, ctx, &enc_length);
+        unsigned char *enc =
+            encrypt_and_sign(serialized, serialized_length, ctx, &enc_length);
         free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
-        make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
-                        message, &message_length);
-        }
-        else {
-        make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC,
-                        message, &message_length);    
+            make_sender_buf(enc, enc_length, SESSION_KEY_REQ_IN_PUB_ENC,
+                            message, &message_length);
+        } else {
+            make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
+                            &message_length);
         }
         write(sock, message, message_length);
         free(enc);
     } else {
         unsigned int enc_length;
-        unsigned char *enc =
-        serialize_session_key_req_with_distribution_key(
-                serialized, serialized_length, &ctx->dist_key,
-                ctx->config->name, &enc_length);
+        unsigned char *enc = serialize_session_key_req_with_distribution_key(
+            serialized, serialized_length, &ctx->dist_key, ctx->config->name,
+            &enc_length);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
-        make_sender_buf(enc, enc_length, SESSION_KEY_REQ,
-                        message, &message_length);
-        }
-        else {
-        make_sender_buf(enc, enc_length, ADD_READER_REQ,
-                        message, &message_length);    
+            make_sender_buf(enc, enc_length, SESSION_KEY_REQ, message,
+                            &message_length);
+        } else {
+            make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
+                            &message_length);
         }
         write(sock, message, message_length);
         free(enc);
@@ -113,7 +112,8 @@ unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     return message;
 }
 
-void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ctx_t* ctx, size_t key_size) {
+void save_distribution_key(unsigned char *data_buf, int data_buf_length,
+                           SST_ctx_t *ctx, size_t key_size) {
     signed_data_t signed_data;
 
     // parse data
@@ -121,8 +121,8 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ct
     memcpy(signed_data.sign, data_buf + key_size, key_size);
 
     // verify
-    SHA256_verify(signed_data.data, key_size, signed_data.sign,
-                    key_size, ctx->pub_key);
+    SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
+                  ctx->pub_key);
     printf("auth signature verified\n");
 
     // decrypt encrypted_distribution_key
@@ -133,7 +133,7 @@ void save_distribution_key(unsigned char *data_buf, int data_buf_length,  SST_ct
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf,
-                            decrypted_dist_key_buf_length);
+                           decrypted_dist_key_buf_length);
     free(decrypted_dist_key_buf);
 }
 
@@ -161,8 +161,7 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
     var_length_int_to_num(buf + offset, buf_length, &num,
                           &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {
-        error_exit(
-            "Buffer size of the variable length integer cannot be 0.");
+        error_exit("Buffer size of the variable length integer cannot be 0.");
     }
     *return_to_length = num + var_len_int_buf_size;
     unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
@@ -375,7 +374,8 @@ session_key_list_t *send_session_key_request_check_protocol(
             }
             return s_key_list;
         }
-    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") == 0) {
+    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
+               0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         return s_key_list;
@@ -411,8 +411,10 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned int serialized_length;
             unsigned char *serialized = serialize_message_for_auth(
                 entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name, ctx->config->purpose[ctx->purpose_index], &serialized_length);
-            send_auth_request_message(serialized, serialized_length, ctx, sock, 1);
+                ctx->config->name, ctx->config->purpose[ctx->purpose_index],
+                &serialized_length);
+            send_auth_request_message(serialized, serialized_length, ctx, sock,
+                                      1);
         } else if (message_type == SESSION_KEY_RESP) {
             printf(
                 "Received session key response encrypted with distribution "
@@ -441,10 +443,11 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 
         } else if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
-            unsigned int encrypted_session_key_length = data_buf_length - (key_size * 2);
+            unsigned int encrypted_session_key_length =
+                data_buf_length - (key_size * 2);
             unsigned char encrypted_session_key[encrypted_session_key_length];
             memcpy(encrypted_session_key, data_buf + key_size * 2,
-            encrypted_session_key_length);
+                   encrypted_session_key_length);
             save_distribution_key(data_buf, data_buf_length, ctx, key_size);
 
             // decrypt session_key with decrypted_dist_key_buf
@@ -454,7 +457,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_CBC_128_IV_SIZE, &decrypted_session_key_response_length);
+                    AES_CBC_128_IV_SIZE,
+                    &decrypted_session_key_response_length);
 
             // parse decrypted_session_key_response for nonce comparison &
             // session_key.

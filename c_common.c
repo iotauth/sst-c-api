@@ -6,7 +6,7 @@ void error_exit(char *message) {
     exit(1);
 }
 
-void* error_return_null(char *message) {
+void *error_return_null(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
     return NULL;
@@ -52,7 +52,8 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
 }
 
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num, unsigned int *var_len_int_buf_size) {
+                           unsigned int *num,
+                           unsigned int *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (int i = 0; i < buf_length; i++) {

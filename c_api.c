@@ -99,8 +99,9 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     return session_ctx;
 }
 
-session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_ctx_t *ctx, session_key_list_t *existing_s_key_list) {
-    
+session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
+                                     SST_ctx_t *ctx,
+                                     session_key_list_t *existing_s_key_list) {
     session_key_t *s_key;
     // TODO: Fix integer size 32 or 64
     unsigned int target_session_key_id_int =
@@ -113,8 +114,8 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
         error_exit("Session key list must be not NULL.\n");
     }
     for (int i = 0; i < existing_s_key_list->num_key; i++) {
-        session_key_found = check_session_key(
-            target_session_key_id_int, existing_s_key_list, i);
+        session_key_found = check_session_key(target_session_key_id_int,
+                                              existing_s_key_list, i);
     }
     if (session_key_found >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_found];
@@ -124,8 +125,8 @@ session_key_t *get_session_key_by_ID(unsigned char* target_session_key_id, SST_c
                 target_session_key_id_int);
 
         session_key_list_t *s_key_list;
-        s_key_list = send_session_key_request_check_protocol(
-            ctx, target_session_key_id);
+        s_key_list =
+            send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
             return error_return_null("Failed to get session key from auth.\n");
         }
@@ -169,7 +170,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
             memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
 
-            s_key = get_session_key_by_ID(target_session_key_id, ctx, existing_s_key_list);
+            s_key = get_session_key_by_ID(target_session_key_id, ctx,
+                                          existing_s_key_list);
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
                 error_exit(
                     "Error during comm init - in wrong state, expected: "
@@ -291,7 +293,8 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     if (message_type == SECURE_COMM_MSG) {
         return decrypt_received_message(data_buf, data_buf_length, session_ctx);
     }
-    return error_return_null("Invalid message type while in secure communication.\n");
+    return error_return_null(
+        "Invalid message type while in secure communication.\n");
 }
 
 void send_secure_message(char *msg, unsigned int msg_length,
