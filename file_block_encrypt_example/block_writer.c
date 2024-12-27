@@ -107,18 +107,11 @@ int main(int argc, char *argv[]) {
 
             unsigned int encrypted_length;
             unsigned char *encrypted;
-            // if (encrypt_buf_with_session_key(
-            //         &s_key_list->s_key[i], plaintext_block_buf,
-            //         total_block_size, &encrypted, &encrypted_length)) {
-            //     printf("Encryption failed!\n");
-            // }
-            // No HMAC mode.
             if (encrypt_buf_with_session_key(
                     &s_key_list->s_key[i], plaintext_block_buf,
                     total_block_size, &encrypted, &encrypted_length)) {
                 printf("Encryption failed!\n");
             }
-
             // Save the encrypted block.
             fwrite(encrypted, encrypted_length, 1, encrypted_fp);
             encrypted_file_metadata[i].block_metadata[j].length =

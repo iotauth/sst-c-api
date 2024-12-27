@@ -76,9 +76,9 @@ config_t *load_config(const char *path) {
     };
     char *pline;
     static const char delimiters[] = " \n";
-    unsigned short purpose_count = 0;
-    c->purpose_index = 0;
-    c->no_hmac_mode = 0;
+    unsigned short purpose_count = 0; // Option for ipfs.
+    c->purpose_index = 0; // Option for ipfs.
+    c->no_hmac_mode = 0; // Default with hmac.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {

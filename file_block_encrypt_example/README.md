@@ -2,7 +2,7 @@
 
 This is a simple example for RocksDB block encryption.
 
-It randomly creates key_values (yet implemented in random buffers), append them into a block with a maximum size 32kbytes.
+It randomly creates key_values (implemented as random buffers), append them into a block with a maximum size 32kbytes.
 The leftover space is filled with zero padding.
 Then the entire buffer is encrypted into a single block. The blocks are appended to a single file.
 
