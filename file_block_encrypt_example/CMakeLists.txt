@@ -18,13 +18,10 @@ add_library(SSTLIB
 
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
-add_executable(entity_client entity_client.c)
-add_executable(entity_server entity_server.c)
-add_executable(threaded_get_target_id_client threaded_get_target_id_client.c)
-add_executable(threaded_get_target_id_server threaded_get_target_id_server.c)
+add_executable(block_reader block_reader.c)
+add_executable(block_writer block_writer.c)
+add_executable(block_reader_load_s_key_list block_reader_load_s_key_list.c)
 
-
-target_link_libraries(entity_client SSTLIB)
-target_link_libraries(entity_server SSTLIB)
-target_link_libraries(threaded_get_target_id_client SSTLIB)
-target_link_libraries(threaded_get_target_id_server SSTLIB)
+target_link_libraries(block_writer OpenSSL::SSL Threads::Threads SSTLIB)
+target_link_libraries(block_reader OpenSSL::SSL Threads::Threads SSTLIB)
+target_link_libraries(block_reader_load_s_key_list OpenSSL::SSL Threads::Threads SSTLIB)

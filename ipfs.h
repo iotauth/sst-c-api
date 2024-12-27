@@ -1,6 +1,8 @@
 #ifndef IPFS_H
 #define IPFS_H
 
+#include <stdio.h>
+
 #include "c_api.h"
 
 #define BUFF_SIZE 100

@@ -9,7 +9,8 @@ int main(int argc, char* argv[]) {
     FILE* add_reader_file = fopen(add_reader_path, "r");
     char addReader[64];
     if (add_reader_file == NULL) {
-        error_exit("Cannot open file.\n");
+        fputs("Cannot open file.", stderr);
+        fputc('\n', stderr);
         exit(1);
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
@@ -17,7 +18,7 @@ int main(int argc, char* argv[]) {
     }
     fclose(add_reader_file);
     // Set purpose to make session key request for file sharing.
-    ctx->purpose_index = 1;
+    ctx->config->purpose_index = 1;
     estimate_time_t estimate_time[5];
     struct timeval keygen_start, keygen_end;
     float time_interval;

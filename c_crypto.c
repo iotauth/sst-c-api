@@ -1,5 +1,7 @@
 #include "c_crypto.h"
 
+#include "c_common.h"
+
 void print_last_error(char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 
@@ -10,7 +12,6 @@ void print_last_error(char *msg) {
 }
 
 EVP_PKEY *load_auth_public_key(const char *path) {
-    errno = 0;
     FILE *pemFile = fopen(path, "rb");
     if (pemFile == NULL) {
         printf("Error %d \n", errno);
@@ -25,13 +26,19 @@ EVP_PKEY *load_auth_public_key(const char *path) {
     if (id != EVP_PKEY_RSA) {
         print_last_error("is not RSA Encryption file");
     }
-    OPENSSL_free(cert);
+    fclose(pemFile);
+    X509_free(cert);
     return pub_key;
 }
 
 EVP_PKEY *load_entity_private_key(const char *path) {
     FILE *keyfile = fopen(path, "rb");
+    if (keyfile == NULL) {
+        printf("Error %d \n", errno);
+        print_last_error("Loading entity_priv_key_path failed");
+    }
     EVP_PKEY *priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
+    fclose(keyfile);
     return priv_key;
 }
 
@@ -61,7 +68,7 @@ unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
     if (EVP_PKEY_encrypt(ctx, out, ret_len, data, data_len) <= 0) {
         print_last_error("EVP_PKEY_encrypt failed");
     }
-    OPENSSL_free(ctx);
+    EVP_PKEY_CTX_free(ctx);
     return out;
 }
 
@@ -90,15 +97,16 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
     if (EVP_PKEY_decrypt(ctx, out, ret_len, enc_data, enc_data_len) <= 0) {
         print_last_error("EVP_PKEY_decrypt failed");
     }
+    EVP_PKEY_CTX_free(ctx);
     return out;
 }
 
 unsigned char *SHA256_sign(unsigned char *encrypted,
                            unsigned int encrypted_length, EVP_PKEY *priv_key,
                            size_t *sig_length) {
+    unsigned char md[SHA256_DIGEST_LENGTH];
     unsigned int md_length;
-    unsigned char *md =
-        digest_message_SHA_256(encrypted, encrypted_length, &md_length);
+    digest_message_SHA_256(encrypted, encrypted_length, md, &md_length);
     EVP_PKEY_CTX *ctx;
     unsigned char *sig;
     ctx = EVP_PKEY_CTX_new(priv_key, NULL);
@@ -125,7 +133,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     if (EVP_PKEY_sign(ctx, sig, sig_length, md, md_length) <= 0) {
         print_last_error("EVP_PKEY_sign failed");
     }
-    OPENSSL_free(md);
+    EVP_PKEY_CTX_free(ctx);
 
     return sig;
 }
@@ -133,8 +141,9 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
 void SHA256_verify(unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key) {
     EVP_PKEY_CTX *ctx;
-    unsigned int md_length;
-    unsigned char *md = digest_message_SHA_256(data, data_length, &md_length);
+    unsigned char md[SHA256_DIGEST_LENGTH];
+    unsigned int md_len;
+    digest_message_SHA_256(data, data_length, md, &md_len);
 
     ctx = EVP_PKEY_CTX_new(pub_key, NULL);
     if (!ctx) {
@@ -149,15 +158,14 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
     if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
         print_last_error("EVP_PKEY_CTX_set_signature_md failed");
     }
-    if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_length) != 1) {
+    if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_len) != 1) {
         print_last_error("EVP_PKEY_verify failed");
     }
-    OPENSSL_free(md);
+    EVP_PKEY_CTX_free(ctx);
 }
 
-unsigned char *digest_message_SHA_256(unsigned char *message,
-                                      int message_length,
-                                      unsigned int *digest_len) {
+void digest_message_SHA_256(unsigned char *data, size_t data_len,
+                            unsigned char *md5_hash, unsigned int *md_len) {
     EVP_MD_CTX *mdctx;
 
     if ((mdctx = EVP_MD_CTX_create()) == NULL) {
@@ -166,120 +174,365 @@ unsigned char *digest_message_SHA_256(unsigned char *message,
     if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
         print_last_error("EVP_DigestInit_ex failed");
     }
-    if (EVP_DigestUpdate(mdctx, message, message_length) != 1) {
+    if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
         print_last_error("EVP_DigestUpdate failed");
     }
-    unsigned char *digest =
-        (unsigned char *)OPENSSL_malloc(EVP_MD_size(EVP_sha256()));
-    if (EVP_DigestFinal_ex(mdctx, digest, digest_len) != 1) {
+    if (EVP_DigestFinal_ex(mdctx, md5_hash, md_len) != 1) {
         print_last_error("failed");
     }
     EVP_MD_CTX_destroy(mdctx);
-    return digest;
 }
 
-void AES_CBC_128_encrypt(unsigned char *plaintext,
-                         unsigned int plaintext_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length) {
+const EVP_CIPHER *get_EVP_CIPHER(char enc_mode) {
+    if (enc_mode == AES_128_CBC) {
+        return EVP_aes_128_cbc();
+    } else if (enc_mode == AES_128_CTR) {
+        return EVP_aes_128_ctr();
+    } else if (enc_mode == AES_128_GCM) {
+        return EVP_aes_128_gcm();
+    } else {
+        error_exit("Encryption type not supported.");
+    }
+    return NULL;
+}
+
+int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
+                unsigned char *key, unsigned char *iv, char enc_mode,
+                unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
+    if (!EVP_EncryptInit_ex(ctx, get_EVP_CIPHER(enc_mode), NULL, key, iv)) {
+        // Error
+        EVP_CIPHER_CTX_free(ctx);
+        print_last_error("EVP_EncryptInit_ex failed");
+        return 1;
+    }
+
+    if (enc_mode == AES_128_GCM) {
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
+                                 AES_128_GCM_IV_SIZE,
+                                 NULL)) {  // Set IV length to 16 bytes
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
+            return 1;
+        }
+    }
+
     if (!EVP_EncryptUpdate(ctx, ret, (int *)ret_length, plaintext,
                            plaintext_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptUpdate failed");
+        return 1;
     }
+
     unsigned int temp_len;
     if (!EVP_EncryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptFinal_ex failed");
+        return 1;
     }
     *ret_length += temp_len;
+
+    if (enc_mode == AES_128_GCM) {
+        // Append the GCM authentication tag to the end of the ciphertext
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE,
+                                 ret + *ret_length)) {  // 16 bytes tag
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (GET_TAG) failed");
+            return 1;
+        }
+        *ret_length += AES_GCM_TAG_SIZE;  // Increase the length by the tag size
+    }
+
     EVP_CIPHER_CTX_free(ctx);
+    return 0;
 }
 
-void AES_CBC_128_decrypt(unsigned char *encrypted,
-                         unsigned int encrypted_length, unsigned char *key,
-                         unsigned int key_length, unsigned char *iv,
-                         unsigned int iv_length, unsigned char *ret,
-                         unsigned int *ret_length) {
+int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
+                unsigned char *key, unsigned char *iv, char enc_mode,
+                unsigned char *ret, unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    EVP_DecryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, iv);
+    if (!EVP_DecryptInit_ex(ctx, get_EVP_CIPHER(enc_mode), NULL, key, iv)) {
+        EVP_CIPHER_CTX_free(ctx);
+        print_last_error("EVP_DecryptInit_ex failed");
+        return 1;
+    }
+
+    if (enc_mode == AES_128_GCM) {
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
+                                 AES_128_GCM_IV_SIZE,
+                                 NULL)) {  // Set IV length to 16 bytes
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
+            return 1;
+        }
+
+        // Set the expected tag value by extracting it from the end of the
+        // ciphertext
+        unsigned char *tag =
+            encrypted + encrypted_length -
+            AES_GCM_TAG_SIZE;  // Get the last 16 bytes as the tag
+        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE,
+                                 tag)) {
+            EVP_CIPHER_CTX_free(ctx);
+            print_last_error("EVP_CIPHER_CTX_ctrl (SET_TAG) failed");
+            return 1;
+        }
+
+        encrypted_length -=
+            AES_GCM_TAG_SIZE;  // Adjust the encrypted length to exclude the tag
+    }
+
     if (!EVP_DecryptUpdate(ctx, ret, (int *)ret_length, encrypted,
                            encrypted_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptUpdate failed");
+        return 1;
     }
+
     unsigned int temp_len;
     if (!EVP_DecryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptFinal_ex failed");
+        return 1;
     }
     *ret_length += temp_len;
+
     EVP_CIPHER_CTX_free(ctx);
+    return 0;
 }
 
-unsigned char *symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    unsigned int *ret_length) {
-    unsigned char iv[iv_size];
-    generate_nonce(iv_size, iv);
-    unsigned int encrypted_length = ((buf_length / iv_size) + 1) * iv_size;
-    unsigned char encrypted[encrypted_length];
-    AES_CBC_128_encrypt(buf, buf_length, cipher_key, cipher_key_size, iv,
-                        iv_size, encrypted, &encrypted_length);
-
-    unsigned int temp_length = ((buf_length / iv_size) + 1) * iv_size + iv_size;
-    unsigned char temp[temp_length];
-    memcpy(temp, iv, iv_size);
-    memcpy(temp + iv_size, encrypted, encrypted_length);
-    temp_length = iv_size + encrypted_length;
-    unsigned char hmac_tag[mac_key_size];
-    HMAC(EVP_sha256(), mac_key, mac_key_size, temp, temp_length, hmac_tag,
-         &mac_key_size);
-
-    *ret_length = temp_length + mac_key_size;
-    unsigned char *ret = (unsigned char *)malloc(*ret_length);
-    memcpy(ret, temp, temp_length);
-    memcpy(ret + temp_length, hmac_tag, mac_key_size);
-    return ret;
-}
-
-unsigned char *symmetric_decrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    unsigned int *ret_length) {
-    unsigned int encrypted_length = buf_length - mac_key_size;
-    unsigned char encrypted[encrypted_length];
-    memcpy(encrypted, buf, encrypted_length);
-    unsigned char received_tag[mac_key_size];
-    memcpy(received_tag, buf + encrypted_length, mac_key_size);
-    unsigned char hmac_tag[mac_key_size];
-    HMAC(EVP_sha256(), mac_key, mac_key_size, encrypted, encrypted_length,
-         hmac_tag, &mac_key_size);
-    if (memcmp(received_tag, hmac_tag, mac_key_size) != 0) {
-        printf("Received tag: ");
-        print_buf(received_tag, mac_key_size);
-        printf("Hmac tag: ");
-        print_buf(hmac_tag, mac_key_size);
-        error_exit("Invalid MAC error!");
-    } else {
-        printf("MAC verified!\n");
+unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
+                                                 unsigned int iv_size,
+                                                 unsigned int mac_key_size,
+                                                 char enc_mode,
+                                                 char no_hmac_mode) {
+    unsigned int encrypted_total_length;
+    if (enc_mode == AES_128_CBC) {
+        // This requires, paddings, making the encrypted length multiples of the
+        // block size (key size)
+        encrypted_total_length = ((buf_length / iv_size) + 1) * iv_size;
+    } else if (enc_mode == AES_128_CTR) {
+        // The encrypted length is same on CTR mode.
+        encrypted_total_length = buf_length;
+    } else if (enc_mode == AES_128_GCM) {
+        encrypted_total_length =
+            buf_length +
+            AES_GCM_TAG_SIZE;  // GCM_TAG //TODO: Check. Tag size default is 12.
     }
-    unsigned char iv[iv_size];
-    memcpy(iv, encrypted, iv_size);
+    if (no_hmac_mode == 0) {
+        encrypted_total_length =
+            iv_size + encrypted_total_length + mac_key_size;
+    } else {
+        encrypted_total_length = iv_size + encrypted_total_length;
+    }
+    return encrypted_total_length;
+}
 
-    unsigned int temp_length = encrypted_length - iv_size;
-    unsigned char temp[temp_length];
-    memcpy(temp, encrypted + iv_size, temp_length);
-    *ret_length = ((temp_length) + iv_size) / iv_size * iv_size;
-    unsigned char *ret = (unsigned char *)malloc(*ret_length);
-    memset(ret, 0, *ret_length);
-    AES_CBC_128_decrypt(temp, temp_length, cipher_key, cipher_key_size, iv,
-                        iv_size, ret, ret_length);
-    return ret;
+static int get_symmetric_encrypt_authenticate_buffer(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned int expected_encrypted_total_length,
+    unsigned char *ret, unsigned int *ret_length) {
+    // The return of encrypt_AES will look like this.
+    // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
+    // First attach IV.
+    generate_nonce(iv_size, ret);
+    unsigned int total_length = 0;
+    // Attach encrypted buffer
+    if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
+        if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
+                        ret + iv_size, &total_length)) {
+            printf("AES encryption failed!\n");
+            return 1;
+        }
+        total_length += iv_size;
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.\n");
+        return 1;
+    };
+    if (!no_hmac_mode) {
+        // Attach HMAC tag
+        if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+            HMAC(EVP_sha256(), mac_key, mac_key_size, ret, total_length,
+                 ret + total_length, &mac_key_size);
+            total_length += mac_key_size;
+        }
+        // Add other MAC key sizes in future.
+        else {
+            printf("HMAC_key_size is not supported.\n");
+            return 1;
+        }
+    }
+    if (expected_encrypted_total_length != total_length) {
+        printf("Encrypted length does not match with expected.\n");
+        return 1;
+    }
+    *ret_length = total_length;
+
+    printf("Ret: %d, Total: %d\n", *ret_length, total_length);
+    return 0;
+}
+
+unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
+                                                   unsigned int iv_size,
+                                                   unsigned int mac_key_size,
+                                                   char enc_mode,
+                                                   char no_hmac_mode) {
+    unsigned int decrypted_maximum_length;
+    // First remove the IV length attached on front.
+    decrypted_maximum_length = buf_length - iv_size;
+    if (!no_hmac_mode) {
+        decrypted_maximum_length -= mac_key_size;
+    } else {
+        // There is already no mac.
+    }
+    if (enc_mode == AES_128_CBC) {
+        decrypted_maximum_length = decrypted_maximum_length / iv_size * iv_size;
+    } else if (enc_mode == AES_128_CTR) {
+        // Decrypted_length is same as plaintext on CTR mode.
+    } else if (enc_mode == AES_128_GCM) {
+        decrypted_maximum_length = decrypted_maximum_length - AES_GCM_TAG_SIZE;
+    }
+    return decrypted_maximum_length;
+}
+
+static int get_symmetric_decrypt_authenticate_buffer(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned int expected_decrypted_total_length,
+    unsigned char *ret, unsigned int *ret_length) {
+    // The encrypted buffer is composed like below.
+    // encrypted = iv (16) + encrypted (plaintext) + HMAC (IV + encrypted)(32)
+    unsigned int encrypted_length = buf_length - iv_size;
+    if (!no_hmac_mode) {
+        unsigned char reproduced_tag[mac_key_size];
+        encrypted_length -= mac_key_size;
+        if (mac_key_size == MAC_KEY_SHA256_SIZE) {
+            HMAC(EVP_sha256(), mac_key, mac_key_size, buf,
+                 iv_size + encrypted_length, reproduced_tag, &mac_key_size);
+        } else {
+            printf("HMAC_key_size is not supported.\n");
+            return 1;
+        }
+        if (memcmp(reproduced_tag, buf + iv_size + encrypted_length,
+                   mac_key_size) != 0) {
+            // printf("Received tag: ");
+            // print_buf(buf + encrypted_length, mac_key_size);
+            // printf("Hmac tag: ");
+            // print_buf(reproduced_tag, mac_key_size);
+            return 1;
+        } else {
+            // printf("MAC verified!\n");
+        }
+    }
+    if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
+        if (decrypt_AES(buf + iv_size, encrypted_length, cipher_key, buf,
+                        enc_mode, ret, ret_length)) {
+            printf("AES_CBC_128_decrypt failed!\n");
+            return 1;
+        }
+        if (expected_decrypted_total_length != *ret_length) {
+            if (enc_mode == AES_128_CBC &&
+                expected_decrypted_total_length > *ret_length) {
+                // This is fine. Cannot get exact decrypted length before
+                // decrypting on block ciphers like CBC mode.
+            } else {
+                printf("Decrypted length does not match with expected.\n");
+                return 1;
+            }
+        }
+    }
+    // Add other ciphers in future.
+    else {
+        printf("Cipher_key_size is not supported.\n");
+        return 1;
+    }
+    return 0;
+}
+
+int symmetric_encrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
+    // First, get the expected encrypted length, to assign a buffer size.
+    unsigned int expected_encrypted_total_length =
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
+                                            enc_mode, no_hmac_mode);
+    *ret = (unsigned char *)malloc(expected_encrypted_total_length);
+    return get_symmetric_encrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, *ret,
+        ret_length);
+}
+
+int symmetric_decrypt_authenticate(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length) {
+    unsigned int expected_decrypted_total_length =
+        get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
+                                              enc_mode, no_hmac_mode);
+    *ret = (unsigned char *)malloc(expected_decrypted_total_length);
+    return get_symmetric_decrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_decrypted_total_length, *ret,
+        ret_length);
+}
+
+int symmetric_encrypt_authenticate_without_malloc(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
+    unsigned int expected_encrypted_total_length =
+        get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
+                                            enc_mode, no_hmac_mode);
+
+    return get_symmetric_encrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_encrypted_total_length, ret,
+        ret_length);
+}
+
+int symmetric_decrypt_authenticate_without_malloc(
+    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
+    unsigned int mac_key_size, unsigned char *cipher_key,
+    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
+    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length) {
+    unsigned int expected_decrypted_total_length =
+        get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
+                                              enc_mode, no_hmac_mode);
+    return get_symmetric_decrypt_authenticate_buffer(
+        buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
+        iv_size, enc_mode, no_hmac_mode, expected_decrypted_total_length, ret,
+        ret_length);
+}
+
+void create_salted_password_to_32bytes(const char *password,
+                                       unsigned int password_len,
+                                       const char *salt, unsigned int salt_len,
+                                       unsigned char *ret) {
+    // TODO: Need to think about this. How should we pass the length? Is
+    // strlen() better or sizeof() better? Should we handle it inside the
+    // function or should it be a argument? Leaving it as argument to pass the
+    // char * and the length using sizeof(). Then, when salting the password, it
+    // should exclude the NULL terminator when salting the password.
+
+    // Exclude NULL for both password and salt.
+    unsigned int salted_password_length = password_len - 1 + salt_len - 1;
+    unsigned char salted_password[salted_password_length];
+    // Combine the password with the salt
+    memcpy(salted_password, password, password_len - 1);
+    memcpy(salted_password + password_len - 1, salt,
+           salt_len - 1);  // Exclude NULL
+    // Create SHA256 HMAC.
+    unsigned int md_len;
+    digest_message_SHA_256(salted_password, salted_password_length, ret,
+                           &md_len);
 }

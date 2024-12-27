@@ -1,8 +1,17 @@
 #include "../c_api.h"
 
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        error_exit("Enter config path");
+        fputs("Enter config path", stderr);
+        fputc('\n', stderr);
+        exit(1);
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
@@ -12,7 +21,9 @@ int main(int argc, char *argv[]) {
     socklen_t clnt_addr_size;
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1) {
-        error_exit("socket() error");
+        fputs("socket() error", stderr);
+        fputc('\n', stderr);
+        exit(1);
     }
     int on = 1;
     if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
@@ -26,28 +37,33 @@ int main(int argc, char *argv[]) {
 
     if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
-        error_exit("bind() error");
+        fputs("bind() error", stderr);
+        fputc('\n', stderr);
+        exit(1);
         return -1;
     }
 
     if (listen(serv_sock, 5) == -1) {
-        error_exit("listen() error");
+        fputs("listen() error", stderr);
+        fputc('\n', stderr);
+        exit(1);
         return -1;
     }
     clnt_addr_size = sizeof(clnt_addr);
     clnt_sock =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
-        error_exit("accept() error");
+        fputs("accept() error", stderr);
+        fputc('\n', stderr);
+        exit(1);
         return -1;
     }
 
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
-
-    INIT_SESSION_KEY_LIST(s_key_list);
+    session_key_list_t *s_key_list = init_empty_session_key_list();
     SST_session_ctx_t *session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, &s_key_list);
+        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         printf("There is no session key.\n");
     } else {
@@ -71,10 +87,12 @@ int main(int argc, char *argv[]) {
     clnt_sock2 =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock2 == -1) {
-        error_exit("accept() error");
+        fputs("accept() error", stderr);
+        fputc('\n', stderr);
+        exit(1);
     }
     SST_session_ctx_t *session_ctx2 =
-        server_secure_comm_setup(ctx, clnt_sock2, &s_key_list);
+        server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
 
     pthread_t thread2;
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,

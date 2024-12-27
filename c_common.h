@@ -152,11 +152,11 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf);
 // SST's payload, and the payload's length.
 // @param socket socket to read
 // @param message_type SST message type
-// @param ret Return buffer
-// @param ret_length Return buffer's length
+// @param buf Return buffer
+// @param buf_length Return buffer's length
 int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
-                                        unsigned char *ret,
-                                        unsigned int *ret_length);
+                                        unsigned char *buf,
+                                        unsigned int buf_length);
 
 // Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
 // The four functions num_to_var_length_int(), make_buffer_header(),
@@ -201,7 +201,7 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-void connect_as_client(const char *ip_addr, const char *port_num, int *sock);
+int connect_as_client(const char *ip_addr, const char *port_num, int *sock);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself
@@ -216,6 +216,30 @@ void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
 // @param ret return buffer
 void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 
+// Computes the positive remainder of a modulo operation.
+// This function ensures that the result is always non-negative, even if the
+// first operand (a) is negative. It adjusts the result by adding the modulus
+// (b) when the computed remainder is negative.
+// @param a The dividend (integer to be divided).
+// @param b The divisor (modulus).
+// @return The positive remainder when a is divided by b.
 int mod(int a, int b);
+
+// Reads data from a socket into a buffer.
+// This function reads up to `buf_length` bytes from the specified socket into
+// the provided buffer. It handles error cases, including invalid sockets, read
+// failures, and connection closures.
+// @param socket The socket file descriptor to read from.
+// @param buf A pointer to the buffer where the data will be stored.
+// @param buf_length The maximum number of bytes to read into the buffer.
+// @return The number of bytes successfully read, or -1 if an error occurred.
+unsigned int read_from_socket(int socket, unsigned char *buf,
+                              unsigned int buf_length);
+
+// Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
+// function not to define SECURE_COMM_MSG in c_api.h
+// @param message type to check.
+// @return int 0 for true, -1 for false.
+int check_SECURE_COMM_MSG_type(unsigned char message_type);
 
 #endif  // C_COMMON_H

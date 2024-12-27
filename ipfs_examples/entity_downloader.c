@@ -2,13 +2,15 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        error_exit("Enter config path");
+        fputs("Enter config path", stderr);
+        fputc('\n', stderr);
+        exit(1);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
-    INIT_SESSION_KEY_LIST(s_key_list);
-    ctx->purpose_index = 0;
-
+    session_key_list_t *s_key_list = init_empty_session_key_list();
+    ctx->config->purpose_index = 0;
+    
     char file_name[BUFF_SIZE];
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     estimate_time_t estimate_time[5];
@@ -34,8 +36,7 @@ int main(int argc, char *argv[]) {
         print_buf(received_skey_id, 8);
         struct timeval keygen_start, keygen_end;
         gettimeofday(&keygen_start, NULL);
-        session_key_t *session_key =
-            get_session_key_by_ID(&received_skey_id[0], ctx, &s_key_list);
+        session_key_t *session_key = get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
         gettimeofday(&keygen_end, NULL);
         float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
         float keygen_utime = keygen_end.tv_usec - keygen_start.tv_usec;
