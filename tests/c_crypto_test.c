@@ -16,6 +16,8 @@
 
 #include "../c_common.h"
 
+#define _unused(x) ((void)(x)) // To avoid unused-but-set-variable error.
+
 void AES_test_common(unsigned char mode) {
     unsigned char iv[AES_128_CBC_IV_SIZE];    // 16 bytes
     generate_nonce(AES_128_CBC_IV_SIZE, iv);  // 16 bytes random nonce.
@@ -89,6 +91,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
     printf("Plaintext Length: %ld, Plaintext: %s\n",
            strlen((const char *)plaintext), plaintext);
     int s;
+    _unused(s);
     unsigned int encrypted_length;
     unsigned char *encrypted;
     unsigned int decrypted_length;
