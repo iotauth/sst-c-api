@@ -52,8 +52,9 @@ int main(int argc, char *argv[]) {
             fputc('\n', stderr);
             exit(1);
         }
-        printf("Session key id size: %x\n", decrypted[SEQ_NUM_SIZE+1]);
-        printf("Command size: %d\n", decrypted[SEQ_NUM_SIZE + SESSION_KEY_ID_SIZE +2]);
+        printf("Session key id size: %x\n", decrypted[SEQ_NUM_SIZE + 1]);
+        printf("Command size: %d\n",
+               decrypted[SEQ_NUM_SIZE + SESSION_KEY_ID_SIZE + 2]);
     }
 
     download_file(&decrypted[SEQ_NUM_SIZE], &received_skey_id[0], &file_name[0]);
