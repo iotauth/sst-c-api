@@ -72,7 +72,8 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
 // @param message message with encrypted message and signature
 // @param message_length length of message
 static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
-                                SST_ctx_t *ctx, unsigned int *message_length) {
+                                       SST_ctx_t *ctx,
+                                       unsigned int *message_length) {
     size_t encrypted_length;
     unsigned char *encrypted =
         public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
@@ -187,7 +188,7 @@ void send_auth_request_message(unsigned char *serialized,
 // @param parsed_distribution_key distribution key struct to save information
 // @param buf input buffer with distribution key
 static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                            unsigned char *buf) {
+                                   unsigned char *buf) {
     memcpy(parsed_distribution_key->abs_validity, buf,
            DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
@@ -228,7 +229,6 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     OPENSSL_free(decrypted_dist_key_buf);
 }
 
-
 unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
                                   int offset, unsigned int *return_to_length) {
     unsigned int num;
@@ -268,7 +268,7 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
 }
 
 static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
-                                                session_key_t *s_key) {
+                                                       session_key_t *s_key) {
     s_key->enc_mode = ctx->config->encryption_mode;
     s_key->no_hmac_mode = ctx->config->no_hmac_mode;
 }
@@ -279,9 +279,9 @@ static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
 static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
-                                unsigned int buf_length,
-                                unsigned char *reply_nonce,
-                                session_key_list_t *session_key_list) {
+                                       unsigned int buf_length,
+                                       unsigned char *reply_nonce,
+                                       session_key_list_t *session_key_list) {
     memcpy(reply_nonce, buf, NONCE_SIZE);
     unsigned int buf_idx = NONCE_SIZE;
     unsigned int ret_length;

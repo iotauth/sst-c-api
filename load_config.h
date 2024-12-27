@@ -24,7 +24,6 @@ typedef enum {
     NETWORK_PROTOCOL
 } config_type_t;
 
-
 // Get a value by comparing a string of conditional statement with a variable.
 // @param ptr input variable to compare with string
 // @return value

@@ -236,9 +236,10 @@ int mod(int a, int b);
 unsigned int read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
-// Checks message type if it is SECURE_COMM_MSG. This is needed as a separate function not to define SECURE_COMM_MSG in c_api.h
+// Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
+// function not to define SECURE_COMM_MSG in c_api.h
 // @param message type to check.
 // @return int 0 for true, -1 for false.
-int check_SECURE_COMM_MSG_type (unsigned char message_type);
+int check_SECURE_COMM_MSG_type(unsigned char message_type);
 
 #endif  // C_COMMON_H

@@ -1,9 +1,9 @@
 #ifndef IPFS_H
 #define IPFS_H
 
-#include "c_api.h"
-
 #include <stdio.h>
+
+#include "c_api.h"
 
 #define BUFF_SIZE 100
 #define UPLOAD_INDEX 0

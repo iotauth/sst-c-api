@@ -233,7 +233,7 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     return (unsigned int)length_read;
 }
 
-int check_SECURE_COMM_MSG_type (unsigned char message_type) {
+int check_SECURE_COMM_MSG_type(unsigned char message_type) {
     if (message_type == SECURE_COMM_MSG) {
         return 0;
     } else {
