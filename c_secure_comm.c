@@ -161,7 +161,11 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        write(sock, message, message_length);
+        unsigned int bytes_written =
+            write_to_socket(sock, message, message_length);
+        if (bytes_written != message_length) {
+            error_exit("Failed to write data to socket.");
+        }
         OPENSSL_free(enc);
     } else {
         unsigned int enc_length;
@@ -177,7 +181,11 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        write(sock, message, message_length);
+        unsigned int bytes_written =
+            write_to_socket(sock, message, message_length);
+        if (bytes_written != message_length) {
+            error_exit("Failed to write data to socket.");
+        }
         OPENSSL_free(enc);
     }
 }

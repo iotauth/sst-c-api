@@ -96,7 +96,11 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     unsigned int sender_HS_1_length;
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
                     sender_HS_1, &sender_HS_1_length);
-    write(sock, sender_HS_1, sender_HS_1_length);
+    unsigned int bytes_written =
+        write_to_socket(sock, sender_HS_1, sender_HS_1_length);
+    if (bytes_written != sender_HS_1_length) {
+        error_exit("Failed to write data to socket.");
+    }
     free(parsed_buf);
     entity_client_state = HANDSHAKE_1_SENT;
 
@@ -121,7 +125,11 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         unsigned int sender_HS_2_length;
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
                         sender_HS_2, &sender_HS_2_length);
-        write(sock, sender_HS_2, sender_HS_2_length);
+        unsigned int bytes_written =
+            write_to_socket(sock, sender_HS_2, sender_HS_2_length);
+        if (bytes_written != sender_HS_2_length) {
+            error_exit("Failed to write data to socket.");
+        }
         free(parsed_buf);
         update_validity(s_key);
         printf("switching to IN_COMM\n");
@@ -183,7 +191,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     entity_server_state = IDLE;
     unsigned char server_nonce[HS_NONCE_SIZE];
 
-    session_key_t *s_key;
+    session_key_t *s_key = NULL;
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
@@ -228,7 +236,11 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned int sender_length;
             make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_2,
                             sender, &sender_length);
-            write(clnt_sock, sender, sender_length);
+            unsigned int bytes_written =
+                write_to_socket(clnt_sock, sender, sender_length);
+            if (bytes_written != sender_length) {
+                error_exit("Failed to write data to socket.");
+            }
             free(parsed_buf);
             printf("switching to HANDSHAKE_2_SENT\n");
             entity_server_state = HANDSHAKE_2_SENT;
@@ -405,19 +417,32 @@ int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path) {
     FILE *load_file_fp;
     if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
-        return 1;
+        return 1;  // Error opening file
     } else {
-        // Save the malloced pointer.
+        // Save the malloced pointer
         session_key_t *s = session_key_list->s_key;
+
         // Read the session_key_list_t structure
-        fread(session_key_list, sizeof(session_key_list_t), 1, load_file_fp);
-        // Reload the saved pointer.
+        size_t items_read = fread(session_key_list, sizeof(session_key_list_t),
+                                  1, load_file_fp);
+        if (items_read != 1) {
+            fclose(load_file_fp);
+            return 2;  // Error reading session_key_list_t structure
+        }
+
+        // Reload the saved pointer
         session_key_list->s_key = s;
+
         // Read the dynamically allocated memory pointed to by s_key
-        fread(session_key_list->s_key, sizeof(session_key_t), MAX_SESSION_KEY,
-              load_file_fp);
+        items_read = fread(session_key_list->s_key, sizeof(session_key_t),
+                           MAX_SESSION_KEY, load_file_fp);
+        if (items_read != MAX_SESSION_KEY) {
+            fclose(load_file_fp);
+            return 3;  // Error reading session keys
+        }
+
         fclose(load_file_fp);
-        return 0;
+        return 0;  // Success
     }
 }
 
@@ -486,7 +511,12 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     }
 
     // Read the IV
-    fread(iv, 1, sizeof(iv), saved_file_fp);
+    size_t iv_read = fread(iv, 1, sizeof(iv), saved_file_fp);
+    if (iv_read != sizeof(iv)) {
+        printf("Failed to read IV!\n");
+        fclose(saved_file_fp);
+        return 1;
+    }
 
     // Read the encrypted data
     ciphertext_len = fread(ciphertext, 1, sizeof(ciphertext), saved_file_fp);

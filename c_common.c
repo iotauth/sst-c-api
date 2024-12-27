@@ -233,6 +233,37 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     return (unsigned int)length_read;
 }
 
+unsigned int write_to_socket(int socket, const unsigned char *buf,
+                             unsigned int buf_length) {
+    if (socket < 0) {
+        // Socket is not open.
+        errno = EBADF;
+        return -1;
+    }
+
+    unsigned int total_written = 0;
+    ssize_t length_written;
+
+    // Continue writing until the entire buffer is written
+    while (total_written < buf_length) {
+        length_written =
+            write(socket, buf + total_written, buf_length - total_written);
+
+        if (length_written < 0) {
+            // Error occurred while writing
+            error_exit("Writing to socket failed.");
+        } else if (length_written == 0) {
+            // Socket closed unexpectedly
+            error_exit("Connection closed while writing.");
+        }
+
+        // Update the total number of bytes written
+        total_written += length_written;
+    }
+
+    return total_written;
+}
+
 int check_SECURE_COMM_MSG_type(unsigned char message_type) {
     if (message_type == SECURE_COMM_MSG) {
         return 0;

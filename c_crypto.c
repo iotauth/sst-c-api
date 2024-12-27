@@ -306,7 +306,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
                                                  unsigned int mac_key_size,
                                                  char enc_mode,
                                                  char no_hmac_mode) {
-    unsigned int encrypted_total_length;
+    unsigned int encrypted_total_length = 0;
     if (enc_mode == AES_128_CBC) {
         // This requires, paddings, making the encrypted length multiples of the
         // block size (key size)

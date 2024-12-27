@@ -236,6 +236,17 @@ int mod(int a, int b);
 unsigned int read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
+// Writes data to a socket from a buffer.
+// This function writes up to `buf_length` bytes from the provided buffer
+// to the specified socket. It handles partial writes, socket errors, and
+// connection closures, ensuring that the full buffer is written.
+// @param socket The socket file descriptor to write to.
+// @param buf A pointer to the buffer containing the data to be written.
+// @param buf_length The number of bytes to write from the buffer.
+// @return The number of bytes successfully written, or -1 if an error occurred.
+unsigned int write_to_socket(int socket, const unsigned char *buf,
+                             unsigned int buf_length);
+
 // Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
 // function not to define SECURE_COMM_MSG in c_api.h
 // @param message type to check.
