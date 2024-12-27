@@ -52,25 +52,25 @@ void AES_test_common(unsigned char mode) {
     printf("\n");
 }
 
-void AES_CBC_test() {
+void AES_CBC_test(void) {
     printf("**** STARTING AES_CBC_TEST.\n");
     AES_test_common(AES_128_CBC);
 }
 
-void AES_CTR_test() {
+void AES_CTR_test(void) {
     printf("**** STARTING AES_CTR_TEST.\n");
     AES_test_common(AES_128_CTR);
 }
 
-void AES_GCM_test() {
+void AES_GCM_test(void) {
     printf("**** STARTING AES_GCM_TEST.\n");
     AES_test_common(AES_128_GCM);
 }
 
-void AES_test() {
+void AES_test(void) {
     AES_CBC_test();
     AES_CTR_test();
-    // AES_GCM_test();
+    AES_GCM_test();
 }
 
 void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
@@ -152,36 +152,36 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
 
 ////////////////////
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test(void) {
     printf("**** STARTING symmetric_encrypt_authenticate_AES_128_CBC_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 0, 0);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test(void) {
     printf("**** STARTING symmetric_encrypt_authenticate_AES_128_CTR_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 0, 0);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test(void) {
     printf("**** STARTING symmetric_encrypt_authenticate_AES_128_GCM_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 0, 0);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CBC_noHMAC_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 1, 0);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CTR_noHMAC_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 1, 0);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_GCM_noHMAC_test.\n");
@@ -190,28 +190,28 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test() {
 
 ////////////////////
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CBC_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CTR_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_GCM_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test."
@@ -219,7 +219,7 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_te
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 1, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test."
@@ -227,7 +227,7 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_te
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 1, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test."
@@ -237,7 +237,7 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_te
 
 ////////////////////
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_with_malloc_tests.\n");
@@ -249,7 +249,7 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test() {
     symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test();
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test() {
+void symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test(void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_without_malloc_tests.\n");
@@ -261,12 +261,12 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test() {
     symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test();
 }
 
-void symmetric_encrypt_decrypt_authenticate_test() {
+void symmetric_encrypt_decrypt_authenticate_test(void) {
     symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test();
     symmetric_encrypt_decrypt_authenticate_AES_128_without_malloc_test();
 }
 
-int main() {
+int main(void) {
     AES_test();
     symmetric_encrypt_decrypt_authenticate_test();
 }
