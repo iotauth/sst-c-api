@@ -24,7 +24,7 @@ target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 if(MSVC)
   target_compile_options(SSTLIB PUBLIC /W4 /WX)
 else()
-  target_compile_options(SSTLIB PUBLIC -Wall -Wextra -Wpedantic -Werror)
+  target_compile_options(SSTLIB PUBLIC -Wall -Wextra -Wpedantic -Werror -Wno-unused-but-set-variable -Wno-unused-parameter -Wno-unused-variable)
 endif()
 
 install(TARGETS SSTLIB DESTINATION lib)
