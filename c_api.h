@@ -2,7 +2,6 @@
 #define C_API_H
 
 #include <pthread.h>
-#include <stdint.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
