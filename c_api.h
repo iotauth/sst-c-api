@@ -177,7 +177,8 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 int send_secure_message(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx);
 
-// Encrypt buffer with session key.
+// Encrypt buffer with session key. This mallocs data, so the buffer must be
+// freed after use.
 // @param s_key session key to encrypt
 // @param plaintext plaintext to be encrypted
 // @param plaintext_length length of plaintext to be encrypted
@@ -189,7 +190,8 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned char **encrypted,
                                  unsigned int *encrypted_length);
 
-// Decrypt buffer with session key.
+// Decrypt buffer with session key. This mallocs data, so the buffer must be
+// freed after use.
 // @param s_key session key to decrypt
 // @param encrypted encrypted buffer to be decrypted
 // @param encrypted_length length of encrypted buffer to be decrypted
@@ -201,8 +203,8 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned char **decrypted,
                                  unsigned int *decrypted_length);
 
-// Encrypts buffer with session key with mallocing the return buffer. The user
-// must provide the ciphertext buffer.
+// Encrypts buffer with session key without mallocing the return buffer. The
+// user must provide the ciphertext buffer.
 // @param s_key session key to encrypt
 // @param plaintext plaintext to be encrypted
 // @param plaintext_length length of plaintext to be encrypted
@@ -216,7 +218,7 @@ int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
                                                 unsigned char *encrypted,
                                                 unsigned int *encrypted_length);
 
-// Decrypt buffer with session key with mallocing the return buffer. The user
+// Decrypt buffer with session key without mallocing the return buffer. The user
 // must provide the plaintext buffer.
 // @param s_key session key to decrypt
 // @param encrypted encrypted buffer to be decrypted

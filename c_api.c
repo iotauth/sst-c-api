@@ -195,7 +195,6 @@ SST_session_ctx_t *server_secure_comm_setup(
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        // memset(received_buf, 0, MAX_HS_BUF_LENGTH);
         int received_buf_length =
             read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {

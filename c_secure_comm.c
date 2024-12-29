@@ -392,13 +392,15 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
     memcpy(buf + SEQ_NUM_SIZE, (unsigned char *)msg, msg_length);
 
-    // encrypt
+    unsigned int estimate_encrypted_length =
+        get_expected_encrypted_total_length(
+            SEQ_NUM_SIZE + msg_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
+            session_ctx->s_key.enc_mode, session_ctx->s_key.no_hmac_mode);
+    unsigned char encrypted_stack[estimate_encrypted_length];
     unsigned int encrypted_length;
-    unsigned char *encrypted;
-
-    if (encrypt_buf_with_session_key(&session_ctx->s_key, buf,
-                                     SEQ_NUM_SIZE + msg_length, &encrypted,
-                                     &encrypted_length)) {
+    if (encrypt_buf_with_session_key_without_malloc(
+            &session_ctx->s_key, buf, SEQ_NUM_SIZE + msg_length,
+            encrypted_stack, &encrypted_length)) {
         error_exit("Encryption failed.");
     }
 
@@ -410,21 +412,13 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                                          // 1024. Must need to decide static
                                          // or dynamic buffer size.
     unsigned int sender_buf_length;
-    make_sender_buf(encrypted, encrypted_length, SECURE_COMM_MSG, sender_buf,
-                    &sender_buf_length);
-    free(encrypted);
+    make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
+                    sender_buf, &sender_buf_length);
 
-    ssize_t bytes_written = 0;
-    while (bytes_written < (ssize_t)msg_length) {
-        ssize_t more = write(session_ctx->sock, sender_buf, sender_buf_length);
-        if (more <= 0 &&
-            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-            usleep(100);
-            continue;
-        } else if (more < 0) {
-            return -1;
-        }
-        bytes_written += more;
+    unsigned int bytes_written =
+        write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
+    if (bytes_written != sender_buf_length) {
+        error_exit("Failed to write data to socket.");
     }
     return bytes_written;
 }

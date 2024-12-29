@@ -249,6 +249,10 @@ unsigned int write_to_socket(int socket, const unsigned char *buf,
         length_written =
             write(socket, buf + total_written, buf_length - total_written);
 
+        if (length_written <= 0 &&
+            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            continue;
+        }
         if (length_written < 0) {
             // Error occurred while writing
             error_exit("Writing to socket failed.");
