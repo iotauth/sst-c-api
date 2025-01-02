@@ -20,11 +20,6 @@ target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
 add_executable(entity_client entity_client.c)
 add_executable(entity_server entity_server.c)
-add_executable(threaded_get_target_id_client threaded_get_target_id_client.c)
-add_executable(threaded_get_target_id_server threaded_get_target_id_server.c)
-
 
 target_link_libraries(entity_client SSTLIB)
 target_link_libraries(entity_server SSTLIB)
-target_link_libraries(threaded_get_target_id_client SSTLIB)
-target_link_libraries(threaded_get_target_id_server SSTLIB)
