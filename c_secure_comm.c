@@ -254,12 +254,6 @@ void send_auth_request_message(unsigned char *serialized,
     }
 }
 
-// Separate the message received from Auth and
-// store the distribution key in the distribution key struct
-// Must free distribution_key.mac_key, distribution_key.cipher_key
-// @param parsed_distribution_key distribution key struct to save information
-// @param buf input buffer with distribution key
-
 void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
                            size_t key_size) {
     signed_data_t signed_data;
@@ -282,7 +276,7 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
     ctx->dist_key.enc_mode = ctx->config->encryption_mode;
-    OPENSSL_free(decrypted_dist_key_buf);
+    free(decrypted_dist_key_buf);
 }
 
 unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
@@ -345,7 +339,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     unsigned char *ret = (unsigned char *)malloc(*ret_length);
     memcpy(ret, s_key->key_id, KEY_ID_SIZE);
     memcpy(ret + KEY_ID_SIZE, encrypted, encrypted_length);
-    OPENSSL_free(encrypted);
+    free(encrypted);
     return ret;
 }
 
@@ -365,7 +359,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
-    OPENSSL_free(decrypted);
+    free(decrypted);
 
     // compare my_nonce and received_nonce
     if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
@@ -679,7 +673,7 @@ unsigned char *check_handshake1_send_handshake2(
 
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
-    OPENSSL_free(decrypted);
+    free(decrypted);
 
     printf("client's nonce: ");
     print_buf(hs.nonce, HS_NONCE_SIZE);
