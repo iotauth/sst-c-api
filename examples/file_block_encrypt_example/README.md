@@ -2,9 +2,9 @@
 
 This is a simple example for RocksDB block encryption.
 
-It randomly creates key_values (implemented as random buffers), append them into a block with a maximum size 32kbytes.
+It randomly creates key_values (implemented as random buffers), append the created random key_values into a block with a maximum size 32kbytes.
 The leftover space is filled with zero padding.
-Then the entire buffer is encrypted into a single block. The blocks are appended to a single file.
+Then the entire buffer is encrypted into a single block. Append the `TOTAL_BLOCK_NUM`(10) blocks, and save them as a single file.
 
 The detailed logic is as below.
 
@@ -14,9 +14,9 @@ The detailed logic is as below.
 2. The key_values are appended until the total size is 32 kbytes.
 3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. The leftover buffer will be used in the next block.
 4. The block is now 32kbytes, and it is encrypted with a session key.
-5. 1~5 is repeated, making a single file. The blocks are appended to each other.
+5. 1~5 is repeated, appending 10 blocks, making a single file.
 6. 5 is repeated, making three separate files, `encrypted'i'.txt`. Each file uses different session keys.
-7. To test if the encryption decryption worked prorperly, we make a `plaintext'i'.txt`, which is the blocks not encrypted.
+7. To test if the encryption decryption worked prorperly, we save `plaintext'i'.txt`, which is the blocks not encrypted.
 8. The metadata is saved inside `encrypted_file_metadata.dat`. Same with `plaintext_file_metadata.dat`. It saves the used session key id for the file.
 
 ### Decrypt and Comparing part. `block_reader.c`
