@@ -2,15 +2,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../ipfs.h"
+#include "../../ipfs.h"
 
-/**TODO: YEONGBIN: Should not use functions other than c_api.h.
- * read_header_return_data_buf_pointer
- * decrypt_received_message
- * print_buf
- * error_return_null
- * #define SEQ_NUM_SIZE 8
- */
 #define MAX_PAYLOAD_LENGTH 1024
 #define SEQ_NUM_SIZE 8
 
@@ -58,7 +51,7 @@ int main(int argc, char *argv[]) {
     if (session_key == NULL) {
         printf("There is no session key.\n");
         exit(1);
-;    } else {
+    } else {
         sleep(5);
         file_decrypt_save(*session_key, &file_name[0]);
     }

@@ -1,4 +1,4 @@
-#include "../ipfs.h"
+#include "../../ipfs.h"
 
 int main(int argc, char* argv[]) {
     char* config_path = argv[1];
