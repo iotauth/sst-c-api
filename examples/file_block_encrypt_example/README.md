@@ -53,5 +53,5 @@ Client Terminal
 `$ ./block_reader ../block_reader.config`
 
 ### Example 2
-Loading the saved key is also possible. `block_writer.c` saves the session key in `s_key_list.bin`. The next example loads the saved session key, and decrypts the file.
+Loading the saved key is also possible. `block_writer.c` saves the session key in `s_key_list.bin`. The next example does not request the session key by id, but loads the saved session key, and decrypts the file.
 `$ ./block_reader_load_s_key_list`

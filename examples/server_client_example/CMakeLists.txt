@@ -10,11 +10,11 @@ find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(SSTLIB        
-  ../c_api.c
-  ../c_common.c
-  ../c_crypto.c
-  ../c_secure_comm.c
-  ../load_config.c)
+  ../../c_api.c
+  ../../c_common.c
+  ../../c_crypto.c
+  ../../c_secure_comm.c
+  ../../load_config.c)
 
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
