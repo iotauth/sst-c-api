@@ -141,6 +141,70 @@ static int check_validity(unsigned char *validity) {
     }
 }
 
+// Separate the message received from Auth and
+// store the distribution key in the distribution key struct
+// Must free distribution_key.mac_key, distribution_key.cipher_key
+// @param parsed_distribution_key distribution key struct to save information
+// @param buf input buffer with distribution key
+static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
+                                   unsigned char *buf) {
+    memcpy(parsed_distribution_key->abs_validity, buf,
+           DIST_KEY_EXPIRATION_TIME_SIZE);
+    unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
+    unsigned int cipher_key_size = buf[cur_index];
+    parsed_distribution_key->cipher_key_size = cipher_key_size;
+    cur_index += 1;
+    memcpy(parsed_distribution_key->cipher_key, buf + cur_index,
+           cipher_key_size);
+    cur_index += cipher_key_size;
+    unsigned int mac_key_size = buf[cur_index];
+    parsed_distribution_key->mac_key_size = mac_key_size;
+    cur_index += 1;
+    memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
+}
+
+// Set the session key's encryption mode and no_hmac_mode to the SST_ctx's
+// modes.
+// @param ctx The SST_ctx_t to get the config.
+// @param s_key The target session key to set the modes.
+static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
+                                                       session_key_t *s_key) {
+    s_key->enc_mode = ctx->config->encryption_mode;
+    s_key->no_hmac_mode = ctx->config->no_hmac_mode;
+}
+
+// Separate the session key, nonce, and crypto spec from the message.
+// @param buf input buffer with session key, nonce, and crypto spec
+// @param buf_length length of buf
+// @param reply_nonce nonce to compare with
+// @param session_key_list session key list struct
+static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
+                                       unsigned int buf_length,
+                                       unsigned char *reply_nonce,
+                                       session_key_list_t *session_key_list) {
+    memcpy(reply_nonce, buf, NONCE_SIZE);
+    unsigned int buf_idx = NONCE_SIZE;
+    unsigned int ret_length;
+    unsigned char *ret =
+        parse_string_param(buf, buf_length, buf_idx, &ret_length);
+    // TODO: need to apply cryptoSpec?
+    //~~use ret~~
+    free(ret);
+    buf_idx += ret_length;
+    unsigned int session_key_list_length =
+        read_unsigned_int_BE(&buf[buf_idx], 4);
+
+    buf_idx += 4;
+    for (unsigned int i = 0; i < session_key_list_length; i++) {
+        buf = buf + buf_idx;
+        buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
+        update_enc_mode_and_no_hmac_to_session_key(ctx,
+                                                   &session_key_list->s_key[i]);
+    }
+    session_key_list->num_key = (int)session_key_list_length;
+    session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
+}
+
 void send_auth_request_message(unsigned char *serialized,
                                unsigned int serialized_length, SST_ctx_t *ctx,
                                int sock, int requestIndex) {
@@ -195,22 +259,6 @@ void send_auth_request_message(unsigned char *serialized,
 // Must free distribution_key.mac_key, distribution_key.cipher_key
 // @param parsed_distribution_key distribution key struct to save information
 // @param buf input buffer with distribution key
-static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                                   unsigned char *buf) {
-    memcpy(parsed_distribution_key->abs_validity, buf,
-           DIST_KEY_EXPIRATION_TIME_SIZE);
-    unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
-    unsigned int cipher_key_size = buf[cur_index];
-    parsed_distribution_key->cipher_key_size = cipher_key_size;
-    cur_index += 1;
-    memcpy(parsed_distribution_key->cipher_key, buf + cur_index,
-           cipher_key_size);
-    cur_index += cipher_key_size;
-    unsigned int mac_key_size = buf[cur_index];
-    parsed_distribution_key->mac_key_size = mac_key_size;
-    cur_index += 1;
-    memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
-}
 
 void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
                            size_t key_size) {
@@ -273,44 +321,6 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     cur_idx += ret->mac_key_size;
 
     return cur_idx;
-}
-
-static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
-                                                       session_key_t *s_key) {
-    s_key->enc_mode = ctx->config->encryption_mode;
-    s_key->no_hmac_mode = ctx->config->no_hmac_mode;
-}
-
-// Separate the session key, nonce, and crypto spec from the message.
-// @param buf input buffer with session key, nonce, and crypto spec
-// @param buf_length length of buf
-// @param reply_nonce nonce to compare with
-// @param session_key_list session key list struct
-static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
-                                       unsigned int buf_length,
-                                       unsigned char *reply_nonce,
-                                       session_key_list_t *session_key_list) {
-    memcpy(reply_nonce, buf, NONCE_SIZE);
-    unsigned int buf_idx = NONCE_SIZE;
-    unsigned int ret_length;
-    unsigned char *ret =
-        parse_string_param(buf, buf_length, buf_idx, &ret_length);
-    // TODO: need to apply cryptoSpec?
-    //~~use ret~~
-    free(ret);
-    buf_idx += ret_length;
-    unsigned int session_key_list_length =
-        read_unsigned_int_BE(&buf[buf_idx], 4);
-
-    buf_idx += 4;
-    for (unsigned int i = 0; i < session_key_list_length; i++) {
-        buf = buf + buf_idx;
-        buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
-        update_enc_mode_and_no_hmac_to_session_key(ctx,
-                                                   &session_key_list->s_key[i]);
-    }
-    session_key_list->num_key = (int)session_key_list_length;
-    session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
 }
 
 unsigned char *parse_handshake_1(session_key_t *s_key,
