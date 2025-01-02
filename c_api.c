@@ -330,9 +330,6 @@ void receive_message(unsigned char *received_buf,
     }
 }
 
-// TODO: Check read_secure_message and return_decrypted_buf. They are used for
-// LF, but need to check.
-
 int read_secure_message(int socket, unsigned char *buf,
                         unsigned int buf_length) {
     unsigned char message_type;
