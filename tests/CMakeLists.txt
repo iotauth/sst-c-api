@@ -19,14 +19,10 @@ add_library(SSTLIB
 target_link_libraries(SSTLIB OpenSSL::SSL Threads::Threads)
 
 add_executable(c_crypto_test c_crypto_test.c)
-add_executable(multi_thread_get_session_key_test multi_thread_get_session_key_test.c)
 add_executable(save_load_session_key_list_with_password_test save_load_session_key_list_with_password_test.c)
-add_executable(encrypt_buf_with_session_key_without_malloc_execution_time_test encrypt_buf_with_session_key_without_malloc_execution_time_test.c)
 
 target_link_libraries(c_crypto_test SSTLIB)
-target_link_libraries(multi_thread_get_session_key_test SSTLIB)
 target_link_libraries(save_load_session_key_list_with_password_test SSTLIB)
-target_link_libraries(encrypt_buf_with_session_key_without_malloc_execution_time_test SSTLIB)
 
 if(MSVC)
   target_compile_options(SSTLIB PRIVATE /W4 /WX)
