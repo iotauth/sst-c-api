@@ -264,14 +264,13 @@ int symmetric_decrypt_authenticate_without_malloc(
     unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
     char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
 
-// @brief Create a 32 byte digested password.
+// Create a 32 byte digested password using the salt.
 // @param password password's pointer
 // @param password_len Length of password.
 // @param salt Salt string's pointer.
 // @param salt_len Length of salt.
 // @param ret The pointer assigned by the caller, filled with the digested
 // password.
-//
 void create_salted_password_to_32bytes(const char *password,
                                        unsigned int password_len,
                                        const char *salt, unsigned int salt_len,
