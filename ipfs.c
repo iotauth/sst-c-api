@@ -1,8 +1,9 @@
 #include "ipfs.h"
 
-#include <stdio.h>
-
 #include "c_secure_comm.h"
+#include "c_common.h"
+#include "c_crypto.h"
+// #include "c_api.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
 const char TXT_FILE_EXTENSION[] = ".txt";
@@ -355,7 +356,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
                     &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
                 error_exit(
                     "Error during decryption after receiving "
