@@ -1,4 +1,4 @@
-# Tests for SST C API.
+# Unit Tests for SST C API.
 This directory is for testing functions in the SST C API.
 
 `c_crypto_test.c` - Unit tests for functions in `c_crypto.c`.
