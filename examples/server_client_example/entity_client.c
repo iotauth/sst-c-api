@@ -1,13 +1,22 @@
-#include "../c_api.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+#include "../../c_api.h"
 
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        printf("Failed to get session key. Returning NULL.\n");
+        exit(1);
+    }
+    printf("finished\n");
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    printf("finished\n");
     sleep(1);
     pthread_t thread;
     pthread_create(&thread, NULL, &receive_thread_read_one_each,
