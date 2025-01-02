@@ -342,6 +342,11 @@ int read_secure_message(int socket, unsigned char *buf,
     return bytes_read;
 }
 
+int send_secure_message(char *msg, unsigned int msg_length,
+                        SST_session_ctx_t *session_ctx) {
+    return send_SECURE_COMM_message(msg, msg_length, session_ctx);
+}
+
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
                                     unsigned int *decrypted_buf_length,
@@ -358,11 +363,6 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
     }
     return error_return_null(
         "Invalid message type while in secure communication.\n");
-}
-
-int send_secure_message(char *msg, unsigned int msg_length,
-                        SST_session_ctx_t *session_ctx) {
-    return send_SECURE_COMM_message(msg, msg_length, session_ctx);
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
