@@ -1,5 +1,7 @@
 #include "ipfs.h"
 
+#include <stdio.h>
+
 #include "c_secure_comm.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
