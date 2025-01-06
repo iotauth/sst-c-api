@@ -15,22 +15,38 @@ This directory includes unit tests and integration tests for the SST C API.
 
 # Test Instructions
 
+We use $IOTAUTH for the root directory of `iotauth` repo.
+
+## Generate example Auths and entities (If you haven't already done so)
+```
+$ cd $IOTAUTH/examples
+$ ./generateAll.sh
+```
+
 ## Turn on Auth (Only Applicable to Integration Tests)
 ```
-$ cd iotauth/auth/auth-server
+$ cd $IOTAUTH/auth/auth-server
+```
+Run `make` if you have not built Auth jar before.
+```
 $ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
 ```
 
 ## Build tests (For Both Unit Tests and Integration Tests)
 ```
-$ cd iotauth/entity/c/tests
+$ cd $IOTAUTH/entity/c/tests
 $ mkdir build && cd build
 $ cmake ../
 $ make
 ```
 
-## Execute tests (For Both Unit Tests and Integration Tests)
+## Execute Unit tests
 ```
 $ ./c_crypto_test
-$ ./TEST ../test_configs/client.config
+```
+
+## Execute Integration tests
+$TEST is one of the integration tests above.
+```
+$ ./$TEST ../test_configs/client.config
 ```
