@@ -19,7 +19,7 @@
 
 #define _unused(x) ((void)(x))  // To avoid unused-but-set-variable error.
 
-void AES_test_common(AES_encryption_mode mode) {
+void AES_test_common(AES_encryption_mode_t mode) {
     unsigned char iv[AES_128_CBC_IV_SIZE];    // 16 bytes
     generate_nonce(AES_128_CBC_IV_SIZE, iv);  // 16 bytes random nonce.
 
