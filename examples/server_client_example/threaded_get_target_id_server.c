@@ -1,86 +1,71 @@
+/**
+ * @file threaded_get_target_id_server.c
+ * @author Dongha Kim
+ * @brief A multi-threaded server program that retrieves session keys by their IDs.
+ * Create multiple threads, read the meta data that contains the session key ID, and request the session key by their IDs. This program uses the SST_ctx_t's mutex, to ensure thread-safe.
+ * @copyright Copyright (c) 2025
+ * 
+ */
 #include "../../c_api.h"
 #include <stdio.h>
+#include <pthread.h>
 
-void *call_get_session_key_by_ID0(void* SST_ctx){
-    SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
+// Define a struct to hold the thread arguments
+typedef struct {
+    SST_ctx_t *ctx;
+    char *file_path;
+} thread_args_t;
+
+void *call_get_session_key_by_ID(void *args) {
+    thread_args_t *data = (thread_args_t *)args;
+    SST_ctx_t *ctx = data->ctx;
+    char *file_path = data->file_path;
+
     session_key_list_t *s_key_list = init_empty_session_key_list();
 
-    char *file_path0 = "s_key_id0.dat";
-    FILE *fp0 = fopen(file_path0, "rb");
     unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    fread(target_session_key_id, SESSION_KEY_ID_SIZE, 1, fp0);
-    printf("Session Key ID: %s\n", target_session_key_id);
-    // pthread_mutex_lock(&ctx->mutex);
+    FILE *fp = fopen(file_path, "rb");
+    if (!fp) {
+        fprintf(stderr, "Error: Could not open file %s\n", file_path);
+        return NULL;
+    }
+    fread(target_session_key_id, SESSION_KEY_ID_SIZE, 1, fp);
+    fclose(fp);
+    printf("Session Key ID from file %s: %u\n", file_path, convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE));
+
     pthread_mutex_lock(&ctx->mutex);
     session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     pthread_mutex_unlock(&ctx->mutex);
-    printf("Session Key ID: %s\n", session_key->key_id);
-    return NULL;
-}
 
-void *call_get_session_key_by_ID1(void* SST_ctx){
-    SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    if (session_key) {
+        printf("Retrieved Session Key ID: %u\n", convert_skid_buf_to_int(session_key->key_id, SESSION_KEY_ID_SIZE));
+    } else {
+        fprintf(stderr, "Error: Failed to retrieve session key for %s\n", file_path);
+    }
 
-    char *file_path0 = "s_key_id1.dat";
-    FILE *fp0 = fopen(file_path0, "rb");
-    unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    fread(target_session_key_id, SESSION_KEY_ID_SIZE, 1, fp0);
-    printf("Session Key ID: %s\n", target_session_key_id);
-    // pthread_mutex_lock(&ctx->mutex);
-    pthread_mutex_lock(&ctx->mutex);
-    session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
-    pthread_mutex_unlock(&ctx->mutex);
-    printf("Session Key ID: %s\n", session_key->key_id);
-    return NULL;
-}
-
-void *call_get_session_key_by_ID2(void* SST_ctx){
-    SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
-    session_key_list_t *s_key_list = init_empty_session_key_list();
-
-    char *file_path0 = "s_key_id2.dat";
-    FILE *fp0 = fopen(file_path0, "rb");
-    unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    fread(target_session_key_id, SESSION_KEY_ID_SIZE, 1, fp0);
-    printf("Session Key ID: %s\n", target_session_key_id);
-    // pthread_mutex_lock(&ctx->mutex);
-    pthread_mutex_lock(&ctx->mutex);
-    session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
-    pthread_mutex_unlock(&ctx->mutex);
-    printf("Session Key ID: %s\n", session_key->key_id);
     return NULL;
 }
 
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
-
     pthread_mutex_init(&ctx->mutex, NULL);
-    pthread_t thread0, thread1, thread2;
-    pthread_create(&thread0, NULL, &call_get_session_key_by_ID0,
-                   (void *)ctx);
-    pthread_create(&thread1, NULL, &call_get_session_key_by_ID1,
-                   (void *)ctx);
-    pthread_create(&thread2, NULL, &call_get_session_key_by_ID2,
-                   (void *)ctx);
-    pthread_join(thread0, NULL);
-    pthread_join(thread1, NULL);
-    pthread_join(thread2, NULL);
 
-    // session_key_list_t *s_key_list = get_session_key(ctx, NULL);
-    // char *file_path0 = "s_key_id0.dat";
-    // FILE *fp0 = fopen(file_path0, "wb");
-    // fwrite(s_key_list->s_key->key_id, SESSION_KEY_ID_SIZE, 1, fp0);
-    // fclose(fp0);
+    pthread_t threads[3];
+    thread_args_t args[3] = {
+        {ctx, "s_key_id0.dat"},
+        {ctx, "s_key_id1.dat"},
+        {ctx, "s_key_id2.dat"}
+    };
 
-    // char *file_path1 = "s_key_id1.dat";
-    // FILE *fp1 = fopen(file_path1, "wb");
-    // fwrite(s_key_list->s_key->key_id, SESSION_KEY_ID_SIZE, 1, fp1);
-    // fclose(fp1);
+    for (int i = 0; i < 3; i++) {
+        pthread_create(&threads[i], NULL, call_get_session_key_by_ID, (void *)&args[i]);
+    }
 
-    // char *file_path2 = "s_key_id2.dat";
-    // FILE *fp2 = fopen(file_path2, "wb");
-    // fwrite(s_key_list->s_key->key_id, SESSION_KEY_ID_SIZE, 1, fp2);
-    // fclose(fp2);
+    for (int i = 0; i < 3; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    pthread_mutex_destroy(&ctx->mutex);
+    return 0;
 }
