@@ -149,7 +149,6 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
 // @param enc_mode AES encryption mode.
 // @param hmac_mode Boolean to use or not use HMAC
 // @return expected_encrypted_total_length The expected encrypted length
-
 unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
                                                  unsigned int iv_size,
                                                  unsigned int mac_key_size,
