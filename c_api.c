@@ -76,7 +76,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx) {
     int sock;
     connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                      (const char *)ctx->config->entity_server_port_num, &sock);
+                      ctx->config->entity_server_port_num, &sock);
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server_with_socket(s_key, sock);
     return session_ctx;

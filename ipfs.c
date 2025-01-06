@@ -1,8 +1,8 @@
 #include "ipfs.h"
 
-#include "c_secure_comm.h"
 #include "c_common.h"
 #include "c_crypto.h"
+#include "c_secure_comm.h"
 // #include "c_api.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
@@ -320,7 +320,7 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
-                      (const char *)ctx->config->auth_port_num, &sock);
+                      ctx->config->auth_port_num, &sock);
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];

@@ -156,7 +156,7 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
                                      payload_length, sender, sender_length);
 }
 
-int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
+int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
@@ -166,7 +166,7 @@ int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     serv_addr.sin_family = AF_INET;  // IPv4
     serv_addr.sin_addr.s_addr =
         inet_addr(ip_addr);  // the ip_address to connect to
-    serv_addr.sin_port = htons(atoi(port_num));
+    serv_addr.sin_port = htons(port_num);
 
     int count_retries = 0;
     int ret = -1;
@@ -178,13 +178,13 @@ int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
             usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
-            printf("Successfully connected to %s:%s on attempt %d.\n", ip_addr,
+            printf("Successfully connected to %s:%d on attempt %d.\n", ip_addr,
                    port_num, count_retries);
             break;
         }
     }
     if (ret < 0) {
-        printf("Failed to connect to %s:%s after %d attempts.\n", ip_addr,
+        printf("Failed to connect to %s:%d after %d attempts.\n", ip_addr,
                port_num, count_retries - 1);
     }
     return ret;

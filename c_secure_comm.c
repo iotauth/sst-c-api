@@ -168,7 +168,7 @@ static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // @param ctx The SST_ctx_t to get the config.
 // @param s_key The target session key to set the modes.
 static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
-                                                       session_key_t *s_key) {
+                                                         session_key_t *s_key) {
     s_key->enc_mode = ctx->config->encryption_mode;
     s_key->hmac_mode = ctx->config->hmac_mode;
 }
@@ -198,8 +198,8 @@ static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     for (unsigned int i = 0; i < session_key_list_length; i++) {
         buf = buf + buf_idx;
         buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
-        update_enc_mode_and_hmac_mode_to_session_key(ctx,
-                                                   &session_key_list->s_key[i]);
+        update_enc_mode_and_hmac_mode_to_session_key(
+            ctx, &session_key_list->s_key[i]);
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
@@ -512,7 +512,7 @@ session_key_list_t *send_session_key_request_check_protocol(
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;
     connect_as_client((const char *)ctx->config->auth_ip_addr,
-                      (const char *)ctx->config->auth_port_num, &sock);
+                      ctx->config->auth_port_num, &sock);
 
     session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
 

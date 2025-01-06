@@ -23,7 +23,7 @@ typedef enum {
 typedef enum {
     USE_HMAC,
     NO_HMAC,
-    } hmac_mode_t;
+} hmac_mode_t;
 
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
@@ -57,9 +57,9 @@ typedef struct {
     char *auth_pubkey_path;
     char *entity_privkey_path;
     char auth_ip_addr[INET_ADDRSTRLEN];
-    char auth_port_num[6];
+    int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
-    char entity_server_port_num[6];
+    int entity_server_port_num;
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
     char file_system_manager_ip_addr[INET_ADDRSTRLEN];
     char file_system_manager_port_num[6];

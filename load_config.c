@@ -76,9 +76,9 @@ config_t *load_config(const char *path) {
     };
     char *pline;
     static const char delimiters[] = " \n";
-    unsigned short purpose_count = 0; // Option for ipfs.
-    c->purpose_index = 0; // Option for ipfs.
-    c->hmac_mode = USE_HMAC; // Default with HMAC.
+    unsigned short purpose_count = 0;  // Option for ipfs.
+    c->purpose_index = 0;              // Option for ipfs.
+    c->hmac_mode = USE_HMAC;           // Default with HMAC.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
@@ -132,7 +132,8 @@ config_t *load_config(const char *path) {
                     } else {
                         error_exit(
                             "Wrong input for hmac_mode.\n Please type "
-                            "\"off\" or \"0\" to not use HMAC mode.\n Please type "
+                            "\"off\" or \"0\" to not use HMAC mode.\n Please "
+                            "type "
                             "\"on\" or \"1\" to use HMAC mode.");
                     }
                     break;
@@ -155,7 +156,10 @@ config_t *load_config(const char *path) {
                     break;
                 case AUTH_INFO_PORT:
                     ptr = strtok(NULL, delimiters);
-                    strcpy(c->auth_port_num, ptr);
+                    c->auth_port_num = atoi(ptr);
+                    if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
+                        error_exit("Error: Invalid port number.\n");
+                    }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
                     ptr = strtok(NULL, delimiters);
@@ -165,7 +169,11 @@ config_t *load_config(const char *path) {
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
                     ptr = strtok(NULL, delimiters);
                     printf("Port number of entity server: %s\n", ptr);
-                    strcpy(c->entity_server_port_num, ptr);
+                    c->entity_server_port_num = atoi(ptr);
+                    if (c->entity_server_port_num < 0 ||
+                        c->entity_server_port_num > 65535) {
+                        error_exit("Error: Invalid port number.\n");
+                    }
                     break;
                 case NETWORK_PROTOCOL:
                     ptr = strtok(NULL, delimiters);
