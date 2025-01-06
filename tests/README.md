@@ -40,12 +40,12 @@ $ cmake ../
 $ make
 ```
 
-## Execute Unit tests
+## Execute Unit Tests
 ```
 $ ./c_crypto_test
 ```
 
-## Execute Integration tests
+## Execute Integration Tests
 $TEST is one of the integration tests above.
 ```
 $ ./$TEST ../test_configs/client.config
