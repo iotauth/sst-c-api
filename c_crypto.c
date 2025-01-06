@@ -321,7 +321,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
             buf_length +
             AES_GCM_TAG_SIZE;  // GCM_TAG //TODO: Check. Tag size default is 12.
     }
-    if (no_hmac_mode == NO_HMAC) {
+    if (no_hmac_mode == USE_HMAC) {
         encrypted_total_length =
             iv_size + encrypted_total_length + mac_key_size;
     } else {
