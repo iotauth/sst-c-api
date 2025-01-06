@@ -163,14 +163,14 @@ static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
     memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
 }
 
-// Set the session key's encryption mode and no_hmac_mode to the SST_ctx's
+// Set the session key's encryption mode and hmac_mode to the SST_ctx's
 // modes.
 // @param ctx The SST_ctx_t to get the config.
 // @param s_key The target session key to set the modes.
-static void update_enc_mode_and_no_hmac_to_session_key(SST_ctx_t *ctx,
+static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
                                                        session_key_t *s_key) {
     s_key->enc_mode = ctx->config->encryption_mode;
-    s_key->no_hmac_mode = ctx->config->no_hmac_mode;
+    s_key->hmac_mode = ctx->config->hmac_mode;
 }
 
 // Separate the session key, nonce, and crypto spec from the message.
@@ -198,7 +198,7 @@ static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     for (unsigned int i = 0; i < session_key_list_length; i++) {
         buf = buf + buf_idx;
         buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
-        update_enc_mode_and_no_hmac_to_session_key(ctx,
+        update_enc_mode_and_hmac_mode_to_session_key(ctx,
                                                    &session_key_list->s_key[i]);
     }
     session_key_list->num_key = (int)session_key_list_length;
@@ -399,7 +399,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     unsigned int estimate_encrypted_length =
         get_expected_encrypted_total_length(
             SEQ_NUM_SIZE + msg_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
-            session_ctx->s_key.enc_mode, session_ctx->s_key.no_hmac_mode);
+            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode);
     unsigned char encrypted_stack[estimate_encrypted_length];
     unsigned int encrypted_length;
     if (encrypt_buf_with_session_key_without_malloc(
@@ -444,7 +444,7 @@ unsigned char *decrypt_received_message(unsigned char *data,
     if (symmetric_decrypt_authenticate(
             data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
             session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            session_ctx->s_key.enc_mode, session_ctx->s_key.no_hmac_mode,
+            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode,
             &decrypted, decrypted_buf_length)) {
         error_exit("Error during decrypting received message.\n");
     }
@@ -787,7 +787,7 @@ int encrypt_or_decrypt_buf_with_session_key(
             if (symmetric_encrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
                 error_exit(
                     "Error during encrypting buffer with session key.\n");
@@ -797,7 +797,7 @@ int encrypt_or_decrypt_buf_with_session_key(
             if (symmetric_decrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
                 error_exit(
                     "Error during decrypting buffer with session key.\n");
@@ -818,7 +818,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
             if (symmetric_encrypt_authenticate_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
                 error_exit(
                     "Error during encrypting buffer with session key.\n");
@@ -828,7 +828,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
             if (symmetric_decrypt_authenticate_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
                 error_exit(
                     "Error during decrypting buffer with session key.\n");

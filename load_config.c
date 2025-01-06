@@ -9,7 +9,7 @@ const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
 const char encryption_mode[] = "encryptionMode";
-const char no_hmac_mode[] = "noHmacMode";
+const char hmac_mode[] = "HmacMode";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
 const char authInfo_ip_address[] = "auth.ip.address";
@@ -29,8 +29,8 @@ config_type_t get_key_value(char *ptr) {
         return ENTITY_INFO_NUMKEY;
     } else if (strcmp(ptr, encryption_mode) == 0) {
         return ENCRYPTION_MODE;
-    } else if (strcmp(ptr, no_hmac_mode) == 0) {
-        return NO_HMAC_MODE;
+    } else if (strcmp(ptr, hmac_mode) == 0) {
+        return HMAC_MODE;
     } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
         return AUTH_INFO_PUBKEY_PATH;
     } else if (strcmp(ptr, entity_info_privkey_path) == 0) {
@@ -78,7 +78,7 @@ config_t *load_config(const char *path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0; // Option for ipfs.
     c->purpose_index = 0; // Option for ipfs.
-    c->no_hmac_mode = USE_HMAC; // Default with hmac.
+    c->hmac_mode = USE_HMAC; // Default with HMAC.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
@@ -122,18 +122,18 @@ config_t *load_config(const char *path) {
                         c->encryption_mode = AES_128_GCM;
                     }
                     break;
-                case NO_HMAC_MODE:
+                case HMAC_MODE:
                     ptr = strtok(NULL, delimiters);
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
-                        c->no_hmac_mode = USE_HMAC;
+                        c->hmac_mode = NO_HMAC;
                     } else if (strcmp(ptr, "on") == 0 ||
                                strcmp(ptr, "1") == 0) {
-                        c->no_hmac_mode = NO_HMAC;
+                        c->hmac_mode = USE_HMAC;
                     } else {
                         error_exit(
-                            "Wrong input for no_hmac_mode.\n Please type "
-                            "\"off\" or \"0\" to use HMAC mode.\n Please type "
-                            "\"on\" or \"1\" to not use HMAC mode.");
+                            "Wrong input for hmac_mode.\n Please type "
+                            "\"off\" or \"0\" to not use HMAC mode.\n Please type "
+                            "\"on\" or \"1\" to use HMAC mode.");
                     }
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
