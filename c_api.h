@@ -2,6 +2,7 @@
 #define C_API_H
 
 #include <pthread.h>
+#include <arpa/inet.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
@@ -9,6 +10,9 @@
 #define MAC_KEY_SIZE 32
 #define MAX_CIPHER_KEY_SIZE 32
 #define MAX_SESSION_KEY 10
+#define MAX_NAME_LENGTH 32
+#define MAX_PURPOSE_LENGTH 64
+#define NETWORK_PROTOCOL_NAME_LENGTH 4
 
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
@@ -32,21 +36,21 @@ typedef struct {
 } distribution_key_t;
 
 typedef struct {
-    char name[32];
+    char name[MAX_NAME_LENGTH];
     // Currently, the config struct can hold up to two purposes.
     unsigned short purpose_index;
-    char purpose[2][36];
+    char purpose[2][MAX_PURPOSE_LENGTH];
     int numkey;
     char encryption_mode;
     char no_hmac_mode;
     char *auth_pubkey_path;
     char *entity_privkey_path;
-    char auth_ip_addr[17];
+    char auth_ip_addr[INET_ADDRSTRLEN];
     char auth_port_num[6];
-    char entity_server_ip_addr[17];
+    char entity_server_ip_addr[INET_ADDRSTRLEN];
     char entity_server_port_num[6];
-    char network_protocol[4];
-    char file_system_manager_ip_addr[17];
+    char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
+    char file_system_manager_ip_addr[INET_ADDRSTRLEN];
     char file_system_manager_port_num[6];
 } config_t;
 
