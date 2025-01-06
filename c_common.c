@@ -173,11 +173,19 @@ int connect_as_client(const char *ip_addr, const char *port_num, int *sock) {
     while (count_retries++ < 100) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-            usleep(500);
+            printf("Connection attempt %d failed. Retrying...\n",
+                   count_retries);
+            usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
+            printf("Successfully connected to %s:%s on attempt %d.\n", ip_addr,
+                   port_num, count_retries);
             break;
         }
+    }
+    if (ret < 0) {
+        printf("Failed to connect to %s:%s after %d attempts.\n", ip_addr,
+               port_num, count_retries - 1);
     }
     return ret;
 }
