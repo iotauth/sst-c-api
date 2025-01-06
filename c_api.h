@@ -94,6 +94,7 @@ SST_ctx_t *init_SST(const char *config_path);
 // Initializes empty session_key_list.
 // Mallocs session_key_list_t and the session_key_t as much as the
 // MAX_SESSION_KEY.
+// @return Empty session key list.
 session_key_list_t *init_empty_session_key_list(void);
 
 // Request and get session key from Auth according to secure connection
@@ -126,6 +127,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 // @param target_session_key_id ID of the target session key.
 // @param ctx SST context to communicate with Auth.
 // @param existing_s_key_list list of session keys that currently exist.
+// @param return The session key received with the target ID.
 session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
                                      SST_ctx_t *ctx,
                                      session_key_list_t *existing_s_key_list);
@@ -150,6 +152,7 @@ void *receive_thread(void *SST_session_ctx);
 // @param socket socket connected with the server
 // @param buf buffer to fill the received message.
 // @param buf_length the maximum length of the buffer
+// @return the total number of bytes read from the socket, or -1 on failure.
 int read_secure_message(int socket, unsigned char *buf,
                         unsigned int buf_length);
 
@@ -171,7 +174,9 @@ void receive_message(unsigned char *received_buf,
 // buffer. If an error occurs, returns NULL.
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf
+// @param decrypted_buf_length length of the decrypted buf
 // @param SST_session_ctx_t session ctx struct
+// @param The unsigned char pointer of the returned decrypted buffer.
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
                                     unsigned int *decrypted_buf_length,
@@ -182,6 +187,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 // @param msg message to send
 // @param msg_length length of message
 // @param SST_session_ctx_t session ctx struct
+// @return the total number of bytes written to the socket, or -1 on failure.
 int send_secure_message(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx);
 
@@ -290,6 +296,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 // Returns the session key id buffer to be saved in unsigned integer.
 // @param buf session key id buffer to convert to int
 // @param byte_length length of session key id buffer
+// @return Session key id converted to integer.
 unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 
 // Generates a random nonce.
