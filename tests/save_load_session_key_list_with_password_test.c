@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
            strlen((const char *)plaintext), plaintext);
     int ret;
     unsigned int encrypted_length;
-    unsigned char *encrypted;
+    unsigned char *encrypted = NULL;
     ret = symmetric_encrypt_authenticate(
         plaintext, strlen((const char *)plaintext), s_key_list->s_key->mac_key,
         MAC_KEY_SHA256_SIZE, s_key_list->s_key->cipher_key,
@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
                                         password, sizeof(password), salt,
                                         sizeof(salt));
     unsigned int decrypted_length;
-    unsigned char *decrypted;
+    unsigned char *decrypted = NULL;
     ret = symmetric_decrypt_authenticate(
         encrypted, encrypted_length, new_s_key_list->s_key->mac_key,
         MAC_KEY_SHA256_SIZE, new_s_key_list->s_key->cipher_key,

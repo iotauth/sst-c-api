@@ -105,7 +105,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
     unsigned char *serialized, unsigned int serialized_length,
     distribution_key_t *dist_key, char *name, unsigned int *ret_length) {
     unsigned int temp_length;
-    unsigned char *temp;
+    unsigned char *temp = NULL;
     if (symmetric_encrypt_authenticate(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
@@ -326,7 +326,7 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     indicator_entity_nonce[0] = 1;
 
     unsigned int encrypted_length;
-    unsigned char *encrypted;
+    unsigned char *encrypted = NULL;
     if (symmetric_encrypt_authenticate(
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
@@ -350,7 +350,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                                                   unsigned int *ret_length) {
     printf("received session key handshake2!\n");
     unsigned int decrypted_length;
-    unsigned char *decrypted;
+    unsigned char *decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -376,7 +376,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     memset(buf, 0, HS_INDICATOR_SIZE);
     serialize_handshake(entity_nonce, hs.nonce, buf);
 
-    unsigned char *ret;
+    unsigned char *ret = NULL;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -440,7 +440,7 @@ unsigned char *decrypt_received_message(unsigned char *data,
                                         unsigned int data_length,
                                         unsigned int *decrypted_buf_length,
                                         SST_session_ctx_t *session_ctx) {
-    unsigned char *decrypted;
+    unsigned char *decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
             session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -660,7 +660,7 @@ unsigned char *check_handshake1_send_handshake2(
     unsigned char *server_nonce, session_key_t *s_key,
     unsigned int *ret_length) {
     unsigned int decrypted_length;
-    unsigned char *decrypted;
+    unsigned char *decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             received_buf + SESSION_KEY_ID_SIZE,
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
@@ -686,7 +686,7 @@ unsigned char *check_handshake1_send_handshake2(
     memset(buf, 0, HS_INDICATOR_SIZE);
     serialize_handshake(server_nonce, hs.nonce, buf);
 
-    unsigned char *ret;
+    unsigned char *ret = NULL;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,

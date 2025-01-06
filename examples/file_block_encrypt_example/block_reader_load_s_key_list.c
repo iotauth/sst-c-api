@@ -64,7 +64,7 @@ int main(int argc, char *argv[]) {
                   plaintext_fp);
 
             unsigned int decrypted_length;
-            unsigned char *decrypted;
+            unsigned char *decrypted = NULL;
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,

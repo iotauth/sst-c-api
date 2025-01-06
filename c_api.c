@@ -263,7 +263,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                     "disconnecting...\n");
             }
             unsigned int decrypted_length;
-            unsigned char *decrypted;
+            unsigned char *decrypted = NULL;
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,

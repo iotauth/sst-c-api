@@ -94,9 +94,9 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
     int s;
     _unused(s);
     unsigned int encrypted_length;
-    unsigned char *encrypted;
+    unsigned char *encrypted = NULL;
     unsigned int decrypted_length;
-    unsigned char *decrypted;
+    unsigned char *decrypted = NULL;
     if (!without_malloc) {
         s = symmetric_encrypt_authenticate(
             plaintext, strlen((const char *)plaintext), mac_key,

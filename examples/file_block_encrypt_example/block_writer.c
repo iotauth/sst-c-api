@@ -106,7 +106,7 @@ int main(int argc, char *argv[]) {
                 total_block_size;
 
             unsigned int encrypted_length;
-            unsigned char *encrypted;
+            unsigned char *encrypted = NULL;
             if (encrypt_buf_with_session_key(
                     &s_key_list->s_key[i], plaintext_block_buf,
                     total_block_size, &encrypted, &encrypted_length)) {

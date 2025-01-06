@@ -45,7 +45,7 @@ EVP_PKEY *load_entity_private_key(const char *path) {
 unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
                               EVP_PKEY *pub_key, size_t *ret_len) {
     EVP_PKEY_CTX *ctx;
-    unsigned char *out;
+    unsigned char *out = NULL;
 
     ctx = EVP_PKEY_CTX_new(pub_key, NULL);
     if (!ctx) {
@@ -76,7 +76,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
                                int padding, EVP_PKEY *priv_key,
                                size_t *ret_len) {
     EVP_PKEY_CTX *ctx;
-    unsigned char *out;
+    unsigned char *out = NULL;
     ctx = EVP_PKEY_CTX_new(priv_key, NULL);
     if (!ctx) {
         print_last_error("EVP_PKEY_CTX_new failed");
@@ -108,7 +108,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     unsigned int md_length;
     digest_message_SHA_256(encrypted, encrypted_length, md, &md_length);
     EVP_PKEY_CTX *ctx;
-    unsigned char *sig;
+    unsigned char *sig = NULL;
     ctx = EVP_PKEY_CTX_new(priv_key, NULL);
     if (!ctx) {
         print_last_error("EVP_PKEY_CTX_new failed");
