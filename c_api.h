@@ -1,8 +1,8 @@
 #ifndef C_API_H
 #define C_API_H
 
-#include <pthread.h>
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
@@ -14,6 +14,12 @@
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
 
+typedef enum {
+    AES_128_CBC,
+    AES_128_CTR,
+    AES_128_GCM,
+} AES_encryption_mode;
+
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
@@ -22,7 +28,7 @@ typedef struct {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    char enc_mode;
+    AES_encryption_mode enc_mode;
     char no_hmac_mode;
 } session_key_t;
 
@@ -32,7 +38,7 @@ typedef struct {
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
     unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
-    char enc_mode;
+    AES_encryption_mode enc_mode;
 } distribution_key_t;
 
 typedef struct {
@@ -60,7 +66,6 @@ typedef struct {
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
-
 } SST_session_ctx_t;
 
 // This struct is a session_key_list.

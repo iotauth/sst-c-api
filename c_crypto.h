@@ -15,6 +15,8 @@
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
+#include "c_api.h"
+
 #define AES_128_KEY_SIZE_IN_BYTES 16
 #define AES_128_IV_SIZE 16
 #define AES_128_CBC_IV_SIZE 16
@@ -31,9 +33,9 @@
 #define SHA256_DIGEST_LENGTH 32
 
 // Encryption Mode //
-#define AES_128_CBC 101
-#define AES_128_CTR 102
-#define AES_128_GCM 103
+// #define AES_128_CBC 101
+// #define AES_128_CTR 102
+// #define AES_128_GCM 103
 
 // Struct for digital signature
 typedef struct {
@@ -119,8 +121,9 @@ void digest_message_SHA_256(unsigned char *data, size_t data_len,
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
 int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
-                unsigned char *key, unsigned char *iv, char enc_mode,
-                unsigned char *ret, unsigned int *ret_length);
+                unsigned char *key, unsigned char *iv,
+                AES_encryption_mode enc_mode, unsigned char *ret,
+                unsigned int *ret_length);
 
 // Decrypt the message with the cipher key of the session key obtained from Auth
 // by using Cipher Block Chaining(CBC) decryption of OpenSSL.
@@ -132,8 +135,9 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
 // @param ret_length length of ret
 // @return 0 for success, 1 for error.
 int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
-                unsigned char *key, unsigned char *iv, char enc_mode,
-                unsigned char *ret, unsigned int *ret_length);
+                unsigned char *key, unsigned char *iv,
+                AES_encryption_mode enc_mode, unsigned char *ret,
+                unsigned int *ret_length);
 
 // Get the expected encrypted length depnding on encryption modes and
 // no_hmac_mode. Use it together with
@@ -149,7 +153,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
 unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
                                                  unsigned int iv_size,
                                                  unsigned int mac_key_size,
-                                                 char enc_mode,
+                                                 AES_encryption_mode enc_mode,
                                                  char no_hmac_mode);
 
 // Get the expected encrypted length depnding on encryption modes and
@@ -167,7 +171,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
 unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
                                                    unsigned int iv_size,
                                                    unsigned int mac_key_size,
-                                                   char enc_mode,
+                                                   AES_encryption_mode enc_mode,
                                                    char no_hmac_mode);
 
 // Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
@@ -192,8 +196,9 @@ unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
 int symmetric_encrypt_authenticate(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
+    unsigned int cipher_key_size, unsigned int iv_size,
+    AES_encryption_mode enc_mode, char no_hmac_mode, unsigned char **ret,
+    unsigned int *ret_length);
 
 // Decrypt the ciphertext with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
@@ -217,8 +222,9 @@ int symmetric_encrypt_authenticate(
 int symmetric_decrypt_authenticate(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char **ret, unsigned int *ret_length);
+    unsigned int cipher_key_size, unsigned int iv_size,
+    AES_encryption_mode enc_mode, char no_hmac_mode, unsigned char **ret,
+    unsigned int *ret_length);
 
 // This works similar with the symmetric_encrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -239,8 +245,9 @@ int symmetric_decrypt_authenticate(
 int symmetric_encrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
+    unsigned int cipher_key_size, unsigned int iv_size,
+    AES_encryption_mode enc_mode, char no_hmac_mode, unsigned char *ret,
+    unsigned int *ret_length);
 
 // This works similar with the symmetric_decrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -261,8 +268,9 @@ int symmetric_encrypt_authenticate_without_malloc(
 int symmetric_decrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size, char enc_mode,
-    char no_hmac_mode, unsigned char *ret, unsigned int *ret_length);
+    unsigned int cipher_key_size, unsigned int iv_size,
+    AES_encryption_mode enc_mode, char no_hmac_mode, unsigned char *ret,
+    unsigned int *ret_length);
 
 // Create a 32 byte digested password using the salt.
 // @param password password's pointer

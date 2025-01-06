@@ -14,11 +14,12 @@
 
 #include <assert.h>
 
+#include "../c_api.h"
 #include "../c_common.h"
 
 #define _unused(x) ((void)(x))  // To avoid unused-but-set-variable error.
 
-void AES_test_common(unsigned char mode) {
+void AES_test_common(AES_encryption_mode mode) {
     unsigned char iv[AES_128_CBC_IV_SIZE];    // 16 bytes
     generate_nonce(AES_128_CBC_IV_SIZE, iv);  // 16 bytes random nonce.
 
