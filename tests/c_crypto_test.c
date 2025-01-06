@@ -77,7 +77,7 @@ void AES_test(void) {
 }
 
 void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
-                                                   char no_hmac_mode,
+                                                   no_hmac_mode_t no_hmac_mode,
                                                    char without_malloc) {
     // Generate cipher_key
     unsigned char cipher_key[AES_128_KEY_SIZE_IN_BYTES];  // 16 bytes

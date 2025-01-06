@@ -78,7 +78,7 @@ config_t *load_config(const char *path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0; // Option for ipfs.
     c->purpose_index = 0; // Option for ipfs.
-    c->no_hmac_mode = 0; // Default with hmac.
+    c->no_hmac_mode = USE_HMAC; // Default with hmac.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     printf("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
@@ -125,10 +125,10 @@ config_t *load_config(const char *path) {
                 case NO_HMAC_MODE:
                     ptr = strtok(NULL, delimiters);
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
-                        c->no_hmac_mode = 0;
+                        c->no_hmac_mode = USE_HMAC;
                     } else if (strcmp(ptr, "on") == 0 ||
                                strcmp(ptr, "1") == 0) {
-                        c->no_hmac_mode = 1;
+                        c->no_hmac_mode = NO_HMAC;
                     } else {
                         error_exit(
                             "Wrong input for no_hmac_mode.\n Please type "

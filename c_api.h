@@ -20,6 +20,11 @@ typedef enum {
     AES_128_GCM,
 } AES_encryption_mode_t;
 
+typedef enum {
+    NO_HMAC,
+    USE_HMAC,
+} no_hmac_mode_t;
+
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
@@ -29,7 +34,7 @@ typedef struct {
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
     AES_encryption_mode_t enc_mode;
-    char no_hmac_mode;
+    no_hmac_mode_t no_hmac_mode;
 } session_key_t;
 
 typedef struct {
@@ -48,7 +53,7 @@ typedef struct {
     char purpose[2][MAX_PURPOSE_LENGTH];
     int numkey;
     char encryption_mode;
-    char no_hmac_mode;
+    no_hmac_mode_t no_hmac_mode;
     char *auth_pubkey_path;
     char *entity_privkey_path;
     char auth_ip_addr[INET_ADDRSTRLEN];
