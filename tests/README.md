@@ -11,6 +11,8 @@ This directory includes unit tests and integration tests for the SST C API.
 
 - `encrypt_buf_with_session_key_without_malloc_execution_time_test.c` : Tests the time taken from `encrypt_buf_with_session_key_without_malloc()` and `decrypt_buf_with_session_key_without_malloc()`.
 
+- `multi_thread_get_session_key_test.c` : Tests `get_session_key()` called simultaneously by multiple threads. This test fails.
+
 # Test Instructions
 
 ## Turn on Auth (Only Applicable to Integration Tests)
