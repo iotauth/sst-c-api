@@ -55,6 +55,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
                0) {
+        // TODO:(Dongha Kim): Implement session key request via UDP.
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
     if (earned_s_key_list == NULL) {

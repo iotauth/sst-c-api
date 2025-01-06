@@ -150,6 +150,7 @@ session_key_list_t *send_session_key_request_check_protocol(
 // @return session_key_t struct according to key id
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx);
 
+// TODO:(Dongha Kim): Implement session key request via UDP.
 // Request the session key to Auth according to session key id via UDP
 // connection.
 // @param

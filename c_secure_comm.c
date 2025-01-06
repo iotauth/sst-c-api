@@ -648,11 +648,10 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     // Should not come here.
     return NULL;
 }
-
+// TODO:(Dongha Kim): Implement session key request via UDP.
 // session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
 //     session_key_list_t *s_key_list;
 //     return s_key_list;
-//     // TODO:(Dongha Kim) Implement this function.
 //     error_exit("This function is not implemented yet.");
 // }
 
