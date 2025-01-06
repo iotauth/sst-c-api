@@ -3,6 +3,11 @@
  * @file encrypt_buf_with_session_key_without_malloc_execution_time_test.c
  * @author Dongha Kim (you@domain.com)
  * @brief Measure executiontime of encrypt function.
+ * This program measures the execution time of the
+ * `encrypt_buf_with_session_key_without_malloc` and
+ * `decrypt_buf_with_session_key_without_malloc` functions in a controlled loop.
+ * These functions encrypt and decrypt data using a session key without dynamic
+ * memory allocation
  */
 #include <openssl/rand.h>
 #include <stdio.h>
@@ -52,11 +57,11 @@ int main(int argc, char *argv[]) {
                     encrypted_data, &processed_size)) {
                 printf("Encryption failed!\n");
             }
-            // if (decrypt_buf_with_session_key_without_malloc(
-            //         &s_key_list->s_key[0], encrypted_data,
-            //         processed_size, decrypted_data, &processed_size)) {
-            //     printf("Encryption failed!\n");
-            // }
+            if (decrypt_buf_with_session_key_without_malloc(
+                    &s_key_list->s_key[0], encrypted_data, processed_size,
+                    decrypted_data, &processed_size)) {
+                printf("Encryption failed!\n");
+            }
             // End measuring time for the inner loop
             clock_gettime(CLOCK_MONOTONIC, &end_inner);
 

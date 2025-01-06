@@ -1,4 +1,4 @@
-#include "../c_api.h"
+#include "../../c_api.h"
 #include <stdio.h>
 
 void *call_get_session_key_by_ID0(void* SST_ctx){
@@ -15,6 +15,7 @@ void *call_get_session_key_by_ID0(void* SST_ctx){
     session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     pthread_mutex_unlock(&ctx->mutex);
     printf("Session Key ID: %s\n", session_key->key_id);
+    return NULL;
 }
 
 void *call_get_session_key_by_ID1(void* SST_ctx){
@@ -31,6 +32,7 @@ void *call_get_session_key_by_ID1(void* SST_ctx){
     session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     pthread_mutex_unlock(&ctx->mutex);
     printf("Session Key ID: %s\n", session_key->key_id);
+    return NULL;
 }
 
 void *call_get_session_key_by_ID2(void* SST_ctx){
@@ -47,6 +49,7 @@ void *call_get_session_key_by_ID2(void* SST_ctx){
     session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     pthread_mutex_unlock(&ctx->mutex);
     printf("Session Key ID: %s\n", session_key->key_id);
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {

@@ -1,4 +1,4 @@
-#include "../c_api.h"
+#include "../../c_api.h"
 #include <stdio.h>
 
 int main(int argc, char *argv[]) {
