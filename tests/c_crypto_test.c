@@ -16,7 +16,7 @@
 
 #include "../c_common.h"
 
-#define _unused(x) ((void)(x)) // To avoid unused-but-set-variable error.
+#define _unused(x) ((void)(x))  // To avoid unused-but-set-variable error.
 
 void AES_test_common(unsigned char mode) {
     unsigned char iv[AES_128_CBC_IV_SIZE];    // 16 bytes
@@ -153,7 +153,9 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
     }
 }
 
-////////////////////
+// These test cases perform encryption, authentication, and decryption using
+// different encryption modes (AES-CBC, AES-CTR, AES-GCM) with dynamic memory
+// allocation (malloc).
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test(void) {
     printf("**** STARTING symmetric_encrypt_authenticate_AES_128_CBC_test.\n");
@@ -191,30 +193,36 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_test(void) {
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 1, 0);
 }
 
-////////////////////
+// These test cases perform encryption, authentication, and decryption using
+// different encryption modes (AES-CBC, AES-CTR, AES-GCM) without dynamic memory
+// allocation.
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CBC_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CTR_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_GCM_without_malloc_test.\n");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 0, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_test."
@@ -222,7 +230,8 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_noHMAC_without_malloc_te
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 1, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_test."
@@ -230,7 +239,8 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_noHMAC_without_malloc_te
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 1, 1);
 }
 
-void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test(void) {
+void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test(
+    void) {
     printf(
         "**** STARTING "
         "symmetric_encrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_test."
@@ -238,7 +248,9 @@ void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_noHMAC_without_malloc_te
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 1, 1);
 }
 
-////////////////////
+// Executes all encryption, authentication, and decryption tests without using
+// malloc for buffer allocation. Includes HMAC and no-HMAC cases for AES
+// encryption modes: AES-CBC AES-CTR AES-GCM
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_with_malloc_test(void) {
     printf(
