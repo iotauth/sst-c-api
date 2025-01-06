@@ -7,7 +7,9 @@ This directory includes unit tests and integration tests for the SST C API.
 
 ## Integration Tests with Auth
 
-- `save_load_session_key_list_with_password_test.c`: Tests `save_session_key_list_with_password_test()` and `load_session_key_list_with_password_test()`
+- `save_load_session_key_list_with_password_test.c`: Tests `save_session_key_list_with_password_test()` and `load_session_key_list_with_password_test()`.
+
+- `encrypt_buf_with_session_key_without_malloc_execution_time_test.c` : Tests the time taken from `encrypt_buf_with_session_key_without_malloc()` and `decrypt_buf_with_session_key_without_malloc()`.
 
 # Test Instructions
 

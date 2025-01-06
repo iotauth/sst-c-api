@@ -1,13 +1,20 @@
 
 /**
  * @file encrypt_buf_with_session_key_without_malloc_execution_time_test.c
- * @author Dongha Kim (you@domain.com)
- * @brief Measure executiontime of encrypt function.
+ * @author Dongha Kim
+ * @brief Measure execution time of encrypt function.
  * This program measures the execution time of the
  * `encrypt_buf_with_session_key_without_malloc` and
- * `decrypt_buf_with_session_key_without_malloc` functions in a controlled loop.
+ * `decrypt_buf_with_session_key_without_malloc` functions in a nested loop.
  * These functions encrypt and decrypt data using a session key without dynamic
- * memory allocation
+ * memory allocation.
+ *
+ * The outer loop simulates processing multiple files by repeating the inner
+ * loop for each file iteration, measuring total and average times per file. The
+ * inner loop handles encryption and decryption of data blocks, measuring the
+ * time taken for each block and accumulating it. The results provide average
+ * encryption and decryption times per block and per file for performance
+ * evaluation.
  */
 #include <openssl/rand.h>
 #include <stdio.h>
