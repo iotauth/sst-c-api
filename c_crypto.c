@@ -211,7 +211,7 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
     if (enc_mode == AES_128_GCM) {
         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
                                  AES_128_GCM_IV_SIZE,
-                                 NULL)) {  // Set IV length to 16 bytes
+                                 NULL)) {  // Set IV length to 12 bytes
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
             return 1;
@@ -262,7 +262,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
     if (enc_mode == AES_128_GCM) {
         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
                                  AES_128_GCM_IV_SIZE,
-                                 NULL)) {  // Set IV length to 16 bytes
+                                 NULL)) {  // Set IV length to 12 bytes
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
             return 1;
