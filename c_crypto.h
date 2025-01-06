@@ -27,7 +27,7 @@
 #define REL_VALIDITY_SIZE 6
 #define MAX_MAC_KEY_SIZE 32
 #define MAC_KEY_SHA256_SIZE 32
-#define CIPHER_KEY_SIZE 16  // FIXME: To be replaced by config.
+#define CIPHER_KEY_SIZE 16
 #define RSA_KEY_SIZE 256
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
 #define SHA256_DIGEST_LENGTH 32
