@@ -99,12 +99,15 @@ session_key_list_t *init_empty_session_key_list(void);
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
 // @param config_info config struct obtained from load_config()
-// @return secure session key
+// @return secure session key list.
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list);
 
 // Connect to entity_server using the session key. This function can be called
 // after the connect() function, and uses the user's socket.
+// @param s_key session key struct received by Auth
+// @param sock Connected socket number
+// @return Connected session_ctx.
 SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                                                         int sock);
 
@@ -112,7 +115,8 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
 // function contains the connect() function, and uses the
 // secure_connect_to_server_with_socket() function.
 // @param s_key session key struct received by Auth
-// @return secure socket number
+// @param ctx config struct obtained from load_config()
+// @return Connected session_ctx.
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx);
 
