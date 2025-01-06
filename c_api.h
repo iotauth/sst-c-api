@@ -203,7 +203,7 @@ int send_secure_message(char *msg, unsigned int msg_length,
 // @param plaintext_length length of plaintext to be encrypted
 // @param encrypted double pointer of returned encrypted buffer
 // @param encrypted_length length of returned encrypted buffer
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned int plaintext_length,
                                  unsigned char **encrypted,
@@ -216,7 +216,7 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param encrypted_length length of encrypted buffer to be decrypted
 // @param decrypted double pointer of returned decrypted buffer
 // @param decrypted_length length of returned decrypted buffer
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
                                  unsigned int encrypted_length,
                                  unsigned char **decrypted,
@@ -230,7 +230,7 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
 // @param encrypted pointer the user should provide to get the encrypted buffer
 // filled
 // @param encrypted_length length of returned encrypted buffer
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
                                                 unsigned char *plaintext,
                                                 unsigned int plaintext_length,
@@ -245,7 +245,7 @@ int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
 // @param decrypted pointer the user should provide to get the encrypted buffer
 // filled
 // @param decrypted_length length of returned decrypted buffer
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
                                                 unsigned char *encrypted,
                                                 unsigned int encrypted_length,
@@ -255,14 +255,14 @@ int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
 // Saves session key list recursively.
 // @param session_key_list_t session_key_list to save
 // @param file_path file_path to save
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int save_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
 // Loads session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path);
 
@@ -274,7 +274,7 @@ int load_session_key_list(session_key_list_t *session_key_list,
 // @param password_len length of the password
 // @param salt salt char to salt the password
 // @param salt_len length of the salt
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
                                         const char *password,
@@ -290,7 +290,7 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
 // @param password_len length of the password
 // @param salt salt char to salt the password
 // @param salt_len length of the salt
-// @return 0 for success, 1 for fail
+// @return 0 for success, -1 for fail
 int load_session_key_list_with_password(session_key_list_t *session_key_list,
                                         const char *file_path,
                                         const char *password,

@@ -205,7 +205,7 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
         // Error
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptInit_ex failed");
-        return 1;
+        return -1;
     }
 
     if (enc_mode == AES_128_GCM) {
@@ -214,7 +214,7 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
                                  NULL)) {  // Set IV length to 12 bytes
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
-            return 1;
+            return -1;
         }
     }
 
@@ -222,14 +222,14 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
                            plaintext_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptUpdate failed");
-        return 1;
+        return -1;
     }
 
     unsigned int temp_len;
     if (!EVP_EncryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_EncryptFinal_ex failed");
-        return 1;
+        return -1;
     }
     *ret_length += temp_len;
 
@@ -239,7 +239,7 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
                                  ret + *ret_length)) {  // 16 bytes tag
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (GET_TAG) failed");
-            return 1;
+            return -1;
         }
         *ret_length += AES_GCM_TAG_SIZE;  // Increase the length by the tag size
     }
@@ -256,7 +256,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
     if (!EVP_DecryptInit_ex(ctx, get_EVP_CIPHER(enc_mode), NULL, key, iv)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptInit_ex failed");
-        return 1;
+        return -1;
     }
 
     if (enc_mode == AES_128_GCM) {
@@ -265,7 +265,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                                  NULL)) {  // Set IV length to 12 bytes
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
-            return 1;
+            return -1;
         }
 
         // Set the expected tag value by extracting it from the end of the
@@ -277,7 +277,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                                  tag)) {
             EVP_CIPHER_CTX_free(ctx);
             print_last_error("EVP_CIPHER_CTX_ctrl (SET_TAG) failed");
-            return 1;
+            return -1;
         }
 
         encrypted_length -=
@@ -288,14 +288,14 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                            encrypted_length)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptUpdate failed");
-        return 1;
+        return -1;
     }
 
     unsigned int temp_len;
     if (!EVP_DecryptFinal_ex(ctx, ret + *ret_length, (int *)&temp_len)) {
         EVP_CIPHER_CTX_free(ctx);
         print_last_error("EVP_DecryptFinal_ex failed");
-        return 1;
+        return -1;
     }
     *ret_length += temp_len;
 
@@ -347,14 +347,14 @@ static int get_symmetric_encrypt_authenticate_buffer(
         if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
                         ret + iv_size, &total_length)) {
             printf("AES encryption failed!\n");
-            return 1;
+            return -1;
         }
         total_length += iv_size;
     }
     // Add other ciphers in future.
     else {
         printf("Cipher_key_size is not supported.\n");
-        return 1;
+        return -1;
     };
     if (!no_hmac_mode) {
         // Attach HMAC tag
@@ -366,12 +366,12 @@ static int get_symmetric_encrypt_authenticate_buffer(
         // Add other MAC key sizes in future.
         else {
             printf("HMAC_key_size is not supported.\n");
-            return 1;
+            return -1;
         }
     }
     if (expected_encrypted_total_length != total_length) {
         printf("Encrypted length does not match with expected.\n");
-        return 1;
+        return -1;
     }
     *ret_length = total_length;
 
@@ -420,7 +420,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
                  iv_size + encrypted_length, reproduced_tag, &mac_key_size);
         } else {
             printf("HMAC_key_size is not supported.\n");
-            return 1;
+            return -1;
         }
         if (memcmp(reproduced_tag, buf + iv_size + encrypted_length,
                    mac_key_size) != 0) {
@@ -428,7 +428,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
             // print_buf(buf + encrypted_length, mac_key_size);
             // printf("Hmac tag: ");
             // print_buf(reproduced_tag, mac_key_size);
-            return 1;
+            return -1;
         } else {
             // printf("MAC verified!\n");
         }
@@ -437,7 +437,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
         if (decrypt_AES(buf + iv_size, encrypted_length, cipher_key, buf,
                         enc_mode, ret, ret_length)) {
             printf("AES_CBC_128_decrypt failed!\n");
-            return 1;
+            return -1;
         }
         if (expected_decrypted_total_length != *ret_length) {
             if (enc_mode == AES_128_CBC &&
@@ -446,14 +446,14 @@ static int get_symmetric_decrypt_authenticate_buffer(
                 // decrypting on block ciphers like CBC mode.
             } else {
                 printf("Decrypted length does not match with expected.\n");
-                return 1;
+                return -1;
             }
         }
     }
     // Add other ciphers in future.
     else {
         printf("Cipher_key_size is not supported.\n");
-        return 1;
+        return -1;
     }
     return 0;
 }

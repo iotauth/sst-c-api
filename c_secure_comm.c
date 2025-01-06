@@ -131,11 +131,11 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
 
 // Check the validity of the buffer.
 // @param validity unsigned char buffer to check.
-// @return 1 when expired, 0 when valid
+// @return -1 when expired, 0 when valid
 static int check_validity(unsigned char *validity) {
     if ((uint64_t)time(NULL) >
         read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        return 1;
+        return -1;
     } else {
         return 0;
     }
@@ -807,7 +807,7 @@ int encrypt_or_decrypt_buf_with_session_key(
         }
     } else {
         printf("Session key is expired.\n");
-        return 1;
+        return -1;
     }
 }
 
@@ -838,6 +838,6 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
         }
     } else {
         printf("Session key is expired.\n");
-        return 1;
+        return -1;
     }
 }

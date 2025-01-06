@@ -221,7 +221,7 @@ int check_session_key_list_addable(int requested_num_key,
 // inside the function).
 // @param output_length pointer to store the size of the output buffer in bytes.
 // @param encrypt 1 for encryption, 0 for decryption.
-// @return 0 on success, 1 if the session key is invalid or expired.
+// @return 0 on success, -1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char **output, unsigned int *output_length, int encrypt);
@@ -236,7 +236,7 @@ int encrypt_or_decrypt_buf_with_session_key(
 // @param output pointer to the pre-allocated output buffer.
 // @param output_length pointer to store the size of the output buffer in bytes.
 // @param encrypt 1 for encryption, 0 for decryption.
-// @return 0 on success, 1 if the session key is invalid or expired.
+// @return 0 on success, -1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char *output, unsigned int *output_length, int encrypt);

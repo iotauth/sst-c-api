@@ -413,7 +413,7 @@ int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path) {
     FILE *load_file_fp;
     if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
-        return 1;  // Error opening file
+        return -1;  // Error opening file
     } else {
         // Save the malloced pointer
         session_key_t *s = session_key_list->s_key;
@@ -470,13 +470,13 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     if (encrypt_AES(buffer, buffer_len, salted_password, iv, AES_128_CBC,
                     ciphertext, &ciphertext_len)) {
         printf("AES encryption failed!");
-        return 1;
+        return -1;
     }
 
     FILE *saved_file_fp = fopen(file_path, "wb");
     if (!saved_file_fp) {
         printf("Failed to open file: %s\n", file_path);
-        return 1;
+        return -1;
     }
     // Write the IV
     fwrite(iv, 1, sizeof(iv), saved_file_fp);
@@ -503,7 +503,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     saved_file_fp = fopen(file_path, "rb");
     if (!saved_file_fp) {
         printf("Failed to open file for reading!\n");
-        return 1;
+        return -1;
     }
 
     // Read the IV
@@ -511,7 +511,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     if (iv_read != sizeof(iv)) {
         printf("Failed to read IV!\n");
         fclose(saved_file_fp);
-        return 1;
+        return -1;
     }
 
     // Read the encrypted data
@@ -520,7 +520,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     if (ciphertext_len <= 0) {
         printf("Failed to read encrypted data!\n");
-        return 1;
+        return -1;
     }
 
     // Create a salted password, and digest it to 32 bytes.
@@ -532,7 +532,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     if (decrypt_AES(ciphertext, ciphertext_len, salted_password, iv,
                     AES_128_CBC, buffer, &plaintext_len)) {
         printf("AES decryption failed!\n");
-        return 1;
+        return -1;
     }
 
     // Deserialize the buffer into session_key_list
@@ -540,7 +540,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
     if (!session_key_list->s_key) {
         printf("Memory allocation failed!\n");
-        return 1;
+        return -1;
     }
     memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
            sizeof(session_key_t) * MAX_SESSION_KEY);

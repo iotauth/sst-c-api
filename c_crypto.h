@@ -119,7 +119,7 @@ void digest_message_SHA_256(unsigned char *data, size_t data_len,
 // @param iv initialize vector to be used in first encryption of CBC encryption
 // @param ret decrypted message received from CBC encryption
 // @param ret_length length of ret
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
                 unsigned char *key, unsigned char *iv,
                 AES_encryption_mode enc_mode, unsigned char *ret,
@@ -133,7 +133,7 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
 // @param iv initialize vector to be used in first decryption of CBC decryption
 // @param ret decrypted message received from CBC decryption
 // @param ret_length length of ret
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
                 unsigned char *key, unsigned char *iv,
                 AES_encryption_mode enc_mode, unsigned char *ret,
@@ -192,7 +192,7 @@ unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
 // @param no_hmac_mode Boolean to use or not use HMAC
 // @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
@@ -218,7 +218,7 @@ int symmetric_encrypt_authenticate(
 // @param no_hmac_mode Boolean to use or not use HMAC
 // @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
@@ -241,7 +241,7 @@ int symmetric_decrypt_authenticate(
 // @param no_hmac_mode Boolean to use or not use HMAC
 // @param ret The pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
@@ -264,7 +264,7 @@ int symmetric_encrypt_authenticate_without_malloc(
 // @param no_hmac_mode Boolean to use or not use HMAC
 // @param ret The pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
-// @return 0 for success, 1 for error.
+// @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate_without_malloc(
     unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
     unsigned int mac_key_size, unsigned char *cipher_key,
