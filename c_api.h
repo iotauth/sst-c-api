@@ -10,7 +10,7 @@
 #define MAC_KEY_SIZE 32
 #define MAX_CIPHER_KEY_SIZE 32
 #define MAX_SESSION_KEY 10
-#define MAX_NAME_LENGTH 32
+#define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
 
@@ -47,7 +47,7 @@ typedef struct {
 } distribution_key_t;
 
 typedef struct {
-    char name[MAX_NAME_LENGTH];
+    char name[MAX_ENTITY_NAME_LENGTH];
     // Currently, the config struct can hold up to two purposes.
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH];
