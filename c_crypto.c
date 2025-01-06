@@ -374,8 +374,6 @@ static int get_symmetric_encrypt_authenticate_buffer(
         return -1;
     }
     *ret_length = total_length;
-
-    printf("Ret: %d, Total: %d\n", *ret_length, total_length);
     return 0;
 }
 
