@@ -170,7 +170,8 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
 
     int count_retries = 0;
     int ret = -1;
-    while (count_retries++ < 100) {
+    // FIXME(Dongha Kim): Make the maximum number of retries configurable.
+    while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
             printf("Connection attempt %d failed. Retrying...\n",
