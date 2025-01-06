@@ -351,7 +351,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                    encrypted_entity_nonce_length);
             save_distribution_key(data_buf, ctx, key_size);
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce;
+            unsigned char *decrypted_entity_nonce = NULL;
             if (symmetric_decrypt_authenticate(
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
@@ -375,7 +375,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             break;
         } else if (message_type == ADD_READER_RESP) {
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce;
+            unsigned char *decrypted_entity_nonce = NULL;
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
