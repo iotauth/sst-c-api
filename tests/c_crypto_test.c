@@ -77,7 +77,7 @@ void AES_test(void) {
 }
 
 void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
-                                                   no_hmac_mode_t no_hmac_mode,
+                                                   hmac_mode_t hmac_mode,
                                                    char without_malloc) {
     // Generate cipher_key
     unsigned char cipher_key[AES_128_KEY_SIZE_IN_BYTES];  // 16 bytes
@@ -101,7 +101,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         s = symmetric_encrypt_authenticate(
             plaintext, strlen((const char *)plaintext), mac_key,
             MAC_KEY_SHA256_SIZE, cipher_key, AES_128_KEY_SIZE_IN_BYTES,
-            AES_128_IV_SIZE, enc_mode, no_hmac_mode, &encrypted,
+            AES_128_IV_SIZE, enc_mode, hmac_mode, &encrypted,
             &encrypted_length);
         printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
         print_buf(encrypted, encrypted_length);
@@ -109,7 +109,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         s = symmetric_decrypt_authenticate(
             encrypted, encrypted_length, mac_key, MAC_KEY_SHA256_SIZE,
             cipher_key, AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE,
-            enc_mode, no_hmac_mode, &decrypted, &decrypted_length);
+            enc_mode, hmac_mode, &decrypted, &decrypted_length);
         printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
                decrypted);
         assert(s == 0);
@@ -123,12 +123,12 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         unsigned int estimate_encrypted_length =
             get_expected_encrypted_total_length(
                 strlen((const char *)plaintext), AES_128_IV_SIZE,
-                MAC_KEY_SHA256_SIZE, enc_mode, no_hmac_mode);
+                MAC_KEY_SHA256_SIZE, enc_mode, hmac_mode);
         unsigned char encrypted_stack[estimate_encrypted_length];
         s = symmetric_encrypt_authenticate_without_malloc(
             plaintext, strlen((const char *)plaintext), mac_key,
             MAC_KEY_SHA256_SIZE, cipher_key, AES_128_KEY_SIZE_IN_BYTES,
-            AES_128_IV_SIZE, enc_mode, no_hmac_mode, &encrypted_stack[0],
+            AES_128_IV_SIZE, enc_mode, hmac_mode, &encrypted_stack[0],
             &encrypted_length);
         encrypted = &encrypted_stack[0];
         printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
@@ -137,12 +137,12 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         unsigned int estimate_decrypted_length =
             get_expected_decrypted_maximum_length(
                 encrypted_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
-                enc_mode, no_hmac_mode);
+                enc_mode, hmac_mode);
         unsigned char decrypted_stack[estimate_decrypted_length];
         s = symmetric_decrypt_authenticate_without_malloc(
             encrypted, encrypted_length, mac_key, MAC_KEY_SHA256_SIZE,
             cipher_key, AES_128_KEY_SIZE_IN_BYTES, AES_128_IV_SIZE, enc_mode,
-            no_hmac_mode, &decrypted_stack[0], &decrypted_length);
+            hmac_mode, &decrypted_stack[0], &decrypted_length);
         decrypted = &decrypted_stack[0];
         printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
                decrypted);
