@@ -1,6 +1,8 @@
 #ifndef C_SECURE_COMM_H
 #define C_SECURE_COMM_H
 
+#include <stdbool.h>
+
 #include "c_api.h"
 
 // This file includes functions that uses the struct "session_key"
@@ -221,11 +223,11 @@ int check_session_key_list_addable(int requested_num_key,
 // @param output pointer to the dynamically allocated output buffer (allocated
 // inside the function).
 // @param output_length pointer to store the size of the output buffer in bytes.
-// @param encrypt 1 for encryption, 0 for decryption.
+// @param is_encrypt true for encryption, false for decryption.
 // @return 0 on success, -1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char **output, unsigned int *output_length, int encrypt);
+    unsigned char **output, unsigned int *output_length, bool is_encrypt);
 
 // Encrypts or decrypts a buffer using the provided session key without dynamic
 // memory allocation. The caller must allocate sufficient memory for the output
@@ -236,10 +238,10 @@ int encrypt_or_decrypt_buf_with_session_key(
 // @param input_length size of the input buffer in bytes.
 // @param output pointer to the pre-allocated output buffer.
 // @param output_length pointer to store the size of the output buffer in bytes.
-// @param encrypt 1 for encryption, 0 for decryption.
+// @param is_encrypt true for encryption, false for decryption.
 // @return 0 on success, -1 if the session key is invalid or expired.
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char *output, unsigned int *output_length, int encrypt);
+    unsigned char *output, unsigned int *output_length, bool is_encrypt);
 
 #endif  // C_SECURE_COMM_H

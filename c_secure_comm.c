@@ -781,9 +781,10 @@ int check_session_key_list_addable(int requested_num_key,
 
 int encrypt_or_decrypt_buf_with_session_key(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char **output, unsigned int *output_length, int encrypt) {
+    unsigned char **output, unsigned int *output_length, bool is_encrypt) {
     if (!check_session_key_validity(s_key)) {
-        if (encrypt) {
+        if (is_encrypt) {
+            // Encryption mode.
             if (symmetric_encrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
@@ -794,6 +795,7 @@ int encrypt_or_decrypt_buf_with_session_key(
             }
             return 0;
         } else {
+            //
             if (symmetric_decrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
@@ -812,9 +814,9 @@ int encrypt_or_decrypt_buf_with_session_key(
 
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char *output, unsigned int *output_length, int encrypt) {
+    unsigned char *output, unsigned int *output_length, bool is_encrypt) {
     if (!check_session_key_validity(s_key)) {
-        if (encrypt) {
+        if (is_encrypt) {
             if (symmetric_encrypt_authenticate_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
