@@ -52,7 +52,7 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH];
     int numkey;
-    char encryption_mode;
+    AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
     char *auth_pubkey_path;
     char *entity_privkey_path;
@@ -62,7 +62,7 @@ typedef struct {
     int entity_server_port_num;
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
     char file_system_manager_ip_addr[INET_ADDRSTRLEN];
-    char file_system_manager_port_num[6];
+    int file_system_manager_port_num;
 } config_t;
 
 // This struct is used in receive_thread()

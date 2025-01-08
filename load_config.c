@@ -187,8 +187,11 @@ config_t *load_config(const char *path) {
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
                     ptr = strtok(NULL, delimiters);
-                    printf("Port number of file system manager: %s\n", ptr);
-                    strcpy(c->file_system_manager_port_num, ptr);
+                    c->file_system_manager_port_num = atoi(ptr);
+                    if (c->file_system_manager_port_num < 0 ||
+                        c->file_system_manager_port_num > 65535) {
+                        error_exit("Error: Invalid port number.\n");
+                    }
                     break;
             }
             break;

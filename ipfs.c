@@ -199,8 +199,7 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
                                    int hash_value_len) {
     int sock;
     connect_as_client((const char *)ctx->config->file_system_manager_ip_addr,
-                      (const char *)ctx->config->file_system_manager_port_num,
-                      &sock);
+                      ctx->config->file_system_manager_port_num, &sock);
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
     name_size = sizeof(ctx->config->name);
@@ -261,8 +260,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     struct timeval filemanager_start, filemanager_end;
     gettimeofday(&filemanager_start, NULL);
     connect_as_client((const char *)ctx->config->file_system_manager_ip_addr,
-                      (const char *)ctx->config->file_system_manager_port_num,
-                      &sock);
+                      ctx->config->file_system_manager_port_num, &sock);
     int name_size;
     name_size = sizeof(ctx->config->name);
     unsigned char data[BUFF_SIZE];
