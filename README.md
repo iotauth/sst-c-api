@@ -147,7 +147,7 @@ $sudo make install
 
 # Example
 
--   Turn on two different terminals at `$SST_ROOT/entity/c/examples/build`, and turn on Auth on the third terminal.
+-   Turn on two different terminals at `$SST_ROOT/entity/c/examples/server_client_example/build`, and turn on Auth on the third terminal.
 
 Execute
 

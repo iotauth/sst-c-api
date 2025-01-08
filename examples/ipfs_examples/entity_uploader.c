@@ -24,6 +24,10 @@ int main(int argc, char* argv[]) {
     float time_interval;
     gettimeofday(&keygen_start, NULL);
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
+    if (s_key_list_0 == NULL) {
+        printf("Failed to get session key. Returning NULL.\n");
+        exit(1);
+    }
     gettimeofday(&keygen_end, NULL);
     float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
     float keygen_utime = keygen_end.tv_usec - keygen_start.tv_usec;
