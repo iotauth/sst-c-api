@@ -1,3 +1,8 @@
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <unistd.h>
+
 #include "../../ipfs.h"
 
 int main(int argc, char *argv[]) {
@@ -32,7 +37,6 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < 5; i++) {
         receive_data_and_download_file(&received_skey_id[0], ctx, &file_name[0],
                                        &estimate_time[i]);
-        print_buf(received_skey_id, 8);
         struct timeval keygen_start, keygen_end;
         gettimeofday(&keygen_start, NULL);
         session_key_t *session_key =
@@ -43,7 +47,9 @@ int main(int argc, char *argv[]) {
         estimate_time[i].keygenerate_time =
             keygen_time + keygen_utime / 1000000;
         if (session_key == NULL) {
-            error_return_null("There is no session key.\n");
+            fputs("There is no session key.\n", stderr);
+            fputc('\n', stderr);
+            exit(1);
         } else {
             sleep(5);
             struct timeval decrypt_start, decrypt_end;
