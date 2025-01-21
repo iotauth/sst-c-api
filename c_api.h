@@ -160,11 +160,11 @@ void *receive_thread(void *SST_session_ctx);
 
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
 // @param socket socket connected with the server
-// @param buf buffer to fill the received message.
-// @param buf_length the maximum length of the buffer
+// @param plaintext The decrypted plaintext
+// @param session_ctx session ctx struct
 // @return the total number of bytes read from the socket, or -1 on failure.
-int read_secure_message(int socket, unsigned char *buf,
-                        unsigned int buf_length);
+int read_secure_message(int socket, unsigned char **plaintext,
+                        SST_session_ctx_t *session_ctx);
 
 // Creates a thread to receive messages, by reading one bytes each at the SST
 // header. Max buffer length is 1000 bytes currently.
