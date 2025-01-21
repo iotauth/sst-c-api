@@ -24,7 +24,6 @@ int main(int argc, char *argv[]) {
     char concat_buffer[MAX_PAYLOAD_LENGTH];
     int concat_buffer_size = make_download_req_buffer(ctx, concat_buffer);
     send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
-    // ctx->config->purpose_index = 1;
     char file_name[BUFF_SIZE];
     memcpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
@@ -35,8 +34,7 @@ int main(int argc, char *argv[]) {
     int command_size;
     data_buf_length =
         read_secure_message(session_ctx->sock, &decrypted, session_ctx);
-    int a = decrypted[SEQ_NUM_SIZE];
-    if (a != DOWNLOAD_RESP) {
+    if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
         fputs("Not download response!!", stderr);
         fputc('\n', stderr);
         exit(1);
