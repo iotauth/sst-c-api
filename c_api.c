@@ -170,7 +170,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
-            printf("Getting target session key by id failed. Returning NULL.");
+            printf("Getting target session key by id failed. Returning NULL.\n");
             return NULL;
         }
         s_key = s_key_list->s_key;
@@ -331,16 +331,20 @@ void receive_message(unsigned char *received_buf,
     }
 }
 
-int read_secure_message(int socket, unsigned char *buf,
-                        unsigned int buf_length) {
+int read_secure_message(int socket, unsigned char **plaintext,
+                        SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int bytes_read;
-    bytes_read = read_header_return_data_buf_pointer(socket, &message_type, buf,
-                                                     buf_length);
+    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    bytes_read = read_header_return_data_buf_pointer(
+        socket, &message_type, received_buf, MAX_PAYLOAD_LENGTH);
     if (check_SECURE_COMM_MSG_type(message_type)) {
         error_exit("Wrong message_type.");
     }
-    return bytes_read;
+    unsigned int decrypted_length;
+    *plaintext = decrypt_received_message(received_buf, bytes_read, &decrypted_length,
+                                         session_ctx);
+    return decrypted_length;
 }
 
 int send_secure_message(char *msg, unsigned int msg_length,
