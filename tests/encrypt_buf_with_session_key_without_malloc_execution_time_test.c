@@ -32,6 +32,8 @@ long get_time_diff_ns(struct timespec start, struct timespec end) {
 }
 
 int main(int argc, char *argv[]) {
+    // Just to pass compiler warnings.
+    (void)argc;
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
@@ -52,7 +54,6 @@ int main(int argc, char *argv[]) {
     // Start measuring time for the outer loop
     clock_gettime(CLOCK_MONOTONIC, &start_outer);
     for (int j = 0; j < FILE_ITERATION; j++) {
-        unsigned int file_offset = 0;
         total_inner_time_ns = 0;
 
         for (int i = 0; i < BLOCK_ITERATION; i++) {
@@ -75,8 +76,6 @@ int main(int argc, char *argv[]) {
             // Calculate the time for this iteration of the inner loop
             long inner_time_ns = get_time_diff_ns(start_inner, end_inner);
             total_inner_time_ns += inner_time_ns;
-
-            file_offset += BLOCK_SIZE;
         }
 
         // Calculate and print the average time for the inner loop
