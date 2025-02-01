@@ -21,7 +21,7 @@ add_library(sst-c-api STATIC
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Statically link OpenSSL into SSTLIB
+# Statically link OpenSSL into sst-c-api
 target_link_libraries(sst-c-api PRIVATE ${OPENSSL_LIBRARIES} Threads::Threads)
 
 target_include_directories(sst-c-api PUBLIC
@@ -30,16 +30,16 @@ target_include_directories(sst-c-api PUBLIC
   ${OPENSSL_INCLUDE_DIR}
 )
 
-# Ensure OpenSSL is installed along with SSTLIB
+# Ensure OpenSSL is installed along with sst-c-api
 install(FILES ${OPENSSL_LIBRARIES} DESTINATION lib)
 
 # Compiler flags
 if(MSVC)
-  target_compile_options(SSTLIB PUBLIC /W4 /WX)
+  target_compile_options(sst-c-api PUBLIC /W4 /WX)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 # Exclude errors, because some can use GNU-specific variadic arguments. This is done for only compiling the SST library.
 else()
-  target_compile_options(SSTLIB PUBLIC -Wall -Wextra -Wpedantic - Werror)
+  target_compile_options(sst-c-api PUBLIC -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Install the library
@@ -77,6 +77,6 @@ install(FILES c_api.h DESTINATION include/sst-c-api)
 # Build unit tests
 enable_testing()
 
-add_executable(c_crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
-target_link_libraries(c_crypto_test sst-c-api)
-add_test(NAME c_crypto_test COMMAND c_crypto_test)
+add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
+target_link_libraries(crypto_test sst-c-api)
+add_test(NAME crypto_test COMMAND crypto_test)
