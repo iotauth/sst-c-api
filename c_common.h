@@ -233,7 +233,7 @@ int mod(int a, int b);
 // @param buf A pointer to the buffer where the data will be stored.
 // @param buf_length The maximum number of bytes to read into the buffer.
 // @return The number of bytes successfully read, or -1 if an error occurred.
-unsigned int read_from_socket(int socket, unsigned char *buf,
+unsigned int sst_read_from_socket(int socket, unsigned char *buf,
                               unsigned int buf_length);
 
 // Writes data to a socket from a buffer.
@@ -244,7 +244,7 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
 // @param buf A pointer to the buffer containing the data to be written.
 // @param buf_length The number of bytes to write from the buffer.
 // @return The number of bytes successfully written, or -1 if an error occurred.
-unsigned int write_to_socket(int socket, const unsigned char *buf,
+unsigned int sst_write_to_socket(int socket, const unsigned char *buf,
                              unsigned int buf_length);
 
 // Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
