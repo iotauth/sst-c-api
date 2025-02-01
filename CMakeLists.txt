@@ -43,6 +43,12 @@ else()
 endif()
 
 # Install the library
+# Installs in /usr/local/lib/cmake/sst-lib/sst-libTargets.cmake & sst-libTargets-noconfig.cmake
+# Contains target definitions for sst-c-api
+# Helps CMake know how to link against sst-c-api
+
+# sst-libTargets-noconfig.cmake Acts as the entry point for find_package(sst-lib)
+# Defines where to look for sst-libTargets.cmake
 install(TARGETS sst-c-api
   EXPORT sst-libTargets
   LIBRARY DESTINATION lib
@@ -60,12 +66,14 @@ install(
   DESTINATION lib/cmake/sst-lib
 )
 
+# Creates in /usr/local/lib/cmake/sst-lib/sst-libConfig.cmake
+# Acts as the entry point for find_package(sst-lib)
+# Defines where to look for sst-libTargets.cmake
 configure_package_config_file(
   ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sst-libConfig.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
   INSTALL_DESTINATION lib/cmake/sst-lib
 )
-
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
   DESTINATION lib/cmake/sst-lib
