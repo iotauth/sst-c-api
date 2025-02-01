@@ -13,6 +13,8 @@
 #include "../c_crypto.h"
 
 int main(int argc, char *argv[]) {
+    // Just to pass compiler warnings.
+    (void)argc;
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 

@@ -1,28 +1,18 @@
 cmake_minimum_required(VERSION 3.19)
-project(SST VERSION 1.0.0 LANGUAGES C)
+project(SST-IPFS-Examples VERSION 1.0.0 LANGUAGES C)
 
-# Check `openssl version -d` and copy the path to OPENSSL_ROOT_DIR
-# if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-#     set(OPENSSL_ROOT_DIR "/usr/local/ssl")
-# endif()
+# Add the main SST library
+add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 
-find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
-add_executable(entity_uploader entity_uploader.c ../../ipfs.c ../../c_api.c ../../c_common.c ../../c_crypto.c ../../c_secure_comm.c ../../load_config.c)
-add_executable(entity_downloader entity_downloader.c ../../ipfs.c ../../c_api.c ../../c_common.c ../../c_crypto.c ../../c_secure_comm.c ../../load_config.c)
-add_executable(secure_entity_uploader secure_entity_uploader.c ../../ipfs.c ../../c_api.c ../../c_common.c ../../c_crypto.c ../../c_secure_comm.c ../../load_config.c)
-add_executable(secure_entity_downloader secure_entity_downloader.c ../../ipfs.c ../../c_api.c ../../c_common.c ../../c_crypto.c ../../c_secure_comm.c ../../load_config.c)
+# List of executables
+add_executable(entity_uploader entity_uploader.c ../../ipfs.c)
+add_executable(entity_downloader entity_downloader.c ../../ipfs.c)
+add_executable(secure_entity_uploader secure_entity_uploader.c ../../ipfs.c)
+add_executable(secure_entity_downloader secure_entity_downloader.c ../../ipfs.c)
 
-target_link_libraries(entity_uploader OpenSSL::SSL)
-target_link_libraries(entity_uploader Threads::Threads)
-
-target_link_libraries(entity_downloader OpenSSL::SSL)
-target_link_libraries(entity_downloader Threads::Threads)
-
-
-target_link_libraries(secure_entity_uploader OpenSSL::SSL)
-target_link_libraries(secure_entity_uploader Threads::Threads)
-
-target_link_libraries(secure_entity_downloader OpenSSL::SSL)
-target_link_libraries(secure_entity_downloader Threads::Threads)
+# Link against SST library and dependencies
+foreach(prog entity_uploader entity_downloader secure_entity_uploader secure_entity_downloader)
+    target_link_libraries(${prog} sst-c-api Threads::Threads)
+endforeach()

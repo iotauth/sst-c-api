@@ -19,7 +19,7 @@ void *send_request(void *SST_ctx) {
     for (int i = 0; i < 1; i++) {
         // If there is no mutex_lock, this test fails.
         // pthread_mutex_lock(&ctx->mutex);
-        session_key_list_t *s_key_list;
+        session_key_list_t *s_key_list = NULL;
         s_key_list = get_session_key(ctx, s_key_list);
         // pthread_mutex_unlock(&ctx->mutex);
         free_session_key_list_t(s_key_list);
@@ -28,6 +28,8 @@ void *send_request(void *SST_ctx) {
 }
 
 int main(int argc, char *argv[]) {
+    // Just to pass compiler warnings.
+    (void)argc;
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
@@ -44,4 +46,5 @@ int main(int argc, char *argv[]) {
     }
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
+    return 0;
 }
