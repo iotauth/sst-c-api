@@ -98,7 +98,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
                     sender_HS_1, &sender_HS_1_length);
     unsigned int bytes_written =
-        write_to_socket(sock, sender_HS_1, sender_HS_1_length);
+        sst_write_to_socket(sock, sender_HS_1, sender_HS_1_length);
     if (bytes_written != sender_HS_1_length) {
         error_exit("Failed to write data to socket.");
     }
@@ -108,7 +108,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
     unsigned int received_buf_length =
-        read_from_socket(sock, received_buf, sizeof(received_buf));
+        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
@@ -127,7 +127,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
                         sender_HS_2, &sender_HS_2_length);
         unsigned int bytes_written =
-            write_to_socket(sock, sender_HS_2, sender_HS_2_length);
+            sst_write_to_socket(sock, sender_HS_2, sender_HS_2_length);
         if (bytes_written != sender_HS_2_length) {
             error_exit("Failed to write data to socket.");
         }
@@ -197,7 +197,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
         int received_buf_length =
-            read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             perror("Read Error:");
         }
@@ -237,7 +237,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_2,
                             sender, &sender_length);
             unsigned int bytes_written =
-                write_to_socket(clnt_sock, sender, sender_length);
+                sst_write_to_socket(clnt_sock, sender, sender_length);
             if (bytes_written != sender_length) {
                 error_exit("Failed to write data to socket.");
             }
@@ -249,7 +249,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
         unsigned int received_buf_length =
-            read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -298,7 +298,7 @@ void *receive_thread(void *SST_session_ctx) {
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length;
     while (1) {
-        received_buf_length = read_from_socket(session_ctx->sock, received_buf,
+        received_buf_length = sst_read_from_socket(session_ctx->sock, received_buf,
                                                sizeof(received_buf));
         receive_message(received_buf, received_buf_length, session_ctx);
     }
