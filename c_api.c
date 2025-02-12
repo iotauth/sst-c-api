@@ -86,6 +86,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                                                         int sock) {
     // Initialize SST_session_ctx_t
     SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));
+    session_ctx->internal_buf.buf = malloc(MAX_PAYLOAD_LENGTH);
     session_ctx->received_seq_num = 0;
     session_ctx->sent_seq_num = 0;
 
@@ -170,7 +171,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
-            printf("Getting target session key by id failed. Returning NULL.\n");
+            printf(
+                "Getting target session key by id failed. Returning NULL.\n");
             return NULL;
         }
         s_key = s_key_list->s_key;
@@ -342,8 +344,8 @@ int read_secure_message(int socket, unsigned char **plaintext,
         error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
-    *plaintext = decrypt_received_message(received_buf, bytes_read, &decrypted_length,
-                                         session_ctx);
+    *plaintext = decrypt_received_message(received_buf, bytes_read,
+                                          &decrypted_length, session_ctx);
     return decrypted_length;
 }
 
@@ -564,6 +566,11 @@ void generate_random_nonce(int length, unsigned char *buf) {
 void free_session_key_list_t(session_key_list_t *session_key_list) {
     free(session_key_list->s_key);
     free(session_key_list);
+}
+
+void free_SST_session_ctx_t(SST_session_ctx_t *session_ctx) {
+    free(session_ctx->internal_buf.buf);
+    free(session_ctx);
 }
 
 void free_SST_ctx_t(SST_ctx_t *ctx) {

@@ -65,12 +65,18 @@ typedef struct {
     int file_system_manager_port_num;
 } config_t;
 
+typedef struct {
+    size_t length;
+    unsigned char *buf;
+} internal_buf_t;
+
 // This struct is used in receive_thread()
 typedef struct {
     int sock;
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
+    internal_buf_t internal_buf;
 } SST_session_ctx_t;
 
 // This struct is a session_key_list.
@@ -318,6 +324,10 @@ void generate_random_nonce(int length, unsigned char *buf);
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Free memory allocated in SST_session_ctx_t.
+// @param SST_session_ctx_t session_ctx to free.
+void free_SST_session_ctx_t(SST_session_ctx_t *session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
