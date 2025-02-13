@@ -229,7 +229,7 @@ int mod(int a, int b) {
 // TODO: Merge with sst_read_from_socket.
 // Function to read exactly `size` bytes from a socket
 int SST_read_exact(int sock, unsigned char *buffer, int size) {
-    if (socket < 0) {
+    if (sock < 0) {
         // Socket is not open.
         errno = EBADF;
         return -1;
