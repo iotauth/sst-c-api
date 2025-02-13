@@ -857,3 +857,119 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
         return -1;
     }
 }
+
+int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
+                              unsigned char *encrypted_buf,
+                              unsigned int encrypted_length, unsigned char *buf,
+                              size_t num) {
+    int ret = -1;
+    unsigned int decrypted_length;
+
+    // Allocate stack memory for decrypted buffer, which will be SEQ_NUM[8
+    // bytes] + decrypted
+    unsigned int estimate_decrypted_max_length =
+        get_expected_decrypted_maximum_length(
+            encrypted_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
+            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode);
+    unsigned char decrypted_stack[estimate_decrypted_max_length];
+
+    if (decrypt_buf_with_session_key_without_malloc(
+            &session_ctx->s_key, encrypted_buf, encrypted_length,
+            decrypted_stack, &decrypted_length) != 0) {
+        error_exit("Decryption failed.");
+    }
+
+    // Check sequence number.
+    unsigned int received_seq_num =
+        read_unsigned_int_BE(decrypted_stack, SEQ_NUM_SIZE);
+    if (received_seq_num != session_ctx->received_seq_num) {
+        error_exit("Wrong sequence number expected.");
+    }
+    session_ctx->received_seq_num++;
+    printf("Received seq_num: %d\n", received_seq_num);
+
+    if (num < decrypted_length - SEQ_NUM_SIZE) {
+        printf("The buffer is too small. Returning error code -1.\n");
+        return -1;
+    }
+    // // Check if decrypted length matches with expected length.
+    // if (decrypted_length - SEQ_NUM_SIZE != num) {
+    //     error_exit(
+    //         "Decrypted length does not match expected decrypted length.");
+    // }
+
+    // Copy the decrypted buffer to the buffer to return.
+    memcpy(buf, decrypted_stack + SEQ_NUM_SIZE,
+           decrypted_length - SEQ_NUM_SIZE);
+    // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
+    return decrypted_length - SEQ_NUM_SIZE;
+}
+
+// Function to read a variable-length integer from the socket
+int read_var_length_int(int sock, unsigned int *num,
+                        unsigned int *var_len_size) {
+    *num = 0;
+    *var_len_size = 0;
+
+    for (int i = 0; i < MAX_PAYLOAD_BUF_SIZE; i++) {
+        unsigned char byte;
+        if (SST_read_exact(sock, &byte, 1) < 0) {
+            return -1;  // Error while reading
+        }
+
+        *num |= (byte & 127) << (7 * i);
+        (*var_len_size)++;
+
+        if ((byte & 128) == 0) {
+            return 0;  // Done reading variable-length integer
+        }
+    }
+    return -1;  // Invalid variable-length integer (too large)
+}
+
+ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
+                                 unsigned char *buf) {
+    // Step 1: Read the 1-byte message type
+    if (SST_read_exact(sock, message_type, 1) <= 0) {
+        return -1;  // Error or disconnected
+    }
+    // Step 2: Read the variable-length field
+    unsigned int payload_length = 0;
+    unsigned int var_len_size = 0;
+    if (read_var_length_int(sock, &payload_length, &var_len_size) < 0) {
+        return -1;
+    }
+
+    // Step 3: Read the payload
+    if (SST_read_exact(sock, buf, payload_length) < 0) {
+        return -1;
+    }
+
+    // Successfully read a message
+    // printf("Received Message: Type=%u, Payload Length=%u\n", message_type,
+    // payload_length); printf("Payload: %.*s\n", payload_length, payload);
+
+    return payload_length;
+}
+
+ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                          size_t num) {
+    unsigned char message_type;
+    ssize_t payload_length;
+    payload_length = get_msg_type_and_payload(session_ctx->sock, &message_type,
+                                              session_ctx->payload_buf);
+    if (payload_length <= 0) {
+        error_exit("TODO:");
+    }
+    if (!check_SECURE_COMM_MSG_type(message_type)) {
+        error_exit("Invalid message type while in secure communication.\n");
+    }
+    return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
+                                     payload_length, buf, num);
+}
+
+// Always read the exact number it requested.
+ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                 size_t num) {
+    return SST_read_internal(session_ctx, buf, num);
+}
