@@ -349,7 +349,7 @@ int read_secure_message(int socket, unsigned char **plaintext,
     return decrypted_length;
 }
 
-int send_secure_message(char *msg, unsigned int msg_length,
+int SST_write(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx) {
     return send_SECURE_COMM_message(msg, msg_length, session_ctx);
 }

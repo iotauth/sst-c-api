@@ -209,7 +209,7 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 // @param msg_length length of message
 // @param SST_session_ctx_t session ctx struct
 // @return the total number of bytes written to the socket, or -1 on failure.
-int send_secure_message(char *msg, unsigned int msg_length,
+int SST_write(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx);
 
 // Encrypt buffer with session key. This mallocs data, so the buffer must be

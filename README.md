@@ -82,9 +82,9 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 -   The user can 
 - Returns the decrypted buffer, and must free() after use.
 
-**int send_secure_message()**
+**int SST_write()**
 
--   `send_secure_message()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
+-   `SST_write()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
 - It recursively `write()`s until it sends the total message length.
 - Input includes message, length of message, and session_ctx struct.
 - Returns the bytes written if success, and -1 if failure.

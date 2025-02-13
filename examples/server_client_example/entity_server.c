@@ -1,11 +1,11 @@
-#include "../../c_api.h"
-
-#include <sys/socket.h>
 #include <netinet/in.h>
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
+
+#include "../../c_api.h"
 
 void exit_with_error(char *message) {
     fputs(message, stderr);
@@ -68,12 +68,10 @@ int main(int argc, char *argv[]) {
                        (void *)session_ctx);
         sleep(1);
 
-        send_secure_message("Hello client", strlen("Hello client"),
-                            session_ctx);
+        SST_write("Hello client", strlen("Hello client"), session_ctx);
         sleep(1);
-        send_secure_message("Hello client - second message",
-                            strlen("Hello client - second message"),
-                            session_ctx);
+        SST_write("Hello client - second message",
+                  strlen("Hello client - second message"), session_ctx);
         sleep(2);
         close(clnt_sock);
         pthread_cancel(thread);
@@ -93,12 +91,10 @@ int main(int argc, char *argv[]) {
                    (void *)session_ctx2);
     sleep(1);
 
-    send_secure_message("Hello client 2", strlen("Hello client 2"),
-                        session_ctx2);
+    SST_write("Hello client 2", strlen("Hello client 2"), session_ctx2);
     sleep(1);
-    send_secure_message("Hello client 2 - second message",
-                        strlen("Hello client 2 - second message"),
-                        session_ctx2);
+    SST_write("Hello client 2 - second message",
+              strlen("Hello client 2 - second message"), session_ctx2);
     sleep(1);
 
     sleep(3);
