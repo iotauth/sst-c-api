@@ -13,6 +13,10 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
+#define MAX_PAYLOAD_LENGTH 1024
+#define MAX_SECURE_COMM_LENGTH \
+    1088  // The total length of the message, including the header and
+          // encryption and authentication
 
 typedef enum {
     AES_128_CBC,
@@ -77,6 +81,7 @@ typedef struct {
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
     internal_buf_t internal_buf;
+    unsigned char payload_buf[MAX_SECURE_COMM_LENGTH];
 } SST_session_ctx_t;
 
 // This struct is a session_key_list.
