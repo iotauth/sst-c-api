@@ -68,10 +68,10 @@ int main(int argc, char *argv[]) {
                        (void *)session_ctx);
         sleep(1);
 
-        SST_write("Hello client", strlen("Hello client"), session_ctx);
+        SST_write(session_ctx, "Hello client", strlen("Hello client"));
         sleep(1);
-        SST_write("Hello client - second message",
-                  strlen("Hello client - second message"), session_ctx);
+        SST_write(session_ctx, "Hello client - second message",
+                  strlen("Hello client - second message"));
         sleep(2);
         close(clnt_sock);
         pthread_cancel(thread);
@@ -91,10 +91,10 @@ int main(int argc, char *argv[]) {
                    (void *)session_ctx2);
     sleep(1);
 
-    SST_write("Hello client 2", strlen("Hello client 2"), session_ctx2);
+    SST_write(session_ctx2, "Hello client 2", strlen("Hello client 2"));
     sleep(1);
-    SST_write("Hello client 2 - second message",
-              strlen("Hello client 2 - second message"), session_ctx2);
+    SST_write(session_ctx2, "Hello client 2 - second message",
+              strlen("Hello client 2 - second message"));
     sleep(1);
 
     sleep(3);

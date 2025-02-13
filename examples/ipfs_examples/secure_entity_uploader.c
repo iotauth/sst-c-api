@@ -46,9 +46,9 @@ int main(int argc, char* argv[]) {
     pthread_t thread;
     pthread_create(&thread, NULL, &receive_thread_read_one_each,
                    (void*)session_ctx);
-    SST_write("Hello", strlen("Hello"), session_ctx);
+    SST_write(session_ctx, "Hello", strlen("Hello"));
     sleep(1);
-    SST_write(concat_buffer, concat_buffer_size, session_ctx);
+    SST_write(session_ctx, concat_buffer, concat_buffer_size);
     free_SST_ctx_t(ctx);
     pthread_cancel(thread);
 }

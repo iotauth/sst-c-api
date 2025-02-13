@@ -205,12 +205,12 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
 
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
+// @param SST_session_ctx_t session ctx struct
 // @param msg message to send
 // @param msg_length length of message
-// @param SST_session_ctx_t session ctx struct
 // @return the total number of bytes written to the socket, or -1 on failure.
-int SST_write(char *msg, unsigned int msg_length,
-                        SST_session_ctx_t *session_ctx);
+int SST_write(SST_session_ctx_t *session_ctx, char *msg,
+              unsigned int msg_length);
 
 // Encrypt buffer with session key. This mallocs data, so the buffer must be
 // freed after use.
@@ -344,6 +344,6 @@ void free_SST_ctx_t(SST_ctx_t *ctx);
 // @param buf Pointer of the buffer to be filled.
 // @param num The number of bytes to read.
 ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
-    size_t num);
+                 size_t num);
 
 #endif  // C_API_H

@@ -16,10 +16,10 @@ int main(int argc, char *argv[]) {
     }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    SST_write("Hello server", strlen("Hello server"), session_ctx);
+    SST_write(session_ctx, "Hello server", strlen("Hello server"));
     sleep(1);
-    SST_write("Hello server - second message",
-              strlen("Hello server - second message"), session_ctx);
+    SST_write(session_ctx, "Hello server - second message",
+              strlen("Hello server - second message"));
     free_SST_session_ctx_t(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);

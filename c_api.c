@@ -300,8 +300,8 @@ void *receive_thread(void *SST_session_ctx) {
     unsigned char received_buf[MAX_SECURE_COMM_LENGTH];
     unsigned int received_buf_length;
     while (1) {
-        received_buf_length = sst_read_from_socket(session_ctx->sock, received_buf,
-                                               sizeof(received_buf));
+        received_buf_length = sst_read_from_socket(
+            session_ctx->sock, received_buf, sizeof(received_buf));
         receive_message(received_buf, received_buf_length, session_ctx);
     }
 }
@@ -349,8 +349,8 @@ int read_secure_message(int socket, unsigned char **plaintext,
     return decrypted_length;
 }
 
-int SST_write(char *msg, unsigned int msg_length,
-                        SST_session_ctx_t *session_ctx) {
+int SST_write(SST_session_ctx_t *session_ctx, char *msg,
+              unsigned int msg_length) {
     return send_SECURE_COMM_message(msg, msg_length, session_ctx);
 }
 
@@ -583,6 +583,6 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
 // TODO: Fix the other reads.
 // Always read the exact number it requested.
 ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
-    size_t num) {
-return SST_read_internal(session_ctx, buf, num);
+                 size_t num) {
+    return SST_read_internal(session_ctx, buf, num);
 }
