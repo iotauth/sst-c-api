@@ -49,10 +49,7 @@
 #define HS_NONCE_SIZE 8
 #define HS_INDICATOR_SIZE 1 + HS_NONCE_SIZE * 2
 #define SEQ_NUM_SIZE 8
-#define MAX_PAYLOAD_LENGTH 1024
-#define MAX_SECURE_COMM_LENGTH \
-    1088  // The total length of the message, including the header and
-          // encryption and authentication
+
 #define MAX_HS_BUF_LENGTH 256
 #define MAX_ERROR_MESSAGE_LENGTH 128
 
@@ -227,6 +224,8 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 // @param b The divisor (modulus).
 // @return The positive remainder when a is divided by b.
 int mod(int a, int b);
+
+int SST_read_exact(int sock, unsigned char *buffer, int size);
 
 // Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into

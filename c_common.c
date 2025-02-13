@@ -116,7 +116,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           &ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        error_exit("Wrong header calculation... Exiting...");
+        error_exit("Wrong header calculation... Exiting...");   
     }
     if (ret_length > buf_length) {
         error_exit("Larger buffer size required.");
@@ -224,6 +224,33 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret) {
 int mod(int a, int b) {
     int r = a % b;
     return r < 0 ? r + b : r;
+}
+
+// TODO: Merge with sst_read_from_socket.
+// Function to read exactly `size` bytes from a socket
+int SST_read_exact(int sock, unsigned char *buffer, int size) {
+    if (socket < 0) {
+        // Socket is not open.
+        errno = EBADF;
+        return -1;
+    }
+    int total_read = 0;
+    while (total_read < size) {
+        int bytes_read = read(sock, buffer + total_read, size - total_read);
+        if (bytes_read < 0 && (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            printf("Reading from socket %d failed with error: `%s`. Will try again.\n", sock, strerror(errno));
+            usleep(100000);  // 100 milliseconds = 100,000 microseconds
+            continue;
+        } else if (bytes_read < 0) {
+            // A more serious error occurred.
+            error_exit("Reading from socket failed.");
+            return -1;
+        } else if (bytes_read == 0) {
+            return 0; // Connection closed or error
+        }
+        total_read += bytes_read;
+    }
+    return 0;
 }
 
 unsigned int sst_read_from_socket(int socket, unsigned char *buf,
