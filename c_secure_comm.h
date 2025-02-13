@@ -112,7 +112,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 // @param msg pointer to the plaintext message to be sent.
 // @param msg_length length of the plaintext message in bytes.
 // @return the total number of bytes written to the socket, or -1 on failure.
-int send_SECURE_COMM_message(SST_session_ctx_t *session_ctx, char *msg,
+int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
                              unsigned int msg_length);
 
 // Decrypts message, reads seq_num, checks validity, and prints message

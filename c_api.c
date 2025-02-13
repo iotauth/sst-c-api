@@ -351,7 +351,7 @@ int read_secure_message(int socket, unsigned char **plaintext,
 
 int SST_write(SST_session_ctx_t *session_ctx, char *msg,
               unsigned int msg_length) {
-    return send_SECURE_COMM_message(session_ctx, msg, msg_length);
+    return SST_write_internal(session_ctx, msg, msg_length);
 }
 
 unsigned char *return_decrypted_buf(unsigned char *received_buf,

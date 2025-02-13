@@ -422,7 +422,7 @@ int send_splitted_message(SST_session_ctx_t *session_ctx, char *msg,
     return total_bytes_written;
 }
 
-int send_SECURE_COMM_message(SST_session_ctx_t *session_ctx, char *msg,
+int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
                              unsigned int msg_length) {
     if (check_session_key_validity(&session_ctx->s_key)) {
         error_exit("Session key expired!\n");
