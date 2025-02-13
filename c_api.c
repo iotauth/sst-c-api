@@ -579,3 +579,10 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     free_config_t(ctx->config);
     free(ctx);
 }
+
+// TODO: Fix the other reads.
+// Always read the exact number it requested.
+ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
+    size_t num) {
+return SST_read_internal(session_ctx, buf, num);
+}

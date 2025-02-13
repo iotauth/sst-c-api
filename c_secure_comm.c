@@ -961,15 +961,11 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
     if (payload_length <= 0) {
         error_exit("TODO:");
     }
-    if (!check_SECURE_COMM_MSG_type(message_type)) {
+    if (check_SECURE_COMM_MSG_type(message_type) != 0) {
         error_exit("Invalid message type while in secure communication.\n");
     }
     return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
                                      payload_length, buf, num);
 }
 
-// Always read the exact number it requested.
-ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
-                 size_t num) {
-    return SST_read_internal(session_ctx, buf, num);
-}
+

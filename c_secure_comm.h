@@ -244,4 +244,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char *output, unsigned int *output_length, bool is_encrypt);
 
+ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                          size_t num);
+
 #endif  // C_SECURE_COMM_H

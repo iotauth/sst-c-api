@@ -338,4 +338,12 @@ void free_SST_session_ctx_t(SST_session_ctx_t *session_ctx);
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
 
+// TODO: Fix the other reads.
+// Read the received message, and return the buffer in plaintext.
+// @param SST_session_ctx_t session_ctx
+// @param buf Pointer of the buffer to be filled.
+// @param num The number of bytes to read.
+ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
+    size_t num);
+
 #endif  // C_API_H

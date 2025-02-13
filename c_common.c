@@ -250,7 +250,7 @@ int SST_read_exact(int sock, unsigned char *buffer, int size) {
         }
         total_read += bytes_read;
     }
-    return 0;
+    return total_read;
 }
 
 unsigned int sst_read_from_socket(int socket, unsigned char *buf,
