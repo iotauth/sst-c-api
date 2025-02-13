@@ -967,5 +967,3 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
     return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
                                      payload_length, buf, num);
 }
-
-
