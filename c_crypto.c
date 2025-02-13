@@ -317,9 +317,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
         // The encrypted length is same on CTR mode.
         encrypted_total_length = buf_length;
     } else if (enc_mode == AES_128_GCM) {
-        encrypted_total_length =
-            buf_length +
-            AES_GCM_TAG_SIZE;  // GCM_TAG
+        encrypted_total_length = buf_length + AES_GCM_TAG_SIZE;  // GCM_TAG
     }
     if (hmac_mode == USE_HMAC) {
         encrypted_total_length =
@@ -377,11 +375,9 @@ static int get_symmetric_encrypt_authenticate_buffer(
     return 0;
 }
 
-unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
-                                                   unsigned int iv_size,
-                                                   unsigned int mac_key_size,
-                                                   AES_encryption_mode_t enc_mode,
-                                                   hmac_mode_t hmac_mode) {
+unsigned int get_expected_decrypted_maximum_length(
+    unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
+    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode) {
     unsigned int decrypted_maximum_length;
     // First remove the IV length attached on front.
     decrypted_maximum_length = buf_length - iv_size;
