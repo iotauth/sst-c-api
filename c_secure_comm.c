@@ -386,11 +386,8 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
-                             SST_session_ctx_t *session_ctx) {
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        error_exit("Session key expired!\n");
-    }
+int send_splitted_message(SST_session_ctx_t *session_ctx, char *msg,
+                          unsigned int msg_length) {
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);
     write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
@@ -409,22 +406,40 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     }
 
     session_ctx->sent_seq_num++;
-    unsigned char
-        sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
-                                         // does not support dynamic sizes,
-                                         // the max length is shorter than
-                                         // 1024. Must need to decide static
-                                         // or dynamic buffer size.
-    unsigned int sender_buf_length;
-    make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
-                    sender_buf, &sender_buf_length);
 
-    unsigned int bytes_written =
-        sst_write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
-    if (bytes_written != sender_buf_length) {
-        error_exit("Failed to write data to socket.");
+    unsigned char header[MAX_PAYLOAD_BUF_SIZE + 1];
+    unsigned int header_length;
+    make_buffer_header(encrypted_length, SECURE_COMM_MSG, header,
+                       &header_length);
+    unsigned int total_bytes_written = 0;
+    unsigned int bytes_written = 0;
+    bytes_written =
+        sst_write_to_socket(session_ctx->sock, header, header_length);
+    total_bytes_written += bytes_written;
+    bytes_written = sst_write_to_socket(session_ctx->sock, encrypted_stack,
+                                        encrypted_length);
+    total_bytes_written += bytes_written;
+    return total_bytes_written;
+}
+
+int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
+                             SST_session_ctx_t *session_ctx) {
+    if (check_session_key_validity(&session_ctx->s_key)) {
+        error_exit("Session key expired!\n");
     }
-    return bytes_written;
+
+    size_t bytes_sent = 0;
+    size_t chunk_size = 0;
+    int sent = 0;
+    while (bytes_sent < msg_length) {
+        chunk_size = (msg_length - bytes_sent < MAX_PAYLOAD_LENGTH)
+                         ? (msg_length - bytes_sent)
+                         : MAX_PAYLOAD_LENGTH;
+        sent = send_splitted_message(session_ctx, msg + bytes_sent, chunk_size);
+        bytes_sent += sent;
+    }
+    // Bytes all written.
+    return msg_length;
 }
 
 void print_received_message(unsigned char *data, unsigned int data_length,
