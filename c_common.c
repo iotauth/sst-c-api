@@ -17,6 +17,24 @@ void SST_print_log(const char *fmt, ...) {
     va_end(args);
 }
 
+// Print out error messages along with errno if set.
+void SST_print_error(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    // Print the "ERROR:" prefix to stderr
+    fprintf(stderr, "ERROR: ");
+    // Print the formatted error message to stderr (without adding a newline)
+    vfprintf(stderr, fmt, args);
+    // Print errno if it is set
+    if (errno != 0) {
+        fprintf(stderr, " (errno: %d, %s)", errno, strerror(errno));
+    }
+    // End the line after the error message and errno
+    fprintf(stderr, "\n");
+
+    va_end(args);
+}
+
 void error_exit(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
