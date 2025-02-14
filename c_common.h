@@ -93,6 +93,9 @@ void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 // Print out log messages.
 void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
+// Print out error messages along with errno if set.
+void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
 // Print out error message and exit program.
 // @param message error message
 void error_exit(char *message);
