@@ -423,7 +423,7 @@ int send_splitted_message(SST_session_ctx_t *session_ctx, char *msg,
 }
 
 int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
-                             unsigned int msg_length) {
+                       unsigned int msg_length) {
     if (check_session_key_validity(&session_ctx->s_key)) {
         error_exit("Session key expired!\n");
     }
@@ -926,7 +926,7 @@ int read_var_length_int(int sock, unsigned int *num,
 
 ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
                                  unsigned char *buf) {
-                                    int ret = -1;
+    int ret = -1;
     // Step 1: Read the 1-byte message type
     ret = sst_read_from_socket_exact(sock, message_type, 1);
     if (ret <= 0) {
@@ -960,7 +960,7 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
     payload_length = get_msg_type_and_payload(session_ctx->sock, &message_type,
                                               session_ctx->payload_buf);
     if (payload_length <= 0) {
-       return payload_length;
+        return payload_length;
     }
     if (check_SECURE_COMM_MSG_type(message_type) != 0) {
         error_exit("Invalid message type while in secure communication.\n");
