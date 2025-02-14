@@ -225,6 +225,13 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 // @return The positive remainder when a is divided by b.
 int mod(int a, int b);
 
+// Reads data from a socket into a buffer.
+// This function repeats trying read() until it reads the exact `size`.
+// @param socket The socket file descriptor to read from.
+// @param buf A pointer to the buffer where the data will be stored.
+// @param buf_length The exact number of bytes to read into the buffer.
+// @return The number of bytes successfully read, 0 for EOF, or -1 if an error
+// occurred.
 int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size);
 
 // Reads data from a socket into a buffer.
@@ -234,7 +241,8 @@ int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size);
 // @param socket The socket file descriptor to read from.
 // @param buf A pointer to the buffer where the data will be stored.
 // @param buf_length The maximum number of bytes to read into the buffer.
-// @return The number of bytes successfully read, or -1 if an error occurred.
+// @return The number of bytes successfully read, 0 for EOF, or -1 if an error
+// occurred.
 unsigned int sst_read_from_socket(int socket, unsigned char *buf,
                                   unsigned int buf_length);
 
