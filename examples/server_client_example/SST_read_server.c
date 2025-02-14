@@ -19,6 +19,9 @@ void *SST_read_thread(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         data_buf_length = SST_read(session_ctx, data_buf, 512);
+        if(data_buf_length <= 0) {
+            printf("Read failed.\n");
+        }
         printf("--------------------\n");
         printf("Received from client: %s\n", data_buf);
     }

@@ -228,7 +228,7 @@ int mod(int a, int b) {
 
 // TODO: Merge with sst_read_from_socket.
 // Function to read exactly `size` bytes from a socket
-int SST_read_exact(int sock, unsigned char *buffer, int size) {
+int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size) {
     if (sock < 0) {
         // Socket is not open.
         errno = EBADF;
@@ -246,6 +246,7 @@ int SST_read_exact(int sock, unsigned char *buffer, int size) {
             error_exit("Reading from socket failed.");
             return -1;
         } else if (bytes_read == 0) {
+            printf("Socket is disconnected.\n");
             return 0; // Connection closed or error
         }
         total_read += bytes_read;

@@ -225,7 +225,7 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 // @return The positive remainder when a is divided by b.
 int mod(int a, int b);
 
-int SST_read_exact(int sock, unsigned char *buffer, int size);
+int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size);
 
 // Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into

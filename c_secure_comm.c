@@ -892,11 +892,6 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
         printf("The buffer is too small. Returning error code -1.\n");
         return -1;
     }
-    // // Check if decrypted length matches with expected length.
-    // if (decrypted_length - SEQ_NUM_SIZE != num) {
-    //     error_exit(
-    //         "Decrypted length does not match expected decrypted length.");
-    // }
 
     // Copy the decrypted buffer to the buffer to return.
     memcpy(buf, decrypted_stack + SEQ_NUM_SIZE,
@@ -910,39 +905,45 @@ int read_var_length_int(int sock, unsigned int *num,
                         unsigned int *var_len_size) {
     *num = 0;
     *var_len_size = 0;
+    int ret = -1;
 
     for (int i = 0; i < MAX_PAYLOAD_BUF_SIZE; i++) {
         unsigned char byte;
-        if (SST_read_exact(sock, &byte, 1) < 0) {
-            return -1;  // Error while reading
+        ret = sst_read_from_socket_exact(sock, &byte, 1);
+        if (ret <= 0) {
+            return ret;  // Error while reading
         }
 
         *num |= (byte & 127) << (7 * i);
         (*var_len_size)++;
 
         if ((byte & 128) == 0) {
-            return 0;  // Done reading variable-length integer
+            return 1;  // Done reading variable-length integer
         }
     }
-    return -1;  // Invalid variable-length integer (too large)
+    return -1;  // Invalid variable-length integer
 }
 
 ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
                                  unsigned char *buf) {
+                                    int ret = -1;
     // Step 1: Read the 1-byte message type
-    if (SST_read_exact(sock, message_type, 1) <= 0) {
-        return -1;  // Error or disconnected
+    ret = sst_read_from_socket_exact(sock, message_type, 1);
+    if (ret <= 0) {
+        return ret;  // Error or disconnected
     }
     // Step 2: Read the variable-length field
     unsigned int payload_length = 0;
     unsigned int var_len_size = 0;
-    if (read_var_length_int(sock, &payload_length, &var_len_size) < 0) {
-        return -1;
+    ret = read_var_length_int(sock, &payload_length, &var_len_size);
+    if (ret <= 0) {
+        return ret;
     }
 
     // Step 3: Read the payload
-    if (SST_read_exact(sock, buf, payload_length) < 0) {
-        return -1;
+    ret = sst_read_from_socket_exact(sock, buf, payload_length);
+    if (ret <= 0) {
+        return ret;
     }
 
     // Successfully read a message
@@ -959,7 +960,7 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
     payload_length = get_msg_type_and_payload(session_ctx->sock, &message_type,
                                               session_ctx->payload_buf);
     if (payload_length <= 0) {
-        error_exit("TODO:");
+       return payload_length;
     }
     if (check_SECURE_COMM_MSG_type(message_type) != 0) {
         error_exit("Invalid message type while in secure communication.\n");
