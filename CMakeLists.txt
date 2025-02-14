@@ -42,8 +42,6 @@ else()
   target_compile_options(sst-c-api PUBLIC -Wall -Wextra -Wpedantic -Werror)
 endif()
 
-message(STATUS "CMAKE_BUILD_TYPE is set to: ${CMAKE_BUILD_TYPE}")
-
 # Set DEBUG flag for Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   message(STATUS "Enabling DEBUG flag")
