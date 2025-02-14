@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <openssl/rand.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -71,6 +72,26 @@ typedef struct {
     unsigned char dhParam[];  // TODO: The buffer size is temporarily defined
                               // none. Need to implement diffie_helman protocol.
 } HS_nonce_t;
+
+#if defined(__GNUC__)
+#define ATTRIBUTE_FORMAT_PRINTF(f, s) __attribute__((format(printf, f, s)))
+#else
+#define ATTRIBUTE_FORMAT_PRINTF(f, s)
+#endif
+
+// Debug logging (only enabled in DEBUG mode)
+#ifdef DEBUG
+#define SST_DEBUG_ENABLED 1
+#else
+#define SST_DEBUG_ENABLED 0
+#endif
+
+// Print out debug messages. This will be printed only when the 
+// cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
+void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out log messages.
+void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 // Print out error message and exit program.
 // @param message error message

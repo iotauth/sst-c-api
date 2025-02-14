@@ -42,6 +42,14 @@ else()
   target_compile_options(sst-c-api PUBLIC -Wall -Wextra -Wpedantic -Werror)
 endif()
 
+message(STATUS "CMAKE_BUILD_TYPE is set to: ${CMAKE_BUILD_TYPE}")
+
+# Set DEBUG flag for Debug builds
+if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
+  message(STATUS "Enabling DEBUG flag")
+  target_compile_definitions(sst-c-api PUBLIC DEBUG=1)
+endif()
+
 # Install the library
 # Installs in /usr/local/lib/cmake/sst-lib/sst-libTargets.cmake & sst-libTargets-noconfig.cmake
 # Contains target definitions for sst-c-api

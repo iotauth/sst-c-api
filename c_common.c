@@ -1,5 +1,22 @@
 #include "c_common.h"
 
+void SST_print_debug(const char *fmt, ...) {
+    if (SST_DEBUG_ENABLED) {
+        va_list args;
+        va_start(args, fmt);
+        printf("DEBUG: ");
+        vprintf(fmt, args);
+        va_end(args);
+    }
+}
+
+void SST_print_log(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
 void error_exit(char *message) {
     fputs(message, stderr);
     fputc('\n', stderr);
