@@ -86,7 +86,7 @@ typedef struct {
 #define SST_DEBUG_ENABLED 0
 #endif
 
-// Print out debug messages. This will be printed only when the 
+// Print out debug messages. This will be printed only when the
 // cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
@@ -106,9 +106,15 @@ void error_exit(char *message);
 void *error_return_null(char *message);
 
 // Utility function for printing unsigned char buffer in hex string.
+// Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf(unsigned char *buf, size_t size);
+void print_buf_debug(unsigned char *buf, size_t size);
+
+// Utility function for printing unsigned char buffer in hex string.
+// @param buf given buffer of unsigned chars.
+// @param size length of the given buffer.
+void print_buf_log(unsigned char *buf, size_t size);
 
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.

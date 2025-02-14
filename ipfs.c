@@ -49,11 +49,11 @@ void file_duplication_check(const char *file_name, const char *file_extension,
     file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
     for (;;) {
         if (suffix_num == MAX_REPLY_NUM) {
-            printf("Cannot save the file. \n");
+            SST_print_error("Cannot save the file. \n");
             exit(1);
         }
         if (0 == access(file_name_buf, F_OK)) {
-            printf("File already exists: %s\n", file_name_buf);
+            SST_print_log("File already exists: %s.\n", file_name_buf);
             // Copy suffix and file extension.
             char suffix_in_string[5];
             sprintf(suffix_in_string, "%d", suffix_num);
@@ -80,13 +80,15 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
     memcpy(command + sizeof(IPFS_ADD_COMMAND) - 1, file_name,
            strlen(file_name));
-    printf("Command: %s\n", command);
+    SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
         error_exit("Popen failed.\n");
         exit(1);
     }
-    while (fgets(buff, BUFF_SIZE, fp)) printf("%s\n", buff);
+    while (fgets(buff, BUFF_SIZE, fp)) {
+        SST_print_log("%s\n", buff);
+    }
     pclose(fp);
     char *result;
     strtok(buff, " ");
@@ -121,10 +123,10 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     generate_nonce(AES_128_CBC_IV_SIZE, iv);
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
                     encrypted, &encrypted_length)) {
-        printf("Encryption failed!\n");
+        SST_print_error("Encryption failed!\n");
     }
     free(file_buf);
-    printf("\nFile encryption was successful.\n");
+    SST_print_log("\nFile encryption was successful.\n");
 
     char file_name_buffer[20];
     file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION,
@@ -144,7 +146,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     fwrite(enc_save, 1,
            encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len, fenc);
     free(enc_save);
-    printf("File was saved: %s.\n", file_name_buffer);
+    SST_print_log("File was saved: %s.\n", file_name_buffer);
     fclose(fenc);
     gettimeofday(&encrypt_end, NULL);
     float encrypt_time = encrypt_end.tv_sec - encrypt_start.tv_sec;
@@ -179,7 +181,7 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
                     &ret_length)) {
-        printf("Error while decrypting.\n");
+        SST_print_error("Error while decrypting.\n");
     }
     free(file_buf);
 
@@ -191,7 +193,8 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
-    printf("Completed decryption and saved the file: %s\n", result_file_name);
+    SST_print_log("Completed decryption and saved the file: %s\n",
+                  result_file_name);
 }
 
 void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
@@ -212,7 +215,8 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     data[3 + name_size + key_id_size] = hash_value_len;
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
     write(sock, data, 4 + name_size + key_id_size + hash_value_len);
-    printf("Send the data such as sessionkey id, hash value for file. \n");
+    SST_print_log(
+        "Send the data such as sessionkey id, hash value for file. \n");
 }
 
 int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,
@@ -271,7 +275,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length =
         read_from_socket(sock, received_buf, sizeof(received_buf));
-    printf("Receive the information for file.\n");
+    SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
         (filemanager_end.tv_sec - filemanager_start.tv_sec);
@@ -288,10 +292,10 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     memcpy(command + command_size - 1, file_name, strlen(file_name));
-    printf("Command: %s \n", command);
+    SST_print_log("Command: %s \n", command);
     fin = popen(command, "r");
     pclose(fin);
-    printf("Download the file: %s\n", file_name);
+    SST_print_log("Download the file: %s\n", file_name);
     gettimeofday(&download_end, NULL);
     float download_time = (download_end.tv_sec - download_start.tv_sec);
     float download_utime = (download_end.tv_usec - download_start.tv_usec);
@@ -309,10 +313,10 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     memcpy(command + command_size - 1, file_name, strlen(file_name));
     memcpy(command + command_size + strlen(file_name) - 1, "\n", 1);
-    printf("Command: %s \n", command);
+    SST_print_log("Command: %s \n", command);
     fin = popen(command, "r");
     pclose(fin);
-    printf("Success for downloading %s.\n", file_name);
+    SST_print_log("Success for downloading %s.\n", file_name);
 }
 
 void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
@@ -366,9 +370,9 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                                              // & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
             } else {
-                printf("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!\n");
             }
-            printf("Add a file reader to the database.\n");
+            SST_print_log("Add a file reader to the database.\n");
             close(sock);
             break;
         } else if (message_type == ADD_READER_RESP) {
@@ -390,9 +394,9 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                                              // & received entity's nonce.
                 error_exit("Auth nonce NOT verified");
             } else {
-                printf("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!\n");
             }
-            printf("Add a file reader to the database.\n");
+            SST_print_log("Add a file reader to the database.\n");
             close(sock);
             break;
         }

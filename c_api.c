@@ -24,7 +24,7 @@ SST_ctx_t *init_SST(const char *config_path) {
     ctx->priv_key =
         (void *)load_entity_private_key(ctx->config->entity_privkey_path);
     if (numkey > MAX_SESSION_KEY) {
-        printf(
+        SST_print_error(
             "Too much requests of session keys. The max number of requestable "
             "session keys are %d",
             MAX_SESSION_KEY);
@@ -46,7 +46,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config->numkey,
                                            existing_s_key_list)) {
-            printf("Unable to get_session_key().\n");
+            SST_print_error("Unable to get_session_key().\n");
             return existing_s_key_list;
         }
     }
@@ -59,7 +59,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
     if (earned_s_key_list == NULL) {
-        printf("Failed to get session key. Returning NULL.\n");
+        SST_print_error("Failed to get session key. Returning NULL.\n");
         return NULL;
     }
 
@@ -133,7 +133,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         }
         free(parsed_buf);
         update_validity(s_key);
-        printf("switching to IN_COMM\n");
+        SST_print_debug("Switching to IN_COMM.\n");
         entity_client_state = IN_COMM;
     }
     memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
@@ -170,7 +170,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
-            printf("Getting target session key by id failed. Returning NULL.\n");
+            SST_print_error(
+                "Getting target session key by id failed. Returning NULL.\n");
             return NULL;
         }
         s_key = s_key_list->s_key;
@@ -206,13 +207,13 @@ SST_session_ctx_t *server_secure_comm_setup(
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == SKEY_HANDSHAKE_1) {
-            printf("received session key handshake1\n");
+            SST_print_debug("Received session key handshake1.\n");
             if (entity_server_state != IDLE) {
                 error_exit(
                     "Error during comm init - in wrong state, expected: IDLE, "
                     "disconnecting...\n");
             }
-            printf("switching to HANDSHAKE_1_RECEIVED state.\n");
+            SST_print_debug("Switching to HANDSHAKE_1_RECEIVED state.\n");
             entity_server_state = HANDSHAKE_1_RECEIVED;
             unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
             memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
@@ -242,7 +243,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                 error_exit("Failed to write data to socket.");
             }
             free(parsed_buf);
-            printf("switching to HANDSHAKE_2_SENT\n");
+            SST_print_debug("Switching to HANDSHAKE_2_SENT.\n");
             entity_server_state = HANDSHAKE_2_SENT;
         }
     }
@@ -255,7 +256,7 @@ SST_session_ctx_t *server_secure_comm_setup(
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == SKEY_HANDSHAKE_3) {
-            printf("received session key handshake3!\n");
+            SST_print_debug("Received session key handshake3!\n");
             if (entity_server_state != HANDSHAKE_2_SENT) {
                 error_exit(
                     "Error during comm init - in wrong state, expected: "
@@ -281,10 +282,11 @@ SST_session_ctx_t *server_secure_comm_setup(
                     "Comm init failed: server NOT verified, nonce NOT matched, "
                     "disconnecting...\n");
             } else {
-                printf("server authenticated/authorized by solving nonce!\n");
+                SST_print_debug(
+                    "Server authenticated/authorized by solving nonce!\n");
             }
             update_validity(s_key);
-            printf("switching to IN_COMM\n");
+            SST_print_debug("Switching to IN_COMM.\n");
             entity_server_state = IN_COMM;
             memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
             return session_ctx;
@@ -342,8 +344,8 @@ int read_secure_message(int socket, unsigned char **plaintext,
         error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
-    *plaintext = decrypt_received_message(received_buf, bytes_read, &decrypted_length,
-                                         session_ctx);
+    *plaintext = decrypt_received_message(received_buf, bytes_read,
+                                          &decrypted_length, session_ctx);
     return decrypted_length;
 }
 
@@ -474,13 +476,13 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
     // The hashed salt will be the encryption key.
     if (encrypt_AES(buffer, buffer_len, salted_password, iv, AES_128_CBC,
                     ciphertext, &ciphertext_len)) {
-        printf("AES encryption failed!");
+        SST_print_error("AES encryption failed!");
         return -1;
     }
 
     FILE *saved_file_fp = fopen(file_path, "wb");
     if (!saved_file_fp) {
-        printf("Failed to open file: %s\n", file_path);
+        SST_print_error("Failed to open file: %s\n", file_path);
         return -1;
     }
     // Write the IV
@@ -507,14 +509,14 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     saved_file_fp = fopen(file_path, "rb");
     if (!saved_file_fp) {
-        printf("Failed to open file for reading!\n");
+        SST_print_error("Failed to open file for reading!\n");
         return -1;
     }
 
     // Read the IV
     size_t iv_read = fread(iv, 1, sizeof(iv), saved_file_fp);
     if (iv_read != sizeof(iv)) {
-        printf("Failed to read IV!\n");
+        SST_print_error("Failed to read IV!\n");
         fclose(saved_file_fp);
         return -1;
     }
@@ -524,7 +526,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     fclose(saved_file_fp);
 
     if (ciphertext_len <= 0) {
-        printf("Failed to read encrypted data!\n");
+        SST_print_error("Failed to read encrypted data!\n");
         return -1;
     }
 
@@ -536,7 +538,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     unsigned int plaintext_len;
     if (decrypt_AES(ciphertext, ciphertext_len, salted_password, iv,
                     AES_128_CBC, buffer, &plaintext_len)) {
-        printf("AES decryption failed!\n");
+        SST_print_error("AES decryption failed!\n");
         return -1;
     }
 
@@ -544,7 +546,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     memcpy(session_key_list, buffer, sizeof(session_key_list_t));
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
     if (!session_key_list->s_key) {
-        printf("Memory allocation failed!\n");
+        SST_print_error("Memory allocation failed!\n");
         return -1;
     }
     memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
