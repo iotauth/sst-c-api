@@ -47,18 +47,26 @@ void *error_return_null(char *message) {
     return NULL;
 }
 
-void print_buf(unsigned char *buf, size_t size) {
+void print_buf_debug(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
         sprintf(hex + 3 * i, " %.2x", buf[i]);
     }
-    printf("Hex:%s\n", hex);
+    SST_print_debug("Hex:%s\n", hex);
+}
+
+void print_buf_log(unsigned char *buf, size_t size) {
+    char hex[size * 3 + 1];
+    for (size_t i = 0; i < size; i++) {
+        sprintf(hex + 3 * i, " %.2x", buf[i]);
+    }
+    SST_print_log("Hex:%s\n", hex);
 }
 
 void generate_nonce(int length, unsigned char *buf) {
     int x = RAND_bytes(buf, length);
     if (x == -1) {
-        printf("Failed to create Random Nonce");
+        SST_print_error("Failed to create Random Nonce");
         exit(1);
     }
 }
@@ -209,19 +217,19 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-            printf("Connection attempt %d failed. Retrying...\n",
-                   count_retries);
+            SST_print_error("Connection attempt %d failed. Retrying...\n",
+                            count_retries);
             usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
-            printf("Successfully connected to %s:%d on attempt %d.\n", ip_addr,
-                   port_num, count_retries);
+            SST_print_debug("Successfully connected to %s:%d on attempt %d.\n",
+                            ip_addr, port_num, count_retries);
             break;
         }
     }
     if (ret < 0) {
-        printf("Failed to connect to %s:%d after %d attempts.\n", ip_addr,
-               port_num, count_retries - 1);
+        SST_print_error("Failed to connect to %s:%d after %d attempts.\n",
+                        ip_addr, port_num, count_retries - 1);
     }
     return ret;
 }
@@ -273,7 +281,7 @@ int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size) {
         int bytes_read = read(sock, buffer + total_read, size - total_read);
         if (bytes_read < 0 &&
             (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-            printf(
+            SST_print_debug(
                 "Reading from socket %d failed with error: `%s`. Will try "
                 "again.\n",
                 sock, strerror(errno));
@@ -284,7 +292,7 @@ int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size) {
             error_exit("Reading from socket failed.");
             return -1;
         } else if (bytes_read == 0) {
-            printf("Socket is disconnected.\n");
+            SST_print_debug("Socket is disconnected.\n");
             return 0;  // Connection closed or error
         }
         total_read += bytes_read;
