@@ -97,8 +97,8 @@ void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 // Print out error message and exit program.
-// @param message error message
-void error_exit(char *message);
+// @param fmt error message
+void SST_print_error_exit(const char *fmt, ...);
 
 // Print out error message and return NULL.
 // return NULL value

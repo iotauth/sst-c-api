@@ -63,13 +63,12 @@ config_t *load_config(const char *path) {
             SST_print_error("SST Config file not found on path %s.\n", path);
         } else if (errno == EACCES) {
             SST_print_error("SST Config file permission denied on path %s.\n",
-                   path);
+                            path);
         } else {
             SST_print_error("SST Config file open failed on path %s.\n", path);
         }
         // Print the specific error message
-        perror("fopen");
-        error_exit("");
+        SST_print_error_exit("fopen() failed.");
     }
     char buffer[MAX] = {
         0,
@@ -130,7 +129,7 @@ config_t *load_config(const char *path) {
                                strcmp(ptr, "1") == 0) {
                         c->hmac_mode = USE_HMAC;
                     } else {
-                        error_exit(
+                        SST_print_error_exit(
                             "Wrong input for hmac_mode.\n Please type "
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
@@ -158,7 +157,7 @@ config_t *load_config(const char *path) {
                     ptr = strtok(NULL, delimiters);
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
-                        error_exit("Error: Invalid port number.\n");
+                        SST_print_error_exit("Error: Invalid port number.\n");
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
@@ -172,7 +171,7 @@ config_t *load_config(const char *path) {
                     c->entity_server_port_num = atoi(ptr);
                     if (c->entity_server_port_num < 0 ||
                         c->entity_server_port_num > 65535) {
-                        error_exit("Error: Invalid port number.\n");
+                        SST_print_error_exit("Error: Invalid port number.\n");
                     }
                     break;
                 case NETWORK_PROTOCOL:
@@ -182,7 +181,8 @@ config_t *load_config(const char *path) {
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
                     ptr = strtok(NULL, delimiters);
-                    SST_print_debug("IP address of file system manager: %s\n", ptr);
+                    SST_print_debug("IP address of file system manager: %s\n",
+                                    ptr);
                     strcpy(c->file_system_manager_ip_addr, ptr);
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
@@ -190,7 +190,7 @@ config_t *load_config(const char *path) {
                     c->file_system_manager_port_num = atoi(ptr);
                     if (c->file_system_manager_port_num < 0 ||
                         c->file_system_manager_port_num > 65535) {
-                        error_exit("Error: Invalid port number.\n");
+                        SST_print_error_exit("Error: Invalid port number.\n");
                     }
                     break;
             }

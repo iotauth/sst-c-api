@@ -35,9 +35,11 @@ void SST_print_error(const char *fmt, ...) {
     va_end(args);
 }
 
-void error_exit(char *message) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
+void SST_print_error_exit(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_print_error(fmt, args);
+    va_end(args);
     exit(1);
 }
 
@@ -159,14 +161,14 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           &ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        error_exit("Wrong header calculation... Exiting...");
+        SST_print_error_exit("Wrong header calculation... Exiting...");
     }
     if (ret_length > buf_length) {
-        error_exit("Larger buffer size required.");
+        SST_print_error_exit("Larger buffer size required.");
     }
     unsigned int bytes_read = read_from_socket(socket, buf, buf_length);
     if (ret_length != bytes_read) {
-        error_exit("Wrong read... Exiting..");
+        SST_print_error_exit("Wrong read... Exiting..");
     }
     return bytes_read;
 }
@@ -203,7 +205,7 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
-        error_exit("socket() error");
+        SST_print_error_exit("socket() error");
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
@@ -237,7 +239,8 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
 void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
                          unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
-        error_exit("Error: handshake should include at least on nonce.");
+        SST_print_error_exit(
+            "Error: handshake should include at least on nonce.");
     }
     unsigned char indicator = 0;
     if (nonce != NULL) {
@@ -278,9 +281,9 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     }
     ssize_t length_read = read(socket, buf, buf_length);
     if (length_read < 0) {
-        error_exit("Reading from socket failed.");
+        SST_print_error_exit("Reading from socket failed.");
     } else if (length_read == 0) {
-        error_exit("Connection closed.");
+        SST_print_error_exit("Connection closed.");
     }
     return (unsigned int)length_read;
 }
@@ -307,10 +310,10 @@ unsigned int write_to_socket(int socket, const unsigned char *buf,
         }
         if (length_written < 0) {
             // Error occurred while writing
-            error_exit("Writing to socket failed.");
+            SST_print_error_exit("Writing to socket failed.");
         } else if (length_written == 0) {
             // Socket closed unexpectedly
-            error_exit("Connection closed while writing.");
+            SST_print_error_exit("Connection closed while writing.");
         }
 
         // Update the total number of bytes written

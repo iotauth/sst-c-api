@@ -111,7 +111,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
             dist_key->mac_key_size, dist_key->cipher_key,
             dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
             0, &temp, &temp_length)) {
-        error_exit(
+        SST_print_error_exit(
             "Error during encryption while "
             "serialize_session_key_req_with_distribution_key\n");
     }
@@ -228,7 +228,7 @@ void send_auth_request_message(unsigned char *serialized,
         unsigned int bytes_written =
             write_to_socket(sock, message, message_length);
         if (bytes_written != message_length) {
-            error_exit("Failed to write data to socket.");
+            SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
     } else {
@@ -248,7 +248,7 @@ void send_auth_request_message(unsigned char *serialized,
         unsigned int bytes_written =
             write_to_socket(sock, message, message_length);
         if (bytes_written != message_length) {
-            error_exit("Failed to write data to socket.");
+            SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
     }
@@ -286,7 +286,8 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
     var_length_int_to_num(buf + offset, buf_length, &num,
                           &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {
-        error_exit("Buffer size of the variable length integer cannot be 0.");
+        SST_print_error_exit(
+            "Buffer size of the variable length integer cannot be 0.");
     }
     *return_to_length = num + var_len_int_buf_size;
     unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
@@ -332,7 +333,8 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &encrypted,
             &encrypted_length)) {
-        error_exit("Error during encryption while parse_handshake_1\n");
+        SST_print_error_exit(
+            "Error during encryption while parse_handshake_1\n");
     }
 
     *ret_length = encrypted_length + KEY_ID_SIZE;
@@ -355,7 +357,8 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
-        error_exit("Error during decryption in checking handshake2.\n");
+        SST_print_error_exit(
+            "Error during decryption in checking handshake2.\n");
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
@@ -364,7 +367,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     // compare my_nonce and received_nonce
     if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
                 HS_NONCE_SIZE) != 0) {
-        error_exit(
+        SST_print_error_exit(
             "Comm init failed: server NOT verified, nonce NOT matched, "
             "disconnecting...\n");
     } else {
@@ -381,7 +384,8 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                                        s_key->enc_mode, 0, &ret, ret_length)) {
-        error_exit("Error during encryption while send_handshake_3.\n");
+        SST_print_error_exit(
+            "Error during encryption while send_handshake_3.\n");
     }
     return ret;
 }
@@ -389,7 +393,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                              SST_session_ctx_t *session_ctx) {
     if (check_session_key_validity(&session_ctx->s_key)) {
-        error_exit("Session key expired!\n");
+        SST_print_error_exit("Session key expired!\n");
     }
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);
@@ -405,7 +409,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     if (encrypt_buf_with_session_key_without_malloc(
             &session_ctx->s_key, buf, SEQ_NUM_SIZE + msg_length,
             encrypted_stack, &encrypted_length)) {
-        error_exit("Encryption failed.");
+        SST_print_error_exit("Encryption failed.");
     }
 
     session_ctx->sent_seq_num++;
@@ -422,7 +426,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     unsigned int bytes_written =
         write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
     if (bytes_written != sender_buf_length) {
-        error_exit("Failed to write data to socket.");
+        SST_print_error_exit("Failed to write data to socket.");
     }
     return bytes_written;
 }
@@ -446,15 +450,15 @@ unsigned char *decrypt_received_message(unsigned char *data,
             session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode,
             &decrypted, decrypted_buf_length)) {
-        error_exit("Error during decrypting received message.\n");
+        SST_print_error_exit("Error during decrypting received message.\n");
     }
     unsigned int received_seq_num =
         read_unsigned_int_BE(decrypted, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
-        error_exit("Wrong sequence number expected.");
+        SST_print_error_exit("Wrong sequence number expected.");
     }
     if (check_session_key_validity(&session_ctx->s_key)) {
-        error_exit("Session key expired!\n");
+        SST_print_error_exit("Session key expired!\n");
     }
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.\n", received_seq_num);
@@ -494,7 +498,7 @@ session_key_list_t *send_session_key_request_check_protocol(
             if (strncmp((const char *)s_key_list->s_key[0].key_id,
                         (const char *)target_key_id,
                         SESSION_KEY_ID_SIZE) != 0) {
-                error_exit("Session key id is NOT as expected\n");
+                SST_print_error_exit("Session key id is NOT as expected\n");
             } else {
                 SST_print_debug("Session key id is as expected.\n");
             }
@@ -560,7 +564,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
                     ctx->config->encryption_mode, 0, &decrypted,
                     &decrypted_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decryption after receiving "
                     "SESSION_KEY_RESP.\n");
             }
@@ -572,7 +576,6 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             print_buf_debug(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {
-                // error_exit("Auth nonce NOT verified");
                 return error_return_null("Auth nonce NOT verified\n");
             } else {
                 SST_print_debug("Auth nonce verified!\n");
@@ -602,7 +605,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decryption after receiving "
                     "SESSION_KEY_RESP_WITH_DIST_KEY\n");
             }
@@ -652,7 +655,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 // session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
 //     session_key_list_t *s_key_list;
 //     return s_key_list;
-//     error_exit("This function is not implemented yet.");
+//     SST_print_error_exit("This function is not implemented yet.");
 // }
 
 unsigned char *check_handshake1_send_handshake2(
@@ -667,7 +670,7 @@ unsigned char *check_handshake1_send_handshake2(
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &decrypted,
             &decrypted_length)) {
-        error_exit("Error during decrypting handshake1.\n");
+        SST_print_error_exit("Error during decrypting handshake1.\n");
     }
 
     HS_nonce_t hs;
@@ -691,7 +694,8 @@ unsigned char *check_handshake1_send_handshake2(
                                        MAC_KEY_SIZE, s_key->cipher_key,
                                        CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                                        s_key->enc_mode, 0, &ret, ret_length)) {
-        error_exit("Error during encryption while send_handshake2.\n");
+        SST_print_error_exit(
+            "Error during encryption while send_handshake2.\n");
     }
     return ret;
 }
@@ -790,7 +794,7 @@ int encrypt_or_decrypt_buf_with_session_key(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during encrypting buffer with session key.\n");
             }
             return 0;
@@ -801,7 +805,7 @@ int encrypt_or_decrypt_buf_with_session_key(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decrypting buffer with session key.\n");
             }
             return 0;
@@ -822,7 +826,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during encrypting buffer with session key.\n");
             }
             return 0;
@@ -832,7 +836,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decrypting buffer with session key.\n");
             }
             return 0;
