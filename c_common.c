@@ -43,9 +43,11 @@ void SST_print_error_exit(const char *fmt, ...) {
     exit(1);
 }
 
-void *error_return_null(char *message) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
+void *SST_print_error_return_null(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_print_error(fmt, args);
+    va_end(args);
     return NULL;
 }
 

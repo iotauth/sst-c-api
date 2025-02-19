@@ -292,7 +292,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    return error_return_null("Unrecognized or invalid state for server.\n");
+    return SST_print_error_return_null("Unrecognized or invalid state for server.");
 }
 
 void *receive_thread(void *SST_session_ctx) {
@@ -368,8 +368,8 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
         return decrypt_received_message(data_buf, data_buf_length,
                                         decrypted_buf_length, session_ctx);
     }
-    return error_return_null(
-        "Invalid message type while in secure communication.\n");
+    return SST_print_error_return_null(
+        "Invalid message type while in secure communication.");
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
