@@ -866,7 +866,6 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
                               unsigned char *encrypted_buf,
                               unsigned int encrypted_length, unsigned char *buf,
                               size_t num) {
-    int ret = -1;
     unsigned int decrypted_length;
 
     // Allocate stack memory for decrypted buffer, which will be SEQ_NUM[8
