@@ -26,6 +26,11 @@ void *SST_read_thread(void *SST_session_ctx) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fputs("Enter config path", stderr);
+        fputc('\n', stderr);
+        exit(1);
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
