@@ -355,6 +355,13 @@ int SST_write(SST_session_ctx_t *session_ctx, char *msg,
     return SST_write_internal(session_ctx, msg, msg_length);
 }
 
+// TODO: Fix the other reads.
+// Always read the exact number it requested.
+ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
+    size_t num) {
+return SST_read_internal(session_ctx, buf, num);
+}
+
 unsigned char *return_decrypted_buf(unsigned char *received_buf,
                                     unsigned int received_buf_length,
                                     unsigned int *decrypted_buf_length,
@@ -579,11 +586,4 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     EVP_PKEY_free((EVP_PKEY *)ctx->pub_key);
     free_config_t(ctx->config);
     free(ctx);
-}
-
-// TODO: Fix the other reads.
-// Always read the exact number it requested.
-ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
-                 size_t num) {
-    return SST_read_internal(session_ctx, buf, num);
 }
