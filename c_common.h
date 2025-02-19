@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <openssl/rand.h>
 #include <pthread.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -72,19 +73,61 @@ typedef struct {
                               // none. Need to implement diffie_helman protocol.
 } HS_nonce_t;
 
+#if defined(__GNUC__)
+#define ATTRIBUTE_FORMAT_PRINTF(f, s) __attribute__((format(printf, f, s)))
+#else
+#define ATTRIBUTE_FORMAT_PRINTF(f, s)
+#endif
+
+// Debug logging (only enabled in DEBUG mode)
+#ifdef DEBUG
+#define SST_DEBUG_ENABLED 1
+#else
+#define SST_DEBUG_ENABLED 0
+#endif
+
+// Print out debug messages. This will be printed only when the
+// cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
+// Uses printf-style formatting.  
+// @param fmt Format string for the debug message.  
+// @param ... Additional arguments for formatting. 
+void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out log messages.
+// Uses printf-style formatting.  
+// @param fmt Format string for the debug message.  
+// @param ... Additional arguments for formatting. 
+void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out error messages along with errno if set.
+// Uses printf-style formatting.  
+// @param fmt Format string for the debug message.  
+// @param ... Additional arguments for formatting. 
+void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
 // Print out error message and exit program.
-// @param message error message
-void error_exit(char *message);
+// Uses printf-style formatting.  
+// @param fmt Format string for the debug message.  
+// @param ... Additional arguments for formatting. 
+void SST_print_error_exit(const char *fmt, ...);
 
 // Print out error message and return NULL.
-// return NULL value
-// @param message error message
-void *error_return_null(char *message);
+// Uses printf-style formatting.  
+// @return Return NULL.
+// @param fmt Format string for the error message.  
+// @param ... Additional arguments for formatting.  
+void *SST_print_error_return_null(const char *fmt, ...);
+
+// Utility function for printing unsigned char buffer in hex string.
+// Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
+// @param buf given buffer of unsigned chars.
+// @param size length of the given buffer.
+void print_buf_debug(unsigned char *buf, size_t size);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf(unsigned char *buf, size_t size);
+void print_buf_log(unsigned char *buf, size_t size);
 
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.

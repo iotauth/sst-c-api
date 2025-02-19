@@ -1,29 +1,76 @@
 #include "c_common.h"
 
-void error_exit(char *message) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
+void SST_print_debug(const char *fmt, ...) {
+    if (SST_DEBUG_ENABLED) {
+        va_list args;
+        va_start(args, fmt);
+        printf("DEBUG: ");
+        vprintf(fmt, args);
+        va_end(args);
+    }
+}
+
+void SST_print_log(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vprintf(fmt, args);
+    va_end(args);
+}
+
+// Print out error messages along with errno if set.
+void SST_print_error(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    // Print the "ERROR:" prefix to stderr
+    fprintf(stderr, "ERROR: ");
+    // Print the formatted error message to stderr (without adding a newline)
+    vfprintf(stderr, fmt, args);
+    // Print errno if it is set
+    if (errno != 0) {
+        fprintf(stderr, " (errno: %d, %s)", errno, strerror(errno));
+    }
+    // End the line after the error message and errno
+    fprintf(stderr, "\n");
+
+    va_end(args);
+}
+
+void SST_print_error_exit(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_print_error(fmt, args);
+    va_end(args);
     exit(1);
 }
 
-void *error_return_null(char *message) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
+void *SST_print_error_return_null(const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_print_error(fmt, args);
+    va_end(args);
     return NULL;
 }
 
-void print_buf(unsigned char *buf, size_t size) {
+void print_buf_debug(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
         sprintf(hex + 3 * i, " %.2x", buf[i]);
     }
-    printf("Hex:%s\n", hex);
+    SST_print_debug("Hex:%s\n", hex);
+}
+
+void print_buf_log(unsigned char *buf, size_t size) {
+    char hex[size * 3 + 1];
+    for (size_t i = 0; i < size; i++) {
+        sprintf(hex + 3 * i, " %.2x", buf[i]);
+    }
+    SST_print_log("Hex:%s\n", hex);
 }
 
 void generate_nonce(int length, unsigned char *buf) {
     int x = RAND_bytes(buf, length);
     if (x == -1) {
-        printf("Failed to create Random Nonce");
+        SST_print_error("Failed to create Random Nonce");
         exit(1);
     }
 }
@@ -116,14 +163,14 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           &ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        error_exit("Wrong header calculation... Exiting...");
+        SST_print_error_exit("Wrong header calculation... Exiting...");
     }
     if (ret_length > buf_length) {
-        error_exit("Larger buffer size required.");
+        SST_print_error_exit("Larger buffer size required.");
     }
     unsigned int bytes_read = read_from_socket(socket, buf, buf_length);
     if (ret_length != bytes_read) {
-        error_exit("Wrong read... Exiting..");
+        SST_print_error_exit("Wrong read... Exiting..");
     }
     return bytes_read;
 }
@@ -160,7 +207,7 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
-        error_exit("socket() error");
+        SST_print_error_exit("socket() error");
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
@@ -174,19 +221,19 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-            printf("Connection attempt %d failed. Retrying...\n",
-                   count_retries);
+            SST_print_error("Connection attempt %d failed. Retrying...\n",
+                            count_retries);
             usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
-            printf("Successfully connected to %s:%d on attempt %d.\n", ip_addr,
-                   port_num, count_retries);
+            SST_print_debug("Successfully connected to %s:%d on attempt %d.\n",
+                            ip_addr, port_num, count_retries);
             break;
         }
     }
     if (ret < 0) {
-        printf("Failed to connect to %s:%d after %d attempts.\n", ip_addr,
-               port_num, count_retries - 1);
+        SST_print_error("Failed to connect to %s:%d after %d attempts.\n",
+                        ip_addr, port_num, count_retries - 1);
     }
     return ret;
 }
@@ -194,7 +241,8 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
 void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
                          unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
-        error_exit("Error: handshake should include at least on nonce.");
+        SST_print_error_exit(
+            "Error: handshake should include at least on nonce.");
     }
     unsigned char indicator = 0;
     if (nonce != NULL) {
@@ -235,9 +283,9 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     }
     ssize_t length_read = read(socket, buf, buf_length);
     if (length_read < 0) {
-        error_exit("Reading from socket failed.");
+        SST_print_error_exit("Reading from socket failed.");
     } else if (length_read == 0) {
-        error_exit("Connection closed.");
+        SST_print_error_exit("Connection closed.");
     }
     return (unsigned int)length_read;
 }
@@ -264,10 +312,10 @@ unsigned int write_to_socket(int socket, const unsigned char *buf,
         }
         if (length_written < 0) {
             // Error occurred while writing
-            error_exit("Writing to socket failed.");
+            SST_print_error_exit("Writing to socket failed.");
         } else if (length_written == 0) {
             // Socket closed unexpectedly
-            error_exit("Connection closed while writing.");
+            SST_print_error_exit("Connection closed while writing.");
         }
 
         // Update the total number of bytes written
