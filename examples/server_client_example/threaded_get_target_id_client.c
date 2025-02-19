@@ -23,11 +23,6 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fputs("Enter config path", stderr);
-        fputc('\n', stderr);
-        exit(1);
-    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 

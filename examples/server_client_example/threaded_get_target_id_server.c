@@ -47,11 +47,6 @@ void *call_get_session_key_by_ID(void *args) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        fputs("Enter config path", stderr);
-        fputc('\n', stderr);
-        exit(1);
-    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
     pthread_mutex_init(&ctx->mutex, NULL);

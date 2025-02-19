@@ -7,11 +7,6 @@
 #define MAX_PAYLOAD_LENGTH 1024
 
 int main(int argc, char* argv[]) {
-    if (argc != 4) {
-        fputs("Enter config path, file path, and reader path.", stderr);
-        fputc('\n', stderr);
-        exit(1);
-    }
     char* config_path = argv[1];
     char* my_file_path = argv[2];
     char* add_reader_path = argv[3];
