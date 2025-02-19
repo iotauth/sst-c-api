@@ -429,7 +429,7 @@ int send_splitted_message(SST_session_ctx_t *session_ctx, char *msg,
 int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
                        unsigned int msg_length) {
     if (check_session_key_validity(&session_ctx->s_key)) {
-        error_exit("Session key expired!\n");
+        SST_print_error_exit("Session key expired!\n");
     }
 
     size_t bytes_sent = 0;
@@ -880,14 +880,14 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
     if (decrypt_buf_with_session_key_without_malloc(
             &session_ctx->s_key, encrypted_buf, encrypted_length,
             decrypted_stack, &decrypted_length) != 0) {
-        error_exit("Decryption failed.");
+                SST_print_error_exit("Decryption failed.");
     }
 
     // Check sequence number.
     unsigned int received_seq_num =
         read_unsigned_int_BE(decrypted_stack, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
-        error_exit("Wrong sequence number expected.");
+        SST_print_error_exit("Wrong sequence number expected.");
     }
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.\n", received_seq_num);
@@ -967,7 +967,7 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
         return payload_length;
     }
     if (check_SECURE_COMM_MSG_type(message_type) != 0) {
-        error_exit("Invalid message type while in secure communication.\n");
+        SST_print_error_exit("Invalid message type while in secure communication.\n");
     }
     return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
                                      payload_length, buf, num);

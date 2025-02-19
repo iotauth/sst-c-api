@@ -294,7 +294,7 @@ int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size) {
             continue;
         } else if (bytes_read < 0) {
             // A more serious error occurred.
-            error_exit("Reading from socket failed.");
+            SST_print_error_exit("Reading from socket failed.");
             return -1;
         } else if (bytes_read == 0) {
             SST_print_debug("Socket is disconnected.\n");
