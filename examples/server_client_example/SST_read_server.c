@@ -19,12 +19,18 @@ void *SST_read_thread(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         data_buf_length = SST_read(session_ctx, data_buf, 512);
-        if(data_buf_length <= 0) {
+        if(data_buf_length < 0) {
             printf("Read failed.\n");
+            break;
         }
-        printf("--------------------\n");
+        else if(data_buf_length == 0) {
+            printf("Disconnected.\n");
+            break;
+        }
         printf("Received from client: %s\n", data_buf);
+        printf("--------------------\n");
     }
+    return NULL;
 }
 
 int main(int argc, char *argv[]) {
@@ -80,8 +86,7 @@ int main(int argc, char *argv[]) {
     pthread_t thread;
     pthread_create(&thread, NULL, &SST_read_thread,
                    (void *)session_ctx);
-    sleep(10000);
-    pthread_cancel(thread);
+    pthread_join(thread, NULL);
     close(clnt_sock);
     close(serv_sock);
 
