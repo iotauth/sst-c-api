@@ -14,7 +14,6 @@ int main(int argc, char *argv[]) {
         printf("Failed to get session key. Returning NULL.\n");
         exit(1);
     }
-    printf("finished\n");
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
     sleep(1);

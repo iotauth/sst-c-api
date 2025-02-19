@@ -101,7 +101,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     unsigned int bytes_written =
         sst_write_to_socket(sock, sender_HS_1, sender_HS_1_length);
     if (bytes_written != sender_HS_1_length) {
-        error_exit("Failed to write data to socket.");
+        SST_print_error_exit("Failed to write data to socket.");
     }
     free(parsed_buf);
     entity_client_state = HANDSHAKE_1_SENT;
@@ -116,7 +116,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
-            error_exit(
+            SST_print_error_exit(
                 "Comm init failed: wrong sequence of handshake, "
                 "disconnecting...\n");
         }
@@ -130,7 +130,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         unsigned int bytes_written =
             sst_write_to_socket(sock, sender_HS_2, sender_HS_2_length);
         if (bytes_written != sender_HS_2_length) {
-            error_exit("Failed to write data to socket.");
+            SST_print_error_exit("Failed to write data to socket.");
         }
         free(parsed_buf);
         update_validity(s_key);
@@ -154,7 +154,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     // it does not have to request session key from Auth
     int session_key_found = -1;
     if (existing_s_key_list == NULL) {
-        error_exit("Session key list must be not NULL.\n");
+        SST_print_error_exit("Session key list must be not NULL.\n");
     }
     for (int i = 0; i < existing_s_key_list->num_key; i++) {
         session_key_found = check_session_key(target_session_key_id_int,
@@ -210,7 +210,7 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_1) {
             SST_print_debug("Received session key handshake1.\n");
             if (entity_server_state != IDLE) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during comm init - in wrong state, expected: IDLE, "
                     "disconnecting...\n");
             }
@@ -222,10 +222,10 @@ SST_session_ctx_t *server_secure_comm_setup(
             s_key = get_session_key_by_ID(target_session_key_id, ctx,
                                           existing_s_key_list);
             if (s_key == NULL) {
-                error_exit("FAILED to get session key by ID.");
+                SST_print_error_exit("FAILED to get session key by ID.");
             }
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_1_RECEIVED, disconnecting...");
             }
@@ -241,7 +241,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned int bytes_written =
                 sst_write_to_socket(clnt_sock, sender, sender_length);
             if (bytes_written != sender_length) {
-                error_exit("Failed to write data to socket.");
+                SST_print_error_exit("Failed to write data to socket.");
             }
             free(parsed_buf);
             SST_print_debug("Switching to HANDSHAKE_2_SENT.\n");
@@ -259,7 +259,7 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_3) {
             SST_print_debug("Received session key handshake3!\n");
             if (entity_server_state != HANDSHAKE_2_SENT) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_2_SENT, "
                     "disconnecting...\n");
@@ -270,7 +270,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                     AES_128_CBC, 0, &decrypted, &decrypted_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decryption in HANDSHAKE_2_SENT state.\n");
             }
             HS_nonce_t hs;
@@ -279,7 +279,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             // compare my_nonce and received_nonce
             if (strncmp((const char *)hs.reply_nonce,
                         (const char *)server_nonce, HS_NONCE_SIZE) != 0) {
-                error_exit(
+                SST_print_error_exit(
                     "Comm init failed: server NOT verified, nonce NOT matched, "
                     "disconnecting...\n");
             } else {
@@ -293,7 +293,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    return error_return_null("Unrecognized or invalid state for server.\n");
+    return SST_print_error_return_null("Unrecognized or invalid state for server.");
 }
 
 void *receive_thread(void *SST_session_ctx) {
@@ -342,7 +342,7 @@ int read_secure_message(int socket, unsigned char **plaintext,
     bytes_read = read_header_return_data_buf_pointer(
         socket, &message_type, received_buf, MAX_PAYLOAD_LENGTH);
     if (check_SECURE_COMM_MSG_type(message_type)) {
-        error_exit("Wrong message_type.");
+        SST_print_error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
     *plaintext = decrypt_received_message(received_buf, bytes_read,
@@ -369,8 +369,8 @@ unsigned char *return_decrypted_buf(unsigned char *received_buf,
         return decrypt_received_message(data_buf, data_buf_length,
                                         decrypted_buf_length, session_ctx);
     }
-    return error_return_null(
-        "Invalid message type while in secure communication.\n");
+    return SST_print_error_return_null(
+        "Invalid message type while in secure communication.");
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,

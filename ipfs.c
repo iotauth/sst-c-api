@@ -14,12 +14,12 @@ const char DOWNLOAD_FILE_NAME[] = "download";
 void get_file_content(FILE *fin, unsigned char *file_buf,
                       unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
-        error_exit("Start point is not zero.\n");
+        SST_print_error_exit("Start point is not zero.\n");
         exit(1);
     }
     size_t newLen = fread(file_buf, sizeof(char), bufsize, fin);
     if (ferror(fin) != 0) {
-        error_exit("Error reading file.\n");
+        SST_print_error_exit("Error reading file.\n");
         exit(1);
     }
     file_buf[newLen++] = '\0';
@@ -28,11 +28,11 @@ void get_file_content(FILE *fin, unsigned char *file_buf,
 unsigned long file_size_return(FILE *fin) {
     unsigned long bufsize;
     if (fin == NULL) {
-        error_exit("Cannot read the file.\n");
+        SST_print_error_exit("Cannot read the file.\n");
         exit(1);
     }
     if (fseek(fin, 0L, SEEK_END) != 0) {
-        error_exit("Cannot move pointer to the end of file.\n");
+        SST_print_error_exit("Cannot move pointer to the end of file.\n");
     }
     bufsize = ftell(fin);
 
@@ -83,7 +83,7 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
-        error_exit("Popen failed.\n");
+        SST_print_error_exit("popen() failed.\n");
         exit(1);
     }
     while (fgets(buff, BUFF_SIZE, fp)) {
@@ -360,7 +360,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
                     &decrypted_entity_nonce, &decrypted_entity_nonce_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP_WITH_DIST_KEY.\n");
             }
@@ -368,7 +368,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                         (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
-                error_exit("Auth nonce NOT verified");
+                SST_print_error_exit("Auth nonce NOT verified");
             } else {
                 SST_print_debug("Auth nonce verified!\n");
             }
@@ -384,7 +384,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
                     AES_128_CBC, 0, &decrypted_entity_nonce,
                     &decrypted_entity_nonce_length)) {
-                error_exit(
+                SST_print_error_exit(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP.\n");
             }
@@ -392,7 +392,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                         (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
-                error_exit("Auth nonce NOT verified");
+                SST_print_error_exit("Auth nonce NOT verified");
             } else {
                 SST_print_debug("Auth nonce verified!\n");
             }

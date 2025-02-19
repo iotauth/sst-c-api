@@ -191,7 +191,7 @@ const EVP_CIPHER *get_EVP_CIPHER(AES_encryption_mode_t enc_mode) {
     } else if (enc_mode == AES_128_GCM) {
         return EVP_aes_128_gcm();
     } else {
-        error_exit("Encryption type not supported.");
+        SST_print_error_exit("Encryption type not supported.");
     }
     return NULL;
 }

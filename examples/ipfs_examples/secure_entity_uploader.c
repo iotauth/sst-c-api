@@ -41,7 +41,6 @@ int main(int argc, char* argv[]) {
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    printf("finished\n");
     sleep(1);
     pthread_t thread;
     pthread_create(&thread, NULL, &receive_thread_read_one_each,

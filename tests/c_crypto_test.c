@@ -41,7 +41,7 @@ void AES_test_common(AES_encryption_mode_t mode) {
 
     // Returns IV(16) + cipher + (HMAC(32))
     printf("Cipher Length: %d, Cipher Text: ", length);
-    print_buf(cipher, length);
+    print_buf_log(cipher, length);
 
     unsigned char decrypted[100];
     memset(decrypted, 0, 100);  // Set to 0 for visibility.
@@ -104,7 +104,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             AES_128_IV_SIZE, enc_mode, hmac_mode, &encrypted,
             &encrypted_length);
         printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
-        print_buf(encrypted, encrypted_length);
+        print_buf_log(encrypted, encrypted_length);
         assert(s == 0);
         s = symmetric_decrypt_authenticate(
             encrypted, encrypted_length, mac_key, MAC_KEY_SHA256_SIZE,
@@ -132,7 +132,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             &encrypted_length);
         encrypted = &encrypted_stack[0];
         printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
-        print_buf(encrypted, encrypted_length);
+        print_buf_log(encrypted, encrypted_length);
         assert(s == 0);
         unsigned int estimate_decrypted_length =
             get_expected_decrypted_maximum_length(
