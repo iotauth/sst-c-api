@@ -777,18 +777,18 @@ void update_validity(session_key_t *session_key) {
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_ley_list) {
-    if (MAX_SESSION_KEY - s_ley_list->num_key < requested_num_key) {
+                                   session_key_list_t *s_key_list) {
+    if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
         int expired;
         int temp;
         for (int i = 0; i < requested_num_key; i++) {
-            temp = mod((i + s_ley_list->rear_idx - s_ley_list->num_key),
+            temp = mod((i + s_key_list->rear_idx - s_key_list->num_key),
                        MAX_SESSION_KEY);
-            expired = check_session_key_validity(&s_ley_list->s_key[temp]);
+            expired = check_session_key_validity(&s_key_list->s_key[temp]);
             if (expired) {
-                s_ley_list->num_key -= 1;
+                s_key_list->num_key -= 1;
             }
             ret = ret && expired;
         }
@@ -905,26 +905,22 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
 }
 
 // Function to read a variable-length integer from the socket
-int read_var_length_int(int sock, unsigned int *num,
-                        unsigned int *var_len_size) {
-    *num = 0;
-    *var_len_size = 0;
+int read_var_length_int(int sock, unsigned int *num, unsigned int *var_len_size) {
+    unsigned char buf[MAX_PAYLOAD_BUF_SIZE];
     int ret = -1;
 
-    for (int i = 0; i < MAX_PAYLOAD_BUF_SIZE; i++) {
-        unsigned char byte;
-        ret = sst_read_from_socket_exact(sock, &byte, 1);
+    for (unsigned int i = 0; i < MAX_PAYLOAD_BUF_SIZE; i++) {
+        ret = sst_read_from_socket_exact(sock, &buf[i], 1);
         if (ret <= 0) {
             return ret;  // Error while reading
         }
 
-        *num |= (byte & 127) << (7 * i);
-        (*var_len_size)++;
-
-        if ((byte & 128) == 0) {
-            return 1;  // Done reading variable-length integer
+        if ((buf[i] & 128) == 0) {
+            var_length_int_to_num(buf, i + 1, num, var_len_size);
+            return 1;  // Successfully read variable-length integer
         }
     }
+
     return -1;  // Invalid variable-length integer
 }
 
@@ -949,11 +945,6 @@ ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
     if (ret <= 0) {
         return ret;
     }
-
-    // Successfully read a message
-    // printf("Received Message: Type=%u, Payload Length=%u\n", message_type,
-    // payload_length); printf("Payload: %.*s\n", payload_length, payload);
-
     return payload_length;
 }
 
