@@ -28,15 +28,6 @@ target_include_directories(sst-c-api PUBLIC
 # Ensure OpenSSL is installed along with sst-c-api
 install(FILES ${OPENSSL_LIBRARIES} DESTINATION lib)
 
-# Compiler flags
-if(MSVC)
-  target_compile_options(sst-c-api PUBLIC /W4 /WX)
-elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
-# Exclude errors, because some can use GNU-specific variadic arguments. This is done for only compiling the SST library.
-else()
-  target_compile_options(sst-c-api PUBLIC -Wall -Wextra -Wpedantic -Werror)
-endif()
-
 # Set DEBUG flag for Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   message(STATUS "Enabling DEBUG flag")
