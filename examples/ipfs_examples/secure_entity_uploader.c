@@ -54,5 +54,5 @@ int main(int argc, char* argv[]) {
     sleep(1);
     SST_write(session_ctx, concat_buffer, concat_buffer_size);
     free_SST_ctx_t(ctx);
-    pthread_cancel(thread);
+    pthread_join(thread, NULL);
 }
