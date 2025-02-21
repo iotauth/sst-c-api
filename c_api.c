@@ -311,8 +311,6 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     }
 }
 
-
-
 int read_secure_message(int socket, unsigned char **plaintext,
                         SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
