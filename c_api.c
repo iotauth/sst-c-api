@@ -341,24 +341,6 @@ ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
 return SST_read_internal(session_ctx, buf, num);
 }
 
-unsigned char *return_decrypted_buf(unsigned char *received_buf,
-                                    unsigned int received_buf_length,
-                                    unsigned int *decrypted_buf_length,
-                                    SST_session_ctx_t *session_ctx) {
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char *data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (!check_SECURE_COMM_MSG_type(message_type)) {
-        // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
-        // Must free() after use.
-        return decrypt_received_message(data_buf, data_buf_length,
-                                        decrypted_buf_length, session_ctx);
-    }
-    return SST_print_error_return_null(
-        "Invalid message type while in secure communication.");
-}
-
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
                                  unsigned int plaintext_length,
                                  unsigned char **encrypted,

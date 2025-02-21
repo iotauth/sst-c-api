@@ -62,12 +62,6 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 - This function does not decrypt the message, returns the message as **not decrypted.**
 - Returns the length of the not decrypted message.
 
-
-**unsigned char * return_decrypted_buf()**
-
--   The user can 
-- Returns the decrypted buffer, and must free() after use.
-
 **int SST_write()**
 
 -   `SST_write()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
