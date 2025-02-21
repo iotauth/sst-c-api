@@ -296,17 +296,6 @@ SST_session_ctx_t *server_secure_comm_setup(
     return SST_print_error_return_null("Unrecognized or invalid state for server.");
 }
 
-void *receive_thread(void *SST_session_ctx) {
-    SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
-    unsigned char received_buf[MAX_SECURE_COMM_LENGTH];
-    unsigned int received_buf_length;
-    while (1) {
-        received_buf_length = sst_read_from_socket(
-            session_ctx->sock, received_buf, sizeof(received_buf));
-        receive_message(received_buf, received_buf_length, session_ctx);
-    }
-}
-
 void *receive_thread_read_one_each(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char data_buf[MAX_SECURE_COMM_LENGTH];
@@ -322,17 +311,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     }
 }
 
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx) {
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char *data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (!check_SECURE_COMM_MSG_type(message_type)) {
-        print_received_message(data_buf, data_buf_length, session_ctx);
-    }
-}
+
 
 int read_secure_message(int socket, unsigned char **plaintext,
                         SST_session_ctx_t *session_ctx) {

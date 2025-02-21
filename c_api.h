@@ -74,7 +74,6 @@ typedef struct {
 //     unsigned char *buf;
 // } internal_buf_t;
 
-// This struct is used in receive_thread()
 typedef struct {
     int sock;
     session_key_t s_key;
@@ -163,12 +162,6 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
-// Creates a thread to receive messages.
-// Max buffer length is 1000 bytes currently.
-// Use function receive_message() below for longer read buffer.
-// @param arguments struct including session key and socket number
-void *receive_thread(void *SST_session_ctx);
-
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
 // @param socket socket connected with the server
 // @param plaintext The decrypted plaintext
@@ -181,14 +174,6 @@ int read_secure_message(int socket, unsigned char **plaintext,
 // header. Max buffer length is 1000 bytes currently.
 // @param arguments struct including session key and socket number
 void *receive_thread_read_one_each(void *SST_session_ctx);
-
-// Receive the message and print the message after decrypting with session key.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param SST_session_ctx_t session ctx struct
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx);
 
 // Encrypt the message with session key and send the encrypted message to
 // the socket.

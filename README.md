@@ -55,20 +55,6 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 -   Input is the struct config.
 -   Returns struct SST_session_ctx_t
 
-**void \*receive_thread()**
-
--   Creates a receive_thread and prints the received messages.
--   Usage:
-
-```
-pthread_t thread;
-pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
-```
-
-**void receive_message()**
-
--   Receives messages and print them.
-
 **int read_secure_message(int socket, unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
 
 - `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received message.
