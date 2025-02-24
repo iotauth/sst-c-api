@@ -10,9 +10,14 @@ add_executable(entity_client entity_client.c)
 add_executable(entity_server entity_server.c)
 add_executable(threaded_get_target_id_client threaded_get_target_id_client.c)
 add_executable(threaded_get_target_id_server threaded_get_target_id_server.c)
+add_executable(SST_read_client SST_read_client.c)
+add_executable(SST_read_server SST_read_server.c)
+
 
 # Link against the freshly built SST library
 target_link_libraries(entity_client sst-c-api)
 target_link_libraries(entity_server sst-c-api)
 target_link_libraries(threaded_get_target_id_client sst-c-api)
 target_link_libraries(threaded_get_target_id_server sst-c-api)
+target_link_libraries(SST_read_client sst-c-api)
+target_link_libraries(SST_read_server sst-c-api)

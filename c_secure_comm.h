@@ -107,13 +107,13 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 // protocol. The function constructs a message with a sequence number prepended,
 // encrypts the message, wraps it into a sender buffer, and writes it to the
 // socket.
-// @param msg pointer to the plaintext message to be sent.
-// @param msg_length length of the plaintext message in bytes.
 // @param session_ctx pointer to the session context containing session key and
 // socket information.
+// @param msg pointer to the plaintext message to be sent.
+// @param msg_length length of the plaintext message in bytes.
 // @return the total number of bytes written to the socket, or -1 on failure.
-int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
-                             SST_session_ctx_t *session_ctx);
+int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
+                       unsigned int msg_length);
 
 // Decrypts message, reads seq_num, checks validity, and prints message
 // Print the received message and sequence number after check validity of
@@ -243,5 +243,19 @@ int encrypt_or_decrypt_buf_with_session_key(
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
     session_key_t *s_key, unsigned char *input, unsigned int input_length,
     unsigned char *output, unsigned int *output_length, bool is_encrypt);
+
+int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
+                              unsigned char *encrypted_buf,
+                              unsigned int encrypted_length, unsigned char *buf,
+                              size_t num);
+
+int read_var_length_int(int sock, unsigned int *num,
+                        unsigned int *var_len_size);
+
+ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
+                                 unsigned char *buf);
+
+ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                          size_t num);
 
 #endif  // C_SECURE_COMM_H

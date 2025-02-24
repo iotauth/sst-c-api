@@ -50,7 +50,7 @@
 #define HS_NONCE_SIZE 8
 #define HS_INDICATOR_SIZE 1 + HS_NONCE_SIZE * 2
 #define SEQ_NUM_SIZE 8
-#define MAX_PAYLOAD_LENGTH 1024
+
 #define MAX_HS_BUF_LENGTH 256
 #define MAX_ERROR_MESSAGE_LENGTH 128
 
@@ -269,15 +269,25 @@ void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
 int mod(int a, int b);
 
 // Reads data from a socket into a buffer.
+// This function repeats trying read() until it reads the exact `size`.
+// @param socket The socket file descriptor to read from.
+// @param buf A pointer to the buffer where the data will be stored.
+// @param buf_length The exact number of bytes to read into the buffer.
+// @return The number of bytes successfully read, 0 for EOF, or -1 if an error
+// occurred.
+int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size);
+
+// Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into
 // the provided buffer. It handles error cases, including invalid sockets, read
 // failures, and connection closures.
 // @param socket The socket file descriptor to read from.
 // @param buf A pointer to the buffer where the data will be stored.
 // @param buf_length The maximum number of bytes to read into the buffer.
-// @return The number of bytes successfully read, or -1 if an error occurred.
-unsigned int read_from_socket(int socket, unsigned char *buf,
-                              unsigned int buf_length);
+// @return The number of bytes successfully read, 0 for EOF, or -1 if an error
+// occurred.
+unsigned int sst_read_from_socket(int socket, unsigned char *buf,
+                                  unsigned int buf_length);
 
 // Writes data to a socket from a buffer.
 // This function writes up to `buf_length` bytes from the provided buffer
@@ -287,8 +297,8 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
 // @param buf A pointer to the buffer containing the data to be written.
 // @param buf_length The number of bytes to write from the buffer.
 // @return The number of bytes successfully written, or -1 if an error occurred.
-unsigned int write_to_socket(int socket, const unsigned char *buf,
-                             unsigned int buf_length);
+unsigned int sst_write_to_socket(int socket, const unsigned char *buf,
+                                 unsigned int buf_length);
 
 // Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
 // function not to define SECURE_COMM_MSG in c_api.h

@@ -55,20 +55,6 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 -   Input is the struct config.
 -   Returns struct SST_session_ctx_t
 
-**void \*receive_thread()**
-
--   Creates a receive_thread and prints the received messages.
--   Usage:
-
-```
-pthread_t thread;
-pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
-```
-
-**void receive_message()**
-
--   Receives messages and print them.
-
 **int read_secure_message(int socket, unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
 
 - `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received message.
@@ -76,15 +62,9 @@ pthread_create(&thread, NULL, &receive_thread, (void \*)session_ctx);
 - This function does not decrypt the message, returns the message as **not decrypted.**
 - Returns the length of the not decrypted message.
 
+**int SST_write()**
 
-**unsigned char * return_decrypted_buf()**
-
--   The user can 
-- Returns the decrypted buffer, and must free() after use.
-
-**int send_secure_message()**
-
--   `send_secure_message()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
+-   `SST_write()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
 - It recursively `write()`s until it sends the total message length.
 - Input includes message, length of message, and session_ctx struct.
 - Returns the bytes written if success, and -1 if failure.

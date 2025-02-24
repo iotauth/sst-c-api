@@ -226,7 +226,7 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
+            sst_write_to_socket(sock, message, message_length);
         if (bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -246,7 +246,7 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
+            sst_write_to_socket(sock, message, message_length);
         if (bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -390,11 +390,8 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
-                             SST_session_ctx_t *session_ctx) {
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        SST_print_error_exit("Session key expired!\n");
-    }
+int send_splitted_message(SST_session_ctx_t *session_ctx, char *msg,
+                          unsigned int msg_length) {
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);
     write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
@@ -413,22 +410,40 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     }
 
     session_ctx->sent_seq_num++;
-    unsigned char
-        sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
-                                         // does not support dynamic sizes,
-                                         // the max length is shorter than
-                                         // 1024. Must need to decide static
-                                         // or dynamic buffer size.
-    unsigned int sender_buf_length;
-    make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
-                    sender_buf, &sender_buf_length);
 
-    unsigned int bytes_written =
-        write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
-    if (bytes_written != sender_buf_length) {
-        SST_print_error_exit("Failed to write data to socket.");
+    unsigned char header[MAX_PAYLOAD_BUF_SIZE + 1];
+    unsigned int header_length;
+    make_buffer_header(encrypted_length, SECURE_COMM_MSG, header,
+                       &header_length);
+    unsigned int total_bytes_written = 0;
+    unsigned int bytes_written = 0;
+    bytes_written =
+        sst_write_to_socket(session_ctx->sock, header, header_length);
+    total_bytes_written += bytes_written;
+    bytes_written = sst_write_to_socket(session_ctx->sock, encrypted_stack,
+                                        encrypted_length);
+    total_bytes_written += bytes_written;
+    return total_bytes_written;
+}
+
+int SST_write_internal(SST_session_ctx_t *session_ctx, char *msg,
+                       unsigned int msg_length) {
+    if (check_session_key_validity(&session_ctx->s_key)) {
+        SST_print_error_exit("Session key expired!\n");
     }
-    return bytes_written;
+
+    size_t bytes_sent = 0;
+    size_t chunk_size = 0;
+    int sent = 0;
+    while (bytes_sent < msg_length) {
+        chunk_size = (msg_length - bytes_sent < MAX_PAYLOAD_LENGTH)
+                         ? (msg_length - bytes_sent)
+                         : MAX_PAYLOAD_LENGTH;
+        sent = send_splitted_message(session_ctx, msg + bytes_sent, chunk_size);
+        bytes_sent += sent;
+    }
+    // Bytes all written.
+    return msg_length;
 }
 
 void print_received_message(unsigned char *data, unsigned int data_length,
@@ -485,7 +500,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         if (s_key_list == NULL) {
             return NULL;
         }
-        SST_print_debug("Received %d keys.n", ctx->config->numkey);
+        SST_print_debug("Received %d keys.\n", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -528,7 +543,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -762,18 +777,18 @@ void update_validity(session_key_t *session_key) {
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_ley_list) {
-    if (MAX_SESSION_KEY - s_ley_list->num_key < requested_num_key) {
+                                   session_key_list_t *s_key_list) {
+    if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
         int expired;
         int temp;
         for (int i = 0; i < requested_num_key; i++) {
-            temp = mod((i + s_ley_list->rear_idx - s_ley_list->num_key),
+            temp = mod((i + s_key_list->rear_idx - s_key_list->num_key),
                        MAX_SESSION_KEY);
-            expired = check_session_key_validity(&s_ley_list->s_key[temp]);
+            expired = check_session_key_validity(&s_key_list->s_key[temp]);
             if (expired) {
-                s_ley_list->num_key -= 1;
+                s_key_list->num_key -= 1;
             }
             ret = ret && expired;
         }
@@ -845,4 +860,105 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
         SST_print_error("Session key is expired.\n");
         return -1;
     }
+}
+
+int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
+                              unsigned char *encrypted_buf,
+                              unsigned int encrypted_length, unsigned char *buf,
+                              size_t num) {
+    unsigned int decrypted_length;
+
+    // Allocate stack memory for decrypted buffer, which will be SEQ_NUM[8
+    // bytes] + decrypted
+    unsigned int estimate_decrypted_max_length =
+        get_expected_decrypted_maximum_length(
+            encrypted_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
+            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode);
+    unsigned char decrypted_stack[estimate_decrypted_max_length];
+
+    if (decrypt_buf_with_session_key_without_malloc(
+            &session_ctx->s_key, encrypted_buf, encrypted_length,
+            decrypted_stack, &decrypted_length) != 0) {
+                SST_print_error_exit("Decryption failed.");
+    }
+
+    // Check sequence number.
+    unsigned int received_seq_num =
+        read_unsigned_int_BE(decrypted_stack, SEQ_NUM_SIZE);
+    if (received_seq_num != session_ctx->received_seq_num) {
+        SST_print_error_exit("Wrong sequence number expected.");
+    }
+    session_ctx->received_seq_num++;
+    SST_print_debug("Received seq_num: %d.\n", received_seq_num);
+
+    if (num < decrypted_length - SEQ_NUM_SIZE) {
+        SST_print_error("The buffer is too small. Returning error code -1.\n");
+        return -1;
+    }
+
+    // Copy the decrypted buffer to the buffer to return.
+    memcpy(buf, decrypted_stack + SEQ_NUM_SIZE,
+           decrypted_length - SEQ_NUM_SIZE);
+    // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
+    return decrypted_length - SEQ_NUM_SIZE;
+}
+
+// Function to read a variable-length integer from the socket
+int read_var_length_int(int sock, unsigned int *num, unsigned int *var_len_size) {
+    unsigned char buf[MAX_PAYLOAD_BUF_SIZE];
+    int ret = -1;
+
+    for (unsigned int i = 0; i < MAX_PAYLOAD_BUF_SIZE; i++) {
+        ret = sst_read_from_socket_exact(sock, &buf[i], 1);
+        if (ret <= 0) {
+            return ret;  // Error while reading
+        }
+
+        if ((buf[i] & 128) == 0) {
+            var_length_int_to_num(buf, i + 1, num, var_len_size);
+            return 1;  // Successfully read variable-length integer
+        }
+    }
+
+    return -1;  // Invalid variable-length integer
+}
+
+ssize_t get_msg_type_and_payload(int sock, unsigned char *message_type,
+                                 unsigned char *buf) {
+    int ret = -1;
+    // Step 1: Read the 1-byte message type
+    ret = sst_read_from_socket_exact(sock, message_type, 1);
+    if (ret <= 0) {
+        return ret;  // Error or disconnected
+    }
+    // Step 2: Read the variable-length field
+    unsigned int payload_length = 0;
+    unsigned int var_len_size = 0;
+    ret = read_var_length_int(sock, &payload_length, &var_len_size);
+    if (ret <= 0) {
+        return ret;
+    }
+
+    // Step 3: Read the payload
+    ret = sst_read_from_socket_exact(sock, buf, payload_length);
+    if (ret <= 0) {
+        return ret;
+    }
+    return payload_length;
+}
+
+ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                          size_t num) {
+    unsigned char message_type;
+    ssize_t payload_length;
+    payload_length = get_msg_type_and_payload(session_ctx->sock, &message_type,
+                                              session_ctx->payload_buf);
+    if (payload_length <= 0) {
+        return payload_length;
+    }
+    if (check_SECURE_COMM_MSG_type(message_type) != 0) {
+        SST_print_error_exit("Invalid message type while in secure communication.\n");
+    }
+    return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
+                                     payload_length, buf, num);
 }
