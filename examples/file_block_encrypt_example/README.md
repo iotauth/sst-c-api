@@ -31,7 +31,7 @@ The detailed logic is as below.
 For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
 
 ```
-$cd $SST_ROOT/entity/c/file_block_encrypt_example
+$cd $SST_ROOT/entity/c/examples/file_block_encrypt_example
 $mkdir build && cd build
 $cmake ../
 $make
@@ -40,8 +40,8 @@ $make
 # Example
 
 - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a client1 terminal at `$SST_ROOT/entity/c/file_block_encrypt_example/build`
-- Turn on a client2 terminal at `$SST_ROOT/entity/c/file_block_encrypt_example/build`
+- Turn on a client1 terminal at `$SST_ROOT/entity/c/examples/file_block_encrypt_example/build`
+- Turn on a client2 terminal at `$SST_ROOT/entity/c/examples/file_block_encrypt_example/build`
 
 Execute
 

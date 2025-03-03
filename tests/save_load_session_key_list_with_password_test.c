@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
         &encrypted, &encrypted_length);
     assert(ret == 0);
     printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
-    print_buf(encrypted, encrypted_length);
+    print_buf_log(encrypted, encrypted_length);
 
     session_key_list_t *new_s_key_list = init_empty_session_key_list();
 

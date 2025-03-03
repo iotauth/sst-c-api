@@ -2,7 +2,7 @@
 We use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
 
 ```
-$cd $SST_ROOT/entity/c/server_client_example
+$cd $SST_ROOT/entity/c/examples/server_client_example
 $mkdir build && cd build
 $cmake ../
 $make
@@ -11,8 +11,8 @@ $make
 # Example 1
 
 - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a server terminal at `$SST_ROOT/entity/c/server_client_example/build`
-- Turn on a client terminal at `$SST_ROOT/entity/c/server_client_example/build`
+- Turn on a server terminal at `$SST_ROOT/entity/c/examples/server_client_example/build`
+- Turn on a client terminal at `$SST_ROOT/entity/c/examples/server_client_example/build`
 
 Execute
 Auth Terminal 
@@ -24,7 +24,7 @@ Client Terminal
 
 # Example 2
 - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a terminal at `$SST_ROOT/entity/c/server_client_example/build`
+- Turn on a terminal at `$SST_ROOT/entity/c/examples/server_client_example/build`
 
 Execute
 Auth Terminal 
