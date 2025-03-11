@@ -1,3 +1,5 @@
+// g++ -o sha256_hash sha256_hash.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api
+
 extern "C" {
 #include <sst-c-api/c_api.h>
 }
