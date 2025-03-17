@@ -2,7 +2,7 @@
 
 #include "c_common.h"
 
-void print_last_error(char *msg) {
+void print_last_error(const char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 
     ERR_load_crypto_strings();
