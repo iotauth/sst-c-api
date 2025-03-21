@@ -63,7 +63,37 @@ int main(int argc, char* argv[]) {
         sleep(5);
     }
 
-    
+    // Step 1. Create Hash
+    unsigned char hash_of_file1[SHA256_DIGEST_LENGTH];
+    unsigned int hash_length;
+    digest_message_SHA_256(addReader, addReader, hash_of_file1, hash_length);
+
+    // Step 2. Receive hash from downloader
+    // Use Socket to receive hash from downloader
+    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(9090);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+
+    bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+
+    listen(serverSocket, 5);
+
+    int clientSocket = accept(serverSocket, nullptr, nullptr);
+
+    char buffer[1024] = {0};
+    recv(clientSocket, buffer, sizeof(buffer), 0);
+
+    close(serverSocket);
+
+    // Step 3. Compare hash values
+    if (memcmp(hash_of_file1, hash_of_file2, SHA256_DIGEST_LENGTH) == 0) {
+        printf("Hash values are the same.\n");
+    } else {
+        printf("Hash values are different.\n");
+    }                                                                       
 
     fclose(file);
 

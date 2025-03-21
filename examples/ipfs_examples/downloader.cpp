@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "../../c_crypto.h"
 #include "../../ipfs.h"
 
 int main(int argc, char *argv[]) {
@@ -50,8 +51,26 @@ int main(int argc, char *argv[]) {
         sleep(3);
     }
 
+    // Step 1. Create Hash
+    unsigned char hash_of_file[SHA256_DIGEST_LENGTH];
+    unsigned int hash_length;
+    digest_message_SHA_256(?, ?, hash_of_file, hash_length);
 
-    
+    // Step 2. Send hash to uploader
+    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
+
+    sockaddr_in serverAddress;
+    serverAddress.sin_family = AF_INET;
+    serverAddress.sin_port = htons(9090);
+    serverAddress.sin_addr.s_addr = INADDR_ANY;
+
+    connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+
+    const char* message = hash_of_file;
+    send(clientSocket, message, strlen(message), 0);
+
+    close(clientSocket);
+
     fclose(file);
     free_SST_ctx_t(ctx);
 }
