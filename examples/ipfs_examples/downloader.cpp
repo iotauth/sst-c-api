@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
     // Step 1. Create Hash
     unsigned char hash_of_file[SHA256_DIGEST_LENGTH];
     unsigned int hash_length;
-    digest_message_SHA_256(?, ?, hash_of_file, hash_length);
+    // digest_message_SHA_256(?, ?, hash_of_file, hash_length);
 
     // Step 2. Send hash to uploader
     int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
@@ -66,8 +66,8 @@ int main(int argc, char *argv[]) {
 
     connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
 
-    const char* message = hash_of_file;
-    send(clientSocket, message, strlen(message), 0);
+    // const char* message = hash_of_file;
+    // send(clientSocket, message, strlen(message), 0);
 
     close(clientSocket);
 
