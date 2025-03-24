@@ -63,37 +63,101 @@ int main(int argc, char* argv[]) {
         sleep(5);
     }
 
-    // Step 1. Create Hash
-    unsigned char hash_of_file1[SHA256_DIGEST_LENGTH];
-    unsigned int hash_length;
-    digest_message_SHA_256(addReader, addReader, hash_of_file1, hash_length);
+    // Step 1: Compute Hash of the File
+    cout << "Creating hash of the file" << endl;
 
-    // Step 2. Receive hash from downloader
-    // Use Socket to receive hash from downloader
+    // Open the file in binary mode
+    file = fopen(my_file_path, "rb");
+    if (file == NULL) {
+        fputs("Error opening file for hash calculation", stderr);
+        fputc('\n', stderr);
+        exit(1);
+    }
+
+    // Determine the file size
+    fseek(file, 0, SEEK_END);
+    long filesize = ftell(file);
+    rewind(file);
+
+    // Allocate buffer to hold the file's data
+    unsigned char *file_data = (unsigned char *)malloc(filesize);
+    if (file_data == NULL) {
+        fputs("Memory allocation error", stderr);
+        fputc('\n', stderr);
+        fclose(file);
+        exit(1);
+    }
+
+    // Read the file into the buffer
+    size_t read_bytes = fread(file_data, 1, filesize, file);
+    if (read_bytes != filesize) {
+        fputs("Error reading file", stderr);
+        fputc('\n', stderr);
+        fclose(file);
+        free(file_data);
+        exit(1);
+    }
+    fclose(file);
+
+    // Compute the SHA256 hash of the file data
+    unsigned char hash_of_file[SHA256_DIGEST_LENGTH];
+    unsigned int hash_length = 0;
+    digest_message_SHA_256(file_data, filesize, hash_of_file, &hash_length);
+
+    // Free the buffer as it's no longer needed
+    free(file_data);
+
+    // Step 2: Receive Hash from Downloader using Sockets
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    if (serverSocket < 0) {
+        fputs("Error creating socket", stderr);
+        fputc('\n', stderr);
+        exit(1);
+    }
 
-    sockaddr_in serverAddress;
+    struct sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(9090);
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-    bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress));
+    if (bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
+        fputs("Error binding socket", stderr);
+        fputc('\n', stderr);
+        close(serverSocket);
+        exit(1);
+    }
 
-    listen(serverSocket, 5);
+    if (listen(serverSocket, 5) < 0) {
+        fputs("Error listening on socket", stderr);
+        fputc('\n', stderr);
+        close(serverSocket);
+        exit(1);
+    }
 
     int clientSocket = accept(serverSocket, nullptr, nullptr);
+    if (clientSocket < 0) {
+        fputs("Error accepting connection", stderr);
+        fputc('\n', stderr);
+        close(serverSocket);
+        exit(1);
+    }
 
-    char buffer[1024] = {0};
-    recv(clientSocket, buffer, sizeof(buffer), 0);
-
+    // Expect to receive exactly SHA256_DIGEST_LENGTH bytes from the downloader
+    unsigned char received_hash[SHA256_DIGEST_LENGTH];
+    int bytes_received = recv(clientSocket, received_hash, SHA256_DIGEST_LENGTH, 0);
+    if (bytes_received != SHA256_DIGEST_LENGTH) {
+        fprintf(stderr, "Expected %d bytes but received %d bytes\n", SHA256_DIGEST_LENGTH, bytes_received);
+    }
+    close(clientSocket);
     close(serverSocket);
 
-    // Step 3. Compare hash values
-    if (memcmp(hash_of_file1, hash_of_file2, SHA256_DIGEST_LENGTH) == 0) {
+    // Step 3: Compare the Hash Values
+    if (memcmp(hash_of_file, received_hash, SHA256_DIGEST_LENGTH) == 0) {
         printf("Hash values are the same.\n");
     } else {
         printf("Hash values are different.\n");
-    }                                                                       
+    }
+                                                                        
 
     fclose(file);
 
