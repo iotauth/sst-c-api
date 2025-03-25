@@ -1,117 +1,86 @@
-
+// g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api
 extern "C" {
     #include <sst-c-api/c_api.h>
     #include "../../c_crypto.h"
     #include "../../ipfs.h"
 }
 #include <unistd.h>
+#include <iostream>
+#include <fstream>
 
 int main(int argc, char* argv[]) {
-    char* config_path = argv[1];
-    char* my_file_path = argv[2];
-    char* add_reader_path = argv[3];
-    SST_ctx_t* ctx = init_SST(config_path);
+    std::string config_path = argv[1];
+    std::string my_file_path = argv[2];
+    std::string add_reader_path = argv[3];
+    SST_ctx_t* ctx = init_SST(config_path.c_str());
 
-    FILE* add_reader_file = fopen(add_reader_path, "r");
-    char addReader[64];
-    if (add_reader_file == NULL) {
-        fputs("Cannot open file.", stderr);
-        fputc('\n', stderr);
+    std::ifstream add_reader_file(add_reader_path);
+    if (!add_reader_file) {
+        std::cerr << "Cannot open addReader file." << std::endl;
         exit(1);
     }
-    while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
-        send_add_reader_req_via_TCP(ctx, addReader);
+
+    std::string addReader;
+    while (std::getline(add_reader_file, addReader)) {
+        send_add_reader_req_via_TCP(ctx, const_cast<char*>(addReader.c_str()));
     }
-    fclose(add_reader_file);
+    add_reader_file.close();
+
     // Set purpose to make session key request for file sharing.
     ctx->config->purpose_index = 1;
     estimate_time_t estimate_time[5];
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
-        printf("Failed to get session key. Returning NULL.\n");
+        std::cout << "Failed to get session key. Returning NULL." << std::endl;
         exit(1);
     }
     sleep(1);
-    unsigned char hash_value[BUFF_SIZE];
+
+    std::vector<unsigned char> hash_value(BUFF_SIZE);
     int hash_value_len;
 
-    const char* filename = "Upload_result.csv";
-    FILE* file;
-    file = fopen(filename, "r");
-    if (file) {
-        fclose(file);
-    } else {
-        file = fopen(filename, "w");
-        fprintf(
-            file,
-            "upload_time,keygenerate_time,enc_time,filemanager_time\n");  // columns
-        fclose(file);
-    }
-
-    file = fopen(filename, "a");
-    for (int i = 0; i < ctx->config->numkey; i++) {
-        if (i != 0) {
-            estimate_time[i].keygenerate_time = 0;
-        }
-        hash_value_len =
-            file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path,
-                                &hash_value[0], &estimate_time[i]);
-        sleep(1);
-        upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
-                                      &hash_value[0], hash_value_len);
-                                      
-        sleep(5);
-    }
+    hash_value_len =
+        file_encrypt_upload(&s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()),
+                            &hash_value[0], &estimate_time[0]);
+    sleep(1);
+    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx,
+                                    &hash_value[0], hash_value_len);
+                                    
+    sleep(5);
 
     // Step 1: Compute Hash of the File
-    cout << "Creating hash of the file" << endl;
+    std::cout << "Creating hash of the file" << std::endl;
 
     // Open the file in binary mode
-    file = fopen(my_file_path, "rb");
-    if (file == NULL) {
-        fputs("Error opening file for hash calculation", stderr);
-        fputc('\n', stderr);
+    std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        std::cerr << "Error opening file for hash calculation" << std::endl;
         exit(1);
     }
 
     // Determine the file size
-    fseek(file, 0, SEEK_END);
-    long filesize = ftell(file);
-    rewind(file);
+    std::streamsize filesize = file.tellg();
+    file.seekg(0, std::ios::beg);
 
-    // Allocate buffer to hold the file's data
-    unsigned char *file_data = (unsigned char *)malloc(filesize);
-    if (file_data == NULL) {
-        fputs("Memory allocation error", stderr);
-        fputc('\n', stderr);
-        fclose(file);
+    // Read file data into a vector (which handles its own memory)
+    std::vector<unsigned char> file_data(filesize);
+    if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
+        std::cerr << "Error reading file" << std::endl;
         exit(1);
     }
-
-    // Read the file into the buffer
-    size_t read_bytes = fread(file_data, 1, filesize, file);
-    if (read_bytes != filesize) {
-        fputs("Error reading file", stderr);
-        fputc('\n', stderr);
-        fclose(file);
-        free(file_data);
-        exit(1);
-    }
-    fclose(file);
+    file.close();
 
     // Compute the SHA256 hash of the file data
-    unsigned char hash_of_file[SHA256_DIGEST_LENGTH];
+    std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(file_data, filesize, hash_of_file, &hash_length);
+    digest_message_SHA_256(file_data.data(), file_data.size(), hash_of_file.data(), &hash_length);
 
-    // Free the buffer as it's no longer needed
-    free(file_data);
 
     // Step 2: Receive Hash from Downloader using Sockets
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
+    
     if (serverSocket < 0) {
-        fputs("Error creating socket", stderr);
-        fputc('\n', stderr);
+        std::cerr << "Error creating socket" << std::endl;
         exit(1);
     }
 
@@ -121,45 +90,40 @@ int main(int argc, char* argv[]) {
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
-        fputs("Error binding socket", stderr);
-        fputc('\n', stderr);
+        std::cerr << "Error binding socket" << std::endl;
         close(serverSocket);
         exit(1);
     }
 
     if (listen(serverSocket, 5) < 0) {
-        fputs("Error listening on socket", stderr);
-        fputc('\n', stderr);
+        std::cerr << "Error listening on socket" << std::endl;
         close(serverSocket);
         exit(1);
     }
 
     int clientSocket = accept(serverSocket, nullptr, nullptr);
     if (clientSocket < 0) {
-        fputs("Error accepting connection", stderr);
-        fputc('\n', stderr);
+        std::cerr << "Error accepting connection" << std::endl;
         close(serverSocket);
         exit(1);
     }
 
-    // Expect to receive exactly SHA256_DIGEST_LENGTH bytes from the downloader
-    unsigned char received_hash[SHA256_DIGEST_LENGTH];
-    int bytes_received = recv(clientSocket, received_hash, SHA256_DIGEST_LENGTH, 0);
-    if (bytes_received != SHA256_DIGEST_LENGTH) {
-        fprintf(stderr, "Expected %d bytes but received %d bytes\n", SHA256_DIGEST_LENGTH, bytes_received);
+    // Receive the hash
+    std::vector<unsigned char> received_hash(SHA256_DIGEST_LENGTH);
+    int bytes_received = recv(clientSocket, received_hash.data(), received_hash.size(), 0);
+    if (bytes_received != static_cast<int>(received_hash.size())) {
+        std::cerr << "Expected " << SHA256_DIGEST_LENGTH << " bytes but received " << bytes_received << " bytes" << std::endl;
     }
     close(clientSocket);
     close(serverSocket);
 
     // Step 3: Compare the Hash Values
-    if (memcmp(hash_of_file, received_hash, SHA256_DIGEST_LENGTH) == 0) {
-        printf("Hash values are the same.\n");
+    if (hash_of_file == received_hash) {
+        std::cout << "Hash values are the same." << std::endl;
     } else {
-        printf("Hash values are different.\n");
+        std::cout << "Hash values are different." << std::endl;
     }
                                                                         
-
-    fclose(file);
-
     free_SST_ctx_t(ctx);
+    return 0;
 }
