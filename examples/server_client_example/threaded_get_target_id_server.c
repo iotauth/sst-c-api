@@ -10,11 +10,9 @@
  */
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../../c_api.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <pthread.h>
 
 // Define a struct to hold the thread arguments
 typedef struct {

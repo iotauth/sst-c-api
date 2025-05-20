@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     }
 
     sleep(1);
-    
+
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
     if (session_ctx == NULL) {

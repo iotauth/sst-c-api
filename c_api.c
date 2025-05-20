@@ -85,7 +85,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                                                         int sock) {
     // Initialize SST_session_ctx_t
-    SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));\
+    SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));
     session_ctx->received_seq_num = 0;
     session_ctx->sent_seq_num = 0;
 
@@ -339,8 +339,8 @@ int SST_write(SST_session_ctx_t *session_ctx, char *msg,
 // TODO: Fix the other reads.
 // Always read the exact number it requested.
 ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
-    size_t num) {
-return SST_read_internal(session_ctx, buf, num);
+                 size_t num) {
+    return SST_read_internal(session_ctx, buf, num);
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,

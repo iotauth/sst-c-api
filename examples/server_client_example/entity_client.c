@@ -11,11 +11,10 @@ void *SST_read_thread(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         data_buf_length = SST_read(session_ctx, data_buf, 512);
-        if(data_buf_length < 0) {
+        if (data_buf_length < 0) {
             printf("Read failed.\n");
             break;
-        }
-        else if(data_buf_length == 0) {
+        } else if (data_buf_length == 0) {
             printf("Disconnected.\n");
             break;
         }
@@ -42,8 +41,7 @@ int main(int argc, char *argv[]) {
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
     pthread_t thread;
-    pthread_create(&thread, NULL, &SST_read_thread,
-                   (void *)session_ctx);
+    pthread_create(&thread, NULL, &SST_read_thread, (void *)session_ctx);
     SST_write(session_ctx, "Hello server", strlen("Hello server"));
     SST_write(session_ctx, "Hello server - second message",
               strlen("Hello server - second message"));
@@ -58,8 +56,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread2;
     session_ctx = secure_connect_to_server(&s_key_list->s_key[1], ctx);
-    pthread_create(&thread2, NULL, &SST_read_thread,
-                   (void *)session_ctx);
+    pthread_create(&thread2, NULL, &SST_read_thread, (void *)session_ctx);
     SST_write(session_ctx, "Hello server 2", strlen("Hello server 2"));
     SST_write(session_ctx, "Hello server 2 - second message",
               strlen("Hello server 2 - second message"));

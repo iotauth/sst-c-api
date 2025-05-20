@@ -879,7 +879,7 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
     if (decrypt_buf_with_session_key_without_malloc(
             &session_ctx->s_key, encrypted_buf, encrypted_length,
             decrypted_stack, &decrypted_length) != 0) {
-                SST_print_error_exit("Decryption failed.");
+        SST_print_error_exit("Decryption failed.");
     }
 
     // Check sequence number.
@@ -904,7 +904,8 @@ int parse_SECURE_COMM_message(SST_session_ctx_t *session_ctx,
 }
 
 // Function to read a variable-length integer from the socket
-int read_var_length_int(int sock, unsigned int *num, unsigned int *var_len_size) {
+int read_var_length_int(int sock, unsigned int *num,
+                        unsigned int *var_len_size) {
     unsigned char buf[MAX_PAYLOAD_BUF_SIZE];
     int ret = -1;
 
@@ -957,7 +958,8 @@ ssize_t SST_read_internal(SST_session_ctx_t *session_ctx, unsigned char *buf,
         return payload_length;
     }
     if (check_SECURE_COMM_MSG_type(message_type) != 0) {
-        SST_print_error_exit("Invalid message type while in secure communication.\n");
+        SST_print_error_exit(
+            "Invalid message type while in secure communication.\n");
     }
     return parse_SECURE_COMM_message(session_ctx, session_ctx->payload_buf,
                                      payload_length, buf, num);

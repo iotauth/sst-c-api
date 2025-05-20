@@ -63,7 +63,7 @@ config_t *load_config(const char *path) {
             SST_print_error("SST Config file not found on path %s.\n", path);
         } else if (errno == EACCES) {
             SST_print_error("SST Config file permission denied on path %s.\n",
-                   path);
+                            path);
         } else {
             SST_print_error("SST Config file open failed on path %s.\n", path);
         }
@@ -181,7 +181,8 @@ config_t *load_config(const char *path) {
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
                     ptr = strtok(NULL, delimiters);
-                    SST_print_debug("IP address of file system manager: %s\n", ptr);
+                    SST_print_debug("IP address of file system manager: %s\n",
+                                    ptr);
                     strcpy(c->file_system_manager_ip_addr, ptr);
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
