@@ -16,6 +16,8 @@
 #define TOTAL_BLOCK_NUM 10
 #define TOTAL_FILE_NUM 3
 
+#define BLOCK_FILE_NAME_MAX_LENGTH 15
+
 typedef struct {
     unsigned long int first_index;
     unsigned int length;
