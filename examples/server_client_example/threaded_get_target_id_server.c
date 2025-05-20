@@ -1,14 +1,17 @@
 /**
  * @file threaded_get_target_id_server.c
  * @author Dongha Kim
- * @brief A multi-threaded server program that retrieves session keys by their IDs.
- * Create multiple threads, read the meta data that contains the session key ID, and request the session key by their IDs. This program uses the SST_ctx_t's mutex, to ensure thread-safe.
+ * @brief A multi-threaded server program that retrieves session keys by their
+ * IDs. Create multiple threads, read the meta data that contains the session
+ * key ID, and request the session key by their IDs. This program uses the
+ * SST_ctx_t's mutex, to ensure thread-safe.
  * @copyright Copyright (c) 2025
- * 
+ *
  */
-#include "../../c_api.h"
-#include <stdio.h>
 #include <pthread.h>
+#include <stdio.h>
+
+#include "../../c_api.h"
 
 // Define a struct to hold the thread arguments
 typedef struct {
@@ -31,16 +34,21 @@ void *call_get_session_key_by_ID(void *args) {
     }
     fread(target_session_key_id, SESSION_KEY_ID_SIZE, 1, fp);
     fclose(fp);
-    printf("Session Key ID from file %s: %u\n", file_path, convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE));
+    printf("Session Key ID from file %s: %u\n", file_path,
+           convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE));
 
     pthread_mutex_lock(&ctx->mutex);
-    session_key_t *session_key = get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
+    session_key_t *session_key =
+        get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     pthread_mutex_unlock(&ctx->mutex);
 
     if (session_key) {
-        printf("Retrieved Session Key ID: %u\n", convert_skid_buf_to_int(session_key->key_id, SESSION_KEY_ID_SIZE));
+        printf(
+            "Retrieved Session Key ID: %u\n",
+            convert_skid_buf_to_int(session_key->key_id, SESSION_KEY_ID_SIZE));
     } else {
-        fprintf(stderr, "Error: Failed to retrieve session key for %s\n", file_path);
+        fprintf(stderr, "Error: Failed to retrieve session key for %s\n",
+                file_path);
     }
 
     return NULL;
@@ -53,13 +61,11 @@ int main(int argc, char *argv[]) {
 
     pthread_t threads[3];
     thread_args_t args[3] = {
-        {ctx, "s_key_id0.dat"},
-        {ctx, "s_key_id1.dat"},
-        {ctx, "s_key_id2.dat"}
-    };
+        {ctx, "s_key_id0.dat"}, {ctx, "s_key_id1.dat"}, {ctx, "s_key_id2.dat"}};
 
     for (int i = 0; i < 3; i++) {
-        pthread_create(&threads[i], NULL, call_get_session_key_by_ID, (void *)&args[i]);
+        pthread_create(&threads[i], NULL, call_get_session_key_by_ID,
+                       (void *)&args[i]);
     }
 
     for (int i = 0; i < 3; i++) {
