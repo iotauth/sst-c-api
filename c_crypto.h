@@ -167,11 +167,9 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
 // @param hmac_mode Boolean to use or not use HMAC
 // @return expected_decrypted_maximum_length The expected decrypted length's
 // maximum length.
-unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
-                                                   unsigned int iv_size,
-                                                   unsigned int mac_key_size,
-                                                   AES_encryption_mode_t enc_mode,
-                                                   hmac_mode_t hmac_mode);
+unsigned int get_expected_decrypted_maximum_length(
+    unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
+    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode);
 
 // Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
