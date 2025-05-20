@@ -2,7 +2,7 @@
 
 #include "c_common.h"
 
-void print_last_error(char *msg) {
+void print_last_error(const char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 
     ERR_load_crypto_strings();
@@ -60,7 +60,7 @@ unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
     if (EVP_PKEY_encrypt(ctx, NULL, ret_len, data, data_len) <= 0) {
         print_last_error("EVP_PKEY_encrypt failed");
     }
-    out = OPENSSL_malloc(*ret_len);
+    out = (unsigned char *)OPENSSL_malloc(*ret_len);
     if (!out) {
         print_last_error("OPENSSL_malloc failed");
     }
@@ -90,7 +90,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
     if (EVP_PKEY_decrypt(ctx, NULL, ret_len, enc_data, enc_data_len) <= 0) {
         print_last_error("EVP_PKEY_decrypt failed");
     }
-    out = OPENSSL_malloc(*ret_len);
+    out = (unsigned char *)OPENSSL_malloc(*ret_len);
     if (!out) {
         print_last_error("OPENSSL_malloc failed");
     }
@@ -125,7 +125,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     if (EVP_PKEY_sign(ctx, NULL, sig_length, md, md_length) <= 0) {
         print_last_error("EVP_PKEY_sign failed");
     }
-    sig = OPENSSL_malloc(*sig_length);
+    sig = (unsigned char *)OPENSSL_malloc(*sig_length);
 
     if (!sig) {
         print_last_error("OPENSSL_malloc failed");
@@ -317,9 +317,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
         // The encrypted length is same on CTR mode.
         encrypted_total_length = buf_length;
     } else if (enc_mode == AES_128_GCM) {
-        encrypted_total_length =
-            buf_length +
-            AES_GCM_TAG_SIZE;  // GCM_TAG //TODO: Check. Tag size default is 12.
+        encrypted_total_length = buf_length + AES_GCM_TAG_SIZE;  // GCM_TAG
     }
     if (hmac_mode == USE_HMAC) {
         encrypted_total_length =
@@ -377,11 +375,9 @@ static int get_symmetric_encrypt_authenticate_buffer(
     return 0;
 }
 
-unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
-                                                   unsigned int iv_size,
-                                                   unsigned int mac_key_size,
-                                                   AES_encryption_mode_t enc_mode,
-                                                   hmac_mode_t hmac_mode) {
+unsigned int get_expected_decrypted_maximum_length(
+    unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
+    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode) {
     unsigned int decrypted_maximum_length;
     // First remove the IV length attached on front.
     decrypted_maximum_length = buf_length - iv_size;

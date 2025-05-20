@@ -9,3 +9,4 @@ entity_server
 **/build/**
 **/Testing/**
 .vscode
+!/Makefile

@@ -81,42 +81,14 @@ int main(int argc, char *argv[]) {
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         printf("There is no session key.\n");
-    } else {
-        pthread_t thread;
-        pthread_create(&thread, NULL, &SST_read_thread, (void *)session_ctx);
-
-        SST_write(session_ctx, "Hello client", strlen("Hello client"));
-        SST_write(session_ctx, "Hello client - second message",
-                  strlen("Hello client - second message"));
-        shutdown(clnt_sock, SHUT_RD);
-        pthread_join(thread, NULL);
-        close(clnt_sock);
-        printf("Finished first communication\n");
     }
-    // Second connection. session_key_list caches the session key.
-    clnt_sock2 =
-        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-    if (clnt_sock2 == -1) {
-        exit_with_error("accept() error");
-    }
-
-    sleep(1);
-
-    SST_session_ctx_t *session_ctx2 =
-        server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
-    if (session_ctx == NULL) {
-        printf("There is no session key.\n");
-    } else {
-        pthread_t thread2;
-        pthread_create(&thread2, NULL, &SST_read_thread, (void *)session_ctx2);
-
-        SST_write(session_ctx2, "Hello client 2", strlen("Hello client 2"));
-        SST_write(session_ctx2, "Hello client 2 - second message",
-                  strlen("Hello client 2 - second message"));
-        shutdown(clnt_sock2, SHUT_RD);
-        pthread_join(thread2, NULL);
-        close(clnt_sock2);
-    }
+    pthread_t thread;
+    pthread_create(&thread, NULL, &SST_read_thread, (void *)session_ctx);
+    pthread_join(thread, NULL);
+    close(clnt_sock);
     close(serv_sock);
+
+    free_SST_session_ctx_t(session_ctx);
+    free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
 }

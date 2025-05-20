@@ -1,11 +1,16 @@
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 #include "../../ipfs.h"
 
 int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        fputs("Enter config path, file path, and reader path.", stderr);
+        fputc('\n', stderr);
+        exit(1);
+    }
     char* config_path = argv[1];
     char* my_file_path = argv[2];
     char* add_reader_path = argv[3];

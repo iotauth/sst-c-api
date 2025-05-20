@@ -22,7 +22,7 @@
 #define AES_128_CBC_IV_SIZE 16
 #define AES_128_CTR_IV_SIZE 16
 #define AES_128_GCM_IV_SIZE 12
-#define AES_GCM_TAG_SIZE 12
+#define AES_GCM_TAG_SIZE 16
 #define ABS_VALIDITY_SIZE 6
 #define REL_VALIDITY_SIZE 6
 #define MAX_MAC_KEY_SIZE 32
@@ -45,7 +45,7 @@ typedef struct {
 
 // Print error message when the code has error.
 // @param msg message to print the error
-void print_last_error(char *msg);
+void print_last_error(const char *msg);
 
 // Loads auth's public key from path
 // @param path path of auth's public key
@@ -167,11 +167,9 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
 // @param hmac_mode Boolean to use or not use HMAC
 // @return expected_decrypted_maximum_length The expected decrypted length's
 // maximum length.
-unsigned int get_expected_decrypted_maximum_length(unsigned int buf_length,
-                                                   unsigned int iv_size,
-                                                   unsigned int mac_key_size,
-                                                   AES_encryption_mode_t enc_mode,
-                                                   hmac_mode_t hmac_mode);
+unsigned int get_expected_decrypted_maximum_length(
+    unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
+    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode);
 
 // Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function

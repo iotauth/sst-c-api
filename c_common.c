@@ -139,7 +139,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 
 uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
-    read_from_socket(socket, buf, 1);
+    sst_read_from_socket(socket, buf, 1);
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
     } else {
@@ -152,7 +152,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
                                         unsigned int buf_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
     // Read the first byte.
-    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
     unsigned int var_length_buf_size = read_variable_length_one_byte_each(
@@ -168,7 +168,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     if (ret_length > buf_length) {
         SST_print_error_exit("Larger buffer size required.");
     }
-    unsigned int bytes_read = read_from_socket(socket, buf, buf_length);
+    unsigned int bytes_read = sst_read_from_socket(socket, buf, buf_length);
     if (ret_length != bytes_read) {
         SST_print_error_exit("Wrong read... Exiting..");
     }
@@ -274,8 +274,39 @@ int mod(int a, int b) {
     return r < 0 ? r + b : r;
 }
 
-unsigned int read_from_socket(int socket, unsigned char *buf,
-                              unsigned int buf_length) {
+// Function to read exactly `size` bytes from a socket
+int sst_read_from_socket_exact(int sock, unsigned char *buffer, int size) {
+    if (sock < 0) {
+        // Socket is not open.
+        errno = EBADF;
+        return -1;
+    }
+    int total_read = 0;
+    while (total_read < size) {
+        int bytes_read = read(sock, buffer + total_read, size - total_read);
+        if (bytes_read < 0 &&
+            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            SST_print_debug(
+                "Reading from socket %d failed with error: `%s`. Will try "
+                "again.\n",
+                sock, strerror(errno));
+            usleep(100000);  // 100 milliseconds = 100,000 microseconds
+            continue;
+        } else if (bytes_read < 0) {
+            // A more serious error occurred.
+            SST_print_error_exit("Reading from socket failed.");
+            return -1;
+        } else if (bytes_read == 0) {
+            SST_print_debug("Socket is disconnected.\n");
+            return 0;  // Connection closed or error
+        }
+        total_read += bytes_read;
+    }
+    return total_read;
+}
+
+unsigned int sst_read_from_socket(int socket, unsigned char *buf,
+                                  unsigned int buf_length) {
     if (socket < 0) {
         // Socket is not open.
         errno = EBADF;
@@ -290,8 +321,8 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     return (unsigned int)length_read;
 }
 
-unsigned int write_to_socket(int socket, const unsigned char *buf,
-                             unsigned int buf_length) {
+unsigned int sst_write_to_socket(int socket, const unsigned char *buf,
+                                 unsigned int buf_length) {
     if (socket < 0) {
         // Socket is not open.
         errno = EBADF;

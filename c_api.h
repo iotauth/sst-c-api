@@ -13,6 +13,10 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
+#define MAX_PAYLOAD_LENGTH 1024
+#define MAX_SECURE_COMM_LENGTH \
+    1088  // The total length of the message, including the header and
+          // encryption and authentication
 
 typedef enum {
     AES_128_CBC,
@@ -65,12 +69,12 @@ typedef struct {
     int file_system_manager_port_num;
 } config_t;
 
-// This struct is used in receive_thread()
 typedef struct {
     int sock;
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
+    unsigned char payload_buf[MAX_SECURE_COMM_LENGTH];
 } SST_session_ctx_t;
 
 // This struct is a session_key_list.
@@ -152,12 +156,6 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
-// Creates a thread to receive messages.
-// Max buffer length is 1000 bytes currently.
-// Use function receive_message() below for longer read buffer.
-// @param arguments struct including session key and socket number
-void *receive_thread(void *SST_session_ctx);
-
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
 // @param socket socket connected with the server
 // @param plaintext The decrypted plaintext
@@ -171,35 +169,22 @@ int read_secure_message(int socket, unsigned char **plaintext,
 // @param arguments struct including session key and socket number
 void *receive_thread_read_one_each(void *SST_session_ctx);
 
-// Receive the message and print the message after decrypting with session key.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param SST_session_ctx_t session ctx struct
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx);
-
-// Return the buffer pointer of the decrypted buffer.
-// If the user gives the read buffer as input, it will return the decrypted
-// buffer. If an error occurs, returns NULL.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param decrypted_buf_length length of the decrypted buf
-// @param SST_session_ctx_t session ctx struct
-// @param The unsigned char pointer of the returned decrypted buffer.
-unsigned char *return_decrypted_buf(unsigned char *received_buf,
-                                    unsigned int received_buf_length,
-                                    unsigned int *decrypted_buf_length,
-                                    SST_session_ctx_t *session_ctx);
-
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
+// @param SST_session_ctx_t session ctx struct
 // @param msg message to send
 // @param msg_length length of message
-// @param SST_session_ctx_t session ctx struct
 // @return the total number of bytes written to the socket, or -1 on failure.
-int send_secure_message(char *msg, unsigned int msg_length,
-                        SST_session_ctx_t *session_ctx);
+int SST_write(SST_session_ctx_t *session_ctx, char *msg,
+              unsigned int msg_length);
+
+// TODO: Fix the other reads.
+// Read the received message, and return the buffer in plaintext.
+// @param SST_session_ctx_t session_ctx
+// @param buf Pointer of the buffer to be filled.
+// @param num The number of bytes to read.
+ssize_t SST_read(SST_session_ctx_t *session_ctx, unsigned char *buf,
+                 size_t num);
 
 // Encrypt buffer with session key. This mallocs data, so the buffer must be
 // freed after use.
@@ -318,6 +303,10 @@ void generate_random_nonce(int length, unsigned char *buf);
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
 void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Free memory allocated in SST_session_ctx_t.
+// @param SST_session_ctx_t session_ctx to free.
+void free_SST_session_ctx_t(SST_session_ctx_t *session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free

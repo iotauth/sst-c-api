@@ -1,6 +1,11 @@
 #include "block_common.h"
 
 int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        fputs("Enter config path", stderr);
+        fputc('\n', stderr);
+        exit(1);
+    }
     char *config_path = argv[1];
 
     // Open file_metadata structs.
@@ -31,9 +36,11 @@ int main(int argc, char *argv[]) {
         // s_key_list. get_session_key_by_ID(encrypted_file_metadata[i].key_id,
         // ctx, &s_key_list);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        sprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH, "encrypted%d.txt", i);
+        sprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+                "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH, "plaintext%d.txt", i);
+        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+                 "plaintext%d.txt", i);
 
         FILE *encrypted_fp;
         FILE *plaintext_fp;

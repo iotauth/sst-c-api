@@ -49,7 +49,9 @@ void file_duplication_check(const char *file_name, const char *file_extension,
     file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
     for (;;) {
         if (suffix_num >= MAX_REPLY_NUM) {
-            SST_print_error("Cannot save the file as file name's suffix number exceeds max.\n");
+            SST_print_error(
+                "Cannot save the file as file name's suffix number exceeds "
+                "max.\n");
             exit(1);
         }
         if (0 == access(file_name_buf, F_OK)) {
@@ -274,7 +276,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     write(sock, data, 2 + name_size);
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length =
-        read_from_socket(sock, received_buf, sizeof(received_buf));
+        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
@@ -327,7 +329,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         unsigned int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
