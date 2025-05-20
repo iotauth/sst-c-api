@@ -47,10 +47,10 @@ typedef struct {
 } distribution_key_t;
 
 typedef struct {
-    char name[MAX_ENTITY_NAME_LENGTH];
+    char name[MAX_ENTITY_NAME_LENGTH + 1];
     // Currently, the config struct can hold up to two purposes.
     unsigned short purpose_index;
-    char purpose[2][MAX_PURPOSE_LENGTH];
+    char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;

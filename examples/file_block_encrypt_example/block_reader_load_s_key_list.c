@@ -30,10 +30,10 @@ int main(int argc, char *argv[]) {
         // Request session key by session key ID. It will be added to the
         // s_key_list. get_session_key_by_ID(encrypted_file_metadata[i].key_id,
         // ctx, &s_key_list);
-        char encrypted_filename[15];
-        sprintf(encrypted_filename, "encrypted%d.txt", i);
-        char plaintext_filename[15];
-        sprintf(plaintext_filename, "plaintext%d.txt", i);
+        char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
+        sprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH, "encrypted%d.txt", i);
+        char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
+        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH, "plaintext%d.txt", i);
 
         FILE *encrypted_fp;
         FILE *plaintext_fp;

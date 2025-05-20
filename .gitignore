@@ -8,3 +8,4 @@ entity_server
 /**/Makefile
 **/build/**
 **/Testing/**
+.vscode

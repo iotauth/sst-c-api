@@ -48,8 +48,8 @@ void file_duplication_check(const char *file_name, const char *file_extension,
            strlen(file_extension));
     file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
     for (;;) {
-        if (suffix_num == MAX_REPLY_NUM) {
-            SST_print_error("Cannot save the file. \n");
+        if (suffix_num >= MAX_REPLY_NUM) {
+            SST_print_error("Cannot save the file as file name's suffix number exceeds max.\n");
             exit(1);
         }
         if (0 == access(file_name_buf, F_OK)) {

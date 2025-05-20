@@ -32,10 +32,10 @@ int main(int argc, char *argv[]) {
 
         memcpy(encrypted_file_metadata[i].key_id, s_key_list->s_key[i].key_id,
                SESSION_KEY_ID_SIZE);
-        char encrypted_filename[15];
-        sprintf(encrypted_filename, "encrypted%d.txt", i);
-        char plaintext_filename[15];
-        sprintf(plaintext_filename, "plaintext%d.txt", i);
+        char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
+        snprintf(encrypted_filename, "encrypted%d.txt", BLOCK_FILE_NAME_MAX_LENGTH, i);
+        char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
+        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH, "plaintext%d.txt", i);
 
         FILE *encrypted_fp;
         FILE *plaintext_fp;
