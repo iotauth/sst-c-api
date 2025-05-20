@@ -158,6 +158,9 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     for (int i = 0; i < existing_s_key_list->num_key; i++) {
         session_key_found = check_session_key(target_session_key_id_int,
                                               existing_s_key_list, i);
+        if (session_key_found >= 0) {
+            break;  // Exit loop early when key is found
+        }
     }
     if (session_key_found >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_found];
