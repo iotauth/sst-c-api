@@ -7,7 +7,7 @@ jobs:
   clang-format:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install clang-tidy and clang-format
         run: |
           sudo apt-get update
