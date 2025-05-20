@@ -155,8 +155,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     if (existing_s_key_list == NULL) {
         SST_print_error_exit("Session key list must be not NULL.\n");
     }
-    session_key_idx = find_session_key(target_session_key_id_int,
-                                            existing_s_key_list);
+    session_key_idx =
+        find_session_key(target_session_key_id_int, existing_s_key_list);
     if (session_key_idx >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx == -1) {
