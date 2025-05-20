@@ -155,15 +155,15 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     if (existing_s_key_list == NULL) {
         SST_print_error_exit("Session key list must be not NULL.\n");
     }
-    session_key_idx = find_session_key(target_session_key_id_int,
-                                            existing_s_key_list);
+    session_key_idx =
+        find_session_key(target_session_key_id_int, existing_s_key_list);
     if (session_key_idx >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx == -1) {
         // WARNING: The following line overwrites the purpose.
         snprintf(ctx->config->purpose[ctx->config->purpose_index],
-            MAX_PURPOSE_LENGTH,
-            "{\"keyId\":%d}", target_session_key_id_int);
+                 MAX_PURPOSE_LENGTH, "{\"keyId\":%d}",
+                 target_session_key_id_int);
 
         session_key_list_t *s_key_list;
         s_key_list =
@@ -291,7 +291,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    return SST_print_error_return_null("Unrecognized or invalid state for server.");
+    return SST_print_error_return_null(
+        "Unrecognized or invalid state for server.");
 }
 
 void *receive_thread(void *SST_session_ctx) {
