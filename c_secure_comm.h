@@ -172,15 +172,12 @@ unsigned char *check_handshake1_send_handshake2(
     unsigned char *server_nonce, session_key_t *s_key,
     unsigned int *ret_length);
 
-// This function is used when checking if the server already has the session_key
-// requested Checks if the s_key_list's idx'th session_key_id equals with the
-// key_id
-// @param key_id the target key id to obtain
+// This function is used to find the session_key by its identifier (key_id)
+// in the given session key list and returns the index of the found key.
+// @param key_id the target key id to be found
 // @param s_key_list the cached session_key_list
-// @param idx current index
-// @return index of the s_key_list
-int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
-                      int idx);
+// @return index of the s_key_list if the key is found or -1 otherwise
+int find_session_key(unsigned int key_id, session_key_list_t *s_key_list);
 
 // Adds session key to the list.
 // Appends at the destination list's rear_idx.
