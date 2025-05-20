@@ -85,8 +85,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                                                         int sock) {
     // Initialize SST_session_ctx_t
-    SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));
-    // session_ctx->internal_buf.buf = malloc(MAX_PAYLOAD_LENGTH);
+    SST_session_ctx_t *session_ctx = malloc(sizeof(SST_session_ctx_t));\
     session_ctx->received_seq_num = 0;
     session_ctx->sent_seq_num = 0;
 
@@ -537,7 +536,6 @@ void free_session_key_list_t(session_key_list_t *session_key_list) {
 }
 
 void free_SST_session_ctx_t(SST_session_ctx_t *session_ctx) {
-    // free(session_ctx->internal_buf.buf);
     free(session_ctx);
 }
 

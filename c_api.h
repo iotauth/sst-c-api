@@ -69,17 +69,11 @@ typedef struct {
     int file_system_manager_port_num;
 } config_t;
 
-// typedef struct {
-//     size_t length;
-//     unsigned char *buf;
-// } internal_buf_t;
-
 typedef struct {
     int sock;
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
-    // internal_buf_t internal_buf;
     unsigned char payload_buf[MAX_SECURE_COMM_LENGTH];
 } SST_session_ctx_t;
 
