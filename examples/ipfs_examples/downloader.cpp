@@ -55,7 +55,7 @@ int main(int argc, char *argv[]) {
     std::streamsize filesize = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    // Read the file into the vector
+    // Read the file data into the vector
     std::vector<unsigned char> file_data(filesize);
     if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
         std::cerr << "Error reading file" << std::endl;
@@ -66,33 +66,12 @@ int main(int argc, char *argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(file_data.data(), filesize, hash_of_file.data(), &hash_length);
+    digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]), filesize, hash_of_file.data(), &hash_length);
 
     // Step 2. Send hash to uploader
-    int clientSocket = socket(AF_INET, SOCK_STREAM, 0);
-
-    if (clientSocket < 0) {
-        std::cerr << "Error creating socket" << std::endl;
-        exit(1);
-    }
-
-    sockaddr_in serverAddress;
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(9090);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
-
-    if (connect(clientSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
-        std::cerr << "Error connecting to server" << std::endl;
-        close(clientSocket);
-        exit(EXIT_FAILURE);
-    }
-
     // Send the computed hash (raw bytes)
-    if (send(clientSocket, hash_of_file.data(), hash_length, 0) != static_cast<ssize_t>(hash_length)) {
-        std::cerr << "Error sending hash" << std::endl;
-    }
-
-    close(clientSocket);
+    SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    send_secure_message(reinterpret_cast<char*>(hash_of_file.data()), hash_length, session_ctx);
     
     free_SST_ctx_t(ctx);
     return 0;

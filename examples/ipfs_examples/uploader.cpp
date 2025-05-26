@@ -9,6 +9,12 @@ extern "C" {
 #include <fstream>
 
 int main(int argc, char* argv[]) {
+
+    if (argc != 4) {
+        std::cerr << "Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
+        exit(1);
+    }
+
     std::string config_path = argv[1];
     std::string my_file_path = argv[2];
     std::string add_reader_path = argv[3];
@@ -16,13 +22,13 @@ int main(int argc, char* argv[]) {
 
     std::ifstream add_reader_file(add_reader_path);
     if (!add_reader_file) {
-        std::cerr << "Cannot open addReader file." << std::endl;
+        std::cerr << "Cannot open add_reader file." << std::endl;
         exit(1);
     }
 
-    std::string addReader;
-    while (std::getline(add_reader_file, addReader)) {
-        send_add_reader_req_via_TCP(ctx, const_cast<char*>(addReader.c_str()));
+    std::string add_reader;
+    while (std::getline(add_reader_file, add_reader)) {
+        send_add_reader_req_via_TCP(ctx, const_cast<char*>(add_reader.c_str()));
     }
     add_reader_file.close();
 
@@ -62,7 +68,7 @@ int main(int argc, char* argv[]) {
     std::streamsize filesize = file.tellg();
     file.seekg(0, std::ios::beg);
 
-    // Read file data into a vector (which handles its own memory)
+    // Read file data into a vector
     std::vector<unsigned char> file_data(filesize);
     if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
         std::cerr << "Error reading file" << std::endl;
@@ -73,49 +79,56 @@ int main(int argc, char* argv[]) {
     // Compute the SHA256 hash of the file data
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(file_data.data(), file_data.size(), hash_of_file.data(), &hash_length);
+    digest_message_SHA_256(&file_data[0], filesize, hash_of_file.data(), &hash_length);
 
 
     // Step 2: Receive Hash from Downloader using Sockets
-    int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
     
-    if (serverSocket < 0) {
+    int server_socket = socket(PF_INET, SOCK_STREAM, 0);
+
+    if (server_socket < 0) {
         std::cerr << "Error creating socket" << std::endl;
         exit(1);
     }
 
-    struct sockaddr_in serverAddress;
-    serverAddress.sin_family = AF_INET;
-    serverAddress.sin_port = htons(9090);
-    serverAddress.sin_addr.s_addr = INADDR_ANY;
+    struct sockaddr_in server_address;
+    server_address.sin_family = AF_INET;
+    server_address.sin_port = htons(21100);
+    server_address.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(serverSocket, (struct sockaddr*)&serverAddress, sizeof(serverAddress)) < 0) {
+    if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
         std::cerr << "Error binding socket" << std::endl;
-        close(serverSocket);
+        close(server_socket);
         exit(1);
     }
 
-    if (listen(serverSocket, 5) < 0) {
+    if (listen(server_socket, 5) < 0) {
         std::cerr << "Error listening on socket" << std::endl;
-        close(serverSocket);
+        close(server_socket);
         exit(1);
     }
 
-    int clientSocket = accept(serverSocket, nullptr, nullptr);
-    if (clientSocket < 0) {
+    int client_socket = accept(server_socket, nullptr, nullptr);
+    if (client_socket < 0) {
         std::cerr << "Error accepting connection" << std::endl;
-        close(serverSocket);
+        close(server_socket);
+        exit(1);
+    }
+
+    std::cout << "Client Socket Accepted Connection." << std::endl;
+    SST_session_ctx_t *session_ctx = server_secure_comm_setup(ctx, client_socket, s_key_list_0);
+    std::cout << "Checkpoint 2" << std::endl;
+
+    if (session_ctx == NULL) {
+        std::cerr << "There is no session key.\n" << std::endl;
         exit(1);
     }
 
     // Receive the hash
+
     std::vector<unsigned char> received_hash(SHA256_DIGEST_LENGTH);
-    int bytes_received = recv(clientSocket, received_hash.data(), received_hash.size(), 0);
-    if (bytes_received != static_cast<int>(received_hash.size())) {
-        std::cerr << "Expected " << SHA256_DIGEST_LENGTH << " bytes but received " << bytes_received << " bytes" << std::endl;
-    }
-    close(clientSocket);
-    close(serverSocket);
+    unsigned char *received_hash_data = received_hash.data();
+    read_secure_message(session_ctx->sock, &received_hash_data, session_ctx);
 
     // Step 3: Compare the Hash Values
     if (hash_of_file == received_hash) {
