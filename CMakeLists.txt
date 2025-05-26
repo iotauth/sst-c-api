@@ -17,7 +17,8 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/c_common.c
   ${CMAKE_CURRENT_LIST_DIR}/c_crypto.c
   ${CMAKE_CURRENT_LIST_DIR}/c_secure_comm.c
-  ${CMAKE_CURRENT_LIST_DIR}/load_config.c)
+  ${CMAKE_CURRENT_LIST_DIR}/load_config.c
+  ${CMAKE_CURRENT_LIST_DIR}/ipfs.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
