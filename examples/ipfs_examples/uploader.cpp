@@ -59,7 +59,6 @@ int main(int argc, char* argv[]) {
     sleep(5);
 
     // Step 1: Compute Hash of the File
-    std::cout << "Creating hash of the file." << std::endl;
 
     // Open the file in binary mode
     std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
@@ -84,8 +83,6 @@ int main(int argc, char* argv[]) {
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file.data(), &hash_length);
-
-    std::cout << "Hash of the file created." << std::endl;
 
     // Step 2: Receive Hash from Downloader using Sockets
     
