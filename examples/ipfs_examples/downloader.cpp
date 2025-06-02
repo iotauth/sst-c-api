@@ -1,4 +1,8 @@
+// Compile:
 // g++ -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api
+
+// Execute:
+// ./downloader downloader_copy.config
 #include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>

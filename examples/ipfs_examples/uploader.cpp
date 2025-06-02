@@ -1,4 +1,8 @@
+// Compile:
 // g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api
+
+// Execute:
+// ./uploader uploader_copy.config plain_text.txt addReader.txt
 extern "C" {
     #include <sst-c-api/c_api.h>
     #include "../../c_crypto.h"
@@ -55,7 +59,7 @@ int main(int argc, char* argv[]) {
     sleep(5);
 
     // Step 1: Compute Hash of the File
-    std::cout << "Creating hash of the file" << std::endl;
+    std::cout << "Creating hash of the file." << std::endl;
 
     // Open the file in binary mode
     std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
@@ -81,6 +85,7 @@ int main(int argc, char* argv[]) {
     unsigned int hash_length = 0;
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file.data(), &hash_length);
 
+    std::cout << "Hash of the file created." << std::endl;
 
     // Step 2: Receive Hash from Downloader using Sockets
     
@@ -107,6 +112,8 @@ int main(int argc, char* argv[]) {
         close(server_socket);
         exit(1);
     }
+
+    std::cout << "Waiting for client to connect..." << std::endl;
 
     int client_socket = accept(server_socket, nullptr, nullptr);
     if (client_socket < 0) {
