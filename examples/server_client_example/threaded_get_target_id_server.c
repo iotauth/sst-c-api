@@ -10,6 +10,7 @@
  */
 #include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../../c_api.h"
 
@@ -18,6 +19,12 @@ typedef struct {
     SST_ctx_t *ctx;
     char *file_path;
 } thread_args_t;
+
+void exit_with_error(char *message) {
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    exit(1);
+}
 
 void *call_get_session_key_by_ID(void *args) {
     thread_args_t *data = (thread_args_t *)args;
@@ -55,6 +62,9 @@ void *call_get_session_key_by_ID(void *args) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc != 1) {
+        exit_with_error("Enter config path (target_id_server.c)");
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
     pthread_mutex_init(&ctx->mutex, NULL);

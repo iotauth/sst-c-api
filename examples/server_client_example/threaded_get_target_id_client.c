@@ -8,8 +8,15 @@
  *
  */
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "../../c_api.h"
+
+void exit_with_error(char *message) {
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    exit(1);
+}
 
 void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
     FILE *fp = fopen(file_path, "wb");
@@ -23,6 +30,9 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc != 2) {
+    	exit_with_error("Enter config path (target_id_client.c)");
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
