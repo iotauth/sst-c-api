@@ -5,7 +5,15 @@
 
 #include "../../c_api.h"
 
+void exit_with_error(char *message) {
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    exit(1);
+}
 int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        exit_with_error("Enter config path (entity_client.c)");
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 

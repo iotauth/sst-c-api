@@ -15,7 +15,7 @@ void exit_with_error(char *message) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        exit_with_error("Enter config path");
+        exit_with_error("Enter config path (entity_server.c)");
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
