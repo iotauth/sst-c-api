@@ -12,6 +12,7 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
+#include "../../c_common.h"
 
 // Define a struct to hold the thread arguments
 typedef struct {
@@ -55,6 +56,9 @@ void *call_get_session_key_by_ID(void *args) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc != 0) {
+        SST_print_error_exit("No need to run this file");
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
     pthread_mutex_init(&ctx->mutex, NULL);
