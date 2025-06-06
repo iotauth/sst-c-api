@@ -19,7 +19,7 @@ extern "C" {
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         std::cerr << "Enter config path" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
     
     std::string config_path = argv[1];
@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
     
     if (session_key == NULL) {
         std::cerr << "There is no session key." << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     } else {
         sleep(5);
         file_decrypt_save(*session_key, file_name.data());
@@ -52,7 +52,7 @@ int main(int argc, char *argv[]) {
     std::ifstream file("result.txt", std::ios::binary | std::ios::ate);
     if (!file) {
         std::cerr << "Error opening file for hash calculation" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     // Determine file size
@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> file_data(filesize);
     if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
         std::cerr << "Error reading file" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
     file.close();
 
@@ -78,5 +78,7 @@ int main(int argc, char *argv[]) {
     send_secure_message(reinterpret_cast<char*>(hash_of_file.data()), hash_length, session_ctx);
     
     free_SST_ctx_t(ctx);
-    return 0;
+    free_session_key_list_t(s_key_list);
+
+    return EXIT_SUCCESS;
 }

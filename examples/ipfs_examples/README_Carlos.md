@@ -41,7 +41,7 @@
 
 1. Go to `$ROOT/entity/c/examples/ipfs_examples`.
 
-2. Compile the uploader with `g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`
+2. Compile the uploader with `g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 
     - For debugging mode, compile with `g++ -g -O0 -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 

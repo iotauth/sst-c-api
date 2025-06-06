@@ -8,6 +8,7 @@ extern "C" {
     #include "../../c_crypto.h"
     #include "../../ipfs.h"
 }
+
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
@@ -16,7 +17,7 @@ int main(int argc, char* argv[]) {
 
     if (argc != 4) {
         std::cerr << "Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     std::string config_path = argv[1];
@@ -27,7 +28,7 @@ int main(int argc, char* argv[]) {
     std::ifstream add_reader_file(add_reader_path);
     if (!add_reader_file) {
         std::cerr << "Cannot open add_reader file." << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     std::string add_reader;
@@ -41,8 +42,8 @@ int main(int argc, char* argv[]) {
     estimate_time_t estimate_time[5];
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
-        std::cout << "Failed to get session key. Returning NULL." << std::endl;
-        exit(1);
+        std::cerr << "Failed to get session key. Returning NULL." << std::endl;
+        return EXIT_FAILURE;
     }
     sleep(1);
 
@@ -64,7 +65,7 @@ int main(int argc, char* argv[]) {
     std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
     if (!file) {
         std::cerr << "Error opening file for hash calculation" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     // Determine the file size
@@ -75,7 +76,7 @@ int main(int argc, char* argv[]) {
     std::vector<unsigned char> file_data(filesize);
     if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
         std::cerr << "Error reading file" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
     file.close();
 
@@ -90,8 +91,14 @@ int main(int argc, char* argv[]) {
 
     if (server_socket < 0) {
         std::cerr << "Error creating socket" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
+
+        // Allow reuse of the local address (port) even if it’s in TIME_WAIT
+        int reuse = 1;
+        if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+            std::perror("setsockopt(SO_REUSEADDR) failed"); // Non‐fatal: we can still proceed, but bind might fail.
+        }
 
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
@@ -99,15 +106,15 @@ int main(int argc, char* argv[]) {
     server_address.sin_addr.s_addr = INADDR_ANY;
 
     if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-        std::cerr << "Error binding socket" << std::endl;
+        std::cerr << "Error binding socket: " << std::strerror(errno) << std::endl;
         close(server_socket);
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     if (listen(server_socket, 5) < 0) {
         std::cerr << "Error listening on socket" << std::endl;
         close(server_socket);
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     std::cout << "Waiting for client to connect..." << std::endl;
@@ -116,16 +123,16 @@ int main(int argc, char* argv[]) {
     if (client_socket < 0) {
         std::cerr << "Error accepting connection" << std::endl;
         close(server_socket);
-        exit(1);
+        return EXIT_FAILURE;
     }
-
     std::cout << "Client Socket Accepted Connection." << std::endl;
+    
     SST_session_ctx_t *session_ctx = server_secure_comm_setup(ctx, client_socket, s_key_list_0);
     std::cout << "Checkpoint 2" << std::endl;
 
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
-        exit(1);
+        return EXIT_FAILURE;
     }
 
     // Receive the hash
@@ -142,5 +149,9 @@ int main(int argc, char* argv[]) {
     }
                                                                         
     free_SST_ctx_t(ctx);
-    return 0;
+    free_session_key_list_t(s_key_list_0);
+    close(client_socket);
+    close(server_socket);
+
+    return EXIT_SUCCESS;
 }
