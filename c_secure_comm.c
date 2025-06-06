@@ -700,17 +700,16 @@ unsigned char *check_handshake1_send_handshake2(
     return ret;
 }
 
-int check_session_key(unsigned int key_id, session_key_list_t *s_key_list,
-                      int idx) {
+int find_session_key(unsigned int key_id, session_key_list_t *s_key_list) {
     // TODO: Fix integer size 32 or 64
-    unsigned int list_key_id = read_unsigned_int_BE(
-        s_key_list->s_key[idx].key_id, SESSION_KEY_ID_SIZE);
-
-    if (key_id == list_key_id) {
-        return idx;
-    } else {
-        return -1;
+    for (int idx = 0; idx < s_key_list->num_key; idx++) {
+        unsigned int list_key_id = read_unsigned_int_BE(
+            s_key_list->s_key[idx].key_id, SESSION_KEY_ID_SIZE);
+        if (key_id == list_key_id) {
+            return idx;
+        }
     }
+    return -1;
 }
 
 void add_session_key_to_list(session_key_t *s_key,

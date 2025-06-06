@@ -151,23 +151,19 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 
     // If the entity_server already has the corresponding session key,
     // it does not have to request session key from Auth
-    int session_key_found = -1;
+    int session_key_idx = -1;
     if (existing_s_key_list == NULL) {
         SST_print_error_exit("Session key list must be not NULL.\n");
     }
-    for (int i = 0; i < existing_s_key_list->num_key; i++) {
-        session_key_found = check_session_key(target_session_key_id_int,
-                                              existing_s_key_list, i);
-        if (session_key_found >= 0) {
-            break;  // Exit loop early when key is found
-        }
-    }
-    if (session_key_found >= 0) {
-        s_key = &existing_s_key_list->s_key[session_key_found];
-    } else if (session_key_found == -1) {
+    session_key_idx =
+        find_session_key(target_session_key_id_int, existing_s_key_list);
+    if (session_key_idx >= 0) {
+        s_key = &existing_s_key_list->s_key[session_key_idx];
+    } else if (session_key_idx == -1) {
         // WARNING: The following line overwrites the purpose.
-        sprintf(ctx->config->purpose[ctx->config->purpose_index],
-                "{\"keyId\":%d}", target_session_key_id_int);
+        snprintf(ctx->config->purpose[ctx->config->purpose_index],
+                 MAX_PURPOSE_LENGTH, "{\"keyId\":%d}",
+                 target_session_key_id_int);
 
         session_key_list_t *s_key_list;
         s_key_list =
@@ -295,7 +291,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    return SST_print_error_return_null("Unrecognized or invalid state for server.");
+    return SST_print_error_return_null(
+        "Unrecognized or invalid state for server.");
 }
 
 void *receive_thread(void *SST_session_ctx) {

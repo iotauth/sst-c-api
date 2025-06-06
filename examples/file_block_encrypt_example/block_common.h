@@ -1,10 +1,10 @@
+#include <openssl/rand.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <strings.h>  // bzero()
 
 #include "../../c_api.h"
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <openssl/rand.h>
 
 #define MAX_SIZE 1000
 #define IV_SIZE AES_128_CBC_IV_SIZE
@@ -15,6 +15,8 @@
 
 #define TOTAL_BLOCK_NUM 10
 #define TOTAL_FILE_NUM 3
+
+#define BLOCK_FILE_NAME_MAX_LENGTH 15
 
 typedef struct {
     unsigned long int first_index;
