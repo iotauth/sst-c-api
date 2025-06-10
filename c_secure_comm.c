@@ -1,9 +1,9 @@
 #include "c_secure_comm.h"
 
+#include <unistd.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
-
-#include <unistd.h>
 
 unsigned char entity_client_state;
 unsigned char entity_server_state;

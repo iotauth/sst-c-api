@@ -584,13 +584,12 @@ int secure_rand(int min, int max) {
 
     if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
         fprintf(stderr, "RAND_bytes failed\n");
-        return -1; // handle error
+        return -1;  // handle error
     }
 
     rand_num = ((unsigned int)buffer[0] << 24) |
                ((unsigned int)buffer[1] << 16) |
-               ((unsigned int)buffer[2] << 8) |
-               ((unsigned int)buffer[3]);
+               ((unsigned int)buffer[2] << 8) | ((unsigned int)buffer[3]);
 
     return (rand_num % range) + min;
 }

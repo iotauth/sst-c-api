@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
         // ctx, &s_key_list);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
-                "encrypted%d.txt", i);
+                 "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
                  "plaintext%d.txt", i);

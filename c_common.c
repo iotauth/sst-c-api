@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <math.h>
 #include <netinet/in.h>
+#include <openssl/rand.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -12,7 +13,6 @@
 #include <string.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <openssl/rand.h>
 #include <time.h>
 #include <unistd.h>
 

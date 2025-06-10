@@ -324,16 +324,17 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 void free_SST_ctx_t(SST_ctx_t *ctx);
 
 /**
- * @brief Generates a cryptographically secure random integer within a given range.
+ * @brief Generates a cryptographically secure random integer within a given
+ * range.
  *
- * This function uses OpenSSL's RAND_bytes() to generate cryptographically strong 
- * random numbers. It securely converts these bytes into an integer within the 
- * specified inclusive range [min, max].
+ * This function uses OpenSSL's RAND_bytes() to generate cryptographically
+ * strong random numbers. It securely converts these bytes into an integer
+ * within the specified inclusive range [min, max].
  *
  * @param min The minimum integer value (inclusive) of the desired random range.
  * @param max The maximum integer value (inclusive) of the desired random range.
- * @return A cryptographically secure random integer between min and max (inclusive).
- *         On error, returns -1 (e.g., if RAND_bytes fails).
+ * @return A cryptographically secure random integer between min and max
+ * (inclusive). On error, returns -1 (e.g., if RAND_bytes fails).
  *
  * @note Ensure OpenSSL is properly initialized before calling this function.
  *
@@ -348,6 +349,5 @@ void free_SST_ctx_t(SST_ctx_t *ctx);
  * @endcode
  */
 int secure_rand(int min, int max);
-
 
 #endif  // C_API_H

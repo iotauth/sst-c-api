@@ -1,5 +1,5 @@
-#include "block_common.h"
 #include "../../c_common.h"
+#include "block_common.h"
 
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
@@ -35,7 +35,7 @@ int main(int argc, char *argv[]) {
                SESSION_KEY_ID_SIZE);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
-            "encrypted%d.txt", i);
+                 "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
                  "plaintext%d.txt", i);
@@ -64,7 +64,8 @@ int main(int argc, char *argv[]) {
             // Create random key value buffers.
             while (total_block_size < MAX_PLAINTEXT_BLOCK_SIZE) {
                 // Create a random integer that is >= 56 and <= 144.
-                int plaintext_buf_length = secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
+                int plaintext_buf_length =
+                    secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
                 SST_print_log("Hokeun! %d\n", plaintext_buf_length);
                 // This buffer contains a single key_value.
                 unsigned char
@@ -80,8 +81,9 @@ int main(int argc, char *argv[]) {
                     // Add zero padding to the end of the plaintext_block_buf.
                     bzero(plaintext_block_buf + total_block_size,
                           MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
-                    SST_print_log("Add zero paddings for the leftover %d bytes.\n",
-                           MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
+                    SST_print_log(
+                        "Add zero paddings for the leftover %d bytes.\n",
+                        MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
                     // Now the total_block_size becomes the
                     // MAX_PLAINTEXT_BLOCK_SIZE.
                     total_block_size +=
@@ -120,7 +122,8 @@ int main(int argc, char *argv[]) {
         }
         fclose(plaintext_fp);
         fclose(encrypted_fp);
-        SST_print_log("Finished writing encrypted blocks to encrypted%d.txt\n", i);
+        SST_print_log("Finished writing encrypted blocks to encrypted%d.txt\n",
+                      i);
     }
 
     // Save the file_metadata.
