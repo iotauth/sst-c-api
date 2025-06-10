@@ -70,8 +70,9 @@ int main(int argc, char *argv[]) {
                             strlen("Hello client - second message"),
                             session_ctx);
         sleep(2);
-        close(clnt_sock);
         pthread_cancel(thread);
+        pthread_join(thread,
+                     NULL);  // Needs to wait until the thread is joined.
         printf("Finished first communication\n");
     }
     // Second connection. session_key_list caches the session key.
@@ -97,8 +98,10 @@ int main(int argc, char *argv[]) {
     sleep(1);
 
     sleep(3);
-    close(clnt_sock2);
     pthread_cancel(thread2);
+    pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
+    close(clnt_sock);
+    close(clnt_sock2);
     close(serv_sock);
     free_SST_ctx_t(ctx);
 }

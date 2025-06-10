@@ -1,5 +1,7 @@
 #include "c_secure_comm.h"
 
+#include <unistd.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
 
@@ -76,7 +78,7 @@ static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
                                        unsigned int *message_length) {
     size_t encrypted_length;
     unsigned char *encrypted =
-        public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
+        public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING,
                        (EVP_PKEY *)ctx->pub_key, &encrypted_length);
     size_t sigret_length;
     unsigned char *sigret = SHA256_sign(
@@ -270,7 +272,7 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
     unsigned char *decrypted_dist_key_buf = private_decrypt(
-        signed_data.data, key_size, RSA_PKCS1_PADDING,
+        signed_data.data, key_size, RSA_PKCS1_OAEP_PADDING,
         (EVP_PKEY *)ctx->priv_key, &decrypted_dist_key_buf_length);
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key

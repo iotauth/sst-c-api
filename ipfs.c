@@ -1,9 +1,10 @@
 #include "ipfs.h"
 
+#include <unistd.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
-// #include "c_api.h"
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
 const char TXT_FILE_EXTENSION[] = ".txt";
