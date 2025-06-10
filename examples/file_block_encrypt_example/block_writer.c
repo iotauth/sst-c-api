@@ -1,4 +1,5 @@
 #include "block_common.h"
+#include "../../c_common.h"
 
 int main(int argc, char *argv[]) {
     char *config_path = argv[1];
@@ -33,8 +34,8 @@ int main(int argc, char *argv[]) {
         memcpy(encrypted_file_metadata[i].key_id, s_key_list->s_key[i].key_id,
                SESSION_KEY_ID_SIZE);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(encrypted_filename, "encrypted%d.txt",
-                 BLOCK_FILE_NAME_MAX_LENGTH, i);
+        snprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+            "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
                  "plaintext%d.txt", i);
@@ -62,18 +63,14 @@ int main(int argc, char *argv[]) {
 
             // Create random key value buffers.
             while (total_block_size < MAX_PLAINTEXT_BLOCK_SIZE) {
-                // Create random int between 56~144
-                int plaintext_buf_length =
-                    rand() % (MAX_KEY_VALUE_SIZE + 1 - MIN_KEY_VALUE_SIZE) +
-                    MIN_KEY_VALUE_SIZE;
+                // Create a random integer that is >= 56 and <= 144.
+                int plaintext_buf_length = secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
+                SST_print_log("Hokeun! %d\n", plaintext_buf_length);
                 // This buffer contains a single key_value.
                 unsigned char
                     plaintext_buf[plaintext_buf_length];  // Variable Length
                                                           // Arrays work from
                                                           // C99
-
-                // Insert random bytes inside buffer.
-                RAND_bytes(plaintext_buf, plaintext_buf_length);
 
                 // If the block size exceeds MAX_PLAINTEXT_BLOCK_SIZE after
                 // adding the next block, it should be saved to the next block.
@@ -83,7 +80,7 @@ int main(int argc, char *argv[]) {
                     // Add zero padding to the end of the plaintext_block_buf.
                     bzero(plaintext_block_buf + total_block_size,
                           MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
-                    printf("Add zero paddings for the leftover %d bytes.\n",
+                    SST_print_log("Add zero paddings for the leftover %d bytes.\n",
                            MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
                     // Now the total_block_size becomes the
                     // MAX_PLAINTEXT_BLOCK_SIZE.
@@ -112,18 +109,18 @@ int main(int argc, char *argv[]) {
             if (encrypt_buf_with_session_key(
                     &s_key_list->s_key[i], plaintext_block_buf,
                     total_block_size, &encrypted, &encrypted_length)) {
-                printf("Encryption failed!\n");
+                SST_print_log("Encryption failed!\n");
             }
             // Save the encrypted block.
             fwrite(encrypted, encrypted_length, 1, encrypted_fp);
             encrypted_file_metadata[i].block_metadata[j].length =
                 encrypted_length;
             free(encrypted);
-            printf("Wrote encrypted block %d\n", j);
+            SST_print_log("Wrote encrypted block %d\n", j);
         }
         fclose(plaintext_fp);
         fclose(encrypted_fp);
-        printf("Finished writing encrypted blocks to encrypted%d.txt\n", i);
+        SST_print_log("Finished writing encrypted blocks to encrypted%d.txt\n", i);
     }
 
     // Save the file_metadata.
