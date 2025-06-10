@@ -26,7 +26,7 @@ int main(int argc, char *argv[]) {
                         strlen("Hello server - second message"), session_ctx);
     sleep(1);
     pthread_cancel(thread);
-    pthread_join(thread, NULL); // Needs to wait until the thread is joined.
+    pthread_join(thread, NULL);  // Needs to wait until the thread is joined.
     free(session_ctx);
 
     s_key_list = get_session_key(ctx, s_key_list);
@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
                         strlen("Hello server 2 - second message"), session_ctx);
     sleep(3);
     pthread_cancel(thread2);
-    pthread_join(thread2, NULL); // Needs to wait until the thread is joined.
+    pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
     free(session_ctx);
 
     free_session_key_list_t(s_key_list);

@@ -1,5 +1,7 @@
 #include "c_secure_comm.h"
 
+#include <unistd.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
 
