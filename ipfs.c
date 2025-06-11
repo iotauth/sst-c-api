@@ -194,7 +194,6 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     }
     free(file_buf);
 
-    int reply_num = 0;
     char result_file_name[20];
     file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION,
                            &result_file_name[0]);
@@ -223,7 +222,11 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 3 + name_size, s_key->key_id, key_id_size);
     data[3 + name_size + key_id_size] = hash_value_len;
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
-    write_to_socket(sock, data, 4 + name_size + key_id_size + hash_value_len);
+    int bytes_written = write_to_socket(
+        sock, data, 4 + name_size + key_id_size + hash_value_len);
+    if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
+        SST_print_error_exit("Failed to write data to socket.");
+    }
     SST_print_log(
         "Send the data such as sessionkey id, hash value for file. \n");
 }
@@ -280,12 +283,16 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[0] = DOWNLOAD_INDEX;
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
-    write_to_socket(sock, data, 2 + name_size);
+    int bytes_written = write_to_socket(sock, data, 2 + name_size);
+    if (bytes_written != (2 + name_size)) {
+        SST_print_error_exit("Failed to write data to socket.");
+    }
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    unsigned int received_buf_length =
+    int received_buf_length =
         read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
-        SST_print_error_exit("Failed to read recieved data in IPFS.");
+        SST_print_error_exit(
+            "Socket read eerror in receive_data_and_download_file().\n");
     }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
@@ -338,8 +345,12 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        unsigned int received_buf_length =
+        int received_buf_length =
             read_from_socket(sock, received_buf, sizeof(received_buf));
+        if (received_buf_length < 0) {
+            SST_print_error_exit(
+                "Socket read eerror in send_add_reader_req_via_TCP().\n");
+        }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -347,7 +358,8 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         if (message_type == AUTH_HELLO) {
             unsigned char auth_nonce[NONCE_SIZE];
             // TODO(Dongha Kim)
-            // unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            // unsigned int auth_id = read_unsigned_int_BE(data_buf,
+            // AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
             unsigned int serialized_length;

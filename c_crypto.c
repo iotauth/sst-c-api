@@ -60,7 +60,7 @@ unsigned char *public_encrypt(const unsigned char *data, size_t data_len,
     if (EVP_PKEY_encrypt(ctx, NULL, ret_len, data, data_len) <= 0) {
         print_last_error("EVP_PKEY_encrypt failed");
     }
-    out = (unsigned char *) OPENSSL_malloc(*ret_len);
+    out = (unsigned char *)OPENSSL_malloc(*ret_len);
     if (!out) {
         print_last_error("OPENSSL_malloc failed");
     }
@@ -90,7 +90,7 @@ unsigned char *private_decrypt(const unsigned char *enc_data,
     if (EVP_PKEY_decrypt(ctx, NULL, ret_len, enc_data, enc_data_len) <= 0) {
         print_last_error("EVP_PKEY_decrypt failed");
     }
-    out = (unsigned char *) OPENSSL_malloc(*ret_len);
+    out = (unsigned char *)OPENSSL_malloc(*ret_len);
     if (!out) {
         print_last_error("OPENSSL_malloc failed");
     }
@@ -125,7 +125,7 @@ unsigned char *SHA256_sign(const unsigned char *encrypted,
     if (EVP_PKEY_sign(ctx, NULL, sig_length, md, md_length) <= 0) {
         print_last_error("EVP_PKEY_sign failed");
     }
-    sig = (unsigned char *) OPENSSL_malloc(*sig_length);
+    sig = (unsigned char *)OPENSSL_malloc(*sig_length);
 
     if (!sig) {
         print_last_error("OPENSSL_malloc failed");
