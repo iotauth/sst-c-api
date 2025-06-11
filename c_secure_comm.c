@@ -227,9 +227,8 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
-        if (bytes_written != message_length) {
+        int bytes_written = write_to_socket(sock, message, message_length);
+        if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
@@ -247,9 +246,8 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
-        if (bytes_written != message_length) {
+        int bytes_written = write_to_socket(sock, message, message_length);
+        if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
@@ -425,9 +423,9 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
                     sender_buf, &sender_buf_length);
 
-    unsigned int bytes_written =
+    int bytes_written =
         write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
-    if (bytes_written != sender_buf_length) {
+    if ((unsigned int)bytes_written != sender_buf_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     return bytes_written;

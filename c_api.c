@@ -100,7 +100,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
                     sender_HS_1, &sender_HS_1_length);
     int bytes_written = write_to_socket(sock, sender_HS_1, sender_HS_1_length);
-    if (bytes_written != sender_HS_1_length) {
+    if ((unsigned int)bytes_written != sender_HS_1_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     free(parsed_buf);
@@ -131,9 +131,9 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         unsigned int sender_HS_2_length;
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
                         sender_HS_2, &sender_HS_2_length);
-        unsigned int bytes_written =
+        int bytes_written =
             write_to_socket(sock, sender_HS_2, sender_HS_2_length);
-        if (bytes_written != sender_HS_2_length) {
+        if ((unsigned int)bytes_written != sender_HS_2_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         free(parsed_buf);
@@ -242,9 +242,9 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned int sender_length;
             make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_2,
                             sender, &sender_length);
-            unsigned int bytes_written =
+            int bytes_written =
                 write_to_socket(clnt_sock, sender, sender_length);
-            if (bytes_written != sender_length) {
+            if ((unsigned int)bytes_written != sender_length) {
                 SST_print_error_exit("Failed to write data to socket.");
             }
             free(parsed_buf);
