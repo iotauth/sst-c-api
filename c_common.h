@@ -1,23 +1,8 @@
 #ifndef C_COMMON_H
 #define C_COMMON_H
 
-#include <arpa/inet.h>
-#include <errno.h>
-#include <math.h>
-#include <netinet/in.h>
-#include <openssl/rand.h>
-#include <pthread.h>
-#include <stdarg.h>
-#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/socket.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
 
 // Message Type //
 #define AUTH_HELLO 0
@@ -122,12 +107,12 @@ void *SST_print_error_return_null(const char *fmt, ...);
 // Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_debug(unsigned char *buf, size_t size);
+void print_buf_debug(const unsigned char *buf, size_t size);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_log(unsigned char *buf, size_t size);
+void print_buf_log(const unsigned char *buf, size_t size);
 
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.

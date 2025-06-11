@@ -1,5 +1,21 @@
 #include "c_common.h"
 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <math.h>
+#include <netinet/in.h>
+#include <openssl/rand.h>
+#include <pthread.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <time.h>
+#include <unistd.h>
+
 void SST_print_debug(const char *fmt, ...) {
     if (SST_DEBUG_ENABLED) {
         va_list args;
@@ -51,18 +67,20 @@ void *SST_print_error_return_null(const char *fmt, ...) {
     return NULL;
 }
 
-void print_buf_debug(unsigned char *buf, size_t size) {
+void print_buf_debug(const unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        sprintf(hex + 3 * i, " %.2x", buf[i]);
+        // 4 = space(1) + two hex digits(2) + null charactor(1)
+        snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
     SST_print_debug("Hex:%s\n", hex);
 }
 
-void print_buf_log(unsigned char *buf, size_t size) {
+void print_buf_log(const unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        sprintf(hex + 3 * i, " %.2x", buf[i]);
+        // 4 = space(1) + two hex digits(2) + null charactor(1)
+        snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
     SST_print_log("Hex:%s\n", hex);
 }

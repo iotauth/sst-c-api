@@ -29,18 +29,17 @@ int main(int argc, char *argv[]) {
                                         sizeof(password), salt, sizeof(salt));
 
     // Generate buffer
-    unsigned char plaintext[] =
-        "Testing save_session_key_list_with_password().";
-    printf("Plaintext Length: %ld, Plaintext: %s\n",
-           strlen((const char *)plaintext), plaintext);
+    const char plaintext[] = "Testing save_session_key_list_with_password().";
+    printf("Plaintext Length: %ld, Plaintext: %s\n", strlen(plaintext),
+           plaintext);
     int ret;
     unsigned int encrypted_length;
     unsigned char *encrypted = NULL;
     ret = symmetric_encrypt_authenticate(
-        plaintext, strlen((const char *)plaintext), s_key_list->s_key->mac_key,
-        MAC_KEY_SHA256_SIZE, s_key_list->s_key->cipher_key,
-        AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE, AES_128_CTR, 1,
-        &encrypted, &encrypted_length);
+        (const unsigned char *)plaintext, strlen(plaintext),
+        s_key_list->s_key->mac_key, MAC_KEY_SHA256_SIZE,
+        s_key_list->s_key->cipher_key, AES_128_KEY_SIZE_IN_BYTES,
+        AES_128_CBC_IV_SIZE, AES_128_CTR, 1, &encrypted, &encrypted_length);
     assert(ret == 0);
     printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
     print_buf_log(encrypted, encrypted_length);
@@ -61,7 +60,7 @@ int main(int argc, char *argv[]) {
     printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
            decrypted);
     assert(ret == 0);
-    assert(decrypted_length == strlen((const char *)plaintext));
+    assert(decrypted_length == strlen(plaintext));
     assert(strncmp((const char *)decrypted, (const char *)plaintext,
                    decrypted_length) == 0);
     free_session_key_list_t(s_key_list);
