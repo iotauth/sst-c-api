@@ -64,8 +64,8 @@ EVP_PKEY *load_entity_private_key(const char *path);
 // @param path protected key path
 // @param ret_len length of encrypted message
 // @return encrypted message from public key encryption
-unsigned char *public_encrypt(const unsigned char *data, size_t data_len, int padding,
-                              EVP_PKEY *pub_key, size_t *ret_len);
+unsigned char *public_encrypt(const unsigned char *data, size_t data_len,
+                              int padding, EVP_PKEY *pub_key, size_t *ret_len);
 
 // Decrypt message with private key using private key decryption from OpenSSL.
 // @param enc_data encrypted message for private key decryption
@@ -76,9 +76,9 @@ unsigned char *public_encrypt(const unsigned char *data, size_t data_len, int pa
 // @param path private key path
 // @param ret_len length of decrypted message
 // @return decrypted message from private key decryption
-unsigned char *private_decrypt(const unsigned char *enc_data, size_t enc_data_len,
-                               int padding, EVP_PKEY *priv_key,
-                               size_t *ret_len);
+unsigned char *private_decrypt(const unsigned char *enc_data,
+                               size_t enc_data_len, int padding,
+                               EVP_PKEY *priv_key, size_t *ret_len);
 
 // After digest the encrypted message, sign digested message
 // with private key using private key signature from OpenSSL.
@@ -191,11 +191,11 @@ unsigned int get_expected_decrypted_maximum_length(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate(
-    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
-    unsigned int mac_key_size, const unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
-    unsigned int *ret_length);
+    const unsigned char *buf, unsigned int buf_length,
+    const unsigned char *mac_key, unsigned int mac_key_size,
+    const unsigned char *cipher_key, unsigned int cipher_key_size,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned char **ret, unsigned int *ret_length);
 
 // Decrypt the ciphertext with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
@@ -217,11 +217,11 @@ int symmetric_encrypt_authenticate(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate(
-    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
-    unsigned int mac_key_size, const unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
-    unsigned int *ret_length);
+    const unsigned char *buf, unsigned int buf_length,
+    const unsigned char *mac_key, unsigned int mac_key_size,
+    const unsigned char *cipher_key, unsigned int cipher_key_size,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned char **ret, unsigned int *ret_length);
 
 // This works similar with the symmetric_encrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -240,11 +240,11 @@ int symmetric_decrypt_authenticate(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate_without_malloc(
-    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
-    unsigned int mac_key_size, const unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
-    unsigned int *ret_length);
+    const unsigned char *buf, unsigned int buf_length,
+    const unsigned char *mac_key, unsigned int mac_key_size,
+    const unsigned char *cipher_key, unsigned int cipher_key_size,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned char *ret, unsigned int *ret_length);
 
 // This works similar with the symmetric_decrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -263,11 +263,11 @@ int symmetric_encrypt_authenticate_without_malloc(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate_without_malloc(
-    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
-    unsigned int mac_key_size, const unsigned char *cipher_key,
-    unsigned int cipher_key_size, unsigned int iv_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
-    unsigned int *ret_length);
+    const unsigned char *buf, unsigned int buf_length,
+    const unsigned char *mac_key, unsigned int mac_key_size,
+    const unsigned char *cipher_key, unsigned int cipher_key_size,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned char *ret, unsigned int *ret_length);
 
 // Create a 32 byte digested password using the salt.
 // @param password password's pointer

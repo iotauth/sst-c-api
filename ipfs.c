@@ -49,8 +49,7 @@ void file_duplication_check(const char *file_name, const char *file_extension,
     const int file_name_len = strlen(file_name);
     const int file_extension_len = strlen(file_extension);
     memcpy(file_name_buf, file_name, file_name_len);
-    memcpy(file_name_buf + file_name_len, file_extension,
-           file_extension_len);
+    memcpy(file_name_buf + file_name_len, file_extension, file_extension_len);
     file_name_buf[file_name_len + file_extension_len] = '\0';
     for (;;) {
         if (suffix_num >= MAX_REPLY_NUM) {
@@ -64,7 +63,8 @@ void file_duplication_check(const char *file_name, const char *file_extension,
             // Copy suffix and file extension.
 
             char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
-            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d", suffix_num);
+            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d",
+                     suffix_num);
 
             const int file_suffix_len = strlen(suffix_in_string);
 
