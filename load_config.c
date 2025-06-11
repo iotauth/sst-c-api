@@ -61,7 +61,14 @@ void safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
         SST_print_error_exit("Problem found while copying config value: %s.\n",
                              src);
     } else {
+        dest[dest_size - 1] = 0;
         strncpy(dest, src, dest_size);
+        if (dest[dest_size - 1] != 0) {
+            SST_print_error_exit(
+                "Problem found while copying config value, dest string is not "
+                "null terminated: %s.\n",
+                src);
+        }
     }
 }
 
