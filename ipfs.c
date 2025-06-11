@@ -46,10 +46,12 @@ void file_duplication_check(const char *file_name, const char *file_extension,
                             char *file_name_buf) {
     int suffix_num = 0;
     // Copy file name.
-    memcpy(file_name_buf, file_name, strlen(file_name));
-    memcpy(file_name_buf + strlen(file_name), file_extension,
-           strlen(file_extension));
-    file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
+    const int file_name_len = strlen(file_name);
+    const int file_extension_len = strlen(file_extension);
+    memcpy(file_name_buf, file_name, file_name_len);
+    memcpy(file_name_buf + file_name_len, file_extension,
+           file_extension_len);
+    file_name_buf[file_name_len + file_extension_len] = '\0';
     for (;;) {
         if (suffix_num >= MAX_REPLY_NUM) {
             SST_print_error(
@@ -60,14 +62,18 @@ void file_duplication_check(const char *file_name, const char *file_extension,
         if (0 == access(file_name_buf, F_OK)) {
             SST_print_log("File already exists: %s.\n", file_name_buf);
             // Copy suffix and file extension.
+
             char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
             snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d", suffix_num);
-            memcpy(file_name_buf + strlen(file_name), suffix_in_string,
-                   strlen(suffix_in_string));
-            memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string),
-                   file_extension, strlen(file_extension));
-            file_name_buf[strlen(file_name) + strlen(suffix_in_string) +
-                          strlen(file_extension)] = '\0';
+
+            const int file_suffix_len = strlen(suffix_in_string);
+
+            memcpy(file_name_buf + file_name_len, suffix_in_string,
+                   file_suffix_len);
+            memcpy(file_name_buf + file_name_len + file_suffix_len,
+                   file_extension, file_extension_len);
+            file_name_buf[file_name_len + file_suffix_len +
+                          file_extension_len] = '\0';
             suffix_num += 1;
         } else {
             break;
