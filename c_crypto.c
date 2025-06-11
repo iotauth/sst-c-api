@@ -331,8 +331,8 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
 }
 
 static int get_symmetric_encrypt_authenticate_buffer(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
     unsigned int expected_encrypted_total_length, unsigned char *ret,
@@ -399,8 +399,8 @@ unsigned int get_expected_decrypted_maximum_length(
 }
 
 static int get_symmetric_decrypt_authenticate_buffer(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
     unsigned int expected_decrypted_total_length, unsigned char *ret,
@@ -456,8 +456,8 @@ static int get_symmetric_decrypt_authenticate_buffer(
 }
 
 int symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
     unsigned int *ret_length) {
@@ -473,8 +473,8 @@ int symmetric_encrypt_authenticate(
 }
 
 int symmetric_decrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
     unsigned int *ret_length) {
@@ -489,8 +489,8 @@ int symmetric_decrypt_authenticate(
 }
 
 int symmetric_encrypt_authenticate_without_malloc(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
     unsigned int *ret_length) {
@@ -505,8 +505,8 @@ int symmetric_encrypt_authenticate_without_malloc(
 }
 
 int symmetric_decrypt_authenticate_without_malloc(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
     unsigned int *ret_length) {

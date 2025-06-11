@@ -191,8 +191,8 @@ unsigned int get_expected_decrypted_maximum_length(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
     unsigned int *ret_length);
@@ -217,8 +217,8 @@ int symmetric_encrypt_authenticate(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char **ret,
     unsigned int *ret_length);
@@ -240,8 +240,8 @@ int symmetric_decrypt_authenticate(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_encrypt_authenticate_without_malloc(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
     unsigned int *ret_length);
@@ -263,8 +263,8 @@ int symmetric_encrypt_authenticate_without_malloc(
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
 int symmetric_decrypt_authenticate_without_malloc(
-    unsigned char *buf, unsigned int buf_length, unsigned char *mac_key,
-    unsigned int mac_key_size, unsigned char *cipher_key,
+    const unsigned char *buf, unsigned int buf_length, const unsigned char *mac_key,
+    unsigned int mac_key_size, const unsigned char *cipher_key,
     unsigned int cipher_key_size, unsigned int iv_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, unsigned char *ret,
     unsigned int *ret_length);
