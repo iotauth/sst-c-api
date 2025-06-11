@@ -101,6 +101,7 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s\n", ptr);
+                    c->name[sizeof(c->name) - 1] = 0;
                     strncpy(c->name, ptr, sizeof(c->name));
                     break;
                 case ENTITY_INFO_PURPOSE:
