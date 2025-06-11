@@ -147,7 +147,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
                decrypted);
         assert(s == 0);
-        assert(decrypted_length == strlen((const char *)plaintext));
+        assert(decrypted_length == strlen(plaintext));
         assert(strncmp((const char *)decrypted, (const char *)plaintext,
                        decrypted_length) == 0);
         printf("\n");
