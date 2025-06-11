@@ -157,7 +157,11 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 
 uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
-    read_from_socket(socket, buf, 1);
+    int received_buf_length = read_from_socket(socket, buf, 1);
+    if (received_buf_length < 0) {
+        SST_print_error_exit(
+            "Socket read eerror in read_variable_length_one_byte_each().\n");
+    }
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
     } else {
@@ -170,7 +174,12 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
                                         unsigned int buf_length) {
     unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
     // Read the first byte.
-    read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    int received_buf_length =
+        read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    if (received_buf_length < 0) {
+        SST_print_error_exit(
+            "Socket read eerror in read_header_return_data_buf_pointer().\n");
+    }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
     unsigned int var_length_buf_size = read_variable_length_one_byte_each(
@@ -186,8 +195,8 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     if (ret_length > buf_length) {
         SST_print_error_exit("Larger buffer size required.");
     }
-    unsigned int bytes_read = read_from_socket(socket, buf, buf_length);
-    if (ret_length != bytes_read) {
+    int bytes_read = read_from_socket(socket, buf, buf_length);
+    if ((unsigned int)bytes_read != ret_length) {
         SST_print_error_exit("Wrong read... Exiting..");
     }
     return bytes_read;
@@ -292,8 +301,7 @@ int mod(int a, int b) {
     return r < 0 ? r + b : r;
 }
 
-unsigned int read_from_socket(int socket, unsigned char *buf,
-                              unsigned int buf_length) {
+int read_from_socket(int socket, unsigned char *buf, unsigned int buf_length) {
     if (socket < 0) {
         // Socket is not open.
         errno = EBADF;
@@ -308,8 +316,8 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
     return (unsigned int)length_read;
 }
 
-unsigned int write_to_socket(int socket, const unsigned char *buf,
-                             unsigned int buf_length) {
+int write_to_socket(int socket, const unsigned char *buf,
+                    unsigned int buf_length) {
     if (socket < 0) {
         // Socket is not open.
         errno = EBADF;
