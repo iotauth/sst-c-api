@@ -103,6 +103,9 @@ config_t *load_config(const char *path) {
                     SST_print_debug("Name: %s\n", ptr);
                     c->name[sizeof(c->name) - 1] = 0;
                     strncpy(c->name, ptr, sizeof(c->name));
+                    if (c->name[sizeof(c->name) - 1] != 0) {
+                        SST_print_error_exit("Problem found while loading entity name.\n");
+                    }
                     break;
                 case ENTITY_INFO_PURPOSE:
                     if (purpose_count <= 1) {
