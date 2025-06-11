@@ -2,12 +2,12 @@
 
 ## Prerequisites
 
-### Clone the Repo
-1. Run `git clone --recurse-submodules https://github.com/CarlosBeltranQ/iotauth.git`.
-
-2. Go to `$ROOT/entity/c/`.
-
-2. Run `git pull origin master`.
+## Clone repository & Update submodule
+```
+$ git clone https://github.com/iotauth/iotauth.git
+$ cd iotauth
+$ git submodule update --init
+```
 
 ### Create Example Auth Databases
 

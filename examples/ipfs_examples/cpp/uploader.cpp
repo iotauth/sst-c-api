@@ -1,8 +1,3 @@
-// Compile:
-// g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api
-
-// Execute:
-// ./uploader uploader_copy.config plain_text.txt addReader.txt
 extern "C" {
     #include <sst-c-api/c_api.h>
     #include "../../c_crypto.h"
