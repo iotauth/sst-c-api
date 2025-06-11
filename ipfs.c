@@ -1,5 +1,6 @@
 #include "ipfs.h"
 
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "c_common.h"
@@ -224,8 +225,7 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
     int bytes_written = write_to_socket(
         sock, data, 4 + name_size + key_id_size + hash_value_len);
-    if ((unsigned int)bytes_written !=
-        (4 + name_size + key_id_size + hash_value_len)) {
+    if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     SST_print_log(
@@ -285,7 +285,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
     int bytes_written = write_to_socket(sock, data, 2 + name_size);
-    if ((unsigned int)bytes_written != (2 + name_size)) {
+    if (bytes_written != (2 + name_size)) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
