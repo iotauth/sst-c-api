@@ -64,7 +64,7 @@ EVP_PKEY *load_entity_private_key(const char *path);
 // @param path protected key path
 // @param ret_len length of encrypted message
 // @return encrypted message from public key encryption
-unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
+unsigned char *public_encrypt(const unsigned char *data, size_t data_len, int padding,
                               EVP_PKEY *pub_key, size_t *ret_len);
 
 // Decrypt message with private key using private key decryption from OpenSSL.
@@ -76,7 +76,7 @@ unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
 // @param path private key path
 // @param ret_len length of decrypted message
 // @return decrypted message from private key decryption
-unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
+unsigned char *private_decrypt(const unsigned char *enc_data, size_t enc_data_len,
                                int padding, EVP_PKEY *priv_key,
                                size_t *ret_len);
 
@@ -87,7 +87,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
 // @param path private key path for private key signature
 // @param sig_length length of signed buffer
 // @return sign sign of the encrypted message
-unsigned char *SHA256_sign(unsigned char *encrypted,
+unsigned char *SHA256_sign(const unsigned char *encrypted,
                            unsigned int encrypted_length, EVP_PKEY *priv_key,
                            size_t *sig_length);
 
@@ -98,7 +98,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
 // @param sign signature buffer
 // @param sign_length length of signiture
 // @param path public key path
-void SHA256_verify(unsigned char *data, unsigned int data_length,
+void SHA256_verify(const unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key);
 
 // Digest the message using the SHA256 digest function.
@@ -108,7 +108,7 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
 // message
 // @param md_len The length of the message digest. This cannot be given in a
 // integer.
-void digest_message_SHA_256(unsigned char *data, size_t data_len,
+void digest_message_SHA_256(const unsigned char *data, size_t data_len,
                             unsigned char *md5_hash, unsigned int *md_len);
 
 // Encrypt the message with the cipher key of the session key obtained from Auth
@@ -120,8 +120,8 @@ void digest_message_SHA_256(unsigned char *data, size_t data_len,
 // @param ret decrypted message received from CBC encryption
 // @param ret_length length of ret
 // @return 0 for success, -1 for error.
-int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
-                unsigned char *key, unsigned char *iv,
+int encrypt_AES(const unsigned char *plaintext, unsigned int plaintext_length,
+                const unsigned char *key, const unsigned char *iv,
                 AES_encryption_mode_t enc_mode, unsigned char *ret,
                 unsigned int *ret_length);
 
@@ -134,8 +134,8 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
 // @param ret decrypted message received from CBC decryption
 // @param ret_length length of ret
 // @return 0 for success, -1 for error.
-int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
-                unsigned char *key, unsigned char *iv,
+int decrypt_AES(const unsigned char *encrypted, unsigned int encrypted_length,
+                const unsigned char *key, const unsigned char *iv,
                 AES_encryption_mode_t enc_mode, unsigned char *ret,
                 unsigned int *ret_length);
 

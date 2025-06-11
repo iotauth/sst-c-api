@@ -42,7 +42,7 @@ EVP_PKEY *load_entity_private_key(const char *path) {
     return priv_key;
 }
 
-unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
+unsigned char *public_encrypt(const unsigned char *data, size_t data_len, int padding,
                               EVP_PKEY *pub_key, size_t *ret_len) {
     EVP_PKEY_CTX *ctx;
     unsigned char *out = NULL;
@@ -72,7 +72,7 @@ unsigned char *public_encrypt(unsigned char *data, size_t data_len, int padding,
     return out;
 }
 
-unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
+unsigned char *private_decrypt(const unsigned char *enc_data, size_t enc_data_len,
                                int padding, EVP_PKEY *priv_key,
                                size_t *ret_len) {
     EVP_PKEY_CTX *ctx;
@@ -101,7 +101,7 @@ unsigned char *private_decrypt(unsigned char *enc_data, size_t enc_data_len,
     return out;
 }
 
-unsigned char *SHA256_sign(unsigned char *encrypted,
+unsigned char *SHA256_sign(const unsigned char *encrypted,
                            unsigned int encrypted_length, EVP_PKEY *priv_key,
                            size_t *sig_length) {
     unsigned char md[SHA256_DIGEST_LENGTH];
@@ -138,7 +138,7 @@ unsigned char *SHA256_sign(unsigned char *encrypted,
     return sig;
 }
 
-void SHA256_verify(unsigned char *data, unsigned int data_length,
+void SHA256_verify(const unsigned char *data, unsigned int data_length,
                    unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key) {
     EVP_PKEY_CTX *ctx;
     unsigned char md[SHA256_DIGEST_LENGTH];
@@ -164,7 +164,7 @@ void SHA256_verify(unsigned char *data, unsigned int data_length,
     EVP_PKEY_CTX_free(ctx);
 }
 
-void digest_message_SHA_256(unsigned char *data, size_t data_len,
+void digest_message_SHA_256(const unsigned char *data, size_t data_len,
                             unsigned char *md5_hash, unsigned int *md_len) {
     EVP_MD_CTX *mdctx;
 
@@ -196,8 +196,8 @@ const EVP_CIPHER *get_EVP_CIPHER(AES_encryption_mode_t enc_mode) {
     return NULL;
 }
 
-int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
-                unsigned char *key, unsigned char *iv,
+int encrypt_AES(const unsigned char *plaintext, unsigned int plaintext_length,
+                const unsigned char *key, const unsigned char *iv,
                 AES_encryption_mode_t enc_mode, unsigned char *ret,
                 unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
@@ -248,8 +248,8 @@ int encrypt_AES(unsigned char *plaintext, unsigned int plaintext_length,
     return 0;
 }
 
-int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
-                unsigned char *key, unsigned char *iv,
+int decrypt_AES(const unsigned char *encrypted, unsigned int encrypted_length,
+                const unsigned char *key, const unsigned char *iv,
                 AES_encryption_mode_t enc_mode, unsigned char *ret,
                 unsigned int *ret_length) {
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
@@ -271,7 +271,7 @@ int decrypt_AES(unsigned char *encrypted, unsigned int encrypted_length,
         // Set the expected tag value by extracting it from the end of the
         // ciphertext
         unsigned char *tag =
-            encrypted + encrypted_length -
+            (unsigned char *)encrypted + encrypted_length -
             AES_GCM_TAG_SIZE;  // Get the last 16 bytes as the tag
         if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE,
                                  tag)) {
