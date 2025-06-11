@@ -196,7 +196,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         SST_print_error_exit("Larger buffer size required.");
     }
     int bytes_read = read_from_socket(socket, buf, buf_length);
-    if (ret_length != bytes_read) {
+    if ((unsigned int)bytes_read != ret_length) {
         SST_print_error_exit("Wrong read... Exiting..");
     }
     return bytes_read;
