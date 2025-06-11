@@ -7,7 +7,6 @@
 
 #include "c_api.h"
 
-#define MAX 256
 typedef enum {
     ENTITY_INFO_NAME = 1,
     ENTITY_INFO_PURPOSE,
@@ -22,7 +21,8 @@ typedef enum {
     ENTITY_SERVER_INFO_PORT_NUMBER,
     FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS,
     FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER,
-    NETWORK_PROTOCOL
+    NETWORK_PROTOCOL,
+    UNKNOWN_CONFIG
 } config_type_t;
 
 // Get a value by comparing a string of conditional statement with a variable.

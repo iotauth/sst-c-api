@@ -1,5 +1,7 @@
 #include "c_api.h"
 
+#include <openssl/rand.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
@@ -162,8 +164,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     } else if (session_key_idx == -1) {
         // WARNING: The following line overwrites the purpose.
         snprintf(ctx->config->purpose[ctx->config->purpose_index],
-                 MAX_PURPOSE_LENGTH, "{\"keyId\":%d}",
-                 target_session_key_id_int);
+                 sizeof(ctx->config->purpose[ctx->config->purpose_index]),
+                 "{\"keyId\":%d}", target_session_key_id_int);
 
         session_key_list_t *s_key_list;
         s_key_list =
@@ -573,4 +575,21 @@ void free_SST_ctx_t(SST_ctx_t *ctx) {
     EVP_PKEY_free((EVP_PKEY *)ctx->pub_key);
     free_config_t(ctx->config);
     free(ctx);
+}
+
+int secure_rand(int min, int max) {
+    unsigned int range = max - min + 1;
+    unsigned int rand_num;
+    unsigned char buffer[4];
+
+    if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
+        fprintf(stderr, "RAND_bytes failed\n");
+        return -1;  // handle error
+    }
+
+    rand_num = ((unsigned int)buffer[0] << 24) |
+               ((unsigned int)buffer[1] << 16) |
+               ((unsigned int)buffer[2] << 8) | ((unsigned int)buffer[3]);
+
+    return (rand_num % range) + min;
 }
