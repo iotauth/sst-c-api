@@ -5,6 +5,8 @@
 #include "c_common.h"
 #include "c_crypto.h"
 
+#define MAX_CONFIG_BUF_SIZE 256
+
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
@@ -50,7 +52,7 @@ config_type_t get_key_value(char *ptr) {
     } else if (strcmp(ptr, file_system_manager_port_number) == 0) {
         return FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER;
     } else {
-        return -1;
+        return UNKNOWN_CONFIG;
     }
 }
 
@@ -70,7 +72,7 @@ config_t *load_config(const char *path) {
         // Print the specific error message
         SST_print_error_exit("fopen() failed.");
     }
-    char buffer[MAX] = {
+    char buffer[MAX_CONFIG_BUF_SIZE] = {
         0,
     };
     char *pline;
@@ -81,24 +83,32 @@ config_t *load_config(const char *path) {
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     SST_print_debug("-----SST configuration of %s.-----\n", path);
     while (!feof(fp)) {
-        pline = fgets(buffer, MAX, fp);
+        pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
         char *ptr = strtok(pline, "=");
         while (ptr != NULL) {
-            switch (get_key_value(ptr)) {
+            config_type_t config = get_key_value(ptr);
+            if (config == UNKNOWN_CONFIG) {
+                SST_print_error_exit("Unknown config type %s.\n", ptr);
+            }
+            ptr = strtok(NULL, delimiters);
+            if (ptr == NULL) {
+                SST_print_error_exit("Config value does not exist.\n", ptr);
+            }
+            switch (config) {
+                case UNKNOWN_CONFIG:
+                    SST_print_error_exit("This line must not be reached.\n",
+                                         ptr);
+                    break;
                 case ENTITY_INFO_NAME:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Name: %s\n", ptr);
-                    strcpy(c->name, ptr);
+                    strncpy(c->name, ptr, sizeof(c->name));
                     break;
                 case ENTITY_INFO_PURPOSE:
-                    ptr = strtok(NULL, delimiters);
-                    if (purpose_count == 0) {
-                        SST_print_debug("First purpose: %s\n", ptr);
-                        strcpy(c->purpose[purpose_count], ptr);
-                        purpose_count += 1;
-                    } else if (purpose_count == 1) {
-                        SST_print_debug("Second purpose: %s\n", ptr);
-                        strcpy(c->purpose[purpose_count], ptr);
+                    if (purpose_count <= 1) {
+                        SST_print_debug("Purpose #%d: %s\n", purpose_count + 1,
+                                        ptr);
+                        strncpy(c->purpose[purpose_count], ptr,
+                                sizeof(c->purpose[purpose_count]));
                         purpose_count += 1;
                     } else {
                         SST_print_debug("Error for wrong number of purpose.\n");
@@ -106,12 +116,10 @@ config_t *load_config(const char *path) {
                     c->purpose_index = purpose_count - 1;
                     break;
                 case ENTITY_INFO_NUMKEY:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Numkey: %s\n", ptr);
                     c->numkey = atoi((const char *)ptr);
                     break;
                 case ENCRYPTION_MODE:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Encryption mode: %s\n", ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
                         c->encryption_mode = AES_128_CBC;
@@ -122,7 +130,6 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case HMAC_MODE:
-                    ptr = strtok(NULL, delimiters);
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
                         c->hmac_mode = NO_HMAC;
                     } else if (strcmp(ptr, "on") == 0 ||
@@ -137,36 +144,31 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Pubkey path of Auth: %s\n", ptr);
                     c->auth_pubkey_path = malloc(strlen(ptr) + 1);
                     strcpy(c->auth_pubkey_path, ptr);
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Privkey path of Entity: %s\n", ptr);
                     c->entity_privkey_path = malloc(strlen(ptr) + 1);
                     strcpy(c->entity_privkey_path, ptr);
                     break;
                 case AUTH_INFO_IP_ADDRESS:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("IP address of Auth: %s\n", ptr);
-                    strcpy(c->auth_ip_addr, ptr);
+                    strncpy(c->auth_ip_addr, ptr, sizeof(c->auth_ip_addr));
                     break;
                 case AUTH_INFO_PORT:
-                    ptr = strtok(NULL, delimiters);
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
                         SST_print_error_exit("Error: Invalid port number.\n");
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("IP address of entity server: %s\n", ptr);
-                    strcpy(c->entity_server_ip_addr, ptr);
+                    strncpy(c->entity_server_ip_addr, ptr,
+                            sizeof(c->entity_server_ip_addr));
                     break;
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Port number of entity server: %s\n", ptr);
                     c->entity_server_port_num = atoi(ptr);
                     if (c->entity_server_port_num < 0 ||
@@ -175,18 +177,17 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case NETWORK_PROTOCOL:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("Network Protocol: %s\n", ptr);
-                    strcpy(c->network_protocol, ptr);
+                    strncpy(c->network_protocol, ptr,
+                            sizeof(c->network_protocol));
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
-                    ptr = strtok(NULL, delimiters);
                     SST_print_debug("IP address of file system manager: %s\n",
                                     ptr);
-                    strcpy(c->file_system_manager_ip_addr, ptr);
+                    strncpy(c->file_system_manager_ip_addr, ptr,
+                            sizeof(c->file_system_manager_ip_addr));
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
-                    ptr = strtok(NULL, delimiters);
                     c->file_system_manager_port_num = atoi(ptr);
                     if (c->file_system_manager_port_num < 0 ||
                         c->file_system_manager_port_num > 65535) {
