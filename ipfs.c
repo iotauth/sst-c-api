@@ -6,6 +6,8 @@
 #include "c_crypto.h"
 #include "c_secure_comm.h"
 
+#define MAX_FILE_SUFFIX_LENGTH 5
+
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
 const char TXT_FILE_EXTENSION[] = ".txt";
 const char ENCRYPTED_FILE_NAME[] = "encrypted";
@@ -58,8 +60,8 @@ void file_duplication_check(const char *file_name, const char *file_extension,
         if (0 == access(file_name_buf, F_OK)) {
             SST_print_log("File already exists: %s.\n", file_name_buf);
             // Copy suffix and file extension.
-            char suffix_in_string[5];
-            sprintf(suffix_in_string, "%d", suffix_num);
+            char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
+            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d", suffix_num);
             memcpy(file_name_buf + strlen(file_name), suffix_in_string,
                    strlen(suffix_in_string));
             memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string),

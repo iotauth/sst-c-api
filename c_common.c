@@ -70,7 +70,8 @@ void *SST_print_error_return_null(const char *fmt, ...) {
 void print_buf_debug(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        sprintf(hex + 3 * i, " %.2x", buf[i]);
+        // 4 = space(1) + two hex digits(2) + null charactor(1)
+        snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
     SST_print_debug("Hex:%s\n", hex);
 }
@@ -78,7 +79,8 @@ void print_buf_debug(unsigned char *buf, size_t size) {
 void print_buf_log(unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
-        sprintf(hex + 3 * i, " %.2x", buf[i]);
+        // 4 = space(1) + two hex digits(2) + null charactor(1)
+        snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
     SST_print_log("Hex:%s\n", hex);
 }
