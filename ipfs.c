@@ -106,10 +106,9 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
 int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                         char *my_file_path, unsigned char *hash_value,
                         estimate_time_t *estimate_time) {
-    FILE *fgen, *fin, *fout, *fenc;
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
-    fin = fopen(my_file_path, "r");
+    FILE *fin = fopen(my_file_path, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
@@ -135,7 +134,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                            &file_name_buffer[0]);
 
     // File descriptor for the encrypted file.
-    fenc = fopen(file_name_buffer, "w");
+    FILE *fenc = fopen(file_name_buffer, "w");
     unsigned char *enc_save = (unsigned char *)malloc(
         encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
@@ -160,8 +159,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
 }
 
 void file_decrypt_save(session_key_t s_key, char *file_name) {
-    FILE *fp, *fin, *fout;
-    fin = fopen(file_name, "r");
+    FILE *fin = fopen(file_name, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
@@ -191,7 +189,7 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     char result_file_name[20];
     file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION,
                            &result_file_name[0]);
-    fout = fopen(result_file_name, "w");
+    FILE *fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
@@ -216,7 +214,7 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 3 + name_size, s_key->key_id, key_id_size);
     data[3 + name_size + key_id_size] = hash_value_len;
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
-    write(sock, data, 4 + name_size + key_id_size + hash_value_len);
+    write_to_socket(sock, data, 4 + name_size + key_id_size + hash_value_len);
     SST_print_log(
         "Send the data such as sessionkey id, hash value for file. \n");
 }
@@ -273,10 +271,13 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[0] = DOWNLOAD_INDEX;
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
-    write(sock, data, 2 + name_size);
+    write_to_socket(sock, data, 2 + name_size);
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     unsigned int received_buf_length =
         read_from_socket(sock, received_buf, sizeof(received_buf));
+    if (received_buf_length < 0) {
+        SST_print_error_exit("Failed to read recieved data in IPFS.");
+    }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
@@ -335,9 +336,9 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
-            unsigned int auth_Id;
             unsigned char auth_nonce[NONCE_SIZE];
-            auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            // TODO(Dongha Kim)
+            // unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
             unsigned int serialized_length;
