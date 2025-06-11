@@ -7,8 +7,9 @@
 
 
 extern "C" {
-    #include "../../c_crypto.h"
-    #include "../../ipfs.h"
+    #include "../../../c_common.h"
+    #include "../../../c_crypto.h"
+    #include "../../../ipfs.h"
 }
 
 int main(int argc, char *argv[]) {
@@ -44,6 +45,7 @@ int main(int argc, char *argv[]) {
     std::cout << "Creating hash of the file" << std::endl;
 
     // Open the file in binary read mode
+    // TODO(Carlos Beltran Quinonez): Check the latest result file, e.g., result25.txt.
     std::ifstream file("result.txt", std::ios::binary | std::ios::ate);
     if (!file) {
         std::cerr << "Error opening file for hash calculation" << std::endl;
@@ -66,12 +68,14 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
     digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]), filesize, hash_of_file.data(), &hash_length);
+    std::cout << "hash_length: " << hash_length << std::endl;
+    print_buf_log(&hash_of_file[0], hash_of_file.size());
 
     // Step 2. Send hash to uploader
     // Send the computed hash (raw bytes)
     SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
     send_secure_message(reinterpret_cast<char*>(hash_of_file.data()), hash_length, session_ctx);
-    
+
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list);
 

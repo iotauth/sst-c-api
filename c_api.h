@@ -175,9 +175,10 @@ void *receive_thread_read_one_each(void *SST_session_ctx);
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf
 // @param SST_session_ctx_t session ctx struct
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx);
+// @return the total number of bytes read.
+unsigned int receive_message(unsigned char *received_buf,
+                            unsigned int received_buf_length,
+                            SST_session_ctx_t *session_ctx);
 
 // Return the buffer pointer of the decrypted buffer.
 // If the user gives the read buffer as input, it will return the decrypted

@@ -1,7 +1,8 @@
 extern "C" {
     #include <sst-c-api/c_api.h>
-    #include "../../c_crypto.h"
-    #include "../../ipfs.h"
+    #include "../../../c_common.h"
+    #include "../../../c_crypto.h"
+    #include "../../../ipfs.h"
 }
 
 #include <unistd.h>
@@ -78,7 +79,9 @@ int main(int argc, char* argv[]) {
     // Compute the SHA256 hash of the file data
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(&file_data[0], filesize, hash_of_file.data(), &hash_length);
+    digest_message_SHA_256(&file_data[0], filesize, &hash_of_file[0], &hash_length);
+
+    print_buf_log(&hash_of_file[0], hash_of_file.size());
 
     // Step 2: Receive Hash from Downloader using Sockets
     
@@ -89,11 +92,11 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-        // Allow reuse of the local address (port) even if it’s in TIME_WAIT
-        int reuse = 1;
-        if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-            std::perror("setsockopt(SO_REUSEADDR) failed"); // Non‐fatal: we can still proceed, but bind might fail.
-        }
+    // Allow reuse of the local address (port) even if it’s in TIME_WAIT
+    int reuse = 1;
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
+        std::perror("setsockopt(SO_REUSEADDR) failed"); // Non‐fatal: we can still proceed, but bind might fail.
+    }
 
     struct sockaddr_in server_address;
     server_address.sin_family = AF_INET;
@@ -131,18 +134,24 @@ int main(int argc, char* argv[]) {
     }
 
     // Receive the hash
+    unsigned char* received_hash_buf;
 
-    std::vector<unsigned char> received_hash(SHA256_DIGEST_LENGTH);
-    unsigned char *received_hash_data = received_hash.data();
-    read_secure_message(session_ctx->sock, &received_hash_data, session_ctx);
+    int message_len = -1;
+    for (;;) {
+        message_len = read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
+        std::cout << "message_len: " << message_len << std::endl;
+        if (message_len > 0) {
+            break;
+        }
+        std::cout << "Did not recieve downloader's message yet. Sleeping for 1 second." << std::endl;
+        sleep(1);
+    }   
+    
+    print_buf_log(received_hash_buf, message_len);
 
     // Step 3: Compare the Hash Values
-    if (hash_of_file == received_hash) {
-        std::cout << "Hash values are the same." << std::endl;
-    } else {
-        std::cout << "Hash values are different." << std::endl;
-    }
-                                                                        
+    
+    free(received_hash_buf);
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list_0);
     close(client_socket);
