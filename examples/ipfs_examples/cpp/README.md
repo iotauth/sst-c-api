@@ -9,6 +9,9 @@ $ cd iotauth
 $ git submodule update --init
 ```
 
+## Installation of SST as Shared Library
+Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=readme-ov-file#compile-as-shared-library).
+
 ### Create Example Auth Databases
 
 1. Go to directory `$ROOT/examples`.
@@ -39,7 +42,7 @@ $ git submodule update --init
 
 ## Run the Example Entities
 
-1. Go to `$ROOT/entity/c/examples/ipfs_examples`.
+1. Go to `$ROOT/entity/c/examples/ipfs_examples/cpp`.
 
 2. Compile the uploader with `g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 
@@ -52,8 +55,8 @@ $ git submodule update --init
 4. Create a `plain_text.txt` file in the `ipfs_examples` directory.
     - Enter any text into the file and save.
 
-5. Run `./uploader uploader_copy.config plain_text.txt addReader.txt`.
+5. Run `./uploader ../uploader.config plain_text.txt ../addReader.txt`.
 
-6. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader downloader_copy.config`.
+6. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader ../downloader.config`.
 
 7. Once downloader finishes running, uploader resumes. Once the hashes are compared at the end, uploader has finished running.
