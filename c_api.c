@@ -335,8 +335,8 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
 }
 
 unsigned int receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx) {
+                             unsigned int received_buf_length,
+                             SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
