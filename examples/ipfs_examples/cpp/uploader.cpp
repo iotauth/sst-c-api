@@ -143,13 +143,14 @@ int main(int argc, char* argv[]) {
         if (message_len > 0) {
             break;
         }
-        std::cout << "Did not recieve downloader's message yet. Sleeping for 1 second." << std::endl;
+        std::cout << "Did not receive downloader's message yet. Sleeping for 1 second." << std::endl;
         sleep(1);
     }   
-    
-    print_buf_log(received_hash_buf, message_len);
 
     // Step 3: Compare the Hash Values
+    // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and compare.
+    
+    print_buf_log(received_hash_buf, message_len);
     
     free(received_hash_buf);
     free_SST_ctx_t(ctx);
