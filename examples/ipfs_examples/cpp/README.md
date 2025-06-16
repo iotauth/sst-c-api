@@ -48,9 +48,9 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
     - For debugging mode, compile with `g++ -g -O0 -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 
-3. Compile the downloader with `g++ -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
+3. Compile the downloader with `g++ -std=c++17 -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 
-    - For debugging mode, compile with `g++ -g -O0 -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
+    - For debugging mode, compile with `g++ -std=c++17 -g -O0 -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
 
 4. Create a `plain_text.txt` file in the `ipfs_examples` directory.
     - Enter any text into the file and save.

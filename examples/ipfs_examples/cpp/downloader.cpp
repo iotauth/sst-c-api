@@ -1,15 +1,29 @@
-#include <stdlib.h>
-#include <string.h>
-#include <sys/time.h>
 #include <unistd.h>
 #include <iostream>
 #include <fstream>
-
 
 extern "C" {
     #include "../../../c_common.h"
     #include "../../../c_crypto.h"
     #include "../../../ipfs.h"
+}
+
+namespace fs = std::filesystem;
+
+std::string getAvailableFilename(const std::string& baseName, const std::string& extension) {
+    std::string filename = baseName + extension;
+    if (!fs::exists(filename)) {
+        return filename;
+    }
+
+    int counter = 0;
+    while (true) {
+        filename = baseName + std::to_string(counter) + extension;
+        if (!fs::exists(filename)) {
+            return filename;
+        }
+        ++counter;
+    }
 }
 
 int main(int argc, char *argv[]) {
@@ -27,27 +41,28 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];
 
-    receive_data_and_download_file(received_skey_id.data(), ctx, file_name.data(),
-                                    &estimate_time[0]);
-    
-    session_key_t *session_key =
-        get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
+    receive_data_and_download_file(received_skey_id.data(), ctx, file_name.data(), &estimate_time[0]);
+
+    session_key_t *session_key = get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
     
     if (session_key == NULL) {
         std::cerr << "There is no session key." << std::endl;
         return EXIT_FAILURE;
-    } else {
-        sleep(5);
-        file_decrypt_save(*session_key, file_name.data());
     }
-    sleep(3);
+    
+    // Check the latest result file, e.g., result25.txt.
+    // Before creating the new "result.txt" file, get the file name
+    std::string base = "result";
+    std::string ext = ".txt";
+    
+    std::string available_filename = getAvailableFilename(base, ext);
+
+    file_decrypt_save(*session_key, file_name.data());
 
     // Step 1. Create Hash
-    std::cout << "Creating hash of the file" << std::endl;
 
     // Open the file in binary read mode
-    // TODO(Carlos Beltran Quinonez): Check the latest result file, e.g., result25.txt.
-    std::ifstream file("result.txt", std::ios::binary | std::ios::ate);
+    std::ifstream file(available_filename, std::ios::binary | std::ios::ate);
     if (!file) {
         std::cerr << "Error opening file for hash calculation" << std::endl;
         return EXIT_FAILURE;
@@ -69,8 +84,6 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
     digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]), filesize, hash_of_file.data(), &hash_length);
-    std::cout << "hash_length: " << hash_length << std::endl;
-    print_buf_log(&hash_of_file[0], hash_of_file.size());
 
     // Step 2. Send hash to uploader
     // Send the computed hash (raw bytes)
