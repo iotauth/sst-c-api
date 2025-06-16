@@ -14,7 +14,8 @@ extern "C" {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        std::cerr << "Enter config path" << std::endl;
+        std::cerr << "Invalid number of arguments." << std::endl;
+        std::cerr << "Correct Usage: " << argv[0] << " <config_path>" << std::endl;
         return EXIT_FAILURE;
     }
     

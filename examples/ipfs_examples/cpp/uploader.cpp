@@ -12,7 +12,8 @@ extern "C" {
 int main(int argc, char* argv[]) {
 
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
+        std::cerr << "Invalid number of arguments." << std::endl;
+        std::cerr << "Correct Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -76,12 +77,19 @@ int main(int argc, char* argv[]) {
     }
     file.close();
 
-    // Compute the SHA256 hash of the file data
-    std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(&file_data[0], filesize, &hash_of_file[0], &hash_length);
+    // SHA-256 is 32 bytes
+    unsigned char* hash = static_cast<unsigned char*>(std::malloc(32));
+    if (!hash) {
+        std::cerr << "Allocation failed\n";
+        return EXIT_FAILURE;
+    }
 
-    print_buf_log(&hash_of_file[0], hash_of_file.size());
+    digest_message_SHA_256(&file_data[0], filesize, hash, &hash_length);
+
+    std::cout << "Got " << hash_length << " digest bytes\n";
+
+    print_buf_log(hash, hash_length);
 
     // Step 2: Receive Hash from Downloader using Sockets
     
@@ -149,10 +157,26 @@ int main(int argc, char* argv[]) {
 
     // Step 3: Compare the Hash Values
     // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and compare.
-    
     print_buf_log(received_hash_buf, message_len);
+
+    std::cout << reinterpret_cast<char*>(received_hash_buf) << std::endl;
+
+    unsigned char* received_hash = received_hash_buf + 8; // Remove the two 4-byte sequence numbers in the received buffer
+
+    print_buf_log(received_hash, message_len - 8);
+    print_buf_log(hash, hash_length);
+
+    if (std::memcmp(hash, received_hash, 32) == 0) {
+        std::cout << "Hash values match!" << std::endl;
+    } else {
+        free(hash);
+        free(received_hash_buf);
+        std::cerr << "Hash values do not match!" << std::endl;
+        return EXIT_FAILURE;
+    }
     
     free(received_hash_buf);
+    free(hash);
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list_0);
     close(client_socket);
@@ -160,3 +184,25 @@ int main(int argc, char* argv[]) {
 
     return EXIT_SUCCESS;
 }
+
+
+/*
+    I don't know what triggers the bug. I want to continue testing to see if there is a pattern.
+    Maybe after a certain number of executions? Or maybe after changing the code and recompiling?
+    I don't know yet, but I'm really interested in finding out.
+    On Monday, I want to follow the code as deep as possible.
+    I believe the key is sent in uploader in the upload_to_file_system_manager(), which uses the write_to_socket() function
+    and the downloader receives it using receive_data_and_download_file(), which uses the read_from_socket() function.
+    I want to look deeper into these functions to see if I can find the root of the problem because
+    the problem is that when downloader receives the key, it is an old key that is no longer used.
+    Interestingly, the received key is always 5 hex values behind the current one being used by uploader.
+    So if uploader sends a key with the last hex being 0x08, the received key will be 0x03.
+    Coincidentally, in the config file for uploader it says the number of keys is 5, so this might be linked to the problem.
+    But when I brought this up to Dongha, he said this had no effect on the bug. 
+
+    Next Steps: Look into the two functions mentioned. Also, try to find a pattern as to when the bug is triggered.
+    Ran it 21 times and it successfully finished 21 times in a row. 
+    Recompiled the files and ran it 7 more times, and it successfully finished 7 times in a row.
+    Recompiled the files again with these new notes and ran it 2 more times, and it successfully finished 2 times in a row.
+    Recompiled only the uploader.cpp file and ran it 3 more times, and it successfully finished 3 times in a row.
+*/
