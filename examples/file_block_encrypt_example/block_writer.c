@@ -34,10 +34,10 @@ int main(int argc, char *argv[]) {
         memcpy(encrypted_file_metadata[i].key_id, s_key_list->s_key[i].key_id,
                SESSION_KEY_ID_SIZE);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+        snprintf(encrypted_filename, sizeof(encrypted_filename),
                  "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+        snprintf(plaintext_filename, sizeof(plaintext_filename),
                  "plaintext%d.txt", i);
 
         FILE *encrypted_fp;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
                 // Create a random integer that is >= 56 and <= 144.
                 int plaintext_buf_length =
                     secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
-                SST_print_log("Hokeun! %d\n", plaintext_buf_length);
+
                 // This buffer contains a single key_value.
                 unsigned char
                     plaintext_buf[plaintext_buf_length];  // Variable Length

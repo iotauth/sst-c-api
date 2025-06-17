@@ -99,9 +99,8 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     unsigned int sender_HS_1_length;
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
                     sender_HS_1, &sender_HS_1_length);
-    unsigned int bytes_written =
-        write_to_socket(sock, sender_HS_1, sender_HS_1_length);
-    if (bytes_written != sender_HS_1_length) {
+    int bytes_written = write_to_socket(sock, sender_HS_1, sender_HS_1_length);
+    if ((unsigned int)bytes_written != sender_HS_1_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     free(parsed_buf);
@@ -109,8 +108,12 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
 
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
-    unsigned int received_buf_length =
+    int received_buf_length =
         read_from_socket(sock, received_buf, sizeof(received_buf));
+    if (received_buf_length < 0) {
+        SST_print_error_exit(
+            "Socket read eerror in secure_connect_to_server_with_socket()\n");
+    }
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
@@ -128,9 +131,9 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         unsigned int sender_HS_2_length;
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
                         sender_HS_2, &sender_HS_2_length);
-        unsigned int bytes_written =
+        int bytes_written =
             write_to_socket(sock, sender_HS_2, sender_HS_2_length);
-        if (bytes_written != sender_HS_2_length) {
+        if ((unsigned int)bytes_written != sender_HS_2_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         free(parsed_buf);
@@ -164,8 +167,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     } else if (session_key_idx == -1) {
         // WARNING: The following line overwrites the purpose.
         snprintf(ctx->config->purpose[ctx->config->purpose_index],
-                 MAX_PURPOSE_LENGTH, "{\"keyId\":%d}",
-                 target_session_key_id_int);
+                 sizeof(ctx->config->purpose[ctx->config->purpose_index]),
+                 "{\"keyId\":%d}", target_session_key_id_int);
 
         session_key_list_t *s_key_list;
         s_key_list =
@@ -201,7 +204,8 @@ SST_session_ctx_t *server_secure_comm_setup(
         int received_buf_length =
             read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
-            perror("Read Error:");
+            SST_print_error_exit(
+                "Socket read eerror in server_secure_comm_setup()\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -238,9 +242,9 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned int sender_length;
             make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_2,
                             sender, &sender_length);
-            unsigned int bytes_written =
+            int bytes_written =
                 write_to_socket(clnt_sock, sender, sender_length);
-            if (bytes_written != sender_length) {
+            if ((unsigned int)bytes_written != sender_length) {
                 SST_print_error_exit("Failed to write data to socket.");
             }
             free(parsed_buf);
@@ -250,8 +254,12 @@ SST_session_ctx_t *server_secure_comm_setup(
     }
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        unsigned int received_buf_length =
+        int received_buf_length =
             read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+        if (received_buf_length < 0) {
+            SST_print_error_exit(
+                "Socket read eerror in server_secure_comm_setup()\n");
+        }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
@@ -300,10 +308,13 @@ SST_session_ctx_t *server_secure_comm_setup(
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    unsigned int received_buf_length;
+    int received_buf_length;
     while (1) {
         received_buf_length = read_from_socket(session_ctx->sock, received_buf,
                                                sizeof(received_buf));
+        if (received_buf_length < 0) {
+            SST_print_error_exit("Socket read eerror in receive_thread()\n");
+        }
         receive_message(received_buf, received_buf_length, session_ctx);
     }
 }
@@ -323,9 +334,9 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     }
 }
 
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx) {
+unsigned int receive_message(unsigned char *received_buf,
+                             unsigned int received_buf_length,
+                             SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int data_buf_length;
     unsigned char *data_buf = parse_received_message(
@@ -333,6 +344,7 @@ void receive_message(unsigned char *received_buf,
     if (!check_SECURE_COMM_MSG_type(message_type)) {
         print_received_message(data_buf, data_buf_length, session_ctx);
     }
+    return data_buf_length;
 }
 
 int read_secure_message(int socket, unsigned char **plaintext,
@@ -346,6 +358,7 @@ int read_secure_message(int socket, unsigned char **plaintext,
         SST_print_error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
+    // TODO(Dongha Kim): No logic exists for handling sequence numbers.
     *plaintext = decrypt_received_message(received_buf, bytes_read,
                                           &decrypted_length, session_ctx);
     return decrypted_length;

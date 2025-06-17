@@ -31,10 +31,10 @@ int main(int argc, char *argv[]) {
         get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
                               s_key_list);
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(encrypted_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+        snprintf(encrypted_filename, sizeof(encrypted_filename),
                  "encrypted%d.txt", i);
         char plaintext_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
-        snprintf(plaintext_filename, BLOCK_FILE_NAME_MAX_LENGTH,
+        snprintf(plaintext_filename, sizeof(plaintext_filename),
                  "plaintext%d.txt", i);
 
         FILE *encrypted_fp;

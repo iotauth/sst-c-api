@@ -107,12 +107,12 @@ void *SST_print_error_return_null(const char *fmt, ...);
 // Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_debug(unsigned char *buf, size_t size);
+void print_buf_debug(const unsigned char *buf, size_t size);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_log(unsigned char *buf, size_t size);
+void print_buf_log(const unsigned char *buf, size_t size);
 
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.
@@ -261,8 +261,7 @@ int mod(int a, int b);
 // @param buf A pointer to the buffer where the data will be stored.
 // @param buf_length The maximum number of bytes to read into the buffer.
 // @return The number of bytes successfully read, or -1 if an error occurred.
-unsigned int read_from_socket(int socket, unsigned char *buf,
-                              unsigned int buf_length);
+int read_from_socket(int socket, unsigned char *buf, unsigned int buf_length);
 
 // Writes data to a socket from a buffer.
 // This function writes up to `buf_length` bytes from the provided buffer
@@ -272,8 +271,8 @@ unsigned int read_from_socket(int socket, unsigned char *buf,
 // @param buf A pointer to the buffer containing the data to be written.
 // @param buf_length The number of bytes to write from the buffer.
 // @return The number of bytes successfully written, or -1 if an error occurred.
-unsigned int write_to_socket(int socket, const unsigned char *buf,
-                             unsigned int buf_length);
+int write_to_socket(int socket, const unsigned char *buf,
+                    unsigned int buf_length);
 
 // Checks message type if it is SECURE_COMM_MSG. This is needed as a separate
 // function not to define SECURE_COMM_MSG in c_api.h

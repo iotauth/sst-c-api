@@ -129,7 +129,7 @@ For the rest of this document, we use $SST_ROOT for the root directory of [SST's
 
 
 ```
-$cd $SST_ROOT/entity/c/examples
+$cd $SST_ROOT/entity/c
 $mkdir build && cd build
 $cmake ../
 $make

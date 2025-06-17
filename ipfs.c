@@ -1,10 +1,13 @@
 #include "ipfs.h"
 
+#include <sys/time.h>
 #include <unistd.h>
 
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
+
+#define MAX_FILE_SUFFIX_LENGTH 5
 
 const char IPFS_ADD_COMMAND[] = "ipfs add ";
 const char TXT_FILE_EXTENSION[] = ".txt";
@@ -44,10 +47,11 @@ void file_duplication_check(const char *file_name, const char *file_extension,
                             char *file_name_buf) {
     int suffix_num = 0;
     // Copy file name.
-    memcpy(file_name_buf, file_name, strlen(file_name));
-    memcpy(file_name_buf + strlen(file_name), file_extension,
-           strlen(file_extension));
-    file_name_buf[strlen(file_name) + strlen(file_extension)] = '\0';
+    const int file_name_len = strlen(file_name);
+    const int file_extension_len = strlen(file_extension);
+    memcpy(file_name_buf, file_name, file_name_len);
+    memcpy(file_name_buf + file_name_len, file_extension, file_extension_len);
+    file_name_buf[file_name_len + file_extension_len] = '\0';
     for (;;) {
         if (suffix_num >= MAX_REPLY_NUM) {
             SST_print_error(
@@ -58,14 +62,19 @@ void file_duplication_check(const char *file_name, const char *file_extension,
         if (0 == access(file_name_buf, F_OK)) {
             SST_print_log("File already exists: %s.\n", file_name_buf);
             // Copy suffix and file extension.
-            char suffix_in_string[5];
-            sprintf(suffix_in_string, "%d", suffix_num);
-            memcpy(file_name_buf + strlen(file_name), suffix_in_string,
-                   strlen(suffix_in_string));
-            memcpy(file_name_buf + strlen(file_name) + strlen(suffix_in_string),
-                   file_extension, strlen(file_extension));
-            file_name_buf[strlen(file_name) + strlen(suffix_in_string) +
-                          strlen(file_extension)] = '\0';
+
+            char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
+            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d",
+                     suffix_num);
+
+            const int file_suffix_len = strlen(suffix_in_string);
+
+            memcpy(file_name_buf + file_name_len, suffix_in_string,
+                   file_suffix_len);
+            memcpy(file_name_buf + file_name_len + file_suffix_len,
+                   file_extension, file_extension_len);
+            file_name_buf[file_name_len + file_suffix_len +
+                          file_extension_len] = '\0';
             suffix_num += 1;
         } else {
             break;
@@ -107,10 +116,9 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
 int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                         char *my_file_path, unsigned char *hash_value,
                         estimate_time_t *estimate_time) {
-    FILE *fgen, *fin, *fout, *fenc;
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
-    fin = fopen(my_file_path, "r");
+    FILE *fin = fopen(my_file_path, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
@@ -136,7 +144,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                            &file_name_buffer[0]);
 
     // File descriptor for the encrypted file.
-    fenc = fopen(file_name_buffer, "w");
+    FILE *fenc = fopen(file_name_buffer, "w");
     unsigned char *enc_save = (unsigned char *)malloc(
         encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
@@ -161,8 +169,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
 }
 
 void file_decrypt_save(session_key_t s_key, char *file_name) {
-    FILE *fp, *fin, *fout;
-    fin = fopen(file_name, "r");
+    FILE *fin = fopen(file_name, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
@@ -188,11 +195,10 @@ void file_decrypt_save(session_key_t s_key, char *file_name) {
     }
     free(file_buf);
 
-    int reply_num = 0;
     char result_file_name[20];
     file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION,
                            &result_file_name[0]);
-    fout = fopen(result_file_name, "w");
+    FILE *fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
@@ -217,7 +223,11 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 3 + name_size, s_key->key_id, key_id_size);
     data[3 + name_size + key_id_size] = hash_value_len;
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
-    write(sock, data, 4 + name_size + key_id_size + hash_value_len);
+    int bytes_written = write_to_socket(
+        sock, data, 4 + name_size + key_id_size + hash_value_len);
+    if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
+        SST_print_error_exit("Failed to write data to socket.");
+    }
     SST_print_log(
         "Send the data such as sessionkey id, hash value for file. \n");
 }
@@ -274,10 +284,17 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[0] = DOWNLOAD_INDEX;
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
-    write(sock, data, 2 + name_size);
+    int bytes_written = write_to_socket(sock, data, 2 + name_size);
+    if (bytes_written != (2 + name_size)) {
+        SST_print_error_exit("Failed to write data to socket.");
+    }
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    unsigned int received_buf_length =
+    int received_buf_length =
         read_from_socket(sock, received_buf, sizeof(received_buf));
+    if (received_buf_length < 0) {
+        SST_print_error_exit(
+            "Socket read eerror in receive_data_and_download_file().\n");
+    }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
@@ -329,16 +346,21 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        unsigned int received_buf_length =
+        int received_buf_length =
             read_from_socket(sock, received_buf, sizeof(received_buf));
+        if (received_buf_length < 0) {
+            SST_print_error_exit(
+                "Socket read eerror in send_add_reader_req_via_TCP().\n");
+        }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
-            unsigned int auth_Id;
             unsigned char auth_nonce[NONCE_SIZE];
-            auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            // TODO(Dongha Kim)
+            // unsigned int auth_id = read_unsigned_int_BE(data_buf,
+            // AUTH_ID_LEN);
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
             unsigned int serialized_length;
