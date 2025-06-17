@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
                 // Create a random integer that is >= 56 and <= 144.
                 int plaintext_buf_length =
                     secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
-                SST_print_log("Hokeun! %d\n", plaintext_buf_length);
+
                 // This buffer contains a single key_value.
                 unsigned char
                     plaintext_buf[plaintext_buf_length];  // Variable Length
