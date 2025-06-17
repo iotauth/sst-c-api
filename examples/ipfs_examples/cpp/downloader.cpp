@@ -8,18 +8,27 @@ extern "C" {
     #include "../../../ipfs.h"
 }
 
-namespace fs = std::filesystem;
+// Checks if the file exists by attempting to open it in read mode.
+bool fileExists(const std::string& filename) {
+    FILE* file = fopen(filename.c_str(), "r");
+    if (file) {
+        fclose(file);
+        return true;
+    }
+    return false;
+}
 
+// Checks what the next available filename is by appending a number to the base name.
 std::string getAvailableFilename(const std::string& baseName, const std::string& extension) {
     std::string filename = baseName + extension;
-    if (!fs::exists(filename)) {
+    if (!fileExists(filename)) {
         return filename;
     }
 
     int counter = 0;
     while (true) {
         filename = baseName + std::to_string(counter) + extension;
-        if (!fs::exists(filename)) {
+        if (!fileExists(filename)) {
             return filename;
         }
         ++counter;
