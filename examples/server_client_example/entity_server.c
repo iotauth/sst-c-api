@@ -79,7 +79,8 @@ int main(int argc, char *argv[]) {
     clnt_sock2 =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock2 == -1) {
-        SST_print_error_exit("accept() error for second client in %s", __FILE__);
+        SST_print_error_exit("accept() error for second client in %s",
+                             __FILE__);
     }
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
@@ -105,4 +106,3 @@ int main(int argc, char *argv[]) {
     close(serv_sock);
     free_SST_ctx_t(ctx);
 }
-
