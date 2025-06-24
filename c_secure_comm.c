@@ -1,5 +1,7 @@
 #include "c_secure_comm.h"
 
+#include <unistd.h>
+
 #include "c_common.h"
 #include "c_crypto.h"
 
@@ -76,7 +78,7 @@ static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
                                        unsigned int *message_length) {
     size_t encrypted_length;
     unsigned char *encrypted =
-        public_encrypt(buf, buf_len, RSA_PKCS1_PADDING,
+        public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING,
                        (EVP_PKEY *)ctx->pub_key, &encrypted_length);
     size_t sigret_length;
     unsigned char *sigret = SHA256_sign(
@@ -225,9 +227,8 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
-        if (bytes_written != message_length) {
+        int bytes_written = write_to_socket(sock, message, message_length);
+        if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
@@ -245,9 +246,8 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        unsigned int bytes_written =
-            write_to_socket(sock, message, message_length);
-        if (bytes_written != message_length) {
+        int bytes_written = write_to_socket(sock, message, message_length);
+        if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
         OPENSSL_free(enc);
@@ -270,7 +270,7 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
     unsigned char *decrypted_dist_key_buf = private_decrypt(
-        signed_data.data, key_size, RSA_PKCS1_PADDING,
+        signed_data.data, key_size, RSA_PKCS1_OAEP_PADDING,
         (EVP_PKEY *)ctx->priv_key, &decrypted_dist_key_buf_length);
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
@@ -423,9 +423,9 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
                     sender_buf, &sender_buf_length);
 
-    unsigned int bytes_written =
+    int bytes_written =
         write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
-    if (bytes_written != sender_buf_length) {
+    if ((unsigned int)bytes_written != sender_buf_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     return bytes_written;
@@ -527,8 +527,13 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int state = INIT;
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        unsigned int received_buf_length =
+        int received_buf_length =
             read_from_socket(sock, received_buf, sizeof(received_buf));
+
+        if (received_buf_length < 0) {
+            SST_print_error_exit(
+                "Socket read eerror in send_session_key_req_via_TCP().\n");
+        }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(

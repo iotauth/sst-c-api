@@ -175,9 +175,10 @@ void *receive_thread_read_one_each(void *SST_session_ctx);
 // @param received_buf received message buffer
 // @param received_buf_length length of received_buf
 // @param SST_session_ctx_t session ctx struct
-void receive_message(unsigned char *received_buf,
-                     unsigned int received_buf_length,
-                     SST_session_ctx_t *session_ctx);
+// @return the total number of bytes read.
+unsigned int receive_message(unsigned char *received_buf,
+                             unsigned int received_buf_length,
+                             SST_session_ctx_t *session_ctx);
 
 // Return the buffer pointer of the decrypted buffer.
 // If the user gives the read buffer as input, it will return the decrypted
@@ -322,5 +323,32 @@ void free_session_key_list_t(session_key_list_t *session_key_list);
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
 void free_SST_ctx_t(SST_ctx_t *ctx);
+
+/**
+ * @brief Generates a cryptographically secure random integer within a given
+ * range.
+ *
+ * This function uses OpenSSL's RAND_bytes() to generate cryptographically
+ * strong random numbers. It securely converts these bytes into an integer
+ * within the specified inclusive range [min, max].
+ *
+ * @param min The minimum integer value (inclusive) of the desired random range.
+ * @param max The maximum integer value (inclusive) of the desired random range.
+ * @return A cryptographically secure random integer between min and max
+ * (inclusive). On error, returns -1 (e.g., if RAND_bytes fails).
+ *
+ * @note Ensure OpenSSL is properly initialized before calling this function.
+ *
+ * @example
+ * @code
+ * int num = secure_rand(56, 144);
+ * if (num != -1) {
+ *     printf("Random number: %d\n", num);
+ * } else {
+ *     fprintf(stderr, "Random number generation failed.\n");
+ * }
+ * @endcode
+ */
+int secure_rand(int min, int max);
 
 #endif  // C_API_H

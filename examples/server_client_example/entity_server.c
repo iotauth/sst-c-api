@@ -6,16 +6,11 @@
 #include <unistd.h>
 
 #include "../../c_api.h"
-
-void exit_with_error(char *message) {
-    fputs(message, stderr);
-    fputc('\n', stderr);
-    exit(1);
-}
+#include "../../c_common.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        exit_with_error("Enter config path");
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
@@ -25,7 +20,7 @@ int main(int argc, char *argv[]) {
     socklen_t clnt_addr_size;
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1) {
-        exit_with_error("socket() error");
+        SST_print_error_exit("socket() error in %s", __FILE__);
     }
     int on = 1;
     if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
@@ -39,19 +34,19 @@ int main(int argc, char *argv[]) {
 
     if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
         -1) {
-        exit_with_error("bind() error");
+        SST_print_error_exit("bind() error in %s", __FILE__);
         return -1;
     }
 
     if (listen(serv_sock, 5) == -1) {
-        exit_with_error("listen() error");
+        SST_print_error_exit("listen() error in %s", __FILE__);
         return -1;
     }
     clnt_addr_size = sizeof(clnt_addr);
     clnt_sock =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
-        exit_with_error("accept() error");
+        SST_print_error_exit("accept() error for first client in %s", __FILE__);
         return -1;
     }
 
@@ -76,14 +71,16 @@ int main(int argc, char *argv[]) {
                             session_ctx);
         sleep(2);
         pthread_cancel(thread);
-        pthread_join(thread, NULL); // Needs to wait until the thread is joined.
+        pthread_join(thread,
+                     NULL);  // Needs to wait until the thread is joined.
         printf("Finished first communication\n");
     }
     // Second connection. session_key_list caches the session key.
     clnt_sock2 =
         accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock2 == -1) {
-        exit_with_error("accept() error");
+        SST_print_error_exit("accept() error for second client in %s",
+                             __FILE__);
     }
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
@@ -103,7 +100,7 @@ int main(int argc, char *argv[]) {
 
     sleep(3);
     pthread_cancel(thread2);
-    pthread_join(thread2, NULL); // Needs to wait until the thread is joined.
+    pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
     close(clnt_sock);
     close(clnt_sock2);
     close(serv_sock);
