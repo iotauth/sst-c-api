@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
+#include "../../c_common.h"
 
 void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
     FILE *fp = fopen(file_path, "wb");
@@ -23,6 +24,9 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 }
 
 int main(int argc, char *argv[]) {
+    if (argc != 0) {
+        SST_print_error_exit("No need to run this file");
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
