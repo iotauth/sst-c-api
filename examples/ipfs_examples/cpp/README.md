@@ -42,21 +42,21 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 ## Run the Example Entities
 
-1. Go to `$ROOT/entity/c/examples/ipfs_examples/cpp`.
-
-2. Compile the uploader with `g++ -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
-
-    - For debugging mode, compile with `g++ -g -O0 -o uploader uploader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
-
-3. Compile the downloader with `g++ -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
-
-    - For debugging mode, compile with `g++ -g -O0 -o downloader downloader.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib  -lssl -lcrypto -lsst-c-api`.
-
-4. Create a `plain_text.txt` file in the `ipfs_examples` directory.
+1. Go to `$ROOT/entity/c/examples/ipfs_examples/` and create a `plain_text.txt` file.
     - Enter any text into the file and save.
 
-5. Run `./uploader ../uploader.config plain_text.txt ../addReader.txt`.
+2. Run `cd cpp`.
 
-6. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader ../downloader.config`.
+3. Run `mkdir build && cd build`.
+    - If you get `mkdir: build: File exists` then run `rm -rf build`.
 
-7. Once downloader finishes running, uploader resumes. Once the hashes are compared at the end, uploader has finished running.
+4. Run `cmake ..`.
+    - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.
+
+5. Run `make`.
+
+6. Run `./uploader ../../uploader.config ../../plain_text.txt ../../addReader.txt`.
+
+7. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader ../../downloader.config`.
+
+8. Once downloader finishes running, uploader resumes. Once the hashes are compared at the end, uploader has finished running.

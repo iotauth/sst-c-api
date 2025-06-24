@@ -1,8 +1,8 @@
 extern "C" {
-    #include <sst-c-api/c_api.h>
-    #include "../../../c_common.h"
-    #include "../../../c_crypto.h"
-    #include "../../../ipfs.h"
+    #include <c/c_api.h>
+    #include <c/c_common.h>
+    #include <c/c_crypto.h>
+    #include <c/ipfs.h>
 }
 
 #include <unistd.h>
