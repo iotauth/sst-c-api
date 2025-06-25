@@ -1,13 +1,18 @@
+// Compilation: g++ -g -O0 -o server server.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib -lsst-c-api -lssl -lcrypto -pthread
+// Execution: ./server <config_path>
+
 #include <iostream>
 #include <fstream>
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../../c_api.h"
+extern "C" {
+    #include "../../c_api.h"
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        std::cerr << "Usage: ./" << argv[0] << " <config_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <config_path>" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -64,9 +69,12 @@ int main(int argc, char *argv[]) {
     pthread_t thread;
     pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
     unsigned char *decrypted;
-    read_secure_message(session_ctx->sock, &decrypted, session_ctx);
 
-    std::cout << "Received message: " << reinterpret_cast<const char*>(decrypted) << std::endl;
+    while(read_secure_message(session_ctx->sock, &decrypted, session_ctx) != -1) {
+        // Process the decrypted message
+        std::cout << "Received message: " << reinterpret_cast<const char*>(decrypted) << std::endl;
+        free(decrypted);
+    }
 
     if (close(clnt_sock) == -1) {
         std::cerr << "close" << std::endl;
@@ -74,7 +82,7 @@ int main(int argc, char *argv[]) {
     }
 
     close(clnt_sock);
-    // pthread_cancel(thread);
+    pthread_cancel(thread);
     printf("Finished communication\n");
     free_SST_ctx_t(ctx);
 }

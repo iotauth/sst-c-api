@@ -1,3 +1,6 @@
+// Compilation: g++ -g -O0 -o client client.cpp -I../../ -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib -lsst-c-api -lssl -lcrypto -pthread
+// Execution: ./client <config_path> <csv_file_path>
+
 extern "C" {
     #include <sst-c-api/c_api.h>
     #include "../../ipfs.h"
@@ -6,10 +9,11 @@ extern "C" {
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <unistd.h>
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
-        std::cerr << "Usage: ./" << argv[0] << " <config_path> <csv_file_path>" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " <config_path> <csv_file_path>" << std::endl;
         exit(1);
     }
     
@@ -49,4 +53,6 @@ int main(int argc, char* argv[]) {
     free(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
+    
+    return EXIT_SUCCESS;
 }
