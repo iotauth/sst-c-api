@@ -2,7 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../../ipfs.h"
+#include "../../../ipfs.h"
 
 #define MAX_PAYLOAD_LENGTH 1024
 #define SEQ_NUM_SIZE 8
