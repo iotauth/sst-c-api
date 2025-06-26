@@ -311,7 +311,7 @@ int read_from_socket(int socket, unsigned char *buf, unsigned int buf_length) {
     if (length_read < 0) {
         SST_print_error_exit("Reading from socket failed.");
     } else if (length_read == 0) {
-        SST_print_error_exit("Connection closed.");
+        SST_print_log("0 bytes read from socket, it may have been closed.\n");
     }
     return (unsigned int)length_read;
 }
