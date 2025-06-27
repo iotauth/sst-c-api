@@ -1,8 +1,8 @@
 extern "C" {
-    #include <sst-c-api/c_api.h>
-    #include "../../../c_common.h"
-    #include "../../../c_crypto.h"
-    #include "../../../ipfs.h"
+    #include <c/c_api.h>
+    #include <c/c_common.h>
+    #include <c/c_crypto.h>
+    #include <c/ipfs.h>
 }
 
 #include <unistd.h>
@@ -12,7 +12,8 @@ extern "C" {
 int main(int argc, char* argv[]) {
 
     if (argc != 4) {
-        std::cerr << "Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
+        std::cerr << "Invalid number of arguments." << std::endl;
+        std::cerr << "Correct Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -41,49 +42,13 @@ int main(int argc, char* argv[]) {
         std::cerr << "Failed to get session key. Returning NULL." << std::endl;
         return EXIT_FAILURE;
     }
-    sleep(1);
 
     std::vector<unsigned char> hash_value(BUFF_SIZE);
-    int hash_value_len;
+    int hash_value_len = file_encrypt_upload(&s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()), &hash_value[0], &estimate_time[0]);
 
-    hash_value_len =
-        file_encrypt_upload(&s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()),
-                            &hash_value[0], &estimate_time[0]);
-    sleep(1);
-    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx,
-                                    &hash_value[0], hash_value_len);
-                                    
-    sleep(5);
+    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0], hash_value_len);
 
-    // Step 1: Compute Hash of the File
-
-    // Open the file in binary mode
-    std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
-    if (!file) {
-        std::cerr << "Error opening file for hash calculation" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    // Determine the file size
-    std::streamsize filesize = file.tellg();
-    file.seekg(0, std::ios::beg);
-
-    // Read file data into a vector
-    std::vector<unsigned char> file_data(filesize);
-    if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
-        std::cerr << "Error reading file" << std::endl;
-        return EXIT_FAILURE;
-    }
-    file.close();
-
-    // Compute the SHA256 hash of the file data
-    std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
-    unsigned int hash_length = 0;
-    digest_message_SHA_256(&file_data[0], filesize, &hash_of_file[0], &hash_length);
-
-    print_buf_log(&hash_of_file[0], hash_of_file.size());
-
-    // Step 2: Receive Hash from Downloader using Sockets
+    // Step 1: Receive Hash from Downloader using Sockets
     
     int server_socket = socket(PF_INET, SOCK_STREAM, 0);
 
@@ -115,7 +80,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    std::cout << "Waiting for client to connect..." << std::endl;
+    std::cout << "Ready for the client to connect..." << std::endl;
 
     int client_socket = accept(server_socket, nullptr, nullptr);
     if (client_socket < 0) {
@@ -123,10 +88,8 @@ int main(int argc, char* argv[]) {
         close(server_socket);
         return EXIT_FAILURE;
     }
-    std::cout << "Client Socket Accepted Connection." << std::endl;
     
     SST_session_ctx_t *session_ctx = server_secure_comm_setup(ctx, client_socket, s_key_list_0);
-    std::cout << "Checkpoint 2" << std::endl;
 
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
@@ -136,23 +99,57 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char* received_hash_buf;
 
-    int message_len = -1;
-    for (;;) {
-        message_len = read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
-        std::cout << "message_len: " << message_len << std::endl;
-        if (message_len > 0) {
-            break;
-        }
-        std::cout << "Did not receive downloader's message yet. Sleeping for 1 second." << std::endl;
-        sleep(1);
-    }   
+    int message_len = read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
+
+    // Step 2: Compute Hash of the File
+
+    // Open the file in binary mode
+    std::ifstream file(my_file_path, std::ios::binary | std::ios::ate);
+    if (!file) {
+        std::cerr << "Error opening file for hash calculation" << std::endl;
+        return EXIT_FAILURE;
+    }
+
+    // Determine the file size
+    std::streamsize filesize = file.tellg();
+    file.seekg(0, std::ios::beg);
+
+    // Read file data into a vector
+    std::vector<unsigned char> file_data(filesize);
+    if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
+        std::cerr << "Error reading file" << std::endl;
+        return EXIT_FAILURE;
+    }
+    file.close();
+
+    unsigned int hash_length = 0;
+    // SHA-256 is 32 bytes
+    unsigned char* hash_of_file = static_cast<unsigned char*>(std::malloc(32));
+    if (!hash_of_file) {
+        std::cerr << "Allocation failed\n";
+        return EXIT_FAILURE;
+    }
+
+    digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
 
     // Step 3: Compare the Hash Values
     // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and compare.
-    
-    print_buf_log(received_hash_buf, message_len);
+
+    std::cout << reinterpret_cast<char*>(received_hash_buf) << std::endl;
+
+    unsigned char* received_hash = received_hash_buf + 8; // Remove the two 4-byte sequence numbers in the received buffer
+
+    if (std::memcmp(hash_of_file, received_hash, 32) == 0) {
+        std::cout << "Hash values match!" << std::endl;
+    } else {
+        free(hash_of_file);
+        free(received_hash_buf);
+        std::cerr << "Hash values do not match!" << std::endl;
+        return EXIT_FAILURE;
+    }
     
     free(received_hash_buf);
+    free(hash_of_file);
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list_0);
     close(client_socket);
