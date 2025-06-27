@@ -354,6 +354,11 @@ int read_secure_message(int socket, unsigned char **plaintext,
     unsigned char received_buf[MAX_PAYLOAD_LENGTH];
     bytes_read = read_header_return_data_buf_pointer(
         socket, &message_type, received_buf, MAX_PAYLOAD_LENGTH);
+    if (bytes_read == 0) {
+        SST_print_error("Socket read returned 0, failed to read header.\n");
+        return bytes_read;
+    }
+
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }

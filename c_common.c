@@ -179,6 +179,10 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     if (received_buf_length < 0) {
         SST_print_error_exit(
             "Socket read eerror in read_header_return_data_buf_pointer().\n");
+    } else if (received_buf_length == 0) {
+        SST_print_error(
+            "Socket read returned 0 bytes, it may have been closed.\n");
+        return received_buf_length;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
@@ -311,7 +315,7 @@ int read_from_socket(int socket, unsigned char *buf, unsigned int buf_length) {
     if (length_read < 0) {
         SST_print_error_exit("Reading from socket failed.");
     } else if (length_read == 0) {
-        SST_print_log("0 bytes read from socket, it may have been closed.\n");
+        SST_print_error("0 bytes read from socket, it may have been closed.\n");
     }
     return (unsigned int)length_read;
 }
