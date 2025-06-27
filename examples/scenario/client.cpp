@@ -2,8 +2,8 @@
 // Execution: ./client <config_path> <csv_file_path>
 
 extern "C" {
-    #include <sst-c-api/c_api.h>
-    #include "../../ipfs.h"
+    #include <c/c_api.h>
+    #include <c/ipfs.h>
 }
 
 #include <iostream>
@@ -30,9 +30,6 @@ int main(int argc, char* argv[]) {
     // SST Connect to server
     SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
 
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
-
     // Read CSV file
     std::string my_file_path = argv[2];
     std::ifstream file(my_file_path);
@@ -47,12 +44,13 @@ int main(int argc, char* argv[]) {
         // Send message to server
         std::string message = line.substr(line.find(',') + 1);
         send_secure_message(const_cast<char*>(message.c_str()), message.length(), session_ctx);
+
     }
 
-    pthread_join(thread, NULL);
     free(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
     
     return EXIT_SUCCESS;
+
 }
