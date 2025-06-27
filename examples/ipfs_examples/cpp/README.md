@@ -2,14 +2,14 @@
 
 ## Prerequisites
 
-## Clone repository & Update submodule
+### Clone repository & Update submodule
 ```
 $ git clone https://github.com/iotauth/iotauth.git
 $ cd iotauth
 $ git submodule update --init
 ```
 
-## Installation of SST as Shared Library
+### Installation of SST as Shared Library
 Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=readme-ov-file#compile-as-shared-library).
 
 ### Create Example Auth Databases
