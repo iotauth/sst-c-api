@@ -7,7 +7,7 @@
 #include <unistd.h>
 
 extern "C" {
-    #include "../../c_api.h"
+    #include <c/c_api.h>
 }
 
 int main(int argc, char *argv[]) {
@@ -66,23 +66,34 @@ int main(int argc, char *argv[]) {
     }
 
     // Receive messages from client
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
-    unsigned char *decrypted;
+    unsigned char *received_buf;
+    unsigned char* received_plaintext;
 
-    while(read_secure_message(session_ctx->sock, &decrypted, session_ctx) != -1) {
-        // Process the decrypted message
-        std::cout << "Received message: " << reinterpret_cast<const char*>(decrypted) << std::endl;
-        free(decrypted);
+    for (;;) {
+        int ret = read_secure_message(session_ctx->sock, &received_buf, session_ctx);
+        if (ret == -1) {
+            std::cerr << "Failed to read secure message." << std::endl;
+            break;
+        } else if (ret == 0) {
+            std::cerr << "No more messages to read." << std::endl;
+            break;
+        }
+        // Process the received_buf message
+        // TODO: Remove this temporary fix once the C API is fixed.
+        // Remove the two 4-byte sequence numbers in the received buffer
+        received_plaintext = received_buf + 8;
+        std::cout << reinterpret_cast<const char*>(received_plaintext) << std::endl;
     }
 
+    std::cout << "Finished communication." << std::endl;
+
     if (close(clnt_sock) == -1) {
-        std::cerr << "close" << std::endl;
+        std::cerr << "close() error" << std::endl;
         return EXIT_FAILURE;
     }
 
-    close(clnt_sock);
-    pthread_cancel(thread);
-    printf("Finished communication\n");
+    free(received_buf);
+    free(session_ctx);
     free_SST_ctx_t(ctx);
+    free_session_key_list_t(s_key_list);
 }
