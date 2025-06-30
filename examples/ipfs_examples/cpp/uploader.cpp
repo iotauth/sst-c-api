@@ -1,19 +1,21 @@
 extern "C" {
-    #include <c/c_api.h>
-    #include <c/c_common.h>
-    #include <c/c_crypto.h>
-    #include <c/ipfs.h>
+#include <c/c_api.h>
+#include <c/c_common.h>
+#include <c/c_crypto.h>
+#include <c/ipfs.h>
 }
 
 #include <unistd.h>
-#include <iostream>
+
 #include <fstream>
+#include <iostream>
 
 int main(int argc, char* argv[]) {
-
     if (argc != 4) {
         std::cerr << "Invalid number of arguments." << std::endl;
-        std::cerr << "Correct Usage: " << argv[0] << " <config_path> <my_file_path> <add_reader_path>" << std::endl;
+        std::cerr << "Correct Usage: " << argv[0]
+                  << " <config_path> <my_file_path> <add_reader_path>"
+                  << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -44,12 +46,15 @@ int main(int argc, char* argv[]) {
     }
 
     std::vector<unsigned char> hash_value(BUFF_SIZE);
-    int hash_value_len = file_encrypt_upload(&s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()), &hash_value[0], &estimate_time[0]);
+    int hash_value_len = file_encrypt_upload(
+        &s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()),
+        &hash_value[0], &estimate_time[0]);
 
-    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0], hash_value_len);
+    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0],
+                                  hash_value_len);
 
     // Step 1: Receive Hash from Downloader using Sockets
-    
+
     int server_socket = socket(PF_INET, SOCK_STREAM, 0);
 
     if (server_socket < 0) {
@@ -59,8 +64,11 @@ int main(int argc, char* argv[]) {
 
     // Allow reuse of the local address (port) even if it’s in TIME_WAIT
     int reuse = 1;
-    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse)) < 0) {
-        std::perror("setsockopt(SO_REUSEADDR) failed"); // Non‐fatal: we can still proceed, but bind might fail.
+    if (setsockopt(server_socket, SOL_SOCKET, SO_REUSEADDR, &reuse,
+                   sizeof(reuse)) < 0) {
+        std::perror("setsockopt(SO_REUSEADDR) failed");  // Non‐fatal: we can
+                                                         // still proceed, but
+                                                         // bind might fail.
     }
 
     struct sockaddr_in server_address;
@@ -68,8 +76,10 @@ int main(int argc, char* argv[]) {
     server_address.sin_port = htons(21100);
     server_address.sin_addr.s_addr = INADDR_ANY;
 
-    if (bind(server_socket, (struct sockaddr*)&server_address, sizeof(server_address)) < 0) {
-        std::cerr << "Error binding socket: " << std::strerror(errno) << std::endl;
+    if (bind(server_socket, (struct sockaddr*)&server_address,
+             sizeof(server_address)) < 0) {
+        std::cerr << "Error binding socket: " << std::strerror(errno)
+                  << std::endl;
         close(server_socket);
         return EXIT_FAILURE;
     }
@@ -88,8 +98,9 @@ int main(int argc, char* argv[]) {
         close(server_socket);
         return EXIT_FAILURE;
     }
-    
-    SST_session_ctx_t *session_ctx = server_secure_comm_setup(ctx, client_socket, s_key_list_0);
+
+    SST_session_ctx_t* session_ctx =
+        server_secure_comm_setup(ctx, client_socket, s_key_list_0);
 
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
@@ -99,7 +110,8 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char* received_hash_buf;
 
-    int message_len = read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
+    int message_len =
+        read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
 
     // Step 2: Compute Hash of the File
 
@@ -133,11 +145,14 @@ int main(int argc, char* argv[]) {
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
 
     // Step 3: Compare the Hash Values
-    // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and compare.
+    // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and
+    // compare.
 
     std::cout << reinterpret_cast<char*>(received_hash_buf) << std::endl;
 
-    unsigned char* received_hash = received_hash_buf + 8; // Remove the two 4-byte sequence numbers in the received buffer
+    unsigned char* received_hash =
+        received_hash_buf +
+        8;  // Remove the two 4-byte sequence numbers in the received buffer
 
     if (std::memcmp(hash_of_file, received_hash, 32) == 0) {
         std::cout << "Hash values match!" << std::endl;
@@ -147,7 +162,7 @@ int main(int argc, char* argv[]) {
         std::cerr << "Hash values do not match!" << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     free(received_hash_buf);
     free(hash_of_file);
     free_SST_ctx_t(ctx);
