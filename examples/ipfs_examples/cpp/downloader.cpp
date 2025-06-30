@@ -1,16 +1,17 @@
 #include <unistd.h>
-#include <iostream>
+
 #include <fstream>
+#include <iostream>
 
 extern "C" {
-    #include <c/c_common.h>
-    #include <c/c_crypto.h>
-    #include <c/ipfs.h>
+#include <c/c_common.h>
+#include <c/c_crypto.h>
+#include <c/ipfs.h>
 }
 
 // Checks if the file exists by attempting to open it in read mode.
-bool fileExists(const std::string& filename) {
-    FILE* file = fopen(filename.c_str(), "r");
+bool fileExists(const std::string &filename) {
+    FILE *file = fopen(filename.c_str(), "r");
     if (file) {
         fclose(file);
         return true;
@@ -18,8 +19,10 @@ bool fileExists(const std::string& filename) {
     return false;
 }
 
-// Checks what the next available filename is by appending a number to the base name.
-std::string getAvailableFilename(const std::string& baseName, const std::string& extension) {
+// Checks what the next available filename is by appending a number to the base
+// name.
+std::string getAvailableFilename(const std::string &baseName,
+                                 const std::string &extension) {
     std::string filename = baseName + extension;
     if (!fileExists(filename)) {
         return filename;
@@ -38,10 +41,11 @@ std::string getAvailableFilename(const std::string& baseName, const std::string&
 int main(int argc, char *argv[]) {
     if (argc != 2) {
         std::cerr << "Invalid number of arguments." << std::endl;
-        std::cerr << "Correct Usage: " << argv[0] << " <config_path>" << std::endl;
+        std::cerr << "Correct Usage: " << argv[0] << " <config_path>"
+                  << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     std::string config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path.c_str());
     session_key_list_t *s_key_list = init_empty_session_key_list();
@@ -50,20 +54,22 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];
 
-    receive_data_and_download_file(received_skey_id.data(), ctx, file_name.data(), &estimate_time[0]);
+    receive_data_and_download_file(received_skey_id.data(), ctx,
+                                   file_name.data(), &estimate_time[0]);
 
-    session_key_t *session_key = get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
-    
+    session_key_t *session_key =
+        get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
+
     if (session_key == NULL) {
         std::cerr << "There is no session key." << std::endl;
         return EXIT_FAILURE;
     }
-    
+
     // Check the latest result file, e.g., result25.txt.
     // Before creating the new "result.txt" file, get the file name
     std::string base = "result";
     std::string ext = ".txt";
-    
+
     std::string available_filename = getAvailableFilename(base, ext);
 
     file_decrypt_save(*session_key, file_name.data());
@@ -83,7 +89,7 @@ int main(int argc, char *argv[]) {
 
     // Read the file data into the vector
     std::vector<unsigned char> file_data(filesize);
-    if (!file.read(reinterpret_cast<char*>(file_data.data()), filesize)) {
+    if (!file.read(reinterpret_cast<char *>(file_data.data()), filesize)) {
         std::cerr << "Error reading file" << std::endl;
         return EXIT_FAILURE;
     }
@@ -92,12 +98,15 @@ int main(int argc, char *argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]), filesize, hash_of_file.data(), &hash_length);
+    digest_message_SHA_256(reinterpret_cast<unsigned char *>(&file_data[0]),
+                           filesize, hash_of_file.data(), &hash_length);
 
     // Step 2. Send hash to uploader
     // Send the computed hash (raw bytes)
-    SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    send_secure_message(reinterpret_cast<char*>(hash_of_file.data()), hash_length, session_ctx);
+    SST_session_ctx_t *session_ctx =
+        secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
+                        hash_length, session_ctx);
 
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list);
