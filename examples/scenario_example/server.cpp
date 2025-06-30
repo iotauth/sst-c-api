@@ -1,13 +1,11 @@
-// Compilation: g++ -g -O0 -o server server.cpp -I/opt/homebrew/opt/openssl/include -L/opt/homebrew/opt/openssl/lib -L/usr/local/lib -lsst-c-api -lssl -lcrypto -pthread
-// Execution: ./server <config_path>
-
-#include <iostream>
-#include <fstream>
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <fstream>
+#include <iostream>
+
 extern "C" {
-    #include <c/c_api.h>
+#include <c/c_api.h>
 }
 
 int main(int argc, char *argv[]) {
@@ -39,7 +37,8 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(atoi(PORT_NUM));
 
-    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) == -1) {
+    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
+        -1) {
         std::cerr << "bind() error" << std::endl;
         return EXIT_FAILURE;
     }
@@ -50,7 +49,8 @@ int main(int argc, char *argv[]) {
     }
 
     clnt_addr_size = sizeof(clnt_addr);
-    clnt_sock = accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+    clnt_sock =
+        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
         std::cerr << "accept() error" << std::endl;
         return EXIT_FAILURE;
@@ -59,7 +59,8 @@ int main(int argc, char *argv[]) {
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
     session_key_list_t *s_key_list = init_empty_session_key_list();
-    SST_session_ctx_t *session_ctx = server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+    SST_session_ctx_t *session_ctx =
+        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
         return EXIT_FAILURE;
@@ -67,10 +68,11 @@ int main(int argc, char *argv[]) {
 
     // Receive messages from client
     unsigned char *received_buf;
-    unsigned char* received_plaintext;
+    unsigned char *received_plaintext;
 
     for (;;) {
-        int ret = read_secure_message(session_ctx->sock, &received_buf, session_ctx);
+        int ret =
+            read_secure_message(session_ctx->sock, &received_buf, session_ctx);
         if (ret == -1) {
             std::cerr << "Failed to read secure message." << std::endl;
             break;
@@ -82,7 +84,8 @@ int main(int argc, char *argv[]) {
         // TODO: Remove this temporary fix once the C API is fixed.
         // Remove the two 4-byte sequence numbers in the received buffer
         received_plaintext = received_buf + 8;
-        std::cout << reinterpret_cast<const char*>(received_plaintext) << std::endl;
+        std::cout << reinterpret_cast<const char *>(received_plaintext)
+                  << std::endl;
     }
 
     std::cout << "Finished communication." << std::endl;
