@@ -145,10 +145,6 @@ int main(int argc, char* argv[]) {
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
 
     // Step 3: Compare the Hash Values
-    // TODO(Carlos Beltran Quinonez): Skip two 4-byte sequence numbers and
-    // compare.
-
-    std::cout << reinterpret_cast<char*>(received_hash_buf) << std::endl;
 
     unsigned char* received_hash =
         received_hash_buf +
