@@ -12,6 +12,7 @@ const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
 const char encryption_mode[] = "encryptionMode";
 const char hmac_mode[] = "HmacMode";
+const char auth_id[] = "authInfo.id";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
 const char authInfo_ip_address[] = "auth.ip.address";
@@ -33,6 +34,8 @@ config_type_t get_key_value(char *ptr) {
         return ENCRYPTION_MODE;
     } else if (strcmp(ptr, hmac_mode) == 0) {
         return HMAC_MODE;
+    } else if (strcmp(ptr, auth_id) == 0) {
+        return AUTH_ID;
     } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
         return AUTH_INFO_PUBKEY_PATH;
     } else if (strcmp(ptr, entity_info_privkey_path) == 0) {
@@ -159,6 +162,11 @@ config_t *load_config(const char *path) {
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
                     }
+                    break;
+                case AUTH_ID:
+                    SST_print_debug("Auth ID: %s\n", ptr);
+                    c->auth_id = malloc(strlen(ptr) + 1);
+                    strcpy(c->auth_id, ptr);
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
                     SST_print_debug("Pubkey path of Auth: %s\n", ptr);
