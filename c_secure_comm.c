@@ -540,10 +540,13 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
-            // unsigned int auth_Id;
+            unsigned int auth_Id;
             unsigned char auth_nonce[NONCE_SIZE];
-            // auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN); // Used in
+            auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN); // Used in
             // future.
+            if (auth_Id != (unsigned int)atoi(ctx->config->auth_id)) {
+                return SST_print_error_return_null("Auth ID NOT matched.");
+            }
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
 
