@@ -24,8 +24,9 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 0) {
-        SST_print_error_exit("No need to run this file");
+    if (argc != 1) {
+        SST_print_error_exit("Too many arguments. Usage: %s <config_path>\n",
+                             argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
