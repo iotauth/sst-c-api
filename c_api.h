@@ -54,6 +54,7 @@ typedef struct {
     int numkey;
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
+    char *auth_id;
     char *auth_pubkey_path;
     char *entity_privkey_path;
     char auth_ip_addr[INET_ADDRSTRLEN];

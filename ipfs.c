@@ -358,9 +358,10 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
             unsigned char auth_nonce[NONCE_SIZE];
-            // TODO(Dongha Kim)
-            // unsigned int auth_id = read_unsigned_int_BE(data_buf,
-            // AUTH_ID_LEN);
+            unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+            if (auth_id != (unsigned int)atoi(ctx->config->auth_id)) {
+                SST_print_error_exit("Auth ID NOT matched.");
+            }
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
             unsigned int serialized_length;
