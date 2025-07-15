@@ -360,7 +360,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             unsigned char auth_nonce[NONCE_SIZE];
             unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
             if (auth_id != (unsigned int)atoi(ctx->config->auth_id)) {
-                SST_print_error_exit("Auth ID NOT matched.");
+                SST_print_error_return_null("Auth ID NOT matched.");
             }
             memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
             RAND_bytes(entity_nonce, NONCE_SIZE);
