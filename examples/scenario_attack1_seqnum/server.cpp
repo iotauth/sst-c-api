@@ -71,8 +71,9 @@ int main(int argc, char *argv[]) {
     unsigned char *received_plaintext;
 
     // Because server receives messages, changing the sent sequence number has no effect
-    // session_ctx->received_seq_num--; // Attack the received sequence number
+    session_ctx->received_seq_num = -7; // Attack the received sequence number
     // session_ctx->sent_seq_num++; // Attack the sent sequence number
+    // Both attacks are properly handled by SST
 
     for (;;) {
         int ret =

@@ -38,7 +38,7 @@ int main(int argc, char *argv[]) {
 
     // Because client sends messages, changing the received sequence number has no effect
     // session_ctx->received_seq_num = 10; // Attack the received sequence number
-    // session_ctx->sent_seq_num = 10; // Attack the sent sequence number
+    session_ctx->sent_seq_num = -7; // Attack the sent sequence number
 
     while (std::getline(file, line)) {
         // Sleep for the specified time
