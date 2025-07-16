@@ -357,18 +357,10 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
-            unsigned char auth_nonce[NONCE_SIZE];
-            // TODO(Dongha Kim)
-            // unsigned int auth_id = read_unsigned_int_BE(data_buf,
-            // AUTH_ID_LEN);
-            memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-            RAND_bytes(entity_nonce, NONCE_SIZE);
-            unsigned int serialized_length;
-            unsigned char *serialized = serialize_message_for_auth(
-                entity_nonce, auth_nonce, 0, ctx->config->name, add_reader,
-                &serialized_length);
-            send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                      0);
+            if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
+                                  add_reader, 0)) {
+                SST_print_error_exit("AUTH_HELLO handling failed.\n");
+            }
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_entity_nonce_length =

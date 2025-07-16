@@ -67,6 +67,26 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
+int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
+                      unsigned char *entity_nonce, int sock, int num_key,
+                      char *purpose, int requestIndex) {
+    unsigned char auth_nonce[NONCE_SIZE];
+    unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+    if (auth_id != (unsigned int)ctx->config->auth_id) {
+        SST_print_error("Auth ID NOT matched.");
+        return -1;
+    }
+    memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
+    RAND_bytes(entity_nonce, NONCE_SIZE);
+    unsigned int serialized_length;
+    unsigned char *serialized = serialize_message_for_auth(
+        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
+        &serialized_length);
+    send_auth_request_message(serialized, serialized_length, ctx, sock,
+                              requestIndex);
+    return 0;
+}
+
 // Encrypt the message and sign the encrypted message.
 // @param buf input buffer
 // @param buf_len length of buf
@@ -237,6 +257,7 @@ void send_auth_request_message(unsigned char *serialized,
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, &ctx->dist_key, ctx->config->name,
             &enc_length);
+        free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
@@ -540,21 +561,11 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
-            // unsigned int auth_Id;
-            unsigned char auth_nonce[NONCE_SIZE];
-            // auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN); // Used in
-            // future.
-            memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-            RAND_bytes(entity_nonce, NONCE_SIZE);
-
-            unsigned int serialized_length;
-            unsigned char *serialized = serialize_message_for_auth(
-                entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name,
-                ctx->config->purpose[ctx->config->purpose_index],
-                &serialized_length);
-            send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                      1);
+            if (handle_AUTH_HELLO(
+                    data_buf, ctx, entity_nonce, sock, ctx->config->numkey,
+                    ctx->config->purpose[ctx->config->purpose_index], 1)) {
+                return NULL;
+            }
         } else if (state == AUTH_HELLO_RECEIVED &&
                    message_type == SESSION_KEY_RESP) {
             state = SESSION_KEY_RESP_RECEIVED;
