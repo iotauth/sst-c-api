@@ -44,6 +44,21 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
                                           char *purpose,
                                           unsigned int *ret_length);
 
+// Handles the AUTH_HELLO message.
+// Checks if the auth_id received from the Auth matches with the auth_id loaded
+// from the config. Then, creates the entity_nonce, and sends an auth request
+// message with the correct number of keys, purpose, and requestIndex.
+// @param data_buf input buffer with auth id, and auth nonce.
+// @param ctx SST context to communicate with Auth.
+// @param entity_nonce entity's nonce
+// @param sock socket number
+// @param num_key number of keys to receive from auth
+// @param purpose purpose to get session key
+// @param requestIndex request index for purpose
+void handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
+                       unsigned char *entity_nonce, int sock, int num_key,
+                       char *purpose, int requestIndex);
+
 // Encrypt the message and send the request message to Auth.
 // @param serialized total message
 // @param serialized_length length of message
