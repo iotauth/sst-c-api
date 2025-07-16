@@ -72,7 +72,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
                       char *purpose, int requestIndex) {
     unsigned char auth_nonce[NONCE_SIZE];
     unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
-    if (auth_id != (unsigned int)atoi(ctx->config->auth_id)) {
+    if (auth_id != (unsigned int)ctx->config->auth_id) {
         SST_print_error("Auth ID NOT matched.");
         return -1;
     }

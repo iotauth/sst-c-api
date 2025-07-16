@@ -165,8 +165,7 @@ config_t *load_config(const char *path) {
                     break;
                 case AUTH_ID:
                     SST_print_debug("Auth ID: %s\n", ptr);
-                    c->auth_id = malloc(strlen(ptr) + 1);
-                    strcpy(c->auth_id, ptr);
+                    c->auth_id = atoi((const char *)ptr);
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
                     SST_print_debug("Pubkey path of Auth: %s\n", ptr);
