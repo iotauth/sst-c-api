@@ -357,8 +357,10 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
-            handle_AUTH_HELLO(data_buf, ctx, &entity_nonce, sock, 0, add_reader,
-                              0);
+            if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
+                                  add_reader, 0)) {
+                SST_print_error_exit("AUTH_HELLO handling failed.\n");
+            }
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_entity_nonce_length =
