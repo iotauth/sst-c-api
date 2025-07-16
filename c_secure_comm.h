@@ -57,8 +57,8 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
 // @param requestIndex request index for purpose
 // @return 0 for success, -1 for fail
 int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
-                       unsigned char *entity_nonce, int sock, int num_key,
-                       char *purpose, int requestIndex);
+                      unsigned char *entity_nonce, int sock, int num_key,
+                      char *purpose, int requestIndex);
 
 // Encrypt the message and send the request message to Auth.
 // @param serialized total message
