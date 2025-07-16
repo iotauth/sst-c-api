@@ -506,7 +506,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         if (s_key_list == NULL) {
             return NULL;
         }
-        SST_print_debug("Received %d keys.n", ctx->config->numkey);
+        SST_print_debug("Received %d keys.\n", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
