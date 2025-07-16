@@ -10,3 +10,17 @@ Here are the lines that were added to manipulate the sequence numbers and attack
 `session_ctx->received_seq_num = -7;`
 
 - Sequence numbers changed and set to be equal to pass the comparison.
+
+## Case 1: Only client.cpp or server.cpp sequence number is changed
+
+__Result: Unsuccessful Attack__
+
+- server throws `"ERROR: Wrong sequence number expected."`
+- The sequence numbers are not the same
+
+## Case 2: client.cpp and server.cpp sequence numbers are both changed
+
+__Result: Successful Attack__
+
+- The programs terminate as normal
+- When the sequence numbers are compared, they are the same.
