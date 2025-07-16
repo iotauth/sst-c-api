@@ -777,18 +777,18 @@ void update_validity(session_key_t *session_key) {
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_ley_list) {
-    if (MAX_SESSION_KEY - s_ley_list->num_key < requested_num_key) {
+                                   session_key_list_t *s_key_list) {
+    if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
         int expired;
         int temp;
         for (int i = 0; i < requested_num_key; i++) {
-            temp = mod((i + s_ley_list->rear_idx - s_ley_list->num_key),
+            temp = mod((i + s_key_list->rear_idx - s_key_list->num_key),
                        MAX_SESSION_KEY);
-            expired = check_session_key_validity(&s_ley_list->s_key[temp]);
+            expired = check_session_key_validity(&s_key_list->s_key[temp]);
             if (expired) {
-                s_ley_list->num_key -= 1;
+                s_key_list->num_key -= 1;
             }
             ret = ret && expired;
         }
