@@ -247,7 +247,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -267,7 +267,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -445,7 +445,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                     sender_buf, &sender_buf_length);
 
     int bytes_written =
-        write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
+        sst_write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
     if ((unsigned int)bytes_written != sender_buf_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
@@ -549,7 +549,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
         if (received_buf_length < 0) {
             SST_print_error_exit(
