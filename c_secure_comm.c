@@ -247,7 +247,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -267,7 +267,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -445,7 +445,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                     sender_buf, &sender_buf_length);
 
     int bytes_written =
-        write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
+        sst_write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
     if ((unsigned int)bytes_written != sender_buf_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
@@ -506,7 +506,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         if (s_key_list == NULL) {
             return NULL;
         }
-        SST_print_debug("Received %d keys.n", ctx->config->numkey);
+        SST_print_debug("Received %d keys.\n", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -549,7 +549,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
         if (received_buf_length < 0) {
             SST_print_error_exit(
@@ -777,18 +777,18 @@ void update_validity(session_key_t *session_key) {
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_ley_list) {
-    if (MAX_SESSION_KEY - s_ley_list->num_key < requested_num_key) {
+                                   session_key_list_t *s_key_list) {
+    if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
         int expired;
         int temp;
         for (int i = 0; i < requested_num_key; i++) {
-            temp = mod((i + s_ley_list->rear_idx - s_ley_list->num_key),
+            temp = mod((i + s_key_list->rear_idx - s_key_list->num_key),
                        MAX_SESSION_KEY);
-            expired = check_session_key_validity(&s_ley_list->s_key[temp]);
+            expired = check_session_key_validity(&s_key_list->s_key[temp]);
             if (expired) {
-                s_ley_list->num_key -= 1;
+                s_key_list->num_key -= 1;
             }
             ret = ret && expired;
         }
