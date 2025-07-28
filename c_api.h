@@ -66,7 +66,7 @@ typedef struct {
     int file_system_manager_port_num;
 } config_t;
 
-// This struct is used in receive_thread()
+// This struct is used in receive_thread_read_one_each()
 typedef struct {
     int sock;
     session_key_t s_key;
@@ -152,12 +152,6 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 // @return session key struct
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
-
-// Creates a thread to receive messages.
-// Max buffer length is 1000 bytes currently.
-// Use function receive_message() below for longer read buffer.
-// @param arguments struct including session key and socket number
-void *receive_thread(void *SST_session_ctx);
 
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
 // @param socket socket connected with the server
