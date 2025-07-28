@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Receive the hash
-    unsigned char* received_hash_buf;
+    unsigned char received_hash_buf[MAX_SECURE_COMM_LENGTH];
 
     int message_len =
         read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
