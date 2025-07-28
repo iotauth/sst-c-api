@@ -167,15 +167,6 @@ int read_secure_message(int socket, unsigned char *plaintext,
 // @param arguments struct including session key and socket number
 void *receive_thread_read_one_each(void *SST_session_ctx);
 
-// Receive the message and print the message after decrypting with session key.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param SST_session_ctx_t session ctx struct
-// @return the total number of bytes read.
-unsigned int receive_message(unsigned char *received_buf,
-                             unsigned int received_buf_length,
-                             SST_session_ctx_t *session_ctx);
-
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
 // @param msg message to send
