@@ -226,6 +226,8 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
     unsigned char header[MAX_PAYLOAD_BUF_SIZE + 1];
     unsigned int header_length;
     make_buffer_header(payload_length, MESSAGE_TYPE, header, &header_length);
+        SST_print_debug("header_length: %d\n", header_length);
+
     concat_buffer_header_and_payload(header, header_length, payload,
                                      payload_length, sender, sender_length);
 }

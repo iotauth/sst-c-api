@@ -321,7 +321,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     }
 }
 
-int read_secure_message(int socket, unsigned char **plaintext,
+int read_secure_message(int socket, unsigned char *plaintext,
                         SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int bytes_read;
@@ -332,9 +332,13 @@ int read_secure_message(int socket, unsigned char **plaintext,
         SST_print_error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
-    // TODO(Dongha Kim): No logic exists for handling sequence numbers.
-    *plaintext = decrypt_received_message(received_buf, bytes_read,
+    unsigned char seq_num_and_plaintext[MAX_SECURE_COMM_LENGTH];
+    decrypt_received_message(received_buf, bytes_read, seq_num_and_plaintext,
                              &decrypted_length, session_ctx);
+    // Copy the payload to the buffer declared by user.
+    memcpy(plaintext, seq_num_and_plaintext + SEQ_NUM_SIZE,
+           decrypted_length - SEQ_NUM_SIZE);
+
     return decrypted_length;
 }
 

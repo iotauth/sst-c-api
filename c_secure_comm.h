@@ -141,14 +141,17 @@ void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx);
 
 // Returns the pointer of the decrypted buffer.
-// @param data input data buffer
-// @param data_length length of data buffer
+// @param encrypted_data input data buffer
+// @param encrypted_data_length length of data buffer
+// @param decrypted_data decrypted buffer including sequence number and payload
+// @param decrypted_buf_length length of decrypted buffer
 // @param SST_session_ctx_t session ctx struct
 
-unsigned char *decrypt_received_message(unsigned char *data,
-                                        unsigned int data_length,
-                                        unsigned int *decrypted_buf_length,
-                                        SST_session_ctx_t *session_ctx);
+void decrypt_received_message(unsigned char *encrypted_data,
+                               unsigned int encrypted_data_length,
+                               unsigned char *decrypted_data,
+                               unsigned int *decrypted_buf_length,
+                               SST_session_ctx_t *session_ctx);
 
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity

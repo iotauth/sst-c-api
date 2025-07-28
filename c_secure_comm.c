@@ -436,9 +436,9 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     session_ctx->sent_seq_num++;
     unsigned char
         sender_buf[MAX_SECURE_COMM_LENGTH];  // Currently the send message
-                                         // does not support dynamic sizes,
-                                         // the max length is
-                                         // 1024.
+                                             // does not support dynamic sizes,
+                                             // the max length is
+                                             // 1024.
     unsigned int sender_buf_length;
     make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
                     sender_buf, &sender_buf_length);
@@ -454,26 +454,28 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 void print_received_message(unsigned char *data, unsigned int data_length,
                             SST_session_ctx_t *session_ctx) {
     unsigned int decrypted_length;
-    unsigned char *decrypted = decrypt_received_message(
-        data, data_length, &decrypted_length, session_ctx);
+    unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
+    decrypt_received_message(data, data_length, decrypted, &decrypted_length,
+                             session_ctx);
     printf("%s\n", decrypted + SEQ_NUM_SIZE);
-    free(decrypted);
 }
 
-unsigned char *decrypt_received_message(unsigned char *data,
-                                        unsigned int data_length,
-                                        unsigned int *decrypted_buf_length,
-                                        SST_session_ctx_t *session_ctx) {
-    unsigned char *decrypted = NULL;
-    if (symmetric_decrypt_authenticate(
-            data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
-            session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode,
-            &decrypted, decrypted_buf_length)) {
-        SST_print_error_exit("Error during decrypting received message.\n");
+void decrypt_received_message(unsigned char *encrypted_data,
+                               unsigned int encrypted_data_length,
+                               unsigned char *decrypted_data,
+                               unsigned int *decrypted_buf_length,
+                               SST_session_ctx_t *session_ctx) {
+    if (symmetric_decrypt_authenticate_without_malloc(
+            encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
+            MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
+            AES_128_CBC_IV_SIZE, session_ctx->s_key.enc_mode,
+            session_ctx->s_key.hmac_mode, decrypted_data,
+            decrypted_buf_length)) {
+        SST_print_error_exit(
+            "Error during decrypting buffer with session key.\n");
     }
     unsigned int received_seq_num =
-        read_unsigned_int_BE(decrypted, SEQ_NUM_SIZE);
+        read_unsigned_int_BE(decrypted_data, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
         SST_print_error_exit("Wrong sequence number expected.");
     }
@@ -482,8 +484,6 @@ unsigned char *decrypt_received_message(unsigned char *data,
     }
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.\n", received_seq_num);
-    // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
-    return decrypted;
 }
 
 int check_session_key_validity(session_key_t *session_key) {
