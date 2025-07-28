@@ -13,13 +13,3 @@ add_executable(downloader downloader.cpp)
 foreach(prog uploader downloader)
     target_link_libraries(${prog} sst-c-api Threads::Threads)
 endforeach()
-
-
-# target_include_directories(uploader PRIVATE ../../../.. /opt/homebrew/opt/openssl/include)
-# target_include_directories(downloader PRIVATE ../../../.. /opt/homebrew/opt/openssl/include)
-
-# target_link_directories(uploader PRIVATE /opt/homebrew/opt/openssl/lib ../../../build)
-# target_link_directories(downloader PRIVATE /opt/homebrew/opt/openssl/lib ../../../build)
-
-# target_link_libraries(uploader PRIVATE crypto sst-c-api)
-# target_link_libraries(downloader PRIVATE crypto sst-c-api)
