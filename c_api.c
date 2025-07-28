@@ -312,7 +312,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     unsigned int data_buf_length = 0;
     while (1) {
         data_buf_length = read_secure_message(data_buf, session_ctx);
-        printf("%s\n", data_buf);
+        printf("Received: %.*s\n", data_buf_length, data_buf);
     }
 }
 
