@@ -36,6 +36,7 @@
 #define HS_INDICATOR_SIZE 1 + HS_NONCE_SIZE * 2
 #define SEQ_NUM_SIZE 8
 #define MAX_PAYLOAD_LENGTH 1024
+#define MAX_SECURE_COMM_LENGTH 1091 // Total length of message including header and encryption.
 #define MAX_HS_BUF_LENGTH 256
 #define MAX_ERROR_MESSAGE_LENGTH 128
 

@@ -308,7 +308,7 @@ SST_session_ctx_t *server_secure_comm_setup(
 
 void *receive_thread(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char received_buf[MAX_SECURE_COMM_LENGTH];
     int received_buf_length;
     while (1) {
         received_buf_length = sst_read_from_socket(
@@ -322,13 +322,13 @@ void *receive_thread(void *SST_session_ctx) {
 
 void *receive_thread_read_one_each(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
-    unsigned char data_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char data_buf[MAX_SECURE_COMM_LENGTH];
     unsigned int data_buf_length = 0;
     while (1) {
         unsigned char message_type;
 
         data_buf_length = read_header_return_data_buf_pointer(
-            session_ctx->sock, &message_type, data_buf, MAX_PAYLOAD_LENGTH);
+            session_ctx->sock, &message_type, data_buf, MAX_SECURE_COMM_LENGTH);
         if (!check_SECURE_COMM_MSG_type(message_type)) {
             print_received_message(data_buf, data_buf_length, session_ctx);
         }
@@ -352,9 +352,9 @@ int read_secure_message(int socket, unsigned char **plaintext,
                         SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int bytes_read;
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char received_buf[MAX_SECURE_COMM_LENGTH];
     bytes_read = read_header_return_data_buf_pointer(
-        socket, &message_type, received_buf, MAX_PAYLOAD_LENGTH);
+        socket, &message_type, received_buf, MAX_SECURE_COMM_LENGTH);
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }
