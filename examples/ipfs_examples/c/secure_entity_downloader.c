@@ -32,7 +32,7 @@ int main(int argc, char *argv[]) {
     unsigned char message_type;
     unsigned char session_key_id[8];
     int command_size;
-    data_buf_length = read_secure_message(&decrypted, session_ctx);
+    data_buf_length = read_secure_message(decrypted, session_ctx);
     if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
         fputs("Not download response!!", stderr);
         fputc('\n', stderr);
@@ -44,7 +44,6 @@ int main(int argc, char *argv[]) {
 
     download_file(&decrypted[SEQ_NUM_SIZE], &received_skey_id[0],
                   &file_name[0]);
-    free(decrypted);
     session_key_t *session_key =
         get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
     if (session_key == NULL) {
