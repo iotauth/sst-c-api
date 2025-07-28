@@ -142,12 +142,7 @@ int main(int argc, char* argv[]) {
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
 
     // Step 3: Compare the Hash Values
-
-    unsigned char* received_hash =
-        received_hash_buf +
-        8;  // Remove the two 4-byte sequence numbers in the received buffer
-
-    if (std::memcmp(hash_of_file, received_hash, 32) == 0) {
+    if (std::memcmp(hash_of_file, received_hash_buf, 32) == 0) {
         std::cout << "Hash values match!" << std::endl;
     } else {
         free(hash_of_file);
