@@ -1,8 +1,6 @@
 extern "C" {
-#include <c/c_api.h>
-#include <c/c_common.h>
-#include <c/c_crypto.h>
-#include <c/ipfs.h>
+#include "../../../c_crypto.h"
+#include "../../../ipfs.h"
 }
 
 #include <unistd.h>
@@ -110,7 +108,7 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char received_hash_buf[MAX_SECURE_COMM_LENGTH];
 
-    int message_len = read_secure_message(&received_hash_buf, session_ctx);
+    int message_len = read_secure_message(received_hash_buf, session_ctx);
 
     // Step 2: Compute Hash of the File
 
@@ -153,12 +151,10 @@ int main(int argc, char* argv[]) {
         std::cout << "Hash values match!" << std::endl;
     } else {
         free(hash_of_file);
-        free(received_hash_buf);
         std::cerr << "Hash values do not match!" << std::endl;
         return EXIT_FAILURE;
     }
 
-    free(received_hash_buf);
     free(hash_of_file);
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list_0);
