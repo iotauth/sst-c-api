@@ -65,12 +65,11 @@ pthread_t thread;
 pthread_create(&thread, NULL, &receive_thread_read_one_each, (void \*)session_ctx);
 ```
 
-**int read_secure_message(int socket, unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
+**int read_secure_message(unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
 
-- `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received message.
-- Input is the connected socket, pointer of the buffer, and the given buffer's length (not the received message)
-- This function does not decrypt the message, returns the message as **not decrypted.**
-- Returns the length of the not decrypted message.
+- `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received decrypted message.
+- Input is the pointer of the user declared buffer, and the given buffer's length (not the received message).
+- Returns the length of the decrypted message.
 
 **int send_secure_message()**
 

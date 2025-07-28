@@ -155,11 +155,10 @@ SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
-// @param socket socket connected with the server
 // @param plaintext The decrypted plaintext
 // @param session_ctx session ctx struct
 // @return the total number of bytes read from the socket, or -1 on failure.
-int read_secure_message(int socket, unsigned char *plaintext,
+int read_secure_message(unsigned char *plaintext,
                         SST_session_ctx_t *session_ctx);
 
 // Creates a thread to receive messages, by reading one bytes each at the SST

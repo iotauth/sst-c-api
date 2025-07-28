@@ -321,13 +321,13 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     }
 }
 
-int read_secure_message(int socket, unsigned char *plaintext,
+int read_secure_message(unsigned char *plaintext,
                         SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int bytes_read;
     unsigned char received_buf[MAX_SECURE_COMM_LENGTH];
     bytes_read = read_header_return_data_buf_pointer(
-        socket, &message_type, received_buf, MAX_SECURE_COMM_LENGTH);
+        session_ctx->sock, &message_type, received_buf, MAX_SECURE_COMM_LENGTH);
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }
@@ -335,11 +335,11 @@ int read_secure_message(int socket, unsigned char *plaintext,
     unsigned char seq_num_and_plaintext[MAX_SECURE_COMM_LENGTH];
     decrypt_received_message(received_buf, bytes_read, seq_num_and_plaintext,
                              &decrypted_length, session_ctx);
-    // Copy the payload to the buffer declared by user.
+    // Copy the plaintext payload to the buffer declared by user.
     memcpy(plaintext, seq_num_and_plaintext + SEQ_NUM_SIZE,
            decrypted_length - SEQ_NUM_SIZE);
-
-    return decrypted_length;
+    // Return plaintext length.
+    return decrypted_length - SEQ_NUM_SIZE;
 }
 
 int send_secure_message(char *msg, unsigned int msg_length,

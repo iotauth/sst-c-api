@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
     unsigned char received_hash_buf[MAX_SECURE_COMM_LENGTH];
 
     int message_len =
-        read_secure_message(session_ctx->sock, &received_hash_buf, session_ctx);
+        read_secure_message(&received_hash_buf, session_ctx);
 
     // Step 2: Compute Hash of the File
 

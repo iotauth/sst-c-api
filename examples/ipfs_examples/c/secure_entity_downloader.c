@@ -33,7 +33,7 @@ int main(int argc, char *argv[]) {
     unsigned char session_key_id[8];
     int command_size;
     data_buf_length =
-        read_secure_message(session_ctx->sock, &decrypted, session_ctx);
+        read_secure_message(&decrypted, session_ctx);
     if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
         fputs("Not download response!!", stderr);
         fputc('\n', stderr);
