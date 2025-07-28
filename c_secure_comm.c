@@ -451,15 +451,6 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     return bytes_written;
 }
 
-void print_received_message(unsigned char *data, unsigned int data_length,
-                            SST_session_ctx_t *session_ctx) {
-    unsigned int decrypted_length;
-    unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
-    decrypt_received_message(data, data_length, decrypted, &decrypted_length,
-                             session_ctx);
-    printf("%s\n", decrypted + SEQ_NUM_SIZE);
-}
-
 void decrypt_received_message(unsigned char *encrypted_data,
                               unsigned int encrypted_data_length,
                               unsigned char *decrypted_data,

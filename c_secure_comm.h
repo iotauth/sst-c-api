@@ -131,15 +131,6 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                              SST_session_ctx_t *session_ctx);
 
-// Decrypts message, reads seq_num, checks validity, and prints message
-// Print the received message and sequence number after check validity of
-// session key.
-// @param data input data buffer
-// @param data_length length of data buffer
-// @param SST_session_ctx_t session ctx struct
-void print_received_message(unsigned char *data, unsigned int data_length,
-                            SST_session_ctx_t *session_ctx);
-
 // Returns the pointer of the decrypted buffer.
 // @param encrypted_data input data buffer
 // @param encrypted_data_length length of data buffer

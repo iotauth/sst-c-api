@@ -311,13 +311,8 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
     unsigned char data_buf[MAX_SECURE_COMM_LENGTH];
     unsigned int data_buf_length = 0;
     while (1) {
-        unsigned char message_type;
-
-        data_buf_length = read_header_return_data_buf_pointer(
-            session_ctx->sock, &message_type, data_buf, MAX_SECURE_COMM_LENGTH);
-        if (!check_SECURE_COMM_MSG_type(message_type)) {
-            print_received_message(data_buf, data_buf_length, session_ctx);
-        }
+        data_buf_length = read_secure_message(data_buf, session_ctx);
+        printf("%s\n", data_buf);
     }
 }
 
