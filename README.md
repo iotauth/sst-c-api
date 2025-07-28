@@ -76,12 +76,6 @@ pthread_create(&thread, NULL, &receive_thread_read_one_each, (void \*)session_ct
 - This function does not decrypt the message, returns the message as **not decrypted.**
 - Returns the length of the not decrypted message.
 
-
-**unsigned char * return_decrypted_buf()**
-
--   The user can 
-- Returns the decrypted buffer, and must free() after use.
-
 **int send_secure_message()**
 
 -   `send_secure_message()` is a function that sends a message with secure communication to the server by encrypting it with the session key.

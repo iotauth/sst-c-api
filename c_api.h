@@ -176,19 +176,6 @@ unsigned int receive_message(unsigned char *received_buf,
                              unsigned int received_buf_length,
                              SST_session_ctx_t *session_ctx);
 
-// Return the buffer pointer of the decrypted buffer.
-// If the user gives the read buffer as input, it will return the decrypted
-// buffer. If an error occurs, returns NULL.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param decrypted_buf_length length of the decrypted buf
-// @param SST_session_ctx_t session ctx struct
-// @param The unsigned char pointer of the returned decrypted buffer.
-unsigned char *return_decrypted_buf(unsigned char *received_buf,
-                                    unsigned int received_buf_length,
-                                    unsigned int *decrypted_buf_length,
-                                    SST_session_ctx_t *session_ctx);
-
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
 // @param msg message to send
