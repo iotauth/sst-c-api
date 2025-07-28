@@ -461,10 +461,10 @@ void print_received_message(unsigned char *data, unsigned int data_length,
 }
 
 void decrypt_received_message(unsigned char *encrypted_data,
-                               unsigned int encrypted_data_length,
-                               unsigned char *decrypted_data,
-                               unsigned int *decrypted_buf_length,
-                               SST_session_ctx_t *session_ctx) {
+                              unsigned int encrypted_data_length,
+                              unsigned char *decrypted_data,
+                              unsigned int *decrypted_buf_length,
+                              SST_session_ctx_t *session_ctx) {
     if (symmetric_decrypt_authenticate_without_malloc(
             encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
             MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,

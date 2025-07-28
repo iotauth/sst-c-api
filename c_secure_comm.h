@@ -148,10 +148,10 @@ void print_received_message(unsigned char *data, unsigned int data_length,
 // @param SST_session_ctx_t session ctx struct
 
 void decrypt_received_message(unsigned char *encrypted_data,
-                               unsigned int encrypted_data_length,
-                               unsigned char *decrypted_data,
-                               unsigned int *decrypted_buf_length,
-                               SST_session_ctx_t *session_ctx);
+                              unsigned int encrypted_data_length,
+                              unsigned char *decrypted_data,
+                              unsigned int *decrypted_buf_length,
+                              SST_session_ctx_t *session_ctx);
 
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity

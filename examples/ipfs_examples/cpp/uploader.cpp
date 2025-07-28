@@ -110,8 +110,7 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char received_hash_buf[MAX_SECURE_COMM_LENGTH];
 
-    int message_len =
-        read_secure_message(&received_hash_buf, session_ctx);
+    int message_len = read_secure_message(&received_hash_buf, session_ctx);
 
     // Step 2: Compute Hash of the File
 
