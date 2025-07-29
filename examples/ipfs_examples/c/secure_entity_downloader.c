@@ -2,6 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "../../../c_common.h"
 #include "../../../ipfs.h"
 
 #define MAX_PAYLOAD_LENGTH 1024
@@ -9,9 +10,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fputs("Enter config path", stderr);
-        fputc('\n', stderr);
-        exit(1);
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
@@ -28,7 +27,7 @@ int main(int argc, char *argv[]) {
     strncpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
-    if(read_secure_message(decrypted, session_ctx)){
+    if (read_secure_message(decrypted, session_ctx)) {
         printf("Failed to read secure message.");
     }
     if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
