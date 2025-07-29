@@ -52,7 +52,7 @@ jobs:
         repository: iotauth/iotauth
         submodules: true
         ref: ${{ inputs.compiler-ref }}
-    - name: Check out specific ref of reactor-c
+    - name: Check out specific ref of sst-c-api
       uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
@@ -69,10 +69,13 @@ jobs:
         cache: maven
     - name: Build with Maven
       run: mvn -B package --file auth/pom.xml
-    - name: Make the script files executable
-      working-directory: ./examples
-      run: chmod +x ./generateAll.sh
     - name: Run the scripts
       working-directory: ./examples
       run: |
+        chmod +x ./cleanAll.sh ./generateAll.sh
+        ./cleanAll.sh
         ./generateAll.sh -p asdf
+    - name: Run the auth in background.
+      working-directory: ./auth/auth-server
+      run: |
+        java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
