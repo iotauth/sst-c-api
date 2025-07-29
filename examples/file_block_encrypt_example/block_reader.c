@@ -1,6 +1,9 @@
 #include "block_common.h"
 
 int main(int argc, char *argv[]) {
+    if (argc != 2) {
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 

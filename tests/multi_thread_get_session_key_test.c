@@ -28,8 +28,9 @@ void *send_request(void *SST_ctx) {
 }
 
 int main(int argc, char *argv[]) {
-    // Just to pass compiler warnings.
-    (void)argc;
+    if (argc != 2) {
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
