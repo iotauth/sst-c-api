@@ -4,6 +4,7 @@
 #include <unistd.h>
 
 #include "../../../ipfs.h"
+#include "../../../c_common.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

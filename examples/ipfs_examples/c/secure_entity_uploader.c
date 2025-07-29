@@ -3,6 +3,7 @@
 #include <unistd.h>
 
 #include "../../../ipfs.h"
+#include "../../../c_common.h"
 
 #define MAX_PAYLOAD_LENGTH 1024
 
