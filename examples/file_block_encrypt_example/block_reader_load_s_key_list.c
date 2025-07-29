@@ -1,3 +1,4 @@
+#include "../../c_common.h"
 #include "block_common.h"
 
 int main() {
