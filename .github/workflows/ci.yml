@@ -79,10 +79,31 @@ jobs:
       working-directory: auth/auth-server
       run: |
         nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
-    - name: Run the examples.
-      working-directory: entity/c/examples
+
+    - name: Run the file_block_encrypt_example examples.
+      working-directory: entity/c/examples/file_block_encrypt_example
       run: |
-        cd file_block_encrypt_example
         mkdir build && cd build && cmake ../ && make
         ./block_writer ../block_writer.config
         ./block_reader ../block_reader.config
+        ./block_reader_load_s_key_list
+
+    - name: Run the server_client_example examples.
+      working-directory: entity/c/examples/server_client_example
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        ./entity_server ../c_server.config &
+        ./entity_client ../c_client.config
+        ./threaded_get_target_id_client ../c_client.config
+        ./threaded_get_target_id_server ../c_server.config
+
+    - name: Run the tests examples.
+      working-directory: entity/c/examples/tests
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        ./save_load_session_key_list_with_password_test ../test_configs/client.config &
+        ./encrypt_buf_with_session_key_without_malloc_execution_time_test ../test_configs/client.config
+        ./multi_thread_get_session_key_test ../test_configs/client.config
+        ./threaded_get_target_id_server ../test_configs/client.config
+
+

@@ -1,11 +1,6 @@
 #include "block_common.h"
 
-int main(int argc, char *argv[]) {
-    if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
-    }
-    char *config_path = argv[1];
-
+int main() {
     // Open file_metadata structs.
     char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
     char *plaintext_metadata_filename = "plaintext_file_metadata.dat";
