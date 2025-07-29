@@ -99,7 +99,7 @@ jobs:
         ./threaded_get_target_id_server ../c_server.config
 
     - name: Run the tests examples.
-      working-directory: entity/c/examples/tests
+      working-directory: entity/c/tests
       run: |
         mkdir build && cd build && cmake ../ && make
         ./save_load_session_key_list_with_password_test ../test_configs/client.config &
