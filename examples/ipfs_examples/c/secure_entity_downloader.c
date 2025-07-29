@@ -25,7 +25,7 @@ int main(int argc, char *argv[]) {
     int concat_buffer_size = make_download_req_buffer(ctx, concat_buffer);
     send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
     char file_name[BUFF_SIZE];
-    memcpy(file_name, "0", BUFF_SIZE);
+    strncpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
     if(read_secure_message(decrypted, session_ctx)){
