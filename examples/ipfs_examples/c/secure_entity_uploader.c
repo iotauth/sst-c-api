@@ -2,8 +2,8 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../../../ipfs.h"
 #include "../../../c_common.h"
+#include "../../../ipfs.h"
 
 #define MAX_PAYLOAD_LENGTH 1024
 
