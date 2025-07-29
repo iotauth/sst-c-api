@@ -102,7 +102,7 @@ jobs:
       working-directory: entity/c/tests
       run: |
         mkdir build && cd build && cmake ../ && make
-        ./save_load_session_key_list_with_password_test ../test_configs/client.config &
+        ./save_load_session_key_list_with_password_test ../test_configs/client.config
         ./encrypt_buf_with_session_key_without_malloc_execution_time_test ../test_configs/client.config
         ./multi_thread_get_session_key_test ../test_configs/client.config
         ./threaded_get_target_id_server ../test_configs/client.config
