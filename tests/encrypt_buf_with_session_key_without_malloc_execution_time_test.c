@@ -22,8 +22,8 @@
 #include <time.h>
 
 #include "../c_api.h"
-#define FILE_ITERATION 10
-#define BLOCK_ITERATION 16384
+#define FILE_ITERATION 100
+#define BLOCK_ITERATION 40 // 16384 
 #define BLOCK_SIZE 4096
 
 long get_time_diff_ns(struct timespec start, struct timespec end) {
