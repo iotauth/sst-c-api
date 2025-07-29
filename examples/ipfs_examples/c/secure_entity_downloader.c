@@ -28,11 +28,9 @@ int main(int argc, char *argv[]) {
     memcpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
-    unsigned int data_buf_length = 0;
-    unsigned char message_type;
-    unsigned char session_key_id[8];
-    int command_size;
-    data_buf_length = read_secure_message(decrypted, session_ctx);
+    if(read_secure_message(decrypted, session_ctx)){
+        printf("Failed to read secure message.");
+    }
     if (decrypted[SEQ_NUM_SIZE] != DOWNLOAD_RESP) {
         fputs("Not download response!!", stderr);
         fputc('\n', stderr);

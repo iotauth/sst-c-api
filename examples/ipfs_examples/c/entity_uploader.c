@@ -30,7 +30,6 @@ int main(int argc, char* argv[]) {
     ctx->config->purpose_index = 1;
     estimate_time_t estimate_time[5];
     struct timeval keygen_start, keygen_end;
-    float time_interval;
     gettimeofday(&keygen_start, NULL);
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
