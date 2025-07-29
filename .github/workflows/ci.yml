@@ -78,4 +78,4 @@ jobs:
     - name: Run the auth in background.
       working-directory: ./auth/auth-server
       run: |
-        java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+        java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
