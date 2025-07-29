@@ -70,12 +70,19 @@ jobs:
     - name: Build with Maven
       run: mvn -B package --file auth/pom.xml
     - name: Run the scripts
-      working-directory: ./examples
+      working-directory: examples
       run: |
         chmod +x ./cleanAll.sh ./generateAll.sh
         ./cleanAll.sh
         ./generateAll.sh -p asdf
     - name: Run the auth in background.
-      working-directory: ./auth/auth-server
+      working-directory: auth/auth-server
       run: |
-        java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
+        nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
+    - name: Run the examples.
+      working-directory: entity/c/examples
+      run: |
+        cd file_block_encrypt_example
+        mkdir build && cd build && cmake ../ && make
+        ./block_writer ../block_writer.config
+        ./block_reader ../block_reader.config
