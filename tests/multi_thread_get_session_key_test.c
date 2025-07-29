@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_threads; i++) {
         pthread_create(&thread[i], NULL, &send_request, (void *)ctx);
     }
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < num_threads; i++) {
         pthread_join(thread[i], NULL);
     }
     free_session_key_list_t(s_key_list);
