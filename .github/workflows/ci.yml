@@ -121,6 +121,7 @@ jobs:
         tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
         cd kubo
         sudo bash install.sh
+        ipfs init
         ipfs daemon
 
     - name: Run the credential generation scripts for IPFS examples.
