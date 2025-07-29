@@ -122,7 +122,7 @@ jobs:
         cd kubo
         sudo bash install.sh
         ipfs init
-        ipfs daemon
+        nohup ipfs daemon &
 
     - name: Run the credential generation scripts for IPFS examples.
       working-directory: examples
@@ -154,3 +154,12 @@ jobs:
         mkdir build && cd build && cmake ../ && make
         ./uploader ../../uploader.config ../../plain_text ../../addReader.txt
         ./downloader ../../downloader.config
+
+    - name: Stop python file system manager.
+      working-directory: auth/auth-server
+      run: |
+        if [ -f python.pid ]; then
+          kill $(cat python.pid) || echo "File system manager already stopped."
+        else
+          echo "No python.pid file found"
+        fi    
