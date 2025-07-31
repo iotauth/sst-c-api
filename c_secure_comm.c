@@ -435,10 +435,10 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 
     session_ctx->sent_seq_num++;
     unsigned char
-        sender_buf[MAX_SECURE_COMM_LENGTH];  // Currently the send message
-                                             // does not support dynamic sizes,
-                                             // the max length is
-                                             // 1024.
+        sender_buf[MAX_SECURE_COMM_MSG_LENGTH];  // Currently the send message
+                                                 // does not support dynamic
+                                                 // sizes, the max length is
+                                                 // 1024.
     unsigned int sender_buf_length;
     make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
                     sender_buf, &sender_buf_length);

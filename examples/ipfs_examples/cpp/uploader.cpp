@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Receive the hash
-    unsigned char received_hash_buf[MAX_SECURE_COMM_LENGTH];
+    unsigned char received_hash_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
     int message_len = read_secure_message(received_hash_buf, session_ctx);
 
