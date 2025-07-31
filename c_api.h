@@ -13,8 +13,11 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
-#define MAX_SECURE_COMM_MSG_LENGTH \
-    1091  // Total length of message including header and encryption.
+
+#define AES_IV_SIZE 16
+#define SEQ_NUM_SIZE 8
+#define MAX_PAYLOAD_LENGTH 1024
+#define MAX_SECURE_COMM_MSG_LENGTH 1 + 2 + AES_IV_SIZE + (((SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH)/AES_IV_SIZE) + 1)*AES_IV_SIZE + MAC_KEY_SIZE
 
 typedef enum {
     AES_128_CBC,
