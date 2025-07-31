@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     char file_name[BUFF_SIZE];
     memcpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
-    unsigned char decrypted[MAX_SECURE_COMM_LENGTH];
+    unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
     unsigned int data_buf_length = 0;
     unsigned char message_type;
     unsigned char session_key_id[8];

@@ -13,7 +13,7 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
-#define MAX_SECURE_COMM_LENGTH \
+#define MAX_SECURE_COMM_MSG_LENGTH \
     1091  // Total length of message including header and encryption.
 
 typedef enum {
