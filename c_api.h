@@ -17,7 +17,11 @@
 #define AES_IV_SIZE 16
 #define SEQ_NUM_SIZE 8
 #define MAX_PAYLOAD_LENGTH 1024
-#define MAX_SECURE_COMM_MSG_LENGTH 1 + 2 + AES_IV_SIZE + (((SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH)/AES_IV_SIZE) + 1)*AES_IV_SIZE + MAC_KEY_SIZE
+#define MAX_SECURE_COMM_MSG_LENGTH                                  \
+    1 + 2 + AES_IV_SIZE +                                           \
+        (((SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH) / AES_IV_SIZE) + 1) * \
+            AES_IV_SIZE +                                           \
+        MAC_KEY_SIZE
 
 typedef enum {
     AES_128_CBC,
