@@ -14,6 +14,15 @@
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
 
+#define AES_IV_SIZE 16
+#define SEQ_NUM_SIZE 8
+#define MAX_PAYLOAD_LENGTH 1024
+#define ROUND_UP_TO_Y(X, Y) ((((X) / Y) + 1) * Y)
+#define MAX_SECURE_COMM_MSG_LENGTH                                      \
+    1 + 2 + AES_IV_SIZE +                                               \
+        ROUND_UP_TO_Y(SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH, AES_IV_SIZE) + \
+        MAC_KEY_SIZE  // Should be 1091
+
 typedef enum {
     AES_128_CBC,
     AES_128_CTR,
@@ -66,7 +75,7 @@ typedef struct {
     int file_system_manager_port_num;
 } config_t;
 
-// This struct is used in receive_thread()
+// This struct is used in receive_thread_read_one_each()
 typedef struct {
     int sock;
     session_key_t s_key;
@@ -153,46 +162,17 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 SST_session_ctx_t *server_secure_comm_setup(
     SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
 
-// Creates a thread to receive messages.
-// Max buffer length is 1000 bytes currently.
-// Use function receive_message() below for longer read buffer.
-// @param arguments struct including session key and socket number
-void *receive_thread(void *SST_session_ctx);
-
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
-// @param socket socket connected with the server
 // @param plaintext The decrypted plaintext
 // @param session_ctx session ctx struct
 // @return the total number of bytes read from the socket, or -1 on failure.
-int read_secure_message(int socket, unsigned char **plaintext,
+int read_secure_message(unsigned char *plaintext,
                         SST_session_ctx_t *session_ctx);
 
 // Creates a thread to receive messages, by reading one bytes each at the SST
 // header. Max buffer length is 1000 bytes currently.
 // @param arguments struct including session key and socket number
 void *receive_thread_read_one_each(void *SST_session_ctx);
-
-// Receive the message and print the message after decrypting with session key.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param SST_session_ctx_t session ctx struct
-// @return the total number of bytes read.
-unsigned int receive_message(unsigned char *received_buf,
-                             unsigned int received_buf_length,
-                             SST_session_ctx_t *session_ctx);
-
-// Return the buffer pointer of the decrypted buffer.
-// If the user gives the read buffer as input, it will return the decrypted
-// buffer. If an error occurs, returns NULL.
-// @param received_buf received message buffer
-// @param received_buf_length length of received_buf
-// @param decrypted_buf_length length of the decrypted buf
-// @param SST_session_ctx_t session ctx struct
-// @param The unsigned char pointer of the returned decrypted buffer.
-unsigned char *return_decrypted_buf(unsigned char *received_buf,
-                                    unsigned int received_buf_length,
-                                    unsigned int *decrypted_buf_length,
-                                    SST_session_ctx_t *session_ctx);
 
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
