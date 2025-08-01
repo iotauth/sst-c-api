@@ -22,7 +22,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 ### Run IPFS
 
-1. [Install IPFS](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions).
+1. [Install IPFS](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions). Also run `ipfs init` on the first time starting ipfs.
 
 2. Run `ipfs daemon`.
 
@@ -42,7 +42,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 ## Run the Example Entities
 
-1. Go to `$ROOT/entity/c/examples/ipfs_examples/` and create a `plain_text.txt` file.
+1. Go to `$ROOT/entity/c/examples/ipfs_examples/` and create a `plain_text` file.
     - Enter any text into the file and save.
 
 2. Run `cd cpp`.
@@ -55,7 +55,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 5. Run `make`.
 
-6. Run `./uploader ../../uploader.config ../../plain_text.txt ../../addReader.txt`.
+6. Run `./uploader ../../uploader.config ../../plain_text ../../addReader.txt`.
 
 7. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader ../../downloader.config`.
 

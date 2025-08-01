@@ -4,9 +4,8 @@
 #include <iostream>
 
 extern "C" {
-#include <c/c_common.h>
-#include <c/c_crypto.h>
-#include <c/ipfs.h>
+#include "../../../c_crypto.h"
+#include "../../../ipfs.h"
 }
 
 // Checks if the file exists by attempting to open it in read mode.

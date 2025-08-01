@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "../c_api.h"
+#include "../c_common.h"
 
 void *send_request(void *SST_ctx) {
     SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
@@ -28,8 +29,9 @@ void *send_request(void *SST_ctx) {
 }
 
 int main(int argc, char *argv[]) {
-    // Just to pass compiler warnings.
-    (void)argc;
+    if (argc != 2) {
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+    }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
 
@@ -41,7 +43,7 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < num_threads; i++) {
         pthread_create(&thread[i], NULL, &send_request, (void *)ctx);
     }
-    for (int i = 0; i < 100; i++) {
+    for (int i = 0; i < num_threads; i++) {
         pthread_join(thread[i], NULL);
     }
     free_session_key_list_t(s_key_list);

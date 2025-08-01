@@ -24,7 +24,7 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 }
 
 int main(int argc, char *argv[]) {
-    if (argc != 1) {
+    if (argc != 2) {
         SST_print_error_exit("Too many arguments. Usage: %s <config_path>\n",
                              argv[0]);
     }

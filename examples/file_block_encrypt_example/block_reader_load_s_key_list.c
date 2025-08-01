@@ -1,8 +1,7 @@
+#include "../../c_common.h"
 #include "block_common.h"
 
-int main(int argc, char *argv[]) {
-    char *config_path = argv[1];
-
+int main() {
     // Open file_metadata structs.
     char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
     char *plaintext_metadata_filename = "plaintext_file_metadata.dat";

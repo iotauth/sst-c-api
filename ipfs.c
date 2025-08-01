@@ -288,7 +288,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     if (bytes_written != (2 + name_size)) {
         SST_print_error_exit("Failed to write data to socket.");
     }
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
