@@ -4,9 +4,9 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#define SST_KEY_SIZE   16
-#define SST_NONCE_SIZE 12
-#define SST_TAG_SIZE   16   
+#define SST_KEY_SIZE    16
+#define SST_NONCE_SIZE  12
+#define SST_TAG_SIZE    16
 
 // Encrypt using AES-GCM with provided key & nonce
 int sst_encrypt_gcm(
@@ -16,6 +16,16 @@ int sst_encrypt_gcm(
     size_t plaintext_len,
     uint8_t *ciphertext,
     uint8_t tag[SST_TAG_SIZE]
+);
+
+// Decrypt using AES-GCM with provided key, nonce, and tag
+int sst_decrypt_gcm(
+    const uint8_t key[SST_KEY_SIZE],
+    const uint8_t nonce[SST_NONCE_SIZE],
+    const uint8_t *ciphertext,
+    size_t ciphertext_len,
+    const uint8_t tag[SST_TAG_SIZE],
+    uint8_t *plaintext_out
 );
 
 #endif // SST_CRYPTO_EMBEDDED_H
