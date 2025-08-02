@@ -4,11 +4,14 @@ project(receiver_uart_project C)
 # Add the executable target
 add_executable(receiver_uart
     src/receiver_uart.c
+    ../../c_api.c  # 💥 Add this line
+
 )
 
 # Include path for sst_crypto_embedded.h and other headers
 target_include_directories(receiver_uart PRIVATE
-    ${CMAKE_SOURCE_DIR}/../../include
+    ${CMAKE_SOURCE_DIR}/../../include\
+    ${CMAKE_SOURCE_DIR}/../../  # for c_api.h
 )
 
 # Link against the embedded crypto library defined in top-level CMakeLists
