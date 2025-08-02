@@ -10,6 +10,8 @@ add_executable(receiver_uart
     ../../c_common.c
     ../../c_crypto.c
     ../../c_secure_comm.c
+    ../../load_config.c
+    ../../ipfs.c
 )
 
 # Includes
