@@ -1,10 +1,20 @@
 cmake_minimum_required(VERSION 3.13)
 
-# === Pico SDK Setup ===
-set(PICO_SDK_PATH "/home/josef/pico-sdk" CACHE PATH "")
+# Set Pico SDK path
+if(NOT DEFINED PICO_SDK_PATH)
+  set(PICO_SDK_PATH "$ENV{HOME}/pico-sdk" CACHE PATH "Path to the Pico SDK")
+endif()
+
+# 🔥 Critical: Skip toolchain test BEFORE project()
+set(PICO_SKIP_TOOLCHAIN_TEST 1)
+
+# Include Pico SDK before project()
 include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 
-project(sst_embedded C CXX ASM)
+# Project definition comes AFTER skip and sdk include
+project(sst_embedded_project C CXX ASM)
+
+# Initialize Pico SDK
 pico_sdk_init()
 
 # === mbedTLS Setup ===
@@ -12,54 +22,37 @@ set(ENABLE_PROGRAMS OFF CACHE BOOL "")
 set(ENABLE_TESTING OFF CACHE BOOL "")
 set(ENABLE_CRYPTO_DRIVERS OFF CACHE BOOL "")
 set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "")
-set(MBEDTLS_CONFIG_FILE "\"mbedtls_config.h\"")
+set(MBEDTLS_CONFIG_FILE "\"mbedtls_config.h\"") # Note the quotes
 add_definitions(-DMBEDTLS_NO_PLATFORM_ENTROPY)
 
-# NOTE: You must clone mbedtls into: embedded/lib/mbedtls
-add_subdirectory(lib/mbedtls EXCLUDE_FROM_ALL)
+add_subdirectory(
+    lib/mbedtls
+    ${CMAKE_BINARY_DIR}/mbedtls_build
+    EXCLUDE_FROM_ALL
+)
 
-# Manually add mbedtls_time_alt.c to mbedcrypto and give it Pico headers
-foreach(target IN LISTS target_libraries)
-    if(${target} MATCHES "mbedcrypto")
-        target_sources(${target} PRIVATE lib/mbedtls/library/mbedtls_time_alt.c)
-        target_include_directories(${target} PRIVATE
-            ${PICO_SDK_PATH}/src/common/pico_base/include
-            ${PICO_SDK_PATH}/src/rp2_common/pico_time/include
-        )
-    endif()
-endforeach()
+# Add our config folder to mbedcrypto's include directories
+target_include_directories(mbedcrypto INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/config)
 
-
-# === Fix: Add Pico SDK includes for mbedcrypto (for mbedtls_time_alt.c) ===
+# === Patch mbedcrypto for Pico Time Support ===
+target_sources(mbedcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/library/mbedtls_time_alt.c)
 target_include_directories(mbedcrypto PRIVATE
     ${PICO_SDK_PATH}/src/common/pico_base/include
     ${PICO_SDK_PATH}/src/rp2_common/pico_time/include
 )
 
-# === Add Executable ===
-add_executable(pico_encrypt
-    src/c_crypto_embedded.c
-    examples/pico_test_encrypt.c
+# === Build shared embedded crypto library ===
+add_library(sst_embedded
+    src/sst_crypto_embedded.c
 )
 
-# === Include Paths ===
-target_include_directories(pico_encrypt PRIVATE
-    include
-    config
-    lib/mbedtls/include
-    ${PICO_SDK_PATH}/src/common/pico_base/include
+target_include_directories(sst_embedded PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/include
 )
 
-# === Link Libraries ===
-target_link_libraries(pico_encrypt PRIVATE
-    pico_stdlib
-    pico_rand
-    mbedcrypto
-)
+target_link_libraries(sst_embedded PUBLIC mbedcrypto)
 
-# === USB or UART STDIO ===
-pico_enable_stdio_usb(pico_encrypt 1)
-pico_enable_stdio_uart(pico_encrypt 0)
-
-# === Output UF2 ===
-pico_add_extra_outputs(pico_encrypt)
+# === Add submodules ===
+add_subdirectory(sender)
+add_subdirectory(receiver)
