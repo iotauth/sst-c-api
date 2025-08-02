@@ -1,7 +1,10 @@
 cmake_minimum_required(VERSION 3.13)
 project(receiver_uart_project C)
 
-find_package(OpenSSL REQUIRED)
+# Only require OpenSSL when NOT building for Pico
+if(NOT DEFINED PICO_BOARD)
+  find_package(OpenSSL REQUIRED)
+endif()
 
 # Executable
 add_executable(receiver_uart
@@ -18,11 +21,17 @@ add_executable(receiver_uart
 target_include_directories(receiver_uart PRIVATE
     ${CMAKE_SOURCE_DIR}/../../include
     ${CMAKE_SOURCE_DIR}/../../
-    ${OPENSSL_INCLUDE_DIR}
 )
+
+if(OpenSSL_FOUND)
+  target_include_directories(receiver_uart PRIVATE ${OPENSSL_INCLUDE_DIR})
+endif()
 
 # Link libraries
 target_link_libraries(receiver_uart PRIVATE
     sst_embedded           # mbedTLS-based AES-GCM
-    OpenSSL::Crypto        # for init_SST and related
 )
+
+if(OpenSSL_FOUND)
+  target_link_libraries(receiver_uart PRIVATE OpenSSL::Crypto)  # for init_sst etc.
+endif()

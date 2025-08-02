@@ -1,4 +1,17 @@
 cmake_minimum_required(VERSION 3.13)
+project(sender_project C CXX ASM)
+
+# Set PICO_SDK_PATH if not already set
+if(NOT DEFINED PICO_SDK_PATH)
+  set(PICO_SDK_PATH "$ENV{HOME}/pico-sdk" CACHE PATH "Path to the Pico SDK")
+endif()
+
+# Skip toolchain test (recommended for multi-target builds)
+set(PICO_SKIP_TOOLCHAIN_TEST 1)
+
+# Import Pico SDK
+include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
+pico_sdk_init()
 
 # === Executable 1: pico_test_encrypt (Test Driver) ===
 add_executable(pico_encrypt
