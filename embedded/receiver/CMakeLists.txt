@@ -1,7 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 project(receiver_uart_project C)
 
-# Add the executable target
+find_package(OpenSSL REQUIRED)
+
+# Executable
 add_executable(receiver_uart
     src/receiver_uart.c
     ../../c_api.c
@@ -10,13 +12,15 @@ add_executable(receiver_uart
     ../../c_secure_comm.c
 )
 
-# Include paths for headers
+# Includes
 target_include_directories(receiver_uart PRIVATE
     ${CMAKE_SOURCE_DIR}/../../include
-    ${CMAKE_SOURCE_DIR}/../../  # for c_api.h and others in root
+    ${CMAKE_SOURCE_DIR}/../../
+    ${OPENSSL_INCLUDE_DIR}
 )
 
-# Link against the embedded crypto library
+# Link libraries
 target_link_libraries(receiver_uart PRIVATE
-    sst_embedded
+    sst_embedded           # mbedTLS-based AES-GCM
+    OpenSSL::Crypto        # for init_SST and related
 )
