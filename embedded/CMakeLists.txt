@@ -50,5 +50,7 @@ target_include_directories(sst_embedded PUBLIC
 target_link_libraries(sst_embedded PUBLIC mbedcrypto)
 
 # === Add subdirectories ===
-add_subdirectory(sender)
+if(HAS_PICO_SDK)
+  add_subdirectory(sender)
+endif()
 add_subdirectory(receiver)
