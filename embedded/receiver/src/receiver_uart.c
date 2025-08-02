@@ -5,7 +5,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
-#include "c_api.h"
+#include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
 
 #define UART_DEVICE "/dev/serial0"
@@ -58,7 +58,7 @@ int init_serial(const char* device, int baudrate) {
 
 int main() {
     printf("Retrieving session key from SST...\n");
-    SST_ctx_t *sst = init_SST("../sst.config");
+    SST_ctx_t *sst = init_SST("../../receiver/sst.config");
     if (!sst) return fprintf(stderr, "SST init failed.\n"), 1;
 
     session_key_list_t *key_list = get_session_key(sst, init_empty_session_key_list());
