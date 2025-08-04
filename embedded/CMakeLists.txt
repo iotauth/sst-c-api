@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 
-# Optional Pico SDK setup — ONLY if PICO_SDK_PATH is defined
+# === Pico SDK Setup ===
 if(DEFINED ENV{PICO_SDK_PATH})
   set(PICO_SDK_PATH "$ENV{PICO_SDK_PATH}" CACHE PATH "Path to the Pico SDK")
   set(PICO_SKIP_TOOLCHAIN_TEST 1)
@@ -16,28 +16,54 @@ if(HAS_PICO_SDK)
   pico_sdk_init()
 endif()
 
-# === mbedTLS Setup ===
-set(ENABLE_PROGRAMS OFF CACHE BOOL "")
-set(ENABLE_TESTING OFF CACHE BOOL "")
-set(ENABLE_CRYPTO_DRIVERS OFF CACHE BOOL "")
-set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "")
 set(MBEDTLS_CONFIG_FILE "\"mbedtls_config.h\"")
-add_definitions(-DMBEDTLS_NO_PLATFORM_ENTROPY)
 
-add_subdirectory(lib/mbedtls ${CMAKE_BINARY_DIR}/mbedtls_build EXCLUDE_FROM_ALL)
+# === mbedcrypto (minimal build) ===
+add_library(mbedcrypto
+  lib/mbedtls/library/aes.c
+  lib/mbedtls/library/aesce.c
+  lib/mbedtls/library/aria.c
+  lib/mbedtls/library/camellia.c
+  lib/mbedtls/library/ccm.c
+  lib/mbedtls/library/chachapoly.c
+  lib/mbedtls/library/chacha20.c
+  lib/mbedtls/library/cipher.c
+  lib/mbedtls/library/cipher_wrap.c
+  lib/mbedtls/library/constant_time.c
+  lib/mbedtls/library/des.c
+  lib/mbedtls/library/gcm.c
+  lib/mbedtls/library/nist_kw.c
+  lib/mbedtls/library/platform.c
+  lib/mbedtls/library/platform_util.c
+  lib/mbedtls/library/poly1305.c
+  lib/mbedtls/library/sha256.c
+)
 
-target_include_directories(mbedcrypto INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/config)
+target_include_directories(mbedcrypto PUBLIC
+  ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/config
+)
 
-# Optional: patch Pico-specific time override
+target_include_directories(mbedcrypto PRIVATE
+  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/src  # for mbedtls_time_alt.h
+)
+
+target_compile_definitions(mbedcrypto PRIVATE
+  MBEDTLS_NO_PLATFORM_ENTROPY
+)
+
+
 if(HAS_PICO_SDK)
-  target_sources(mbedcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/library/mbedtls_time_alt.c)
-  target_include_directories(mbedcrypto PRIVATE
-    ${PICO_SDK_PATH}/src/common/pico_base/include
-    ${PICO_SDK_PATH}/src/rp2_common/pico_time/include
+  target_sources(mbedcrypto PRIVATE src/mbedtls_time_alt.c) # override
+  target_link_libraries(mbedcrypto PRIVATE pico_stdlib)
+  target_compile_definitions(mbedcrypto PRIVATE 
+    MBEDTLS_PLATFORM_TIME_ALT
+    MBEDTLS_PLATFORM_MS_TIME_ALT
   )
 endif()
 
-# === Our embedded crypto lib ===
+# === Embedded SST Crypto Wrapper ===
 add_library(sst_embedded
   src/sst_crypto_embedded.c
 )
@@ -49,7 +75,7 @@ target_include_directories(sst_embedded PUBLIC
 
 target_link_libraries(sst_embedded PUBLIC mbedcrypto)
 
-# === Add subdirectories ===
+# === Add sender/receiver projects ===
 if(HAS_PICO_SDK)
   add_subdirectory(sender)
 endif()
