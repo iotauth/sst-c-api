@@ -1,0 +1,4 @@
+[submodule "embedded/lib/mbedtls"]
+	path = embedded/lib/mbedtls
+	url = https://github.com/Mbed-TLS/mbedtls.git
+	branch = development
