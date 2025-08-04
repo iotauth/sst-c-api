@@ -87,10 +87,9 @@ set(src_crypto
     sha512.c
     sha3.c
     threading.c
-    #timing.c REMOVE FOR SAFETY (not used in pico-sdk)
+    timing.c
     version.c
     version_features.c
-    mbedtls_time_alt.c
 )
 
 set(src_x509
@@ -256,10 +255,7 @@ if (USE_STATIC_MBEDTLS_LIBRARY)
     set(mbedcrypto_static_target ${mbedcrypto_target})
 endif()
 
-if(USE_STATIC_MBEDTLS_LIBRARY)
-    set(target_libraries ${mbedcrypto_static_target} ${mbedx509_static_target} ${mbedtls_static_target})
-endif()
-
+set(target_libraries ${mbedcrypto_target} ${mbedx509_target} ${mbedtls_target})
 
 if(USE_STATIC_MBEDTLS_LIBRARY AND USE_SHARED_MBEDTLS_LIBRARY)
     string(APPEND mbedtls_static_target    "_static")
@@ -275,19 +271,10 @@ endif()
 set(p256m_target "${MBEDTLS_TARGET_PREFIX}p256m")
 set(everest_target "${MBEDTLS_TARGET_PREFIX}everest")
 
-# === Static build
 if(USE_STATIC_MBEDTLS_LIBRARY)
-    # Define library targets
     add_library(${mbedcrypto_static_target} STATIC ${src_crypto})
     set_target_properties(${mbedcrypto_static_target} PROPERTIES OUTPUT_NAME mbedcrypto)
     target_link_libraries(${mbedcrypto_static_target} PUBLIC ${libs})
-    
-    # Add Pico SDK headers for mbedtls_time_alt.c
-    target_include_directories(${mbedcrypto_static_target} PRIVATE
-        /home/josef/pico-sdk/src/common/pico_base/include
-        /home/josef/pico-sdk/src/rp2_common/pico_time/include
-)
-
 
     if(TARGET ${everest_target})
         target_link_libraries(${mbedcrypto_static_target} PUBLIC ${everest_target})
@@ -304,20 +291,8 @@ if(USE_STATIC_MBEDTLS_LIBRARY)
     add_library(${mbedtls_static_target} STATIC ${src_tls})
     set_target_properties(${mbedtls_static_target} PROPERTIES OUTPUT_NAME mbedtls)
     target_link_libraries(${mbedtls_static_target} PUBLIC ${libs} ${mbedx509_static_target})
-
-    # ⬅️ Set target_libraries *AFTER* defining the static libs
-    set(target_libraries ${mbedcrypto_static_target} ${mbedx509_static_target} ${mbedtls_static_target})
-
-    # ✅ Apply Pico SDK headers now
-    foreach(target IN LISTS target_libraries)
-        target_include_directories(${target} PRIVATE
-            /home/josef/pico-sdk/src/common/pico_base/include
-            /home/josef/pico-sdk/src/rp2_common/pico_time/include
-        )
-    endforeach()
 endif(USE_STATIC_MBEDTLS_LIBRARY)
 
-# === Shared build
 if(USE_SHARED_MBEDTLS_LIBRARY)
     set(CMAKE_LIBRARY_PATH ${CMAKE_CURRENT_BINARY_DIR})
     add_library(${mbedcrypto_target} SHARED ${src_crypto})
@@ -371,7 +346,6 @@ foreach(target IN LISTS target_libraries)
         RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
         PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ)
 endforeach(target)
-
 
 set(lib_target "${MBEDTLS_TARGET_PREFIX}lib")
 

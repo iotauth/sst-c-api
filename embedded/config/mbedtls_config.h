@@ -10,8 +10,8 @@
 #define MBEDTLS_PLATFORM_C
 #define MBEDTLS_PLATFORM_MEMORY
 #define MBEDTLS_NO_PLATFORM_ENTROPY
+#undef MBEDTLS_TIMING_C
 
-// Provide a custom time function to resolve build errors
 #define MBEDTLS_HAVE_TIME
 #define MBEDTLS_PLATFORM_MS_TIME_ALT
 
@@ -19,7 +19,7 @@
 #undef MBEDTLS_SELF_TEST
 #undef MBEDTLS_ERROR_C
 #undef MBEDTLS_FS_IO
-#undef MBEDTLS_TIMING_C
+#undef MBEDTLS_TIMING_C // remove default time function for override
 
 
 #include "mbedtls/check_config.h"

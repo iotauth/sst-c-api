@@ -258,7 +258,7 @@
 //#define MBEDTLS_PLATFORM_VSNPRINTF_ALT
 //#define MBEDTLS_PLATFORM_NV_SEED_ALT
 //#define MBEDTLS_PLATFORM_SETUP_TEARDOWN_ALT
-#define MBEDTLS_PLATFORM_MS_TIME_ALT //uncommented for my own implementation of mbedtls_ms_time() !
+//#define MBEDTLS_PLATFORM_MS_TIME_ALT
 
 /**
  * Uncomment the macro to let Mbed TLS use your alternate implementation of
