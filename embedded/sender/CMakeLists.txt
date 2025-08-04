@@ -13,22 +13,7 @@ set(PICO_SKIP_TOOLCHAIN_TEST 1)
 include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 pico_sdk_init()
 
-# === Executable 1: pico_test_encrypt (Test Driver) ===
-add_executable(pico_encrypt
-    src/pico_test_encrypt.c
-)
-
-target_link_libraries(pico_encrypt PRIVATE
-    pico_stdlib
-    pico_rand
-    sst_embedded
-)
-
-pico_enable_stdio_usb(pico_encrypt 1)
-pico_enable_stdio_uart(pico_encrypt 0)
-pico_add_extra_outputs(pico_encrypt)
-
-# === Executable 2: LiFi Sender with Embedded Encryption ===
+# === Executable: LiFi Sender with Embedded Encryption ===
 add_executable(lifi_sender_embedded
     src/lifi_sender_embedded.c
 )

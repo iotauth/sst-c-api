@@ -78,5 +78,6 @@ target_link_libraries(sst_embedded PUBLIC mbedcrypto)
 # === Add sender/receiver projects ===
 if(HAS_PICO_SDK)
   add_subdirectory(sender)
+else()
+  add_subdirectory(receiver)
 endif()
-add_subdirectory(receiver)
