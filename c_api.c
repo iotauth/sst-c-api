@@ -99,7 +99,8 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     unsigned int sender_HS_1_length;
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
                     sender_HS_1, &sender_HS_1_length);
-    int bytes_written = write_to_socket(sock, sender_HS_1, sender_HS_1_length);
+    int bytes_written =
+        sst_write_to_socket(sock, sender_HS_1, sender_HS_1_length);
     if ((unsigned int)bytes_written != sender_HS_1_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
@@ -109,7 +110,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
     int received_buf_length =
-        read_from_socket(sock, received_buf, sizeof(received_buf));
+        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
         SST_print_error_exit(
             "Socket read eerror in secure_connect_to_server_with_socket()\n");
@@ -132,7 +133,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
                         sender_HS_2, &sender_HS_2_length);
         int bytes_written =
-            write_to_socket(sock, sender_HS_2, sender_HS_2_length);
+            sst_write_to_socket(sock, sender_HS_2, sender_HS_2_length);
         if ((unsigned int)bytes_written != sender_HS_2_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -202,7 +203,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
         int received_buf_length =
-            read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
+            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
                 "Socket read eerror in server_secure_comm_setup()\n");
@@ -243,7 +244,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_2,
                             sender, &sender_length);
             int bytes_written =
-                write_to_socket(clnt_sock, sender, sender_length);
+                sst_write_to_socket(clnt_sock, sender, sender_length);
             if ((unsigned int)bytes_written != sender_length) {
                 SST_print_error_exit("Failed to write data to socket.");
             }
@@ -255,7 +256,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
         int received_buf_length =
-            read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
+            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
                 "Socket read eerror in server_secure_comm_setup()\n");
@@ -305,91 +306,41 @@ SST_session_ctx_t *server_secure_comm_setup(
         "Unrecognized or invalid state for server.");
 }
 
-void *receive_thread(void *SST_session_ctx) {
-    SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
-    int received_buf_length;
-    while (1) {
-        received_buf_length = read_from_socket(session_ctx->sock, received_buf,
-                                               sizeof(received_buf));
-        if (received_buf_length < 0) {
-            SST_print_error_exit("Socket read eerror in receive_thread()\n");
-        }
-        receive_message(received_buf, received_buf_length, session_ctx);
-    }
-}
-
 void *receive_thread_read_one_each(void *SST_session_ctx) {
     SST_session_ctx_t *session_ctx = (SST_session_ctx_t *)SST_session_ctx;
-    unsigned char data_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char data_buf[MAX_SECURE_COMM_MSG_LENGTH];
     unsigned int data_buf_length = 0;
     while (1) {
-        unsigned char message_type;
-
-        data_buf_length = read_header_return_data_buf_pointer(
-            session_ctx->sock, &message_type, data_buf, MAX_PAYLOAD_LENGTH);
-        if (!check_SECURE_COMM_MSG_type(message_type)) {
-            print_received_message(data_buf, data_buf_length, session_ctx);
-        }
+        data_buf_length = read_secure_message(data_buf, session_ctx);
+        printf("Received: %.*s\n", data_buf_length, data_buf);
     }
 }
 
-unsigned int receive_message(unsigned char *received_buf,
-                             unsigned int received_buf_length,
-                             SST_session_ctx_t *session_ctx) {
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char *data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (!check_SECURE_COMM_MSG_type(message_type)) {
-        print_received_message(data_buf, data_buf_length, session_ctx);
-    }
-    return data_buf_length;
-}
-
-int read_secure_message(int socket, unsigned char **plaintext,
+int read_secure_message(unsigned char *plaintext,
                         SST_session_ctx_t *session_ctx) {
     unsigned char message_type;
     unsigned int bytes_read;
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     bytes_read = read_header_return_data_buf_pointer(
-        socket, &message_type, received_buf, MAX_PAYLOAD_LENGTH);
-    if (bytes_read == 0) {
-        SST_print_error("Socket read returned 0, failed to read header.\n");
-        return bytes_read;
-    }
-
+        session_ctx->sock, &message_type, received_buf,
+        MAX_SECURE_COMM_MSG_LENGTH);
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }
     unsigned int decrypted_length;
-    // TODO(Dongha Kim): No logic exists for handling sequence numbers.
-    *plaintext = decrypt_received_message(received_buf, bytes_read,
-                                          &decrypted_length, session_ctx);
-    return decrypted_length;
+    unsigned char seq_num_and_plaintext[MAX_SECURE_COMM_MSG_LENGTH];
+    decrypt_received_message(received_buf, bytes_read, seq_num_and_plaintext,
+                             &decrypted_length, session_ctx);
+    // Copy the plaintext payload to the buffer declared by user.
+    memcpy(plaintext, seq_num_and_plaintext + SEQ_NUM_SIZE,
+           decrypted_length - SEQ_NUM_SIZE);
+    // Return plaintext length.
+    return decrypted_length - SEQ_NUM_SIZE;
 }
 
 int send_secure_message(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx) {
     return send_SECURE_COMM_message(msg, msg_length, session_ctx);
-}
-
-unsigned char *return_decrypted_buf(unsigned char *received_buf,
-                                    unsigned int received_buf_length,
-                                    unsigned int *decrypted_buf_length,
-                                    SST_session_ctx_t *session_ctx) {
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char *data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
-    if (!check_SECURE_COMM_MSG_type(message_type)) {
-        // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
-        // Must free() after use.
-        return decrypt_received_message(data_buf, data_buf_length,
-                                        decrypted_buf_length, session_ctx);
-    }
-    return SST_print_error_return_null(
-        "Invalid message type while in secure communication.");
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,

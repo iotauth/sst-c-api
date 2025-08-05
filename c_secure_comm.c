@@ -67,6 +67,26 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     return ret;
 }
 
+int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
+                      unsigned char *entity_nonce, int sock, int num_key,
+                      char *purpose, int requestIndex) {
+    unsigned char auth_nonce[NONCE_SIZE];
+    unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+    if (auth_id != (unsigned int)ctx->config->auth_id) {
+        SST_print_error("Auth ID NOT matched.");
+        return -1;
+    }
+    memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
+    RAND_bytes(entity_nonce, NONCE_SIZE);
+    unsigned int serialized_length;
+    unsigned char *serialized = serialize_message_for_auth(
+        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
+        &serialized_length);
+    send_auth_request_message(serialized, serialized_length, ctx, sock,
+                              requestIndex);
+    return 0;
+}
+
 // Encrypt the message and sign the encrypted message.
 // @param buf input buffer
 // @param buf_len length of buf
@@ -227,7 +247,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ_IN_PUB_ENC, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -237,6 +257,7 @@ void send_auth_request_message(unsigned char *serialized,
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, &ctx->dist_key, ctx->config->name,
             &enc_length);
+        free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
@@ -246,7 +267,7 @@ void send_auth_request_message(unsigned char *serialized,
             make_sender_buf(enc, enc_length, ADD_READER_REQ, message,
                             &message_length);
         }
-        int bytes_written = write_to_socket(sock, message, message_length);
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
         if ((unsigned int)bytes_written != message_length) {
             SST_print_error_exit("Failed to write data to socket.");
         }
@@ -414,46 +435,38 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 
     session_ctx->sent_seq_num++;
     unsigned char
-        sender_buf[MAX_PAYLOAD_LENGTH];  // TODO: Currently the send message
-                                         // does not support dynamic sizes,
-                                         // the max length is shorter than
-                                         // 1024. Must need to decide static
-                                         // or dynamic buffer size.
+        sender_buf[MAX_SECURE_COMM_MSG_LENGTH];  // Currently the send message
+                                                 // does not support dynamic
+                                                 // sizes, the max length is
+                                                 // 1024.
     unsigned int sender_buf_length;
     make_sender_buf(encrypted_stack, encrypted_length, SECURE_COMM_MSG,
                     sender_buf, &sender_buf_length);
 
     int bytes_written =
-        write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
+        sst_write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
     if ((unsigned int)bytes_written != sender_buf_length) {
         SST_print_error_exit("Failed to write data to socket.");
     }
     return bytes_written;
 }
 
-void print_received_message(unsigned char *data, unsigned int data_length,
-                            SST_session_ctx_t *session_ctx) {
-    unsigned int decrypted_length;
-    unsigned char *decrypted = decrypt_received_message(
-        data, data_length, &decrypted_length, session_ctx);
-    printf("%s\n", decrypted + SEQ_NUM_SIZE);
-    free(decrypted);
-}
-
-unsigned char *decrypt_received_message(unsigned char *data,
-                                        unsigned int data_length,
-                                        unsigned int *decrypted_buf_length,
-                                        SST_session_ctx_t *session_ctx) {
-    unsigned char *decrypted = NULL;
-    if (symmetric_decrypt_authenticate(
-            data, data_length, session_ctx->s_key.mac_key, MAC_KEY_SIZE,
-            session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode,
-            &decrypted, decrypted_buf_length)) {
-        SST_print_error_exit("Error during decrypting received message.\n");
+void decrypt_received_message(unsigned char *encrypted_data,
+                              unsigned int encrypted_data_length,
+                              unsigned char *decrypted_data,
+                              unsigned int *decrypted_buf_length,
+                              SST_session_ctx_t *session_ctx) {
+    if (symmetric_decrypt_authenticate_without_malloc(
+            encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
+            MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
+            AES_128_CBC_IV_SIZE, session_ctx->s_key.enc_mode,
+            session_ctx->s_key.hmac_mode, decrypted_data,
+            decrypted_buf_length)) {
+        SST_print_error_exit(
+            "Error during decrypting buffer with session key.\n");
     }
     unsigned int received_seq_num =
-        read_unsigned_int_BE(decrypted, SEQ_NUM_SIZE);
+        read_unsigned_int_BE(decrypted_data, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
         SST_print_error_exit("Wrong sequence number expected.");
     }
@@ -462,8 +475,6 @@ unsigned char *decrypt_received_message(unsigned char *data,
     }
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.\n", received_seq_num);
-    // This returns SEQ_NUM_BUFFER(8) + decrypted_buffer;
-    return decrypted;
 }
 
 int check_session_key_validity(session_key_t *session_key) {
@@ -485,7 +496,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         if (s_key_list == NULL) {
             return NULL;
         }
-        SST_print_debug("Received %d keys.n", ctx->config->numkey);
+        SST_print_debug("Received %d keys.\n", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -528,7 +539,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
         if (received_buf_length < 0) {
             SST_print_error_exit(
@@ -540,21 +551,11 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
-            // unsigned int auth_Id;
-            unsigned char auth_nonce[NONCE_SIZE];
-            // auth_Id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN); // Used in
-            // future.
-            memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-            RAND_bytes(entity_nonce, NONCE_SIZE);
-
-            unsigned int serialized_length;
-            unsigned char *serialized = serialize_message_for_auth(
-                entity_nonce, auth_nonce, ctx->config->numkey,
-                ctx->config->name,
-                ctx->config->purpose[ctx->config->purpose_index],
-                &serialized_length);
-            send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                      1);
+            if (handle_AUTH_HELLO(
+                    data_buf, ctx, entity_nonce, sock, ctx->config->numkey,
+                    ctx->config->purpose[ctx->config->purpose_index], 1)) {
+                return NULL;
+            }
         } else if (state == AUTH_HELLO_RECEIVED &&
                    message_type == SESSION_KEY_RESP) {
             state = SESSION_KEY_RESP_RECEIVED;
@@ -766,18 +767,18 @@ void update_validity(session_key_t *session_key) {
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_ley_list) {
-    if (MAX_SESSION_KEY - s_ley_list->num_key < requested_num_key) {
+                                   session_key_list_t *s_key_list) {
+    if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
         int expired;
         int temp;
         for (int i = 0; i < requested_num_key; i++) {
-            temp = mod((i + s_ley_list->rear_idx - s_ley_list->num_key),
+            temp = mod((i + s_key_list->rear_idx - s_key_list->num_key),
                        MAX_SESSION_KEY);
-            expired = check_session_key_validity(&s_ley_list->s_key[temp]);
+            expired = check_session_key_validity(&s_key_list->s_key[temp]);
             if (expired) {
-                s_ley_list->num_key -= 1;
+                s_key_list->num_key -= 1;
             }
             ret = ret && expired;
         }

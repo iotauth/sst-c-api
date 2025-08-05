@@ -223,7 +223,7 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 3 + name_size, s_key->key_id, key_id_size);
     data[3 + name_size + key_id_size] = hash_value_len;
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
-    int bytes_written = write_to_socket(
+    int bytes_written = sst_write_to_socket(
         sock, data, 4 + name_size + key_id_size + hash_value_len);
     if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
         SST_print_error_exit("Failed to write data to socket.");
@@ -284,13 +284,13 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[0] = DOWNLOAD_INDEX;
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
-    int bytes_written = write_to_socket(sock, data, 2 + name_size);
+    int bytes_written = sst_write_to_socket(sock, data, 2 + name_size);
     if (bytes_written != (2 + name_size)) {
         SST_print_error_exit("Failed to write data to socket.");
     }
-    unsigned char received_buf[MAX_PAYLOAD_LENGTH];
+    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     int received_buf_length =
-        read_from_socket(sock, received_buf, sizeof(received_buf));
+        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
         SST_print_error_exit(
             "Socket read eerror in receive_data_and_download_file().\n");
@@ -347,7 +347,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         int received_buf_length =
-            read_from_socket(sock, received_buf, sizeof(received_buf));
+            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         if (received_buf_length < 0) {
             SST_print_error_exit(
                 "Socket read eerror in send_add_reader_req_via_TCP().\n");
@@ -357,18 +357,10 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
-            unsigned char auth_nonce[NONCE_SIZE];
-            // TODO(Dongha Kim)
-            // unsigned int auth_id = read_unsigned_int_BE(data_buf,
-            // AUTH_ID_LEN);
-            memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-            RAND_bytes(entity_nonce, NONCE_SIZE);
-            unsigned int serialized_length;
-            unsigned char *serialized = serialize_message_for_auth(
-                entity_nonce, auth_nonce, 0, ctx->config->name, add_reader,
-                &serialized_length);
-            send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                      0);
+            if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
+                                  add_reader, 0)) {
+                SST_print_error_exit("AUTH_HELLO handling failed.\n");
+            }
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
             size_t key_size = RSA_KEY_SIZE;
             unsigned int encrypted_entity_nonce_length =
