@@ -1,25 +1,26 @@
-#include "pico/stdlib.h"
-#include "pico/rand.h"
-#include "hardware/uart.h"
-#include "hardware/gpio.h"
-#include "../../include/sst_crypto_embedded.h"
-#include <string.h>
 #include <stdio.h>
+#include <string.h>
 
-#define UART_ID_DEBUG       uart0
-#define UART_RX_PIN_DEBUG   1
-#define UART_TX_PIN_DEBUG   0
+#include "../../include/sst_crypto_embedded.h"
+#include "hardware/gpio.h"
+#include "hardware/uart.h"
+#include "pico/rand.h"
+#include "pico/stdlib.h"
 
-#define UART_ID             uart1
-#define UART_RX_PIN         5
-#define UART_TX_PIN         4
+#define UART_ID_DEBUG uart0
+#define UART_RX_PIN_DEBUG 1
+#define UART_TX_PIN_DEBUG 0
 
-#define BAUD_RATE           1000000
-#define PREAMBLE_BYTE_1     0xAA
-#define PREAMBLE_BYTE_2     0x55
-#define MSG_TYPE_ENCRYPTED  0x02
+#define UART_ID uart1
+#define UART_RX_PIN 5
+#define UART_TX_PIN 4
 
-void get_random_bytes(uint8_t *buffer, size_t len) {
+#define BAUD_RATE 1000000
+#define PREAMBLE_BYTE_1 0xAA
+#define PREAMBLE_BYTE_2 0x55
+#define MSG_TYPE_ENCRYPTED 0x02
+
+void get_random_bytes(uint8_t* buffer, size_t len) {
     for (size_t i = 0; i < len; i++) {
         buffer[i] = (uint8_t)(get_rand_32() & 0xFF);
     }
@@ -105,11 +106,9 @@ int main() {
         uint8_t ciphertext[256] = {0};
         uint8_t tag[SST_TAG_SIZE] = {0};
 
-        int ret = sst_encrypt_gcm(
-            session_key, nonce,
-            (const uint8_t *)message_buffer, msg_len,
-            ciphertext, tag
-        );
+        int ret =
+            sst_encrypt_gcm(session_key, nonce, (const uint8_t*)message_buffer,
+                            msg_len, ciphertext, tag);
 
         if (ret != 0) {
             printf("Encryption failed! ret=%d\n", ret);
@@ -127,14 +126,16 @@ int main() {
         uart_putc_raw(UART_ID, MSG_TYPE_ENCRYPTED);
 
         uart_write_blocking(UART_ID, nonce, SST_NONCE_SIZE);
-        uint8_t len_bytes[2] = { (msg_len >> 8) & 0xFF, msg_len & 0xFF };
+        uint8_t len_bytes[2] = {(msg_len >> 8) & 0xFF, msg_len & 0xFF};
         uart_write_blocking(UART_ID, len_bytes, 2);
         uart_write_blocking(UART_ID, ciphertext, msg_len);
         uart_write_blocking(UART_ID, tag, SST_TAG_SIZE);
 
         printf("Sent!\n\n");
 
-        gpio_put(25, 1); sleep_ms(100); gpio_put(25, 0);
+        gpio_put(25, 1);
+        sleep_ms(100);
+        gpio_put(25, 0);
     }
 
     return 0;

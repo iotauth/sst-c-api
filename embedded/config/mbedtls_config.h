@@ -16,7 +16,7 @@
 
 // === Timing and time-related features === not used yet
 #undef MBEDTLS_TIMING_C
-//for my own timing override
+// for my own timing override
 #define MBEDTLS_HAVE_TIME
 #define MBEDTLS_PLATFORM_TIME_ALT
 
@@ -28,4 +28,4 @@
 // === Check config consistency ===
 #include "mbedtls/check_config.h"
 
-#endif // MBEDTLS_CONFIG_H
+#endif  // MBEDTLS_CONFIG_H

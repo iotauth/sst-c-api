@@ -5,21 +5,21 @@ cmake_minimum_required(VERSION 3.19)
 project(sst-lib VERSION 1.0.0 LANGUAGES C)
 
 # Check `openssl version -d` and copy the path to OPENSSL_ROOT_DIR
-# if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-#   set(OPENSSL_ROOT_DIR "/usr/local/lib64")
-# endif()
+if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  set(OPENSSL_ROOT_DIR "/usr/local/lib64")
+endif()
 
-# find_package(OpenSSL REQUIRED)
-# find_package(Threads REQUIRED)
+find_package(OpenSSL REQUIRED)
+find_package(Threads REQUIRED)
 
 # if I do need above use this:  -----------------------
-# option(USE_OPENSSL "Enable OpenSSL support" ON)
+option(USE_OPENSSL "Enable OpenSSL support" ON)
 
-# if(USE_OPENSSL AND ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-#   set(OPENSSL_ROOT_DIR "/usr/local/lib64")
-#   find_package(OpenSSL REQUIRED)
-#   find_package(Threads REQUIRED)
-# endif()
+if(USE_OPENSSL AND ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
+  set(OPENSSL_ROOT_DIR "/usr/local/lib64")
+  find_package(OpenSSL REQUIRED)
+  find_package(Threads REQUIRED)
+endif()
 # and call with cmake -DUSE_OPENSSL=OFF .. -------------------------
 # ------------------------------------------------------------------
 
@@ -34,7 +34,7 @@ add_library(sst-c-api STATIC
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Statically link OpenSSL into sst-c-api
-#target_link_libraries(sst-c-api PRIVATE ${OPENSSL_LIBRARIES} Threads::Threads)
+target_link_libraries(sst-c-api PRIVATE ${OPENSSL_LIBRARIES} Threads::Threads)
 
 target_include_directories(sst-c-api PUBLIC
   $<INSTALL_INTERFACE:include>

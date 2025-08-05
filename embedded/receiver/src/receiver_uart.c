@@ -1,12 +1,13 @@
-#include <stdio.h>
+#include <fcntl.h>
+#include <libgen.h>        // Required for dirname() and basename()
+#include <linux/limits.h>  // Required for PATH_MAX
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
 #include <termios.h>
-#include <libgen.h>         // Required for dirname() and basename()
-#include <linux/limits.h>   // Required for PATH_MAX
+#include <unistd.h>
+
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
 
@@ -58,7 +59,7 @@ int init_serial(const char* device, int baudrate) {
     return fd;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     const char* config_path;
     char original_dir[PATH_MAX];
     char new_dir[PATH_MAX];
@@ -89,9 +90,10 @@ int main(int argc, char *argv[]) {
             return 1;
         }
 
-        // Now that we are in the correct directory, we can use the filename part.
+        // Now that we are in the correct directory, we can use the filename
+        // part.
         config_path = basename(argv[1]);
-        
+
         if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
             perror("Fatal: Could not determine new working directory");
             free(path_copy);
@@ -108,14 +110,21 @@ int main(int argc, char *argv[]) {
         const char* config_dir_relative = "../../receiver";
         if (chdir(config_dir_relative) != 0) {
             perror("Could not switch to default config directory");
-            fprintf(stderr, "\nFailed to find default config directory ('%s') from your current location:\n", config_dir_relative);
+            fprintf(stderr,
+                    "\nFailed to find default config directory ('%s') from "
+                    "your current location:\n",
+                    config_dir_relative);
             fprintf(stderr, "  %s\n\n", original_dir);
-            fprintf(stderr, "This program expects to be run from its 'build/receiver' directory.\n");
-            fprintf(stderr, "Alternatively, provide a direct path to the config file.\n");
+            fprintf(stderr,
+                    "This program expects to be run from its 'build/receiver' "
+                    "directory.\n");
+            fprintf(
+                stderr,
+                "Alternatively, provide a direct path to the config file.\n");
             fprintf(stderr, "Usage: %s <path/to/sst.config>\n\n", argv[0]);
             return 1;
         }
-        
+
         if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
             perror("Fatal: Could not determine new working directory");
             return 1;
@@ -128,11 +137,13 @@ int main(int argc, char *argv[]) {
     }
 
     printf("Retrieving session key from SST...\n");
-    SST_ctx_t *sst = init_SST(config_path);
+    SST_ctx_t* sst = init_SST(config_path);
     if (!sst) return fprintf(stderr, "SST init failed.\n"), 1;
 
-    session_key_list_t *key_list = get_session_key(sst, init_empty_session_key_list());
-    if (!key_list || key_list->num_key == 0) return fprintf(stderr, "No session key.\n"), 1;
+    session_key_list_t* key_list =
+        get_session_key(sst, init_empty_session_key_list());
+    if (!key_list || key_list->num_key == 0)
+        return fprintf(stderr, "No session key.\n"), 1;
 
     session_key_t s_key = key_list->s_key[0];
     print_hex("Session Key: ", s_key.cipher_key, SESSION_KEY_SIZE);
@@ -144,7 +155,7 @@ int main(int argc, char *argv[]) {
     uint8_t preamble[2] = {0xAB, 0xCD};
     write(fd, preamble, 2);
     write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-    usleep(5000); // short delay to flush
+    usleep(5000);  // short delay to flush
     printf("Sent preamble + session key over UART.\n");
 
     // Step 2: Listen for encrypted message
@@ -155,8 +166,10 @@ int main(int argc, char *argv[]) {
 
     while (1) {
         if (read(fd, &byte, 1) == 1) {
-            if (state == 0 && byte == PREAMBLE_BYTE_1) state = 1;
-            else if (state == 1 && byte == PREAMBLE_BYTE_2) state = 2;
+            if (state == 0 && byte == PREAMBLE_BYTE_1)
+                state = 1;
+            else if (state == 1 && byte == PREAMBLE_BYTE_2)
+                state = 2;
             else if (state == 2 && byte == MSG_TYPE_ENCRYPTED) {
                 uint8_t nonce[NONCE_SIZE];
                 uint8_t len_bytes[2];
@@ -168,7 +181,9 @@ int main(int argc, char *argv[]) {
                 }
 
                 uint16_t msg_len = (len_bytes[0] << 8) | len_bytes[1];
-                printf("Reading %u bytes of ciphertext and %u bytes of tag...\n", msg_len, TAG_SIZE);
+                printf(
+                    "Reading %u bytes of ciphertext and %u bytes of tag...\n",
+                    msg_len, TAG_SIZE);
 
                 if (msg_len > 1024) {
                     printf("Message too long: %u bytes\n", msg_len);
@@ -188,13 +203,9 @@ int main(int argc, char *argv[]) {
                     print_hex("Ciphertext: ", ciphertext, c);
                     print_hex("Tag: ", tag, TAG_SIZE);
 
-                    int ret = sst_decrypt_gcm(
-                        s_key.cipher_key,
-                        nonce,
-                        ciphertext, msg_len,
-                        tag,
-                        decrypted
-                    );
+                    int ret =
+                        sst_decrypt_gcm(s_key.cipher_key, nonce, ciphertext,
+                                        msg_len, tag, decrypted);
 
                     if (ret == 0) {
                         printf("Decrypted: %.*s\n\n", msg_len, decrypted);

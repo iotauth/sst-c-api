@@ -13,4 +13,4 @@ mbedtls_ms_time_t mbedtls_ms_time(void);  // Correct signature
 }
 #endif
 
-#endif // MBEDTLS_TIME_ALT_H
+#endif  // MBEDTLS_TIME_ALT_H
