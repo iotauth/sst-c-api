@@ -35,3 +35,7 @@ target_link_libraries(receiver_uart PRIVATE
 if(OpenSSL_FOUND)
   target_link_libraries(receiver_uart PRIVATE OpenSSL::Crypto)  # for init_sst etc.
 endif()
+
+target_compile_definitions(receiver_uart PRIVATE
+    DEFAULT_SST_CONFIG_PATH="../../receiver/sst.config"
+)

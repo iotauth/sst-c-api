@@ -56,9 +56,23 @@ int init_serial(const char* device, int baudrate) {
     return fd;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    const char* config_path;
+
+    if (argc > 2) {
+        fprintf(stderr, "Error: Too many arguments.\n");
+        fprintf(stderr, "Usage: %s [<path/to/sst.config>]\n", argv[0]);
+        return 1;
+    } else if (argc == 2) {
+        config_path = argv[1];
+        printf("Using provided config path: %s\n", config_path);
+    } else {
+        config_path = DEFAULT_SST_CONFIG_PATH;
+        printf("No config path provided. Using default: %s\n", config_path);
+    }
+
     printf("Retrieving session key from SST...\n");
-    SST_ctx_t *sst = init_SST("../../receiver/sst.config");
+    SST_ctx_t *sst = init_SST(config_path);
     if (!sst) return fprintf(stderr, "SST init failed.\n"), 1;
 
     session_key_list_t *key_list = get_session_key(sst, init_empty_session_key_list());
