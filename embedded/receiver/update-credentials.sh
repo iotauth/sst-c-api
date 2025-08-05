@@ -50,4 +50,4 @@ fi
 cp "${AUTH_CERT_PATH}" "${RECEIVER_STAGING_DIR}/"
 cp "${CLIENT_KEY_PATH}" "${RECEIVER_STAGING_DIR}/"
 
-echo "✅ Credentials updated successfully."
+echo "Credentials updated successfully."
