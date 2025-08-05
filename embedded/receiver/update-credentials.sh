@@ -13,7 +13,7 @@
 # --- Configuration ---
 # The relative path to the root of the iotauth project directory.
 # Adjust this if your directory structure is different.
-AUTH_PROJECT_ROOT="../../iotauth"
+AUTH_PROJECT_ROOT="../../../iotauth"
 
 # The stable staging directory for the receiver's credentials.
 # This path should match what's in sst.config.
