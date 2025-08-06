@@ -140,7 +140,8 @@ int main(int argc, char* argv[]) {
 
     unsigned int hash_length = 0;
     // SHA-256 is 32 bytes
-    unsigned char* hash_of_file = static_cast<unsigned char*>(std::malloc(HASH_SIZE));
+    unsigned char* hash_of_file =
+        static_cast<unsigned char*>(std::malloc(HASH_SIZE));
     if (!hash_of_file) {
         std::cerr << "Allocation failed\n";
         return EXIT_FAILURE;
