@@ -9,7 +9,7 @@
 
 #define MAX_FILE_SUFFIX_LENGTH 5
 
-const char IPFS_ADD_COMMAND[] = "ipfs add ";
+const char IPFS_ADD_COMMAND[] = "ipfs add --quiet ";
 const char TXT_FILE_EXTENSION[] = ".txt";
 const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
@@ -89,28 +89,29 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
-    memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
-    memcpy(command + sizeof(IPFS_ADD_COMMAND) - 1, file_name,
-           strlen(file_name));
+    snprintf(command, sizeof(command), "%s%s", IPFS_ADD_COMMAND,
+             file_name);
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
         SST_print_error_exit("popen() failed.\n");
         exit(1);
     }
-    while (fgets(buff, BUFF_SIZE, fp)) {
-        SST_print_log("%s\n", buff);
+    if (fgets(buff, sizeof(buff), fp) == NULL) {
+        SST_print_error_exit("Failed to read CID from ipfs output.\n");
+        pclose(fp);
+        return -1;
     }
     pclose(fp);
-    char *result;
-    strtok(buff, " ");
-    result = strtok(NULL, " ");
-    memcpy(hash_value, result, strlen(result));
+    // Strip newline
+    buff[strcspn(buff, "\r\n")] = '\0';
+    size_t cid_len = strlen(buff);
+    memcpy(hash_value, buff, cid_len + 1);  // +1 to include null terminator
     gettimeofday(&upload_end, NULL);
     float upload_time = (upload_end.tv_sec - upload_start.tv_sec);
     float upload_utime = (upload_end.tv_usec - upload_start.tv_usec);
     estimate_time->up_download_time = upload_time + upload_utime / 1000000;
-    return strlen(result);
+    return cid_len;
 }
 
 int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
