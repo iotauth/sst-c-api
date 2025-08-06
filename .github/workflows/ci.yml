@@ -149,21 +149,11 @@ jobs:
         cd c
         mkdir build && cd build && cmake ../ && make
         ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
-        # sleep 2
-        # ./entity_downloader ../../downloader.config
-        # cd ../../cpp
-        # mkdir build && cd build && cmake ../ && make
-        # ./uploader ../../uploader.config ../../plain_text ../../addReader.txt
-        # ./downloader ../../downloader.config
-    - name: Run the ipfs examples.
-      working-directory: entity/c/examples/ipfs_examples/c/build
-      run: |
         ./entity_downloader ../../downloader.config
         cd ../../cpp
         mkdir build && cd build && cmake ../ && make
         ./uploader ../../uploader.config ../../plain_text ../../addReader.txt
         ./downloader ../../downloader.config
-
     - name: Stop python file system manager.
       working-directory: auth/auth-server
       run: |
