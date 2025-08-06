@@ -51,14 +51,16 @@ void file_duplication_check(const char *file_name, const char *file_extension,
     while (suffix_num < MAX_REPLY_NUM) {
         if (suffix_num == 0) {
             // First attempt: plain name + extension
-            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s", file_name, file_extension);
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s", file_name,
+                     file_extension);
         } else {
             // Build suffixed version: name + suffix + extension
             char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
-            snprintf(suffix_in_string, sizeof(suffix_in_string), "%d", suffix_num);
+            snprintf(suffix_in_string, sizeof(suffix_in_string), "%d",
+                     suffix_num);
 
-            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s%s",
-                     file_name, suffix_in_string, file_extension);
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s%s", file_name,
+                     suffix_in_string, file_extension);
         }
 
         if (access(file_name_buf, F_OK) == 0) {
@@ -71,7 +73,8 @@ void file_duplication_check(const char *file_name, const char *file_extension,
         }
     }
 
-    SST_print_error("Cannot save the file as file name's suffix number exceeds max.\n");
+    SST_print_error(
+        "Cannot save the file as file name's suffix number exceeds max.\n");
 }
 
 int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
@@ -81,8 +84,7 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
-    snprintf(command, sizeof(command), "%s%s", IPFS_ADD_COMMAND,
-             file_name);
+    snprintf(command, sizeof(command), "%s%s", IPFS_ADD_COMMAND, file_name);
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
@@ -303,9 +305,12 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
     char command[BUFF_SIZE];
     memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
+    command[command_size] = '\0';  // Make sure it's null-terminated
+
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
-    memcpy(command + command_size - 1, file_name, strlen(file_name));
-    SST_print_log("Command: %s \n", command);
+
+    snprintf(command, sizeof(command), "%s%s", command, file_name);
+    SST_print_log("Command: %s\n", command);
     fin = popen(command, "r");
     pclose(fin);
     SST_print_log("Download the file: %s\n", file_name);
