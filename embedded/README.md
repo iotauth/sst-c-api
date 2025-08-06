@@ -33,9 +33,7 @@ The communication between the sender and receiver is secured using AES-GCM, with
 *   **Sender (Pico)**:
     *   [Pico SDK](https://github.com/raspberrypi/pico-sdk)
 *   **Receiver (Pi 4)**:
-    *   OpenSSL
-    *   The [`iotauth`](https://github.com/iotauth/) project is a dependency for provisioning keys; it may require OpenSSL.
-
+*   The `iotauth` project is a dependency for provisioning keys; it may require OpenSSL. Check [here](https://github.com/iotauth/iotauth) for updates on how to properly use iotauth.
 ## Setup
 
 ### 1. Clone the Repository
