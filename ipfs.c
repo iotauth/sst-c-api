@@ -89,8 +89,9 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
-    snprintf(command, sizeof(command), "%s%s 2>&1", IPFS_ADD_COMMAND,
-             file_name);
+    memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
+    memcpy(command + sizeof(IPFS_ADD_COMMAND) - 1, file_name,
+           strlen(file_name));
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
