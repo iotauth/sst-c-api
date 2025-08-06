@@ -162,7 +162,7 @@ jobs:
         sleep 3
         ./downloader ../../downloader.config
     - name: Stop python file system manager.
-      working-directory: auth/auth-server
+      working-directory: examples/file_sharing
       run: |
         if [ -f python.pid ]; then
           kill $(cat python.pid) || echo "File system manager already stopped."
@@ -184,7 +184,7 @@ jobs:
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
     - name: Stop python file system manager.
-      working-directory: auth/auth-server
+      working-directory: examples/file_sharing
       run: |
         if [ -f secure_python.pid ]; then
           kill $(cat secure_python.pid) || echo "File system manager already stopped."
