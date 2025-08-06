@@ -46,12 +46,18 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Read branch name from iotauth-ref.txt
+      id: read_ref
+      run: |
+        ref=$(head -n 1 iotauth-ref.txt)
+        echo "Ref to use: $ref"
+        echo "ref=$ref" >> "$GITHUB_OUTPUT"
     - name: Check out iotauth repository
       uses: actions/checkout@v4
       with:
         repository: iotauth/iotauth
         submodules: true
-        ref: ${{ inputs.compiler-ref }}
+        ref: ${{ steps.read_ref.outputs.ref }}
     - name: Check out specific ref of sst-c-api
       uses: actions/checkout@v4
       with:
