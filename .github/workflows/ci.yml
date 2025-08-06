@@ -173,11 +173,12 @@ jobs:
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
       run: |
+        pip3 install pycryptodome
         nohup python3 secure_file_system_manager.py file_system_manager.config &
         echo $! > secure_python.pid  # Save the PID
 
     - name: Run the secure ipfs examples.
-      working-directory: entity/c/examples/ipfs_examples
+      working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
