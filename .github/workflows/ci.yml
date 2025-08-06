@@ -152,8 +152,8 @@ jobs:
         ./entity_downloader ../../downloader.config
         cd ../../cpp
         mkdir build && cd build && cmake ../ && make
-        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt & # This waits for the downloader, execute in background and sleep 5 second.
-        sleep 5
+        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt & # This waits for the downloader, execute in background and sleep 3 second.
+        sleep 3
         ./downloader ../../downloader.config
     - name: Stop python file system manager.
       working-directory: auth/auth-server
@@ -162,4 +162,25 @@ jobs:
           kill $(cat python.pid) || echo "File system manager already stopped."
         else
           echo "No python.pid file found"
+        fi    
+
+    - name: Run the secure python file system manager.
+      working-directory: examples/file_sharing
+      run: |
+        nohup python3 secure_file_system_manager.py file_system_manager.config &
+        echo $! > secure_python.pid  # Save the PID
+
+    - name: Run the secure ipfs examples.
+      working-directory: entity/c/examples/ipfs_examples
+      run: |
+        ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
+        sleep 3
+        ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop python file system manager.
+      working-directory: auth/auth-server
+      run: |
+        if [ -f secure_python.pid ]; then
+          kill $(cat secure_python.pid) || echo "File system manager already stopped."
+        else
+          echo "No secure_python.pid file found"
         fi    
