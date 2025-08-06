@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
             file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time,
             estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time,
             estimate_time[i].filemanager_time);
-        sleep(5);
+        sleep(1);
     }
     fclose(file);
 
