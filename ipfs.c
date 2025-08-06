@@ -8,6 +8,7 @@
 #include "c_secure_comm.h"
 
 #define MAX_FILE_SUFFIX_LENGTH 5
+#define MAX_FILENAME_LENGTH 512
 
 const char IPFS_ADD_COMMAND[] = "ipfs add --quiet ";
 const char TXT_FILE_EXTENSION[] = ".txt";
@@ -46,40 +47,31 @@ unsigned long file_size_return(FILE *fin) {
 void file_duplication_check(const char *file_name, const char *file_extension,
                             char *file_name_buf) {
     int suffix_num = 0;
-    // Copy file name.
-    const int file_name_len = strlen(file_name);
-    const int file_extension_len = strlen(file_extension);
-    memcpy(file_name_buf, file_name, file_name_len);
-    memcpy(file_name_buf + file_name_len, file_extension, file_extension_len);
-    file_name_buf[file_name_len + file_extension_len] = '\0';
-    for (;;) {
-        if (suffix_num >= MAX_REPLY_NUM) {
-            SST_print_error(
-                "Cannot save the file as file name's suffix number exceeds "
-                "max.\n");
-            exit(1);
-        }
-        if (0 == access(file_name_buf, F_OK)) {
-            SST_print_log("File already exists: %s.\n", file_name_buf);
-            // Copy suffix and file extension.
 
-            char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
-            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d",
-                     suffix_num);
-
-            const int file_suffix_len = strlen(suffix_in_string);
-
-            memcpy(file_name_buf + file_name_len, suffix_in_string,
-                   file_suffix_len);
-            memcpy(file_name_buf + file_name_len + file_suffix_len,
-                   file_extension, file_extension_len);
-            file_name_buf[file_name_len + file_suffix_len +
-                          file_extension_len] = '\0';
-            suffix_num += 1;
+    while (suffix_num < MAX_REPLY_NUM) {
+        if (suffix_num == 0) {
+            // First attempt: plain name + extension
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s", file_name, file_extension);
         } else {
-            break;
+            // Build suffixed version: name + suffix + extension
+            char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
+            snprintf(suffix_in_string, sizeof(suffix_in_string), "%d", suffix_num);
+
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s%s",
+                     file_name, suffix_in_string, file_extension);
+        }
+
+        if (access(file_name_buf, F_OK) == 0) {
+            // File already exists
+            SST_print_log("File already exists: %s.\n", file_name_buf);
+            suffix_num++;
+        } else {
+            // Found a non-existing name
+            return;
         }
     }
+
+    SST_print_error("Cannot save the file as file name's suffix number exceeds max.\n");
 }
 
 int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
