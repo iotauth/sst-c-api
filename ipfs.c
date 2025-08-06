@@ -304,12 +304,11 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
     char command[BUFF_SIZE];
-    memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
-    command[command_size] = '\0';  // Make sure it's null-terminated
-
+    char base_command[BUFF_SIZE];
+    memcpy(base_command, received_buf + 3 + KEY_ID_SIZE, command_size);
+    base_command[command_size] = '\0';  // Null-terminate it
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
-
-    snprintf(command, sizeof(command), "%s%s", command, file_name);
+    snprintf(command, sizeof(command), "%s%s", base_command, file_name);
     SST_print_log("Command: %s\n", command);
     fin = popen(command, "r");
     pclose(fin);
