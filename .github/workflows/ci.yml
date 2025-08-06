@@ -152,7 +152,7 @@ jobs:
         ./entity_downloader ../../downloader.config
         cd ../../cpp
         mkdir build && cd build && cmake ../ && make
-        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt
+        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt &
         ./downloader ../../downloader.config
     - name: Stop python file system manager.
       working-directory: auth/auth-server
