@@ -14,10 +14,10 @@ The communication between the sender and receiver is secured using AES-GCM, with
 ## Hardware Requirements
 
 *   **Sender**:
-    *   Raspberry Pi Pico
+    *   [Raspberry Pi Pico](https://www.sparkfun.com/raspberry-pi-pico.html?src=raspberrypi) (RP2040)
     *   Li-Fi transmitter compatible with the Pico
 *   **Receiver**:
-    *   Raspberry Pi 4
+    *   [Raspberry Pi 4 Model B (4 GB)](https://www.sparkfun.com/raspberry-pi-4-model-b-4-gb.html?src=raspberrypi) (used for testing)
     *   Li-Fi receiver compatible with the Pi 4
 *   **Connection**:
     *   Jumper wires to connect the Pico and Pi 4 via UART:
