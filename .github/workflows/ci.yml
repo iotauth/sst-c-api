@@ -152,8 +152,8 @@ jobs:
         ./entity_downloader ../../downloader.config
         cd ../../cpp
         mkdir build && cd build && cmake ../ && make
-        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt & # This waits for the downloader, execute in background and sleep 1 second.
-        sleep 1 
+        ./uploader ../../uploader.config ../../plain_text ../../addReader.txt & # This waits for the downloader, execute in background and sleep 5 second.
+        sleep 5
         ./downloader ../../downloader.config
     - name: Stop python file system manager.
       working-directory: auth/auth-server
