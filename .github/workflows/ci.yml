@@ -174,7 +174,7 @@ jobs:
       working-directory: examples/file_sharing
       run: |
         pip3 install pycryptodome
-        nohup python3 secure_file_system_manager.py file_system_manager.config &
+        nohup python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > secure_python.pid  # Save the PID
 
     - name: Run the secure ipfs examples.
