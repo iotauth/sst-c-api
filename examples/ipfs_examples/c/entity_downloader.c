@@ -30,7 +30,6 @@ int main(int argc, char *argv[]) {
             "download_time,keygenerate_time,dec_time,filemanager_time\n");  // columns
         fclose(file);
     }
-    // TODO: Check number of files to be provided to me
 
     file = fopen(filename, "a");
     for (int i = 0; i < 3; i++) {
