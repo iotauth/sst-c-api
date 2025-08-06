@@ -149,6 +149,7 @@ jobs:
         cd c
         mkdir build && cd build && cmake ../ && make
         ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
+        sleep 2
         ./entity_downloader ../../downloader.config
         cd ../../cpp
         mkdir build && cd build && cmake ../ && make
