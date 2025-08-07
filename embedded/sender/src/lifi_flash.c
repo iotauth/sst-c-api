@@ -3,12 +3,12 @@
 
 #include "pico/stdlib.h"
 #include "pico/rand.h"
-
 #include "hardware/gpio.h"
 #include "hardware/uart.h"
 #include "hardware/flash.h"
 #include "hardware/watchdog.h"
-#include "hardware/sync.h"  // For save_and_disable_interrupts(), restore_interrupts()
+#include "hardware/sync.h"
+#include "pico/time.h"
 
 #include "../../include/sst_crypto_embedded.h"
 
@@ -21,8 +21,8 @@
 #define UART_TX_PIN 4
 
 #define BAUD_RATE 1000000
-#define PREAMBLE_BYTE_1 0xAA
-#define PREAMBLE_BYTE_2 0x55
+#define PREAMBLE_BYTE_1 0xAB
+#define PREAMBLE_BYTE_2 0xCD
 #define MSG_TYPE_ENCRYPTED 0x02
 
 #define FLASH_KEY_OFFSET (PICO_FLASH_SIZE_BYTES - 4096)
@@ -30,13 +30,24 @@
 
 bool load_session_key_from_flash(uint8_t *key_out) {
     const uint8_t *flash_ptr = (const uint8_t *)(XIP_BASE + FLASH_KEY_OFFSET);
-    if (*(uint32_t *)&flash_ptr[16] != FLASH_KEY_MAGIC) return false;
+
+    bool all_ff = true;
+    for (int i = 0; i < SST_KEY_SIZE; ++i) {
+        if (flash_ptr[i] != 0xFF) {
+            all_ff = false;
+            break;
+        }
+    }
+
+    if (all_ff || *(uint32_t *)&flash_ptr[16] != FLASH_KEY_MAGIC) {
+        return false;
+    }
 
     memcpy(key_out, flash_ptr, SST_KEY_SIZE);
     return true;
 }
 
-void store_session_key_to_flash(const uint8_t *key) {
+bool store_session_key_to_flash(const uint8_t *key) {
     uint8_t flash_buf[256] = {0};
     memcpy(&flash_buf[0], key, SST_KEY_SIZE);
     *(uint32_t *)&flash_buf[16] = FLASH_KEY_MAGIC;
@@ -45,6 +56,14 @@ void store_session_key_to_flash(const uint8_t *key) {
     flash_range_erase(FLASH_KEY_OFFSET, 4096);
     flash_range_program(FLASH_KEY_OFFSET, flash_buf, 256);
     restore_interrupts(ints);
+    return true;
+}
+
+bool erase_session_key_from_flash() {
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(FLASH_KEY_OFFSET, 4096);
+    restore_interrupts(ints);
+    return true;
 }
 
 void zero_key(uint8_t *key) {
@@ -65,11 +84,31 @@ void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("\n");
 }
 
+bool receive_new_key_with_timeout(uint8_t *key_out, uint timeout_ms) {
+    absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
+    while (absolute_time_diff_us(get_absolute_time(), deadline) > 0) {
+        if (uart_is_readable(UART_ID) && uart_getc(UART_ID) == PREAMBLE_BYTE_1) {
+            while (!uart_is_readable(UART_ID));
+            if (uart_getc(UART_ID) == PREAMBLE_BYTE_2) {
+                printf("Receiving new session key...\n");
+                size_t received = 0;
+                while (received < SST_KEY_SIZE &&
+                       absolute_time_diff_us(get_absolute_time(), deadline) > 0) {
+                    if (uart_is_readable(UART_ID)) {
+                        key_out[received++] = uart_getc(UART_ID);
+                    }
+                }
+                return (received == SST_KEY_SIZE);
+            }
+        }
+    }
+    return false;
+}
+
 int main() {
-    printf("Initializing peripherals and UART interfaces...\n");
     stdio_init_all();
-    stdio_usb_init();
-    sleep_ms(3000);
+    sleep_ms(3000); // Allow USB serial to connect
+
     printf("PICO STARTED\n");
 
     gpio_init(25);
@@ -83,40 +122,36 @@ int main() {
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
-    while (uart_is_readable(UART_ID)) {
-        volatile uint8_t junk = uart_getc(UART_ID);
-    }
+    while (uart_is_readable(UART_ID)) { volatile uint8_t _ = uart_getc(UART_ID); }
 
     uint8_t session_key[SST_KEY_SIZE] = {0};
-    bool session_key_loaded = load_session_key_from_flash(session_key);
+    bool has_key = load_session_key_from_flash(session_key);
 
-    if (session_key_loaded) {
-        printf("Loaded session key from flash\n");
-        print_hex("Cached Session Key: ", session_key, SST_KEY_SIZE);
+    if (!has_key) {
+        printf("No session key found in flash. Waiting to receive one...\n");
+
+        if (receive_new_key_with_timeout(session_key, 10000)) {
+            print_hex("Received session key: ", session_key, SST_KEY_SIZE);
+
+            if (store_session_key_to_flash(session_key)) {
+                printf("Session key stored to flash.\n");
+            } else {
+                printf("ERROR: Failed to write session key to flash.\n");
+                return 1;
+            }
+        } else {
+            printf("ERROR: Timed out waiting for session key. Cannot continue.\n");
+            return 1;
+        }
     } else {
-        printf("Listening for session key over UART...\n");
-        printf("Waiting for preamble...\n");
-        while (true) {
-            if (uart_is_readable(UART_ID) && uart_getc(UART_ID) == 0xAB) {
-                while (!uart_is_readable(UART_ID));
-                if (uart_getc(UART_ID) == 0xCD) {
-                    printf("Preamble received. Receiving session key...\n");
-                    break;
-                }
-            }
+        if (watchdog_caused_reboot()) {
+            printf("Watchdog reboot. Retaining existing session key.\n");
+        } else {
+            printf("Fresh boot detected. Loading key from flash.\n");
         }
-
-        size_t received = 0;
-        while (received < SST_KEY_SIZE) {
-            if (uart_is_readable(UART_ID)) {
-                session_key[received++] = uart_getc(UART_ID);
-            }
-        }
-
-        print_hex("Received Session Key: ", session_key, SST_KEY_SIZE);
-        store_session_key_to_flash(session_key);
-        printf("Session key saved to flash\n");
+        print_hex("Using session key: ", session_key, SST_KEY_SIZE);
     }
+
 
     char message_buffer[256];
 
@@ -143,69 +178,6 @@ int main() {
             }
         }
 
-        if (strncmp(message_buffer, "CMD: ", 4) == 0) {
-            const char *cmd = message_buffer + 4;
-
-            if (strcmp(cmd, "clear key") == 0) {
-                printf("Clearing session key from RAM and flash...\n");
-                zero_key(session_key);
-
-                uint32_t ints = save_and_disable_interrupts();
-                flash_range_erase(FLASH_KEY_OFFSET, 4096);
-                restore_interrupts(ints);
-
-                printf("Session key cleared. Waiting for manual rekey (e.g. via reset or manual transmission)...\n");
-
-                continue;
-            } else if (strcmp(cmd, "rotate key") == 0) {
-                printf("Rotating session key...\n");
-                zero_key(session_key);
-
-                uint32_t ints = save_and_disable_interrupts();
-                flash_range_erase(FLASH_KEY_OFFSET, 4096);
-                restore_interrupts(ints);
-
-                printf("Waiting for new session key over UART...\n");
-
-                // Clear UART buffer
-                while (uart_is_readable(UART_ID)) {
-                    volatile uint8_t junk = uart_getc(UART_ID);
-                }
-
-                printf("Waiting for preamble...\n");
-                while (true) {
-                    if (uart_is_readable(UART_ID) && uart_getc(UART_ID) == 0xAB) {
-                        while (!uart_is_readable(UART_ID));
-                        if (uart_getc(UART_ID) == 0xCD) {
-                            printf("Preamble received. Receiving new session key...\n");
-                            break;
-                        }
-                    }
-                }
-
-                size_t received = 0;
-                while (received < SST_KEY_SIZE) {
-                    if (uart_is_readable(UART_ID)) {
-                        session_key[received++] = uart_getc(UART_ID);
-                    }
-                }
-
-                print_hex("🔑 New Session Key: ", session_key, SST_KEY_SIZE);
-                store_session_key_to_flash(session_key);
-                printf("Session key rotated and saved to flash\n");
-                continue;
-
-
-            } else if (strcmp(cmd, "reboot") == 0) {
-                printf("Rebooting device now...\n");
-                sleep_ms(500);
-                watchdog_reboot(0, 0, 0);
-            } else {
-                printf("Unknown CMD: '%s'\n", cmd);
-                continue;
-            }
-        }
-
         uint8_t nonce[SST_NONCE_SIZE];
         get_random_bytes(nonce, SST_NONCE_SIZE);
 
@@ -214,33 +186,65 @@ int main() {
 
         int ret = sst_encrypt_gcm(session_key, nonce, (const uint8_t *)message_buffer,
                                   msg_len, ciphertext, tag);
-
         if (ret != 0) {
             printf("Encryption failed! ret=%d\n", ret);
             continue;
         }
 
-        printf("Sending encrypted frame:\n");
-        printf("   Message length: %d\n", msg_len);
-        print_hex("   Nonce: ", nonce, SST_NONCE_SIZE);
-        print_hex("   Ciphertext: ", ciphertext, msg_len);
-        print_hex("   Tag: ", tag, SST_TAG_SIZE);
-
         uart_putc_raw(UART_ID, PREAMBLE_BYTE_1);
         uart_putc_raw(UART_ID, PREAMBLE_BYTE_2);
         uart_putc_raw(UART_ID, MSG_TYPE_ENCRYPTED);
-
         uart_write_blocking(UART_ID, nonce, SST_NONCE_SIZE);
         uint8_t len_bytes[2] = {(msg_len >> 8) & 0xFF, msg_len & 0xFF};
         uart_write_blocking(UART_ID, len_bytes, 2);
         uart_write_blocking(UART_ID, ciphertext, msg_len);
         uart_write_blocking(UART_ID, tag, SST_TAG_SIZE);
 
-        printf("Sent!\n\n");
-
         gpio_put(25, 1);
         sleep_ms(100);
         gpio_put(25, 0);
+
+                if (strncmp(message_buffer, "CMD:", 4) == 0) {
+            const char *cmd = message_buffer + 4;
+
+            if (strcmp(cmd, " print key") == 0) {
+                print_hex("Current session key: ", session_key, SST_KEY_SIZE);
+
+            } else if (strcmp(cmd, " clear key") == 0) {
+
+                printf("Clearing session key...\n");
+                zero_key(session_key);
+                if (erase_session_key_from_flash()) {
+                    printf("Key cleared from flash and RAM.\n");
+                } else {
+                    printf("ERROR: Flash is locked. Cannot clear key.\n");
+                }
+
+            } else if (strcmp(cmd, " rotate key") == 0) {
+                printf("Waiting 3 seconds for new session key...\n");
+                uint8_t new_key[SST_KEY_SIZE] = {0};
+                if (receive_new_key_with_timeout(new_key, 3000)) {
+                    print_hex("Received new key: ", new_key, SST_KEY_SIZE);
+                    if (store_session_key_to_flash(new_key)) {
+                        memcpy(session_key, new_key, SST_KEY_SIZE);
+                        zero_key(new_key);
+                        printf("New key stored.\n");
+                    } else {
+                        printf("ERROR: Failed to write new key to flash.\n");
+                    }
+                } else {
+                    printf("Timeout waiting for new key. Keeping old key.\n");
+                    zero_key(new_key);
+                }
+
+            } else if (strcmp(cmd, " reboot") == 0) {
+                printf("Rebooting...\n");
+                sleep_ms(500);
+                watchdog_reboot(0, 0, 0);
+            } else {
+                printf("Unknown command.\n");
+            }
+        }
     }
 
     return 0;

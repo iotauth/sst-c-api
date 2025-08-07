@@ -18,8 +18,8 @@
 #define SESSION_KEY_SIZE 16
 #define NONCE_SIZE 12
 #define TAG_SIZE 16
-#define PREAMBLE_BYTE_1 0xAA
-#define PREAMBLE_BYTE_2 0x55
+#define PREAMBLE_BYTE_1 0xAB
+#define PREAMBLE_BYTE_2 0xCD
 #define MSG_TYPE_ENCRYPTED 0x02
 
 void print_hex(const char* label, const uint8_t* data, size_t len) {
@@ -172,12 +172,21 @@ int main(int argc, char* argv[]) {
         if (read(fd, &byte, 1) == 1) {
             switch (state) {
                 case 0:
-                    if (byte == PREAMBLE_BYTE_1) state = 1;
+                    if (byte == PREAMBLE_BYTE_1) {
+                        state = 1;
+                    } else {
+                        printf("Waiting: got 0x%02X, expecting PREAMBLE_BYTE_1\n", byte);
+                    }
                     break;
                 case 1:
-                    if (byte == PREAMBLE_BYTE_2) state = 2;
-                    else state = 0;
+                    if (byte == PREAMBLE_BYTE_2) {
+                        state = 2;
+                    } else {
+                        printf("Bad second preamble byte: 0x%02X\n", byte);
+                        state = 0;
+                    }
                     break;
+
                 case 2:
                     if (byte == MSG_TYPE_ENCRYPTED) {
                         uint8_t nonce[NONCE_SIZE];
