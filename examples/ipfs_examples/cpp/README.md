@@ -22,7 +22,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 ### Run IPFS
 
-1. [Install IPFS](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions).
+1. [Install IPFS](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions). Also run `ipfs init` on the first time starting ipfs.
 
 2. Run `ipfs daemon`.
 
