@@ -38,7 +38,7 @@ void* receive_and_print_messages(void* thread_args) {
     for (;;) {
         int ret =
             read_secure_message(received_buf, session_ctx);
-        if (ret == -1) {
+        if (ret < 0) {
             std::cerr << "Failed to read secure message." << std::endl;
             break;
         } else if (ret == 0) {
@@ -51,7 +51,7 @@ void* receive_and_print_messages(void* thread_args) {
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";
-    if (close(clnt_sock) == -1) {
+    if (close(clnt_sock) < 0) {
         std::cerr << "close() error" << std::endl;
         return NULL;
     }
@@ -73,7 +73,7 @@ int main(int argc, char *argv[]) {
 
     struct sockaddr_in serv_addr;
     serv_sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (serv_sock == -1) {
+    if (serv_sock < 0) {
         std::cerr << "socket() error" << std::endl;
         return EXIT_FAILURE;
     }
@@ -89,13 +89,12 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT_NUM);
 
-    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
-        -1) {
+    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
         std::cerr << "bind() error" << std::endl;
         return EXIT_FAILURE;
     }
 
-    if (listen(serv_sock, 5) == -1) {
+    if (listen(serv_sock, 5) < 0) {
         std::cerr << "listen() error" << std::endl;
         return EXIT_FAILURE;
     }
@@ -106,7 +105,7 @@ int main(int argc, char *argv[]) {
         socklen_t clnt_addr_size = sizeof(clnt_addr);
         int clnt_sock =
             accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
-        if (clnt_sock == -1) {
+        if (clnt_sock < 0) {
             std::cerr << "accept() error" << std::endl;
             return EXIT_FAILURE;
         }
@@ -120,7 +119,7 @@ int main(int argc, char *argv[]) {
         if (pthread_create(&t, NULL, receive_and_print_messages, args) != 0) {
             std::cerr << "pthread_create() error" << std::endl;
 
-            if (close(clnt_sock) == -1) {
+            if (close(clnt_sock) < 0) {
                 std::cerr << "close() error" << std::endl;
                 return EXIT_FAILURE;
             }
@@ -133,7 +132,7 @@ int main(int argc, char *argv[]) {
 
     std::cout << "Finished communication." << std::endl;
 
-    if (close(serv_sock) == -1) {
+    if (close(serv_sock) < 0) {
         std::cerr << "close() error" << std::endl;
         return EXIT_FAILURE;
     }
