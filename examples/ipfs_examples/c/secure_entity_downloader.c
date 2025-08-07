@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
     strncpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
-    if (read_secure_message(decrypted, session_ctx)<= 0) {
+    if (read_secure_message(decrypted, session_ctx) <= 0) {
         printf("Failed to read secure message.\n");
         exit(1);
     }
@@ -37,11 +37,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
     printf("Session key id size: %x\n", decrypted[1]);
-    printf("Command size: %d\n",
-           decrypted[SESSION_KEY_ID_SIZE + 2]);
+    printf("Command size: %d\n", decrypted[SESSION_KEY_ID_SIZE + 2]);
 
-    download_file(&decrypted[0], &received_skey_id[0],
-                  &file_name[0]);
+    download_file(&decrypted[0], &received_skey_id[0], &file_name[0]);
     session_key_t *session_key =
         get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
     if (session_key == NULL) {
