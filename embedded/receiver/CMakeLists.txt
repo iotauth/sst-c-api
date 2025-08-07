@@ -7,8 +7,8 @@ if(NOT DEFINED PICO_BOARD)
 endif()
 
 # Executable
-add_executable(receiver_uart
-    src/receiver_uart.c
+add_executable(receiver_flash
+    src/receiver_flash.c
     ../../c_api.c
     ../../c_common.c
     ../../c_crypto.c
@@ -18,24 +18,24 @@ add_executable(receiver_uart
 )
 
 # Includes
-target_include_directories(receiver_uart PRIVATE
+target_include_directories(receiver_flash PRIVATE
     ${CMAKE_SOURCE_DIR}/../../include
     ${CMAKE_SOURCE_DIR}/../../
 )
 
 if(OpenSSL_FOUND)
-  target_include_directories(receiver_uart PRIVATE ${OPENSSL_INCLUDE_DIR})
+  target_include_directories(receiver_flash PRIVATE ${OPENSSL_INCLUDE_DIR})
 endif()
 
 # Link libraries
-target_link_libraries(receiver_uart PRIVATE
+target_link_libraries(receiver_flash PRIVATE
     sst_embedded           # mbedTLS-based AES-GCM
 )
 
 if(OpenSSL_FOUND)
-  target_link_libraries(receiver_uart PRIVATE OpenSSL::Crypto)  # for init_sst etc.
+  target_link_libraries(receiver_flash PRIVATE OpenSSL::Crypto)  # for init_sst etc.
 endif()
 
-target_compile_definitions(receiver_uart PRIVATE
+target_compile_definitions(receiver_flash PRIVATE
     DEFAULT_SST_CONFIG_PATH="../../receiver/sst.config"
 )
