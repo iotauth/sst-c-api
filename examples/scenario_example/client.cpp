@@ -1,6 +1,6 @@
 extern "C" {
-#include <c/c_api.h>
-#include <c/ipfs.h>
+#include "../../c_api.h"
+// #include "../../ipfs.h"
 }
 
 #include <unistd.h>
