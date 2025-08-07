@@ -1,173 +1,163 @@
-# Secure Li-Fi Communication with SST
+# 🔐 Secure Li-Fi Communication with SST
 
-This project aims to establish secure, real-time Li-Fi communication between edge devices using AES-GCM encryption with session keys provisioned by an SST-based authentication server.
+This project establishes secure, real-time Li-Fi communication between embedded edge devices using AES-GCM encryption and session keys provisioned by an SST-based authentication server.
 
-## Project Overview
+---
 
-This repository contains the embedded software for a secure Li-Fi communication system. It consists of two main components:
+## 🔧 Project Overview
 
-*   **Sender**: A Raspberry Pi Pico responsible for encrypting and transmitting data via a Li-Fi module.
-*   **Receiver**: A Raspberry Pi 4 that receives the Li-Fi signal, decrypts the data, and is responsible for provisioning session keys from an authentication server.
+This repository contains embedded software for secure Li-Fi communication, consisting of:
 
-The communication between the sender and receiver is secured using AES-GCM, with custom `sst_encrypt_gcm` and `sst_decrypt_gcm` implementations.
+- **Sender (Raspberry Pi Pico)**: Encrypts user-input messages and transmits them via Li-Fi using AES-GCM and a session key.
+- **Receiver (Raspberry Pi 4)**: Fetches session keys from the SST Auth server, transmits them to the Pico via UART, and receives and decrypts Li-Fi messages from the Pico.
 
-## Hardware Requirements
+### Key Features:
+- AES-GCM encryption using `sst_encrypt_gcm()` and `sst_decrypt_gcm()`
+- Flash memory storage for session key persistence on the Pico
+- Command interface over UART with support for:
+  - `CMD: print key sender`
+  - `CMD: print key receiver`
+  - `CMD: print key *`
+  - `CMD: rotate key`
+  - `CMD: clear key`
+  - `CMD: reboot`
+- Smart flash logic: Pico clears flash when needed and waits for valid keys
 
-*   **Sender**:
-    *   [Raspberry Pi Pico](https://www.sparkfun.com/raspberry-pi-pico.html?src=raspberrypi) (RP2040)
-    *   Li-Fi transmitter compatible with the Pico
-*   **Receiver**:
-    *   [Raspberry Pi 4 Model B (4 GB)](https://www.sparkfun.com/raspberry-pi-4-model-b-4-gb.html?src=raspberrypi) (used for testing)
-    *   Li-Fi receiver compatible with the Pi 4
-*   **Connection**:
-    *   Jumper wires to connect the Pico and Pi 4 via UART:
-        *   Pico GP5 (Physical Pin 7) <-> Pi 4 GPIO14 (Physical Pin 8)
+---
 
-## Software Dependencies
+## 🧰 Hardware Requirements
 
-*   **General**:
-    *   CMake (version 3.13 or later)
-    *   ARM GCC Compiler
-    *   Java Development Kit (JDK)
-    *   Maven
-*   **Sender (Pico)**:
-    *   [Pico SDK](https://github.com/raspberrypi/pico-sdk)
-*   **Receiver (Pi 4)**:
-    * The `iotauth` project is a dependency for provisioning keys; it may require OpenSSL. [Check here](https://github.com/iotauth/iotauth)
-## Setup
+### **Sender (Pico)**
+- Raspberry Pi Pico (RP2040)
+- Li-Fi LED transmitter module
+- USB cable (for programming and debug serial)
 
-### 1. Clone the Repository
+### **Receiver (Pi 4)**
+- Raspberry Pi 4 Model B (or equivalent)
+- Li-Fi receiver module
+- Connected over UART1:
+  - **Pico TX (GPIO 4)** <-> **Pi 4 RX (GPIO14, Pin 8)**
 
+---
+
+## 📦 Software Dependencies
+
+- CMake ≥ 3.13
+- ARM GCC Toolchain
+- Java (for SST server)
+- Maven (for SST server)
+- [Pico SDK](https://github.com/raspberrypi/pico-sdk)
+
+### SST Software
+- [iotauth](https://github.com/iotauth/iotauth) project (used for key provisioning)
+- [sst-c-api](https://github.com/iotauth/sst-c-api) (included as a submodule or dependency)
+
+---
+
+## 🛠️ Setup Instructions
+
+### 1. Clone the Repository with Submodules
 ```bash
-git clone <repository-url>
+git clone --recurse-submodules <repo-url>
 cd embedded
 ```
 
-### 2. Pico SDK
-
-Ensure the `PICO_SDK_PATH` environment variable is set to the location of your Pico SDK installation.
-
+### 2. Export `PICO_SDK_PATH`
 ```bash
-export PICO_SDK_PATH="/path/to/pico-sdk"
+export PICO_SDK_PATH=/path/to/pico-sdk
 ```
 
-### 3. Setup `iotauth` Server & Credentials
+---
 
-The receiver requires credentials from the `iotauth` project, which also runs the authentication server.
+## 🔑 SST Server Setup (Key Provisioning)
 
-**A. Generate Credentials**
+### A. Generate Credentials
+```bash
+cd ../../iotauth/examples
+./cleanAll
+./generateAll
+```
 
-1.  Navigate to the `iotauth` project directory. This guide assumes `sst-c-api` and `iotauth` are in the same parent directory.
+### B. Run the Authentication Server
+```bash
+cd ../auth/auth-server
+mvn clean install
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+```
 
-    ```bash
-    cd ../../iotauth/examples
-    ```
-2.  Run the credential generation scripts. You will be prompted to create and confirm a password.
+### C. Copy Credentials to Receiver
+```bash
+cd /path/to/sst-c-api/embedded/receiver
+./update-credentials.sh
+cd ..
+```
 
-    ```bash
-    ./cleanAll
-    ./generateAll
-    ```
-    You should see "generating credentials..." output.
+---
 
-**B. Run the Authentication Server**
+## ⚙️ Building and Flashing
 
-1.  Navigate to the authentication server directory.
+### 1. Build Sender Firmware
+```bash
+cd embedded
+mkdir build && cd build
+cmake ..
+make
+```
 
-    ```bash
-    cd ../auth/auth-server
-    ```
-2.  Build the server using Maven.
+### 2. Flash the Pico
+Copy `sender/lifi_sender_embedded.uf2` to the Pico USB device.
 
-    ```bash
-    mvn clean install
-    ```
-3.  Run the server. You will be prompted for the password you created earlier.
+---
 
-    ```bash
-    java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
-    ```
-    The server is now running and listening for requests. Leave this terminal open.
+## 🔌 USB & UART in WSL (Optional)
 
-**C. Update Receiver Credentials**
+To use UART in WSL:
 
-With the server running, you can now copy the generated credentials to the receiver project. This functionality will support caching the session key for intermittent WiFi connection in the future.
+```powershell
+usbipd list
+usbipd attach --busid <BUSID> --wsl
+```
 
-1.  In a new terminal, navigate back to the `receiver` directory in the `sst-c-api` project:
+Then:
+```bash
+picocom /dev/ttyACM0
+```
 
-    ```bash
-    cd /path/to/sst-c-api/embedded/receiver
-    ```
-2.  Update the `AUTH_PROJECT_ROOT` variable in `update-credentials.sh` to point to your `iotauth` project directory if it's not `../../../iotauth`.
-3.  Run the script to copy the credentials:
+---
 
-    ```bash
-    ./update-credentials.sh
-    cd ..
-    ```
+## 🛜 Running Receiver
 
-## Building and Running
+From a separate terminal:
 
-This guide provides the full workflow for building, flashing, and running the Li-Fi sender and receiver.
+```bash
+./receiver/receiver_uart ../receiver/sst.config
+```
 
-> **Note:** An application is being developed to control multiple Picos from a single USB-connected machine. The following steps are for manual, single-device testing.
+---
 
-### Step 1: Build the Sender (Pico)
+## 💬 Command Interface
 
-1.  Ensure the `PICO_SDK_PATH` environment variable is set.
-2.  Navigate to a build directory.
-    ```bash
-    mkdir -p build && cd build
-    ```
-3.  Run CMake and Make. This will automatically detect the Pico SDK and build the sender application.
-    ```bash
-    cmake ..
-    make
-    ```
+Send commands over UART0 (debug) on the Pico:
 
-### Step 2: Flash the Sender
+| Command                    | Action |
+|---------------------------|--------|
+| `CMD: print key sender`   | Prints key on Pico, receiver confirms |
+| `CMD: print key receiver` | Prints key on Pi 4, Pico confirms |
+| `CMD: print key *`        | Prints keys on both |
+| `CMD: rotate key`         | Receiver sends new session key |
+| `CMD: clear key`          | Clears key from Pico flash |
+| `CMD: reboot`             | Reboots the Pico |
 
-Flash the `sender/lifi_sender_embedded.uf2` file from the build directory to your Pico.
+---
 
-### Step 3: Enable Pico Communication in WSL
+## 🧪 Notes & Future Work
 
-To send messages to the Pico from a WSL environment, you need to attach the Pico's USB device to WSL.
+- Pico startup waits up to 10 seconds for a valid session key on fresh boot.
+- If a session key is stored in flash, it will load and use it immediately.
+- Future work may include:
+  - GUI desktop app to manage multiple Picos
+  - File transfer support
+  - Federated authentication caching
+  - TPM integration for secure key storage on Pi 4
 
-1.  **List USB Devices:** Open a PowerShell or Command Prompt and use `usbipd` to list the available USB devices. Identify the BUSID for your Raspberry Pi Pico.
-    ```powershell
-    usbipd list
-    ```
-2.  **Attach to WSL:** Use the BUSID from the previous step to attach the Pico to WSL.
-    ```powershell
-    # Replace 1-3 with the actual BUSID of your Pico
-    usbipd attach --busid 1-3 --wsl
-    ```
-
-### Step 4: Send a Message with `picocom`
-
-1.  From your WSL terminal, use `picocom` to open a serial connection to the Pico. The device is typically `/dev/ttyACM0`.
-    ```bash
-    picocom /dev/ttyACM0
-    ```
-2.  You can now type messages in the `picocom` terminal and press Enter to send them over the Li-Fi connection.
-
-### Step 5: Build and Run the Receiver
-
-While the `picocom` session is active in one terminal, you will build and run the receiver in another.
-
-1.  **Build the Receiver:**
-    -   Navigate to a build directory (you can use the same one).
-    -   Run CMake with the `-DHAS_PICO_SDK=OFF` flag to build the receiver application.
-    ```bash
-    # From the build directory
-    cmake ..
-    make
-    ```
-2.  **Run the Receiver:**
-    -   Execute the `receiver_uart` program, providing the path to your `sst.config` file.
-    ```bash
-    # From the build directory
-    ./receiver/receiver_uart ../receiver/sst.config
-    ```
-    The receiver will now listen for, decrypt, and display the messages you send from the Pico.
-    In the future I plan to develop an app to communicate with multiple picos and send messages with drag and drop files, queries, and device-specific sharing of messages
+---
