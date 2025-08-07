@@ -35,9 +35,9 @@ void* receive_and_print_messages(void* thread_args) {
 
     // Receive messages from client
     for (;;) {
-        unsigned char *received_buf;
+        unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
         int ret =
-            read_secure_message(session_ctx->sock, &received_buf, session_ctx);
+            read_secure_message(received_buf, session_ctx);
         if (ret == -1) {
             std::cerr << "Failed to read secure message." << std::endl;
             break;
@@ -46,10 +46,7 @@ void* receive_and_print_messages(void* thread_args) {
             break;
         }
         // Process the received_buf message
-        // TODO: Remove this temporary fix once the C API is fixed.
-        // Remove the two 4-byte sequence numbers in the received buffer
-        unsigned char *received_plaintext = received_buf + 8;
-        std::cout << reinterpret_cast<const char *>(received_plaintext)
+        std::cout << reinterpret_cast<const char *>(received_buf)
                   << std::endl;
     }
 
