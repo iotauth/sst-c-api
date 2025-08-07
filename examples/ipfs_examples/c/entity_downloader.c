@@ -3,13 +3,12 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "../../../c_common.h"
 #include "../../../ipfs.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        fputs("Enter config path", stderr);
-        fputc('\n', stderr);
-        exit(1);
+        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
@@ -31,10 +30,9 @@ int main(int argc, char *argv[]) {
             "download_time,keygenerate_time,dec_time,filemanager_time\n");  // columns
         fclose(file);
     }
-    // TODO: Check number of files to be provided to me
 
     file = fopen(filename, "a");
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 3; i++) {
         receive_data_and_download_file(&received_skey_id[0], ctx, &file_name[0],
                                        &estimate_time[i]);
         struct timeval keygen_start, keygen_end;
@@ -51,7 +49,7 @@ int main(int argc, char *argv[]) {
             fputc('\n', stderr);
             exit(1);
         } else {
-            sleep(5);
+            sleep(1);
             struct timeval decrypt_start, decrypt_end;
             gettimeofday(&decrypt_start, NULL);
             file_decrypt_save(*session_key, &file_name[0]);
@@ -74,7 +72,7 @@ int main(int argc, char *argv[]) {
             file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time,
             estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time,
             estimate_time[i].filemanager_time);
-        sleep(3);
+        sleep(1);
     }
     fclose(file);
     free_SST_ctx_t(ctx);

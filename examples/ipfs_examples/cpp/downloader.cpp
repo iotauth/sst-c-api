@@ -1,12 +1,14 @@
-#include <unistd.h>
-
-#include <fstream>
-#include <iostream>
-
 extern "C" {
 #include "../../../c_crypto.h"
 #include "../../../ipfs.h"
 }
+
+#include <unistd.h>
+
+#include <cstring>
+#include <fstream>
+#include <iostream>
+#include <vector>
 
 // Checks if the file exists by attempting to open it in read mode.
 bool fileExists(const std::string &filename) {
