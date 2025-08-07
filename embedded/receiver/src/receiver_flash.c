@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
     uint8_t preamble[2] = {0xAB, 0xCD};
     write(fd, preamble, 2);
     write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-    usleep(5000);  // short delay to flush
+    usleep(50000); // Wait 50ms instead of 5ms flush delay
     printf("Sent preamble + session key over UART.\n");
 
     // Step 2: Listen for encrypted message
