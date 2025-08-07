@@ -1,0 +1,17 @@
+when I make my app for controlling multiple picos I should remember that CMD: <commands> can control the pico sender and receiver, so if I was to drag and drop a file that had that string CMD: <some command>:
+	an outsider would be able to trigger a command if somehow sent or loaded message into pico to send over lifi (clear key) disrupting communication
+	or a user could accidentally pass a file with that and unintentionally halt operations.
+
+Therefore I would need to add a chcek with the app that will allow me to drag and drop files to send to whichever selected picos that are available to the busses
+	this would deny or alter the message slightly (or disable the CMD: <command> feature during transmission of file or message over lifi) -maybe boolean
+  I would need to keep this in mind in case I run into those issues in the future
+
+Some to:do's
+- include image of hardware with pointers to what everything is in my project
+- look into PRNG seeding and how to maximize entropy for randomness (harder for hackers to get me)
+- add TPM for pi 4 and/or best secure caching techniques and protocols for both sender and receiver (pico and pi 4)
+- use my CMD: <commands> functions to control cache and keys in real time (already implemnented)
+
+So I think the most important/next feature could be to add the caching security on pico and pi 4. 
+
+Once that is done look into making the entropy best I can for PRNG seeding (use temp, photodiode) etc. look into that next
