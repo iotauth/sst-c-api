@@ -223,7 +223,7 @@ int main(int argc, char* argv[]) {
                                 decrypted[msg_len] = '\0';
                                 printf("Decrypted: %s\n", decrypted);
 
-                                if (strcmp((char*)decrypted, "rotate key") == 0) {
+                                if (strcmp((char*)decrypted, "CMD: rotate key") == 0) {
                                     printf("Received 'rotate key' command. Rotating session key...\n");
 
                                     // Free and fetch new key
@@ -248,7 +248,7 @@ int main(int argc, char* argv[]) {
 
                                     printf("Sent new session key to Pico.\n");
 
-                                } else if (strcmp((char*)decrypted, "clear key") == 0) {
+                                } else if (strcmp((char*)decrypted, "CMD: clear key") == 0) {
                                     printf("Received 'clear key' command. Zeroing session key (no new key sent).\n");
                                     explicit_bzero(s_key.cipher_key, SESSION_KEY_SIZE); //guarantee zeroing even if compiler thinks its not needed
                                     key_valid = false; // mark key as invalid
