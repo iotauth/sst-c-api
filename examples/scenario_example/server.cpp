@@ -33,21 +33,21 @@ void* receive_and_print_messages(void* thread_args) {
         return NULL;
     }
 
+    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     // Receive messages from client
     for (;;) {
-        unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
         int ret =
             read_secure_message(received_buf, session_ctx);
         if (ret == -1) {
             std::cerr << "Failed to read secure message." << std::endl;
             break;
         } else if (ret == 0) {
-            std::cerr << "No more messages to read." << std::endl;
+            std::cerr << "Connection closed" << std::endl;
             break;
         }
         // Process the received_buf message
-        std::cout << reinterpret_cast<const char *>(received_buf)
-                  << std::endl;
+        std::cout.write(reinterpret_cast<const char *>(received_buf), ret);
+        std::cout << std::endl; // if you want a newline
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";
