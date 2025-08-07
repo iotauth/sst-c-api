@@ -10,3 +10,4 @@ entity_server
 **/Testing/**
 .vscode
 !/Makefile
+embedded/receiver/config/*
