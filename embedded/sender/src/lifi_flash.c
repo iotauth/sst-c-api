@@ -143,7 +143,7 @@ int main() {
             }
         }
 
-        if (strncmp(message_buffer, "CMD:", 4) == 0) {
+        if (strncmp(message_buffer, "CMD: ", 4) == 0) {
             const char *cmd = message_buffer + 4;
 
             if (strcmp(cmd, "clear key") == 0) {
