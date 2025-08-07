@@ -5,7 +5,7 @@
 #include <iostream>
 
 extern "C" {
-#include <c/c_api.h>
+#include "../../c_api.h"
 }
 
 // Struct for arguments for each thread
