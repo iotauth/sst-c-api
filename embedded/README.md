@@ -25,18 +25,20 @@ This repository contains embedded software for secure Li-Fi communication, consi
 
 ---
 
-## 🧰 Hardware Requirements
+## 🔧 Hardware Requirements
 
 ### **Sender (Pico)**
-- Raspberry Pi Pico (RP2040)
+- [Raspberry Pi Pico (RP2040)](https://www.sparkfun.com/raspberry-pi-pico.html?src=raspberrypi)
 - Li-Fi LED transmitter module
 - USB cable (for programming and debug serial)
 
 ### **Receiver (Pi 4)**
-- Raspberry Pi 4 Model B (or equivalent)
+- [Raspberry Pi 4 Model B (4 GB)](https://www.sparkfun.com/raspberry-pi-4-model-b-4-gb.html?src=raspberrypi)
 - Li-Fi receiver module
-- Connected over UART1:
-  - **Pico TX (GPIO 4)** <-> **Pi 4 RX (GPIO14, Pin 8)**
+
+### **Connection (UART1)**
+- **Pico TX (GPIO 4)** → **Pi 4 RX (GPIO14, Pin 8)**
+- **Pico RX (GPIO 5)** ← **Pi 4 TX (GPIO15, Pin 10)**
 
 ---
 
