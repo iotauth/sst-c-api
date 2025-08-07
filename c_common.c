@@ -158,9 +158,9 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     uint16_t length = 1;
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
-    if (received_buf_length < 0) {
+    if (received_buf_length <= 0) {
         SST_print_error_exit(
-            "Socket read eerror in read_variable_length_one_byte_each().\n");
+            "Socket read error in read_variable_length_one_byte_each().\n");
     }
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
@@ -176,18 +176,18 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     // Read the first byte.
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-    if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read eerror in read_header_return_data_buf_pointer().\n");
-    } else if (received_buf_length == 0) {
-        SST_print_error(
-            "Socket read returned 0 bytes, it may have been closed.\n");
+    if (received_buf_length <= 0) {
+        SST_print_error("Failed to read from socket reading the 1 byte message type.");
         return received_buf_length;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
     unsigned int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
+    if (var_length_buf_size <= 0) {
+        SST_print_error("Failed to read from socket reading the variable length buffer.");
+        return var_length_buf_size;
+    }
     unsigned int var_length_buf_size_checked;
     unsigned int ret_length;
     // Decode the variable length buffer and get the bytes to read.
@@ -200,6 +200,10 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         SST_print_error_exit("Larger buffer size required.");
     }
     int bytes_read = sst_read_from_socket(socket, buf, buf_length);
+    if (bytes_read <= 0) {
+        SST_print_error("Failed to read from socket reading the payload.");
+        return bytes_read;
+    }
     if ((unsigned int)bytes_read != ret_length) {
         SST_print_error_exit("Wrong read... Exiting..");
     }
@@ -314,9 +318,9 @@ int sst_read_from_socket(int socket, unsigned char *buf,
     }
     ssize_t length_read = read(socket, buf, buf_length);
     if (length_read < 0) {
-        SST_print_error_exit("Reading from socket failed.");
+        SST_print_error("Reading from socket failed with error.");
     } else if (length_read == 0) {
-        SST_print_error("0 bytes read from socket, it may have been closed.\n");
+        SST_print_error("Connection closed by peer.\n");
     }
     return (unsigned int)length_read;
 }
