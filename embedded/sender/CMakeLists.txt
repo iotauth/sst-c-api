@@ -14,16 +14,19 @@ include(${PICO_SDK_PATH}/external/pico_sdk_import.cmake)
 pico_sdk_init()
 
 # === Executable: LiFi Sender with Embedded Encryption ===
-add_executable(lifi_sender_embedded
-    src/lifi_sender_embedded.c
+include_directories(/home/josef/pico-sdk/src/rp2_common/hardware_irq/include)
+
+add_executable(lifi_flash
+    src/lifi_flash.c
 )
 
-target_link_libraries(lifi_sender_embedded PRIVATE
+target_link_libraries(lifi_flash PRIVATE
     pico_stdlib
     pico_rand
+    pico_platform
     sst_embedded
 )
 
-pico_enable_stdio_usb(lifi_sender_embedded 1)
-pico_enable_stdio_uart(lifi_sender_embedded 0)
-pico_add_extra_outputs(lifi_sender_embedded)
+pico_enable_stdio_usb(lifi_flash 1)
+pico_enable_stdio_uart(lifi_flash 0)
+pico_add_extra_outputs(lifi_flash)

@@ -53,7 +53,6 @@ target_compile_definitions(mbedcrypto PRIVATE
   MBEDTLS_NO_PLATFORM_ENTROPY
 )
 
-
 if(HAS_PICO_SDK)
   target_sources(mbedcrypto PRIVATE src/mbedtls_time_alt.c) # override
   target_link_libraries(mbedcrypto PRIVATE pico_stdlib)

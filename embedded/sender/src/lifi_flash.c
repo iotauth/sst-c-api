@@ -1,13 +1,16 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../../include/sst_crypto_embedded.h"
+#include "pico/stdlib.h"
+#include "pico/rand.h"
+
 #include "hardware/gpio.h"
 #include "hardware/uart.h"
 #include "hardware/flash.h"
 #include "hardware/watchdog.h"
-#include "pico/rand.h"
-#include "pico/stdlib.h"
+#include "hardware/sync.h"  // For save_and_disable_interrupts(), restore_interrupts()
+
+#include "../../include/sst_crypto_embedded.h"
 
 #define UART_ID_DEBUG uart0
 #define UART_RX_PIN_DEBUG 1
@@ -143,8 +146,19 @@ int main() {
         if (strncmp(message_buffer, "CMD:", 4) == 0) {
             const char *cmd = message_buffer + 4;
 
-            if (strcmp(cmd, "clear key") == 0 || strcmp(cmd, "rotate key") == 0) {
-                printf("%s session key...\n", strcmp(cmd, "clear key") == 0 ? "Clearing" : "Rotating");
+            if (strcmp(cmd, "clear key") == 0) {
+                printf("Clearing session key from RAM and flash...\n");
+                zero_key(session_key);
+
+                uint32_t ints = save_and_disable_interrupts();
+                flash_range_erase(FLASH_KEY_OFFSET, 4096);
+                restore_interrupts(ints);
+
+                printf("Session key cleared. Waiting for manual rekey (e.g. via reset or manual transmission)...\n");
+
+                continue;
+            } else if (strcmp(cmd, "rotate key") == 0) {
+                printf("Rotating session key...\n");
                 zero_key(session_key);
 
                 uint32_t ints = save_and_disable_interrupts();
@@ -153,6 +167,7 @@ int main() {
 
                 printf("Waiting for new session key over UART...\n");
 
+                // Clear UART buffer
                 while (uart_is_readable(UART_ID)) {
                     volatile uint8_t junk = uart_getc(UART_ID);
                 }
@@ -175,10 +190,11 @@ int main() {
                     }
                 }
 
-                print_hex("New Session Key: ", session_key, SST_KEY_SIZE);
+                print_hex("🔑 New Session Key: ", session_key, SST_KEY_SIZE);
                 store_session_key_to_flash(session_key);
-                printf("Session key saved to flash\n");
+                printf("Session key rotated and saved to flash\n");
                 continue;
+
 
             } else if (strcmp(cmd, "reboot") == 0) {
                 printf("Rebooting device now...\n");
