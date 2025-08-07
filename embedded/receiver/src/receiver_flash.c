@@ -261,6 +261,8 @@ int main(int argc, char* argv[]) {
                                     printf("Received 'clear key' command. Zeroing session key (no new key sent).\n");
                                     explicit_bzero(s_key.cipher_key, SESSION_KEY_SIZE); //guarantee zeroing even if compiler thinks its not needed
                                     key_valid = false; // mark key as invalid
+                                } else if (strcmp((char*)decrypted, "CMD: print key receiver") == 0 || strcmp((char*)decrypted, "CMD: print key *") == 0) {
+                                    print_hex("Receiver's session key: ", s_key.cipher_key, SESSION_KEY_SIZE);
                                 }
 
                             } else {
