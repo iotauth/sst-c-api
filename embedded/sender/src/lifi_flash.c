@@ -243,6 +243,8 @@ int main() {
                 watchdog_reboot(0, 0, 0);
             } else if (strcmp(cmd, " print key sender") == 0 || strcmp(cmd, " print key *") == 0) {
                 print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);  
+            } else if (strcmp(cmd, " print key receiver") == 0) {
+                printf("Check receiver printed key\n");  
             } else {
                 printf("Unknown command.\n");
             }
