@@ -45,7 +45,7 @@ target_include_directories(mbedcrypto PUBLIC
 )
 
 target_include_directories(mbedcrypto PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_SOURCE_DIR}/include  # for sst_crypto_embedded.h and config_handler.h etc
   ${CMAKE_CURRENT_SOURCE_DIR}/src  # for mbedtls_time_alt.h
 )
 
@@ -65,6 +65,7 @@ endif()
 # === Embedded SST Crypto Wrapper ===
 add_library(sst_embedded
   src/sst_crypto_embedded.c
+  src/config_handler.c
 )
 
 target_include_directories(sst_embedded PUBLIC
