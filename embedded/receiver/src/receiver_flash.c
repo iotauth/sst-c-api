@@ -352,7 +352,6 @@ int main(int argc, char* argv[]) {
                                     state = STATE_WAITING_FOR_ACK;
                                     clock_gettime(CLOCK_MONOTONIC, &state_deadline);
                                     state_deadline.tv_sec += 5;
-
                                 } else if (strcmp((char*)decrypted, "CMD: new key") == 0) {
                                     time_t now = time(NULL);
                                     if (now - last_key_req_time < KEY_UPDATE_COOLDOWN_S) {
