@@ -10,8 +10,10 @@
 #include <stdbool.h> // to use bool type check if key is valid
 #include <time.h>
 
+
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
+#include "../../include/config_handler.h" // For change_directory_to_config_path and get_config_path
 
 #define UART_DEVICE "/dev/serial0"
 #define BAUDRATE B1000000
@@ -88,81 +90,22 @@ int init_serial(const char* device, int baudrate) {
 }
 
 int main(int argc, char* argv[]) {
-    const char* config_path;
-    char original_dir[PATH_MAX];
-    char new_dir[PATH_MAX];
-
-    if (getcwd(original_dir, sizeof(original_dir)) == NULL) {
-        perror("Fatal: Could not determine current working directory");
-        return 1;
-    }
-
+    const char* config_path = NULL;
+    
     if (argc > 2) {
         fprintf(stderr, "Error: Too many arguments.\n");
         fprintf(stderr, "Usage: %s [<path/to/sst.config>]\n", argv[0]);
         return 1;
     } else if (argc == 2) {
-        // A path was provided. We need to change the working directory
-        // to the directory of the config file so that relative paths
-        // within the config file work correctly.
-        char* path_copy = strdup(argv[1]);
-        if (!path_copy) {
-            perror("strdup failed");
-            return 1;
-        }
-
-        char* dir = dirname(path_copy);
-        if (chdir(dir) != 0) {
-            perror("Failed to change directory to config file location");
-            free(path_copy);
-            return 1;
-        }
-
-        // Now that we are in the correct directory, we can use the filename
-        // part.
-        config_path = basename(argv[1]);
-
-        if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
-            perror("Fatal: Could not determine new working directory");
-            free(path_copy);
-            return 1;
-        }
-
-        printf("Changed directory from '%s' to '%s'\n", original_dir, new_dir);
-        printf("Using config file: %s\n", config_path);
-        free(path_copy);
-    } else {
-        // No path provided. Assume the default location is ../../receiver/
-        // relative to the executable's location. We must change directory
-        // there before trying to load the config file.
-        const char* config_dir_relative = "../../receiver";
-        if (chdir(config_dir_relative) != 0) {
-            perror("Could not switch to default config directory");
-            fprintf(stderr,
-                    "\nFailed to find default config directory ('%s') from "
-                    "your current location:\n",
-                    config_dir_relative);
-            fprintf(stderr, "  %s\n\n", original_dir);
-            fprintf(stderr,
-                    "This program expects to be run from its 'build/receiver' "
-                    "directory.\n");
-            fprintf(
-                stderr,
-                "Alternatively, provide a direct path to the config file.\n");
-            fprintf(stderr, "Usage: %s <path/to/sst.config>\n\n", argv[0]);
-            return 1;
-        }
-
-        if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
-            perror("Fatal: Could not determine new working directory");
-            return 1;
-        }
-
-        config_path = "sst.config";
-        printf("No config path provided.\n");
-        printf("Changed directory from '%s' to '%s'\n", original_dir, new_dir);
-        printf("Using default config file: %s\n", config_path);
+        config_path = argv[1];
     }
+    
+    // Call the function to handle the config path logic
+    change_directory_to_config_path(config_path);
+    // Now we can safely use the config path
+    config_path = get_config_path(config_path);
+    // Continue with the rest of the program logic...
+    printf("Using config file: %s\n", config_path);
 
     printf("Retrieving session key from SST...\n");
     SST_ctx_t* sst = init_SST(config_path);
