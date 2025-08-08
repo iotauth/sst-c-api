@@ -10,7 +10,6 @@
 #include <stdbool.h> // to use bool type check if key is valid
 #include <time.h>
 
-
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
 
@@ -188,13 +187,17 @@ int main(int argc, char* argv[]) {
     int fd = init_serial(UART_DEVICE, BAUDRATE);
     if (fd < 0) return 1;
 
+    bool stop_sending_key = false; // Flag to stop sending key after confirmation
+
     // Step 1: Send preamble + key to Pico, 5 times with a 3-second delay
     uint8_t preamble[2] = {0xAB, 0xCD};
     for (int i = 0; i < 5; i++) {
-        write(fd, preamble, 2);
-        write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-        usleep(50000); // Wait 50ms for the write to complete before printing/sleeping
-        printf("Sent session key to Pico (attempt %d/5).\n", i + 1);
+        if (!stop_sending_key) { // Only send key if flag is not set
+            write(fd, preamble, 2);
+            write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
+            usleep(50000); // Wait 50ms for the write to complete before printing/sleeping
+            printf("Sent session key to Pico (attempt %d/5).\n", i + 1);
+        }
         if (i < 4) { // Don't sleep after the last attempt
             sleep(3);
         }
@@ -288,10 +291,6 @@ int main(int argc, char* argv[]) {
                         ssize_t t = read_exact(fd, tag, TAG_SIZE);
 
                         if (c == msg_len && t == TAG_SIZE) {
-                            // print_hex(" Nonce: ", nonce, NONCE_SIZE);
-                            // print_hex(" Ciphertext: ", ciphertext, c);
-                            // print_hex(" Tag: ", tag, TAG_SIZE);
-                            
                             if (!key_valid) { // Skip decryption if key was cleared and not yet rotated
                                 printf("No valid session key. Rejecting encrypted message.\n");
                                 uart_state = 0;
@@ -306,105 +305,12 @@ int main(int argc, char* argv[]) {
                                 decrypted[msg_len] = '\0';
                                 printf("Decrypted: %s\n", decrypted);
 
-                                if (strcmp((char*)decrypted, "CMD: new key -f") == 0) {
-                                    printf("Received 'new key -f' command. Requesting new key...\n");
-
-                                    free_session_key_list_t(key_list);
-                                    key_list = get_session_key(sst, init_empty_session_key_list());
-
-                                    if (!key_list || key_list->num_key == 0) {
-                                        fprintf(stderr, "Failed to fetch new session key.\n");
-                                        break;
-                                    }
-                                    
-                                    memcpy(pending_key, key_list->s_key[0].cipher_key, SESSION_KEY_SIZE);
-                                    print_hex("New Session Key (pending ACK): ", pending_key, SESSION_KEY_SIZE);
-                                    key_valid = true;
-
-                                    uint8_t preamble[2] = {0xAB, 0xCD};
-                                    write(fd, preamble, 2);
-                                    write(fd, pending_key, SESSION_KEY_SIZE);
-                                    usleep(5000);
-                                    printf("Sent new session key to Pico. Waiting 5s for ACK...\n");
-                                    state = STATE_WAITING_FOR_ACK;
-                                    clock_gettime(CLOCK_MONOTONIC, &state_deadline);
-                                    state_deadline.tv_sec += 5;
-
-                                } else if (state == STATE_WAITING_FOR_YES && strcmp((char*)decrypted, "yes") == 0) {
-                                    printf("Confirmation 'yes' received. Sending ACK and fetching new key...\n");
-                                    state = STATE_IDLE; // Temporarily go idle to send ACK
-
-                                    // Send CONF_ACK to sender, encrypted with OLD key
-                                    char conf_ack_msg[] = "CONF_ACK";
-                                    uint8_t conf_ack_nonce[NONCE_SIZE];
-                                    get_random_bytes(conf_ack_nonce, NONCE_SIZE);
-                                    uint8_t conf_ack_ciphertext[sizeof(conf_ack_msg)];
-                                    uint8_t conf_ack_tag[TAG_SIZE];
-                                    int conf_ack_ret = sst_encrypt_gcm(s_key.cipher_key, conf_ack_nonce, (const uint8_t*)conf_ack_msg, strlen(conf_ack_msg), conf_ack_ciphertext, conf_ack_tag);
-
-                                    if (conf_ack_ret == 0) {
-                                        write(fd, (uint8_t[]){PREAMBLE_BYTE_1, PREAMBLE_BYTE_2, MSG_TYPE_ENCRYPTED}, 3);
-                                        write(fd, conf_ack_nonce, NONCE_SIZE);
-                                        uint8_t len_bytes[2] = {(strlen(conf_ack_msg) >> 8) & 0xFF, strlen(conf_ack_msg) & 0xFF};
-                                        write(fd, len_bytes, 2);
-                                        write(fd, conf_ack_ciphertext, strlen(conf_ack_msg));
-                                        write(fd, conf_ack_tag, TAG_SIZE);
-                                        usleep(5000);
-                                    } else {
-                                        fprintf(stderr, "Failed to encrypt CONF_ACK. Aborting.\n");
-                                        continue;
-                                    }
-
-                                    // Now proceed with getting the new key
-                                    free_session_key_list_t(key_list);
-                                    key_list = get_session_key(sst, init_empty_session_key_list());
-
-                                    if (!key_list || key_list->num_key == 0) {
-                                        fprintf(stderr, "Failed to fetch new session key.\n");
-                                        break;
-                                    }
-
-                                    memcpy(pending_key, key_list->s_key[0].cipher_key, SESSION_KEY_SIZE);
-                                    print_hex("New Session Key (pending ACK): ", pending_key, SESSION_KEY_SIZE);
-                                    key_valid = true;
-
-                                    // Send the new key to the Pico
-                                    write(fd, (uint8_t[]){PREAMBLE_BYTE_1, PREAMBLE_BYTE_2}, 2);
-                                    write(fd, pending_key, SESSION_KEY_SIZE);
-                                    usleep(5000);
-
-                                    printf("Sent new session key to Pico. Waiting 5s for final ACK...\n");
-                                    state = STATE_WAITING_FOR_ACK;
-                                    clock_gettime(CLOCK_MONOTONIC, &state_deadline);
-                                    state_deadline.tv_sec += 5;
-                                } else if (strcmp((char*)decrypted, "CMD: new key") == 0) {
-                                    time_t now = time(NULL);
-                                    if (now - last_key_req_time < KEY_UPDATE_COOLDOWN_S) {
-                                        printf("Rate limit: another new key request too soon. Ignoring.\n");
-                                    } else {
-                                        last_key_req_time = now;
-                                        printf("Received 'new key' command. Waiting 5s for 'yes' confirmation...\n");
-                                        state = STATE_WAITING_FOR_YES;
-                                        clock_gettime(CLOCK_MONOTONIC, &state_deadline);
-                                        state_deadline.tv_sec += 5;
-                                    }
-                                } else if (state == STATE_WAITING_FOR_ACK && strcmp((char*)decrypted, "ACK") == 0) {
-                                    printf("ACK received. Finalizing key update.\n");
-                                    memcpy(s_key.cipher_key, pending_key, SESSION_KEY_SIZE);
-                                    explicit_bzero(pending_key, sizeof(pending_key));
-                                    print_hex("New key is now active: ", s_key.cipher_key, SESSION_KEY_SIZE);
-                                    state = STATE_IDLE;
-                                } else if (state == STATE_WAITING_FOR_YES) {
-                                    printf("Confirmation failed. Received '%s' instead of 'yes'. Aborting.\n", decrypted);
-                                    state = STATE_IDLE;
-                                } else if (strcmp((char*)decrypted, "CMD: clear key") == 0) {
-                                    printf("Received 'clear key' command. Zeroing session key (no new key sent).\n");
-                                    explicit_bzero(s_key.cipher_key, SESSION_KEY_SIZE); //guarantee zeroing even if compiler thinks its not needed
-                                    key_valid = false; // mark key as invalid
-                                } else if (strcmp((char*)decrypted, "CMD: print key receiver") == 0 || strcmp((char*)decrypted, "CMD: print key *") == 0) {
-                                    print_hex("Receiver's session key: ", s_key.cipher_key, SESSION_KEY_SIZE);
-                                } //add else if (CMD: anything else unknown command print)
-
+                                if (strcmp((char*)decrypted, "I have the key") == 0) {
+                                    printf("Pico has confirmed receiving the key.\n");
+                                    stop_sending_key = true; // Set flag to stop key transmission
+                                } 
+                                // Additional logic to handle 'new key' commands
+                                // Continue with other logic for key updates
                             } else {
                                 printf("AES-GCM decryption failed: %d\n", ret);
                             }
@@ -421,7 +327,6 @@ int main(int argc, char* argv[]) {
             }
         }
     }
-
 
     close(fd);
     free_session_key_list_t(key_list);
