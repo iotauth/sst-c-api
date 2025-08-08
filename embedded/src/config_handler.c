@@ -16,7 +16,7 @@ void change_directory_to_config_path(const char* config_path) {
     }
 
     if (config_path) {
-        // A path was provided. Change to the directory of the config file
+        // A path was provided. Change to the directory of the config file.
         char* path_copy = strdup(config_path);
         if (!path_copy) {
             perror("strdup failed");
@@ -30,16 +30,20 @@ void change_directory_to_config_path(const char* config_path) {
             exit(1);
         }
 
-        // Now that we are in the correct directory, we can use the filename
-        // part.
+        // Now that we are in the correct directory, get the CWD to print it.
+        if (getcwd(new_dir, sizeof(new_dir)) == NULL) {
+            perror("Fatal: Could not determine new working directory");
+            free(path_copy);
+            exit(1);
+        }
         printf("Changed directory from '%s' to '%s'\n", original_dir, new_dir);
         free(path_copy);
     } else {
-        // No path provided, change to the default directory
+        // No path provided, change to the default directory.
         const char* config_dir_relative = "../../receiver";
         if (chdir(config_dir_relative) != 0) {
             perror("Could not switch to default config directory");
-            fprintf(stderr, "Failed to find default config directory ('%s') from your current location:\n", config_dir_relative);
+            fprintf(stderr, "Failed to find default config ('%s') from your current location:\n", config_dir_relative);
             exit(1);
         }
 
@@ -53,5 +57,28 @@ void change_directory_to_config_path(const char* config_path) {
 }
 
 const char* get_config_path(const char* path) {
-    return path ? path : "../../receiver/sst.config";
+    // This function now returns only the filename part of the path,
+    // because change_directory_to_config_path() has already moved us
+    // into the correct directory.
+    static char filename[PATH_MAX];
+
+    if (path) {
+        // A path was provided, extract the filename.
+        char* path_copy = strdup(path);
+        if (!path_copy) {
+            perror("strdup failed");
+            exit(1);
+        }
+
+        char* bname = basename(path_copy);
+        // Copy the basename to our static buffer so it persists after free.
+        strncpy(filename, bname, sizeof(filename) - 1);
+        filename[sizeof(filename) - 1] = '\0';
+
+        free(path_copy);
+        return filename;
+    } else {
+        // No path provided, use the default filename. After chdir, this is correct.
+        return "sst.config";
+    }
 }
