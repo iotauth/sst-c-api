@@ -188,12 +188,17 @@ int main(int argc, char* argv[]) {
     int fd = init_serial(UART_DEVICE, BAUDRATE);
     if (fd < 0) return 1;
 
-    // Step 1: Send preamble + key to Pico
+    // Step 1: Send preamble + key to Pico, 5 times with a 3-second delay
     uint8_t preamble[2] = {0xAB, 0xCD};
-    write(fd, preamble, 2);
-    write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-    usleep(50000); // Wait 50ms instead of 5ms flush delay
-    printf("Sent preamble + session key over UART.\n");
+    for (int i = 0; i < 5; i++) {
+        write(fd, preamble, 2);
+        write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
+        usleep(50000); // Wait 50ms for the write to complete before printing/sleeping
+        printf("Sent session key to Pico (attempt %d/5).\n", i + 1);
+        if (i < 4) { // Don't sleep after the last attempt
+            sleep(3);
+        }
+    }
 
     // Step 2: Listen for encrypted message
     printf("Listening for encrypted message...\n");
