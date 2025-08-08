@@ -8,6 +8,7 @@
 #include <termios.h>
 #include <unistd.h>
 #include <stdbool.h> // to use bool type check if key is valid
+#include <time.h>
 
 
 #include "../../../c_api.h"
@@ -31,6 +32,22 @@ typedef enum {
     STATE_WAITING_FOR_YES,
     STATE_WAITING_FOR_ACK
 } receiver_state_t;
+
+void get_random_bytes(uint8_t* buf, size_t len) {
+    FILE* f = fopen("/dev/urandom", "rb");
+    if (f == NULL) {
+        perror("FATAL: Failed to open /dev/urandom. Cannot generate nonces");
+        // On a critical failure like this, we should not continue.
+        exit(EXIT_FAILURE);
+    }
+    size_t read_len = fread(buf, 1, len, f);
+    if (read_len < len) {
+        fprintf(stderr, "FATAL: Could not read enough random bytes from /dev/urandom.\n");
+        fclose(f);
+        exit(EXIT_FAILURE);
+    }
+    fclose(f);
+}
 
 void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("%s", label);
@@ -185,6 +202,9 @@ int main(int argc, char* argv[]) {
     int uart_state = 0;
 
     while (1) {
+        // --- Flush any stale data in the input buffer ---
+        tcflush(fd, TCIFLUSH);
+
         // --- Handle State Timeouts ---
         if (state != STATE_IDLE) {
             struct timespec now;
