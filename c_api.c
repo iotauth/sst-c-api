@@ -324,6 +324,10 @@ int read_secure_message(unsigned char *plaintext,
     bytes_read = read_header_return_data_buf_pointer(
         session_ctx->sock, &message_type, received_buf,
         MAX_SECURE_COMM_MSG_LENGTH);
+    if (bytes_read <= 0) {
+        SST_print_error("Failed to read from socket in read_header_return_data_buf_pointer().");
+        return bytes_read;
+    }
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }
