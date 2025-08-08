@@ -65,8 +65,12 @@ endif()
 # === Embedded SST Crypto Wrapper ===
 add_library(sst_embedded
   src/sst_crypto_embedded.c
-  src/config_handler.c
 )
+
+# Only add config_handler.c if not using Pico SDK (Pi 4)
+if(NOT HAS_PICO_SDK)
+  target_sources(sst_embedded PRIVATE src/config_handler.c)
+endif()
 
 target_include_directories(sst_embedded PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
