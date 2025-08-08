@@ -201,10 +201,10 @@ int main(int argc, char* argv[]) {
     uint8_t byte;
     int uart_state = 0;
 
-    while (1) {
-        // --- Flush any stale data in the input buffer ---
-        tcflush(fd, TCIFLUSH);
+    // Flush any stale data in the input buffer before starting the loop.
+    tcflush(fd, TCIFLUSH);
 
+    while (1) {
         // --- Handle State Timeouts ---
         if (state != STATE_IDLE) {
             struct timespec now;
@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) {
                     if (byte == PREAMBLE_BYTE_1) {
                         uart_state = 1;
                     } else {
-                        // printf("Waiting: got 0x%02X, expecting PREAMBLE_BYTE_1\n", byte);
+                        printf("Waiting: got 0x%02X, expecting PREAMBLE_BYTE_1\n", byte);
                     }
                     break;
                 case 1:
