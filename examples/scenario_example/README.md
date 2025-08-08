@@ -98,7 +98,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 1. Go to `$ROOT/entity/c/examples/scenario_example/`.
 
-2. *[Optional]* Customize `dos_attack.csv` to have client send custom messages and dos attacks to the server.
+2. *[Optional]* Customize `dos_attack_key.csv` to have client send custom messages and dos attacks to the server.
     - Format of the csv should be:
         - Each entry should be on its own line.
         - Each value is separated using a comma.
@@ -116,7 +116,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 3. Run the server with `./server ../../server_client_example/c_server.config`.
 
-4. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../dos_attack.csv`.
+4. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../dos_attack_key.csv`.
 
 ## Client DoS Attack Example
 This attack involves using many clients to connect to the server to create the denial of service. To do that though, the Auth databases and configurations need to be modified to support this.

@@ -4,7 +4,6 @@ extern "C" {
 }
 
 #include <unistd.h>
-
 #include <fstream>
 #include <iostream>
 #include <thread>
@@ -12,12 +11,14 @@ extern "C" {
 enum AttackType {
     NONE,
     REPLAY,
-    DOS
+    DOSK,
+    DOSC
 };
 
 static AttackType parseAttackType(const std::string& s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
-    if (s == "DOS" || s == "DoS" || s == "dos") return DOS;
+    if (s == "DOSK" || s == "DosK" || s == "dosk") return DOSK;
+    if (s == "DOSC" || s == "DoSC" || s == "DosC" || s == "Dosc" || s == "dosC" || s == "dosc") return DOSC;
     return NONE;
 }
 
@@ -77,7 +78,7 @@ int main(int argc, char *argv[]) {
         : "";
 
         switch (attack_type) {
-            case REPLAY:
+            case REPLAY: {
                 if      (attack_param == "seq--") {
                     session_ctx->sent_seq_num--;
                 }
@@ -89,18 +90,29 @@ int main(int argc, char *argv[]) {
                     int v = std::stoi(attack_param.substr(4));
                     session_ctx->sent_seq_num = v;
                 }
-                break;
+            } break;
 
-            case DOS: {
-                // interpret attack_param as an integer
+            case DOSK: {
+                // Quantity of get_session_key requests is the fourth column in the CSV
                 int repeat = std::stoi(attack_param);
 
-                // DOS Attack
+                // DOS Attack on get_session_key
                 for (int i = 0; i < repeat; ++i) {
                     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
                 }
-                break;
-            }
+            } break;
+
+            case DOSC: {
+                // Quantity of secure_connect_to_server requests is the fourth column in the CSV
+                int repeat = std::stoi(attack_param);
+
+                // DOS Attack on secure_connect_to_server
+                for (int i = 0; i < repeat; ++i) {
+                    SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
+                    // free_SST_ctx_t(ctx);
+                }
+            } break;
+
 
             case NONE:
             default:
