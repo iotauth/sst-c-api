@@ -1,27 +1,25 @@
-# 🔐 Secure Li-Fi Communication with SST
+# 🔐 Secure and Robust Li-Fi Communication for Embedded Systems
 
-This project establishes secure, real-time Li-Fi communication between embedded edge devices using AES-GCM encryption and session keys provisioned by an SST-based authentication server.
+This project implements a secure, real-time Li-Fi communication channel between a Raspberry Pi Pico and a host computer. It is designed to be a robust and production-ready embedded system, featuring strong cryptography, persistent key storage, and a rich command interface for easy management.
 
 ---
 
-## 🔧 Project Overview
+## 🚀 Project Overview
 
-This repository contains embedded software for secure Li-Fi communication, consisting of:
+This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a complete secure communication workflow, from initial key provisioning to real-time encrypted messaging.
 
-- **Sender (Raspberry Pi Pico)**: Encrypts user-input messages and transmits them via Li-Fi using AES-GCM and a session key.
-- **Receiver (Raspberry Pi 4)**: Fetches session keys from the SST Auth server, transmits them to the Pico via UART, and receives and decrypts Li-Fi messages from the Pico.
+-   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
+-   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
 ### Key Features:
-- AES-GCM encryption using `sst_encrypt_gcm()` and `sst_decrypt_gcm()`
-- Flash memory storage for session key persistence on the Pico
-- Command interface over UART with support for:
-  - `CMD: print key sender`
-  - `CMD: print key receiver`
-  - `CMD: print key *`
-  - `CMD: rotate key`
-  - `CMD: clear key`
-  - `CMD: reboot`
-- Smart flash logic: Pico clears flash when needed and waits for valid keys
+
+-   **Authenticated Encryption**: Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+-   **Robust Key Persistence**: Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
+-   **Secure Key Provisioning**: On first boot, the device enters a provisioning mode, waiting to securely receive its initial session key over the air.
+-   **Watchdog Timer**: The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
+-   **Secure Memory Handling**: Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `explicit_bzero()` to prevent data leakage.
+-   **Interactive Command Interface**: A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
+-   **Modular & Reusable Code**: The project is built with a clean, modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
 
 ---
 
@@ -44,122 +42,95 @@ This repository contains embedded software for secure Li-Fi communication, consi
 
 ## 📦 Software Dependencies
 
-- CMake ≥ 3.13
-- ARM GCC Toolchain
-- Java (for SST server)
-- Maven (for SST server)
-- [Pico SDK](https://github.com/raspberrypi/pico-sdk)
-
-### SST Software
-- [iotauth](https://github.com/iotauth/iotauth) project (used for key provisioning)
-- [sst-c-api](https://github.com/iotauth/sst-c-api) (included as a submodule or dependency)
+-   CMake ≥ 3.13
+-   ARM GCC Toolchain
+-   [Pico SDK](https://github.com/raspberrypi/pico-sdk)
+-   (Optional for Host) [iotauth](https://github.com/iotauth/iotauth) project for advanced key provisioning.
 
 ---
 
-## 🛠️ Setup Instructions
+## 🛠️ Setup & Build
 
-### 1. Clone the Repository with Submodules
+### 1. Clone the Repository
 ```bash
 git clone --recurse-submodules <repo-url>
 cd embedded
 ```
 
-### 2. Export `PICO_SDK_PATH`
+### 2. Configure Pico SDK
 ```bash
 export PICO_SDK_PATH=/path/to/pico-sdk
 ```
 
----
-
-## 🔑 SST Server Setup (Key Provisioning)
-
-### A. Generate Credentials
+### 3. Build the Firmware
 ```bash
-cd ../../iotauth/examples
-./cleanAll
-./generateAll
-```
-
-### B. Run the Authentication Server
-```bash
-cd ../auth/auth-server
-mvn clean install
-java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
-```
-
-### C. Copy Credentials to Receiver
-```bash
-cd /path/to/sst-c-api/embedded/receiver
-./update-credentials.sh
-cd ..
-```
-
----
-
-## ⚙️ Building and Flashing
-
-### 1. Build Sender Firmware
-```bash
-cd embedded
 mkdir build && cd build
 cmake ..
 make
 ```
 
-### 2. Flash the Pico
-Copy `sender/lifi_sender_embedded.uf2` to the Pico USB device.
-
----
-
-## 🔌 USB & UART in WSL (Optional)
-
-To use UART in WSL:
-
-```powershell
-usbipd list
-usbipd attach --busid <BUSID> --wsl
-```
-
-Then:
+### 4. Flash the Pico
+Connect the Pico to your computer while holding the `BOOTSEL` button. Then, copy the firmware to the Pico's USB mass storage device.
 ```bash
-picocom /dev/ttyACM0
+cp sender/lifi_flash.uf2 /media/user/RPI-RP2
 ```
 
 ---
 
-## 🛜 Running Receiver
+## 🎓 How to Run the Demo (Thesis Demonstration)
 
-From a separate terminal:
+This project is perfect for demonstrating a complete, secure communication system.
 
-```bash
-./receiver/receiver_uart ../receiver/sst.config
-```
+**1. First-Time Key Provisioning:**
+   - Flash a cleared device. On the Pico's USB serial monitor, you will see the message: `No valid session key found. Waiting for one...`
+   - From a host computer connected to the Li-Fi UART, send a 32-byte secret key.
+   - The Pico will respond with `Received session key: <key>` and save it to a flash slot. The secure channel is now established.
+
+**2. Secure Communication:**
+   - Reboot the Pico. It will now automatically load the key from flash and print `Using session key: <key>`.
+   - Type any message into the serial monitor (e.g., `This is a secret message!`).
+   - The Pico will encrypt it and transmit it over the Li-Fi LED. A receiver with the same key can now decrypt and authenticate the message.
+
+**3. Remote Management:**
+   - Use the command interface (see below) to interact with the device in real-time. For example, type `CMD: slot status` to verify the key is valid in its slot.
 
 ---
 
 ## 💬 Command Interface
 
-Send commands over UART0 (debug) on the Pico:
+Interact with the Pico over the USB serial connection. All commands are prefixed with `CMD:`.
 
-| Command                    | Action |
-|---------------------------|--------|
-| `CMD: print key sender`   | Prints key on Pico, receiver confirms |
-| `CMD: print key receiver` | Prints key on Pi 4, Pico confirms |
-| `CMD: print key *`        | Prints keys on both |
-| `CMD: rotate key`         | Receiver sends new session key |
-| `CMD: clear key`          | Clears key from Pico flash |
-| `CMD: reboot`             | Reboots the Pico |
+| Command                    | Description |
+| -------------------------- | -------------------------------------------------------------------- |
+| `help`                     | Displays a list of all available commands.                           |
+| `print key`                | Prints the currently active session key.                             |
+| `slot status`              | Shows the validity of key slots A and B and which one is active.     |
+| `use slot A` / `use slot B`  | Switches the active session key to the one in the specified slot.    |
+| `clear slot A` / `clear slot B`| Erases the key from the specified slot.                              |
+| `new key`                  | Waits to receive a new key, but only if the current slot is empty.   |
+| `new key -f`               | Forcibly overwrites the key in the current slot.                     |
+| `print slot key A` / `B` / `*` | Prints the key stored in a specific slot (or all slots).             |
+| `entropy test`             | Prints a sample of random data from the hardware RNG for verification. |
+| `reboot`                   | Reboots the Pico.                                                    |
+
+---
+
+## 🏛️ Project Architecture
+
+The code is organized into a clean, modular structure:
+
+-   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
+-   `include/`: Header files defining the public interface for each module.
+-   `sender/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
+-   `lib/`: External libraries, such as `mbedtls`.
+-   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
 
 ---
 
 ## 🧪 Notes & Future Work
 
-- Pico startup waits up to 10 seconds for a valid session key on fresh boot.
-- If a session key is stored in flash, it will load and use it immediately.
-- Future work may include:
-  - GUI desktop app to manage multiple Picos
-  - File transfer support
-  - Federated authentication caching
-  - TPM integration for secure key storage on Pi 4
-
----
+-   The system is designed for high reliability, automatically recovering from reboots and provisioning itself on first run.
+-   Future work could include:
+    -   A GUI-based host application for managing multiple devices.
+    -   Support for secure file transfers over Li-Fi.
+    -   Integration with a hardware Trusted Platform Module (TPM) on the host for even more secure key storage.
