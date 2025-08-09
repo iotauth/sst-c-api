@@ -10,7 +10,7 @@
 #include "hardware/sync.h"
 #include "pico/time.h"
 #include "pico/bootrom.h"
-#include "mbedtls/md.h"
+
 #include "mbedtls/sha256.h"
 #include "pico/stdio_usb.h"
 
