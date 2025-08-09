@@ -8,8 +8,9 @@
 #include "c_secure_comm.h"
 
 #define MAX_FILE_SUFFIX_LENGTH 5
+#define MAX_FILENAME_LENGTH 512
 
-const char IPFS_ADD_COMMAND[] = "ipfs add ";
+const char IPFS_ADD_COMMAND[] = "ipfs add --quiet ";
 const char TXT_FILE_EXTENSION[] = ".txt";
 const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
@@ -46,40 +47,34 @@ unsigned long file_size_return(FILE *fin) {
 void file_duplication_check(const char *file_name, const char *file_extension,
                             char *file_name_buf) {
     int suffix_num = 0;
-    // Copy file name.
-    const int file_name_len = strlen(file_name);
-    const int file_extension_len = strlen(file_extension);
-    memcpy(file_name_buf, file_name, file_name_len);
-    memcpy(file_name_buf + file_name_len, file_extension, file_extension_len);
-    file_name_buf[file_name_len + file_extension_len] = '\0';
-    for (;;) {
-        if (suffix_num >= MAX_REPLY_NUM) {
-            SST_print_error(
-                "Cannot save the file as file name's suffix number exceeds "
-                "max.\n");
-            exit(1);
-        }
-        if (0 == access(file_name_buf, F_OK)) {
-            SST_print_log("File already exists: %s.\n", file_name_buf);
-            // Copy suffix and file extension.
 
+    while (suffix_num < MAX_REPLY_NUM) {
+        if (suffix_num == 0) {
+            // First attempt: plain name + extension
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s", file_name,
+                     file_extension);
+        } else {
+            // Build suffixed version: name + suffix + extension
             char suffix_in_string[MAX_FILE_SUFFIX_LENGTH + 1];
-            snprintf(suffix_in_string, MAX_FILE_SUFFIX_LENGTH, "%d",
+            snprintf(suffix_in_string, sizeof(suffix_in_string), "%d",
                      suffix_num);
 
-            const int file_suffix_len = strlen(suffix_in_string);
+            snprintf(file_name_buf, MAX_FILENAME_LENGTH, "%s%s%s", file_name,
+                     suffix_in_string, file_extension);
+        }
 
-            memcpy(file_name_buf + file_name_len, suffix_in_string,
-                   file_suffix_len);
-            memcpy(file_name_buf + file_name_len + file_suffix_len,
-                   file_extension, file_extension_len);
-            file_name_buf[file_name_len + file_suffix_len +
-                          file_extension_len] = '\0';
-            suffix_num += 1;
+        if (access(file_name_buf, F_OK) == 0) {
+            // File already exists
+            SST_print_log("File already exists: %s.\n", file_name_buf);
+            suffix_num++;
         } else {
-            break;
+            // Found a non-existing name
+            return;
         }
     }
+
+    SST_print_error(
+        "Cannot save the file as file name's suffix number exceeds max.\n");
 }
 
 int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
@@ -89,28 +84,28 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
-    memcpy(command, IPFS_ADD_COMMAND, sizeof(IPFS_ADD_COMMAND));
-    memcpy(command + sizeof(IPFS_ADD_COMMAND) - 1, file_name,
-           strlen(file_name));
+    snprintf(command, sizeof(command), "%s%s", IPFS_ADD_COMMAND, file_name);
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
         SST_print_error_exit("popen() failed.\n");
         exit(1);
     }
-    while (fgets(buff, BUFF_SIZE, fp)) {
-        SST_print_log("%s\n", buff);
+    if (fgets(buff, sizeof(buff), fp) == NULL) {
+        SST_print_error_exit("Failed to read CID from ipfs output.\n");
+        pclose(fp);
+        return -1;
     }
     pclose(fp);
-    char *result;
-    strtok(buff, " ");
-    result = strtok(NULL, " ");
-    memcpy(hash_value, result, strlen(result));
+    // Strip newline
+    buff[strcspn(buff, "\r\n")] = '\0';
+    size_t cid_len = strlen(buff);
+    memcpy(hash_value, buff, cid_len + 1);  // +1 to include null terminator
     gettimeofday(&upload_end, NULL);
     float upload_time = (upload_end.tv_sec - upload_start.tv_sec);
     float upload_utime = (upload_end.tv_usec - upload_start.tv_usec);
     estimate_time->up_download_time = upload_time + upload_utime / 1000000;
-    return strlen(result);
+    return cid_len;
 }
 
 int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
@@ -309,10 +304,12 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
     char command[BUFF_SIZE];
-    memcpy(command, received_buf + 3 + KEY_ID_SIZE, command_size);
+    char base_command[BUFF_SIZE];
+    memcpy(base_command, received_buf + 3 + KEY_ID_SIZE, command_size);
+    base_command[command_size] = '\0';  // Null-terminate it
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
-    memcpy(command + command_size - 1, file_name, strlen(file_name));
-    SST_print_log("Command: %s \n", command);
+    snprintf(command, sizeof(command), "%s%s", base_command, file_name);
+    SST_print_log("Command: %s\n", command);
     fin = popen(command, "r");
     pclose(fin);
     SST_print_log("Download the file: %s\n", file_name);
