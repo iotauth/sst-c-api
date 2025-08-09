@@ -45,8 +45,7 @@ target_include_directories(mbedcrypto PUBLIC
 )
 
 target_include_directories(mbedcrypto PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/include  # for sst_crypto_embedded.h and config_handler.h etc
-  ${CMAKE_CURRENT_SOURCE_DIR}/src  # for mbedtls_time_alt.h
+  ${CMAKE_CURRENT_SOURCE_DIR}/include  # for sst_crypto_embedded.h and mbedtls_time_alt.h
 )
 
 target_compile_definitions(mbedcrypto PRIVATE
@@ -54,17 +53,37 @@ target_compile_definitions(mbedcrypto PRIVATE
 )
 
 if(HAS_PICO_SDK)
-  target_sources(mbedcrypto PRIVATE src/mbedtls_time_alt.c) # override
+  # Add Pico-specific source files for mbedcrypto
+  target_sources(mbedcrypto PRIVATE src/mbedtls_time_alt.c)
+
+  # Link the Pico standard library and other hardware libraries
   target_link_libraries(mbedcrypto PRIVATE pico_stdlib)
-  target_compile_definitions(mbedcrypto PRIVATE 
+
+  # Define Pico-specific compile definitions
+  target_compile_definitions(mbedcrypto PRIVATE
     MBEDTLS_PLATFORM_TIME_ALT
     MBEDTLS_PLATFORM_MS_TIME_ALT
   )
 endif()
 
+# === Platform-Specific RAM Handler ===
+if(HAS_PICO_SDK)
+    add_library(ram_handler
+        src/pico_handler.c  # Pico-specific RAM handling
+    )
+    target_link_libraries(ram_handler PRIVATE pico_stdlib pico_rand pico_stdio_usb)
+else()
+    # NOTE: src/pi_handler.c does not exist in the file tree.
+    # This will cause an error if building for a non-Pico target.
+    add_library(ram_handler
+        src/pi_handler.c  # Pi-specific RAM handling
+    )
+endif()
+
 # === Embedded SST Crypto Wrapper ===
 add_library(sst_embedded
   src/sst_crypto_embedded.c
+  src/cmd_handler.c
 )
 
 # Only add config_handler.c if not using Pico SDK (Pi 4)
@@ -78,6 +97,8 @@ target_include_directories(sst_embedded PUBLIC
 )
 
 target_link_libraries(sst_embedded PUBLIC mbedcrypto)
+target_link_libraries(sst_embedded PRIVATE ram_handler)
+
 
 # === Add sender/receiver projects ===
 if(HAS_PICO_SDK)
