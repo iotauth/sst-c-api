@@ -5,8 +5,12 @@ extern "C" {
 
 #include <unistd.h>
 
+#include <cstring>
 #include <fstream>
 #include <iostream>
+#include <vector>
+
+#define HASH_SIZE 32
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
@@ -108,7 +112,10 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char received_hash_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int message_len = read_secure_message(received_hash_buf, session_ctx);
+    if (read_secure_message(received_hash_buf, session_ctx) != HASH_SIZE) {
+        std::cerr << "Error: hash size does not match." << std::endl;
+        return EXIT_FAILURE;
+    }
 
     // Step 2: Compute Hash of the File
 
@@ -133,7 +140,8 @@ int main(int argc, char* argv[]) {
 
     unsigned int hash_length = 0;
     // SHA-256 is 32 bytes
-    unsigned char* hash_of_file = static_cast<unsigned char*>(std::malloc(32));
+    unsigned char* hash_of_file =
+        static_cast<unsigned char*>(std::malloc(HASH_SIZE));
     if (!hash_of_file) {
         std::cerr << "Allocation failed\n";
         return EXIT_FAILURE;
@@ -142,7 +150,7 @@ int main(int argc, char* argv[]) {
     digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
 
     // Step 3: Compare the Hash Values
-    if (std::memcmp(hash_of_file, received_hash_buf, 32) == 0) {
+    if (std::memcmp(hash_of_file, received_hash_buf, HASH_SIZE) == 0) {
         std::cout << "Hash values match!" << std::endl;
     } else {
         free(hash_of_file);

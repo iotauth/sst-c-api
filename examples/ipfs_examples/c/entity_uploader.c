@@ -3,9 +3,15 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "../../../c_common.h"
 #include "../../../ipfs.h"
 
 int main(int argc, char* argv[]) {
+    if (argc != 4) {
+        SST_print_error_exit(
+            "Usage: %s <config_path> <my_file_path> <add_reader_path>\n",
+            argv[0]);
+    }
     char* config_path = argv[1];
     char* my_file_path = argv[2];
     char* add_reader_path = argv[3];
@@ -26,7 +32,6 @@ int main(int argc, char* argv[]) {
     ctx->config->purpose_index = 1;
     estimate_time_t estimate_time[5];
     struct timeval keygen_start, keygen_end;
-    float time_interval;
     gettimeofday(&keygen_start, NULL);
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
@@ -87,7 +92,7 @@ int main(int argc, char* argv[]) {
             file, "%.6f,%.6f,%.6f,%.6f\n", estimate_time[i].up_download_time,
             estimate_time[i].keygenerate_time, estimate_time[i].enc_dec_time,
             estimate_time[i].filemanager_time);
-        sleep(5);
+        sleep(1);
     }
     fclose(file);
 
