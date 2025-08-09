@@ -6,11 +6,10 @@
 #include "mbedtls_time_alt.h"      // Include mbedtls_time_alt.h if functions like get_random_bytes() are defined there
 
 #include "ram_handler.h"  // This will call the correct flash handler based on the platform
+#include "pico_handler.h"  // Include the pico handler for specific flash operations
+#include "pico/time.h"      // Include for sleep_ms
 
-extern uint8_t session_key[SST_KEY_SIZE];
-extern int current_slot;
-
-void handle_commands(const char *cmd) {
+void handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
     if (strcmp(cmd, " print key") == 0 || strcmp(cmd, " print key sender") == 0) {
         print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
     } else if (strcmp(cmd, " print key receiver") == 0) {
@@ -19,42 +18,26 @@ void handle_commands(const char *cmd) {
         print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
         printf("Check receiver printed key.\n");
     } else if (strcmp(cmd, " slot status") == 0) {
-        printf("Slot Status:\n");
-        if (current_slot == 0) {
-            printf("  Current slot: A\n");
-        } else {
-            printf("  Current slot: B\n");
-        }
-        uint8_t tmp[SST_KEY_SIZE];
-        if (read_key_from_slot(FLASH_SLOT_A_OFFSET, tmp)) {
-            printf("  Slot A: Valid\n");
-        } else {
-            printf("  Slot A: Invalid\n");
-        }
-        if (read_key_from_slot(FLASH_SLOT_B_OFFSET, tmp)) {
-            printf("  Slot B: Valid\n");
-        } else {
-            printf("  Slot B: Invalid\n");
-        }
+        pico_print_slot_status(*current_slot);
     } else if (strcmp(cmd, " clear slot A") == 0) {
-        flash_range_erase(FLASH_SLOT_A_OFFSET, FLASH_SLOT_SIZE);
+        pico_clear_slot(0);
         printf("Slot A cleared.\n");
     } else if (strcmp(cmd, " clear slot B") == 0) {
-        flash_range_erase(FLASH_SLOT_B_OFFSET, FLASH_SLOT_SIZE);
+        pico_clear_slot(1);
         printf("Slot B cleared.\n");
     } else if (strcmp(cmd, " use slot A") == 0) {
-        current_slot = 0;
-        store_last_used_slot(current_slot);
-        if (read_key_from_slot(FLASH_SLOT_A_OFFSET, session_key)) {
+        *current_slot = 0;
+        store_last_used_slot(*current_slot);
+        if (pico_read_key_from_slot(0, session_key)) {
             print_hex("Using session key from Slot A: ", session_key, SST_KEY_SIZE);
         } else {
             printf("Slot A is empty or invalid. Ready to receive new key.\n");
             zero_key(session_key);
         }
     } else if (strcmp(cmd, " use slot B") == 0) {
-        current_slot = 1;
-        store_last_used_slot(current_slot);
-        if (read_key_from_slot(FLASH_SLOT_B_OFFSET, session_key)) {
+        *current_slot = 1;
+        store_last_used_slot(*current_slot);
+        if (pico_read_key_from_slot(1, session_key)) {
             print_hex("Using session key from Slot B: ", session_key, SST_KEY_SIZE);
         } else {
             printf("Slot B is empty or invalid. Ready to receive new key.\n");
@@ -69,60 +52,39 @@ void handle_commands(const char *cmd) {
         uint8_t new_key[SST_KEY_SIZE] = {0};
         if (receive_new_key_with_timeout(new_key, 3000)) {
             print_hex("Received new key: ", new_key, SST_KEY_SIZE);
-            uint32_t offset = current_slot == 0 ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
-            write_key_to_slot(offset, new_key);
+            pico_write_key_to_slot(*current_slot, new_key);
             memcpy(session_key, new_key, SST_KEY_SIZE);
-            printf("New session key forcibly stored in Slot %c.\n", current_slot == 0 ? 'A' : 'B');
+            printf("New session key forcibly stored in Slot %c.\n", *current_slot == 0 ? 'A' : 'B');
         } else {
             printf("No key received. Aborting.\n");
         }
     } else if (strcmp(cmd, " new key") == 0) {
-        uint32_t offset = current_slot == 0 ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
         uint8_t tmp[SST_KEY_SIZE];
-        if (read_key_from_slot(offset, tmp)) {
-            printf("Slot %c is already occupied. Use 'new key -f' to overwrite.\n", current_slot == 0 ? 'A' : 'B');
+        if (pico_read_key_from_slot(*current_slot, tmp)) {
+            printf("Slot %c is already occupied. Use 'new key -f' to overwrite.\n", *current_slot == 0 ? 'A' : 'B');
         } else {
             printf("Waiting 3 seconds for new key...\n");
             uint8_t new_key[SST_KEY_SIZE] = {0};
             if (receive_new_key_with_timeout(new_key, 5000)) {
                 print_hex("Received new key: ", new_key, SST_KEY_SIZE);
-                write_key_to_slot(offset, new_key);
+                pico_write_key_to_slot(*current_slot, new_key);
                 memcpy(session_key, new_key, SST_KEY_SIZE);
-                printf("New session key stored in Slot %c.\n", current_slot == 0 ? 'A' : 'B');
+                printf("New session key stored in Slot %c.\n", *current_slot == 0 ? 'A' : 'B');
             } else {
                 printf("No key received. Aborting.\n");
             }
         }
     } else if (strcmp(cmd, " print slot key A") == 0) {
-        uint8_t tmp[SST_KEY_SIZE];
-        if (read_key_from_slot(FLASH_SLOT_A_OFFSET, tmp)) {
-            print_hex("Slot A key: ", tmp, SST_KEY_SIZE);
-        } else {
-            printf("Slot A is invalid.\n");
-        }
+        pico_print_key_from_slot(0);
     } else if (strcmp(cmd, " print slot key B") == 0) {
-        uint8_t tmp[SST_KEY_SIZE];
-        if (read_key_from_slot(FLASH_SLOT_B_OFFSET, tmp)) {
-            print_hex("Slot B key: ", tmp, SST_KEY_SIZE);
-        } else {
-            printf("Slot B is invalid.\n");
-        }
+        pico_print_key_from_slot(1);
     } else if (strcmp(cmd, " print slot key *") == 0) {
-        uint8_t tmp[SST_KEY_SIZE];
-        if (read_key_from_slot(FLASH_SLOT_A_OFFSET, tmp)) {
-            print_hex("Slot A key: ", tmp, SST_KEY_SIZE);
-        } else {
-            printf("Slot A is invalid.\n");
-        }
-        if (read_key_from_slot(FLASH_SLOT_B_OFFSET, tmp)) {
-            print_hex("Slot B key: ", tmp, SST_KEY_SIZE);
-        } else {
-            printf("Slot B is invalid.\n");
-        }
+        pico_print_key_from_slot(0);
+        pico_print_key_from_slot(1);
     } else if (strcmp(cmd, " reboot") == 0) {
         printf("Rebooting...\n");
         sleep_ms(500);
-        watchdog_reboot(0, 0, 0);
+        pico_reboot();
     } else if (strcmp(cmd, " help") == 0) {
         printf("Available Commands:\n");
         printf("  CMD: print key\n");

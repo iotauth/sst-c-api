@@ -71,7 +71,11 @@ if(HAS_PICO_SDK)
     add_library(ram_handler
         src/pico_handler.c  # Pico-specific RAM handling
     )
-    target_link_libraries(ram_handler PRIVATE pico_stdlib pico_rand pico_stdio_usb)
+    target_include_directories(ram_handler PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/include
+    )
+    target_link_libraries(ram_handler PRIVATE pico_stdlib pico_rand pico_stdio_usb mbedcrypto)
 else()
     # NOTE: src/pi_handler.c does not exist in the file tree.
     # This will cause an error if building for a non-Pico target.
@@ -97,6 +101,9 @@ target_include_directories(sst_embedded PUBLIC
 )
 
 target_link_libraries(sst_embedded PUBLIC mbedcrypto)
+if(HAS_PICO_SDK)
+  target_link_libraries(sst_embedded PRIVATE pico_stdlib)
+endif()
 target_link_libraries(sst_embedded PRIVATE ram_handler)
 
 

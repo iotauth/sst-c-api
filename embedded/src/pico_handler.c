@@ -8,18 +8,40 @@
 #include "pico/time.h"
 #include "pico/bootrom.h"
 #include "pico/stdio_usb.h"
-#include "mbedtls/sha256.h"  // Add this for mbedtls_sha256
-#include "sst_crypto_embedded.h"  // Add this for key_flash_block_t and FLASH_KEY_MAGIC
+#include <stdio.h>
+#include "mbedtls/sha256.h"
+#include "sst_crypto_embedded.h"
+#include "ram_handler.h"
+#include "config_handler.h"
+#include "pico_handler.h"
 
-#include "../include/sst_crypto_embedded.h"
-#include "../include/ram_handler.h"  // Include the RAM handler for session key management
-// #include "../include/mbedtls_time_alt.h"  // Include mbedtls_time_alt.h if functions like get_random_bytes() are defined there
-#include "../include/config_handler.h"  // For change_directory_to_config_path and get_config_path
+#define UART_ID_DEBUG uart0
+#define UART_RX_PIN_DEBUG 1
+#define UART_TX_PIN_DEBUG 0
 
-#define FLASH_SLOT_SIZE 4096  // 4 KB for the flash slot size
+#define UART_ID uart1
+#define UART_RX_PIN 5
+#define UART_TX_PIN 4
 
+#define BAUD_RATE 1000000
+#define PREAMBLE_BYTE_1 0xAB
+#define PREAMBLE_BYTE_2 0xCD
+#define MSG_TYPE_ENCRYPTED 0x02
+
+
+#define FLASH_SLOT_SIZE     256
 #define FLASH_SLOT_A_OFFSET (PICO_FLASH_SIZE_BYTES - 4096)
 #define FLASH_SLOT_B_OFFSET (PICO_FLASH_SIZE_BYTES - 4096 + FLASH_SLOT_SIZE)
+#define FLASH_KEY_MAGIC     0x53455353  // 'SESS'
+
+#define FLASH_SLOT_INDEX_OFFSET (PICO_FLASH_SIZE_BYTES - 4096 + 2 * FLASH_SLOT_SIZE)
+#define SLOT_INDEX_MAGIC 0xA5
+
+typedef struct {
+    uint8_t key[SST_KEY_SIZE];
+    uint8_t hash[32];   // SHA-256 hash
+    uint32_t magic;
+} key_flash_block_t;
 
 void compute_key_hash(const uint8_t *data, size_t len, uint8_t *out_hash) {
     mbedtls_sha256(data, len, out_hash, 0); // 0 = SHA-256, not SHA-224
@@ -104,7 +126,7 @@ void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("\n");
 }
 
-bool receive_new_key_with_timeout(uint8_t *key_out, uint timeout_ms) {
+bool receive_new_key_with_timeout(uint8_t *key_out, uint32_t timeout_ms) {
     absolute_time_t deadline = make_timeout_time_ms(timeout_ms);
     while (absolute_time_diff_us(get_absolute_time(), deadline) > 0) {
         if (uart_is_readable(UART_ID) && uart_getc(UART_ID) == PREAMBLE_BYTE_1) {
@@ -139,4 +161,53 @@ void store_last_used_slot(uint8_t slot) {
     flash_range_erase(FLASH_SLOT_INDEX_OFFSET, FLASH_SECTOR_SIZE);
     flash_range_program(FLASH_SLOT_INDEX_OFFSET, data, sizeof(data));
     restore_interrupts(ints);
+}
+
+
+void pico_reboot(void) {
+    watchdog_reboot(0, 0, 0);
+}
+
+void pico_print_slot_status(int current_slot) {
+    printf("Slot Status:\n");
+    printf("  Current slot: %c\n", current_slot == 0 ? 'A' : 'B');
+    uint8_t tmp[SST_KEY_SIZE];
+    if (read_key_from_slot(FLASH_SLOT_A_OFFSET, tmp)) {
+        printf("  Slot A: Valid\n");
+    } else {
+        printf("  Slot A: Invalid\n");
+    }
+    if (read_key_from_slot(FLASH_SLOT_B_OFFSET, tmp)) {
+        printf("  Slot B: Valid\n");
+    } else {
+        printf("  Slot B: Invalid\n");
+    }
+}
+
+void pico_clear_slot(int slot) {
+    uint32_t offset = (slot == 0) ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(offset, FLASH_SLOT_SIZE);
+    restore_interrupts(ints);
+}
+
+bool pico_read_key_from_slot(int slot, uint8_t *out) {
+    uint32_t offset = (slot == 0) ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
+    return read_key_from_slot(offset, out);
+}
+
+bool pico_write_key_to_slot(int slot, const uint8_t *key) {
+    uint32_t offset = (slot == 0) ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
+    return write_key_to_slot(offset, key);
+}
+
+void pico_print_key_from_slot(int slot) {
+    uint8_t tmp[SST_KEY_SIZE];
+    if (pico_read_key_from_slot(slot, tmp)) {
+        char label[20];
+        sprintf(label, "Slot %c key: ", slot == 0 ? 'A' : 'B');
+        print_hex(label, tmp, SST_KEY_SIZE);
+    } else {
+        printf("Slot %c is invalid.\n", slot == 0 ? 'A' : 'B');
+    }
 }
