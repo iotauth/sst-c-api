@@ -11,8 +11,8 @@
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
 #include "../../include/config_handler.h" // For change_directory_to_config_path and get_config_path
+#include "../../include/protocol.h" //global vars for speed, serial settings, etc
 
-#include "protocol.h"
 #include "utils.h"
 #include "serial_linux.h"
 #include "replay_window.h"
@@ -149,6 +149,7 @@ int main(int argc, char* argv[]) {
                             continue;
                         }
 
+                        //read payload
                         uint8_t ciphertext[msg_len];
                         uint8_t tag[TAG_SIZE];
                         uint8_t decrypted[msg_len + 1];  // for null-terminator
