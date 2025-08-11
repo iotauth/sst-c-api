@@ -19,13 +19,13 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Watchdog Timer**: The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
 -   **Secure Memory Handling**: Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `explicit_bzero()` to prevent data leakage.
 -   **Interactive Command Interface**: A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
--   **Modular & Reusable Code**: The project is built with a clean, modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
+-   **Modular & Reusable Code**: The project is built with a modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
 
 ---
 
 ## Project Architecture
 
-The code is organized into a clean, modular structure:
+The code is organized into a modular structure:
 
 -   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
 -   `include/`: Header files defining the public interface for each module.
@@ -149,9 +149,6 @@ cp sender/lifi_flash.uf2 /media/user/RPI-RP2
 ---
 
 ## How to Run
-
-This project is perfect for demonstrating a complete, secure communication system.
-
 **1. First-Time Key Provisioning:**
    - Flash a cleared device. On the Pico's USB serial monitor, you will see the message: `No valid session key found. Waiting for one...`
    - From a host computer connected to the Li-Fi UART, send a 32-byte secret key.
