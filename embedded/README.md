@@ -66,7 +66,7 @@ sst-c-api/embedded
     ├── pico_handler.c          # Pico helper logic
     ├── pico_helper.c           # Additional Pico utility functions
     └── sst_crypto_embedded.c   # Embedded crypto API implementation
-
+```
 
 ## 🔧 Hardware Requirements
 
