@@ -23,6 +23,51 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ---
 
+## 📂 Project Structure
+
+```plaintext
+sst-c-api/embedded
+├── CMakeLists.txt              # Root CMake build configuration
+├── CMakePresets.json           # Preset build settings for CMake
+├── README.md                   # Project documentation
+├── notes.txt                   # Developer notes and references
+│
+├── 📁 build/                   # (Generated) Build artifacts from CMake
+│
+├── 📁 config/
+│   └── mbedtls_config.h        # mbedTLS configuration settings
+│
+├── 📁 include/
+│   ├── cmd_handler.h           # Command processing interface
+│   ├── config_handler.h        # Configuration management interface
+│   ├── mbedtls_time_alt.h      # Custom time source for mbedTLS
+│   ├── pico_handler.h          # Pico-specific helper functions
+│   ├── ram_handler.h           # Session key / RAM management
+│   └── sst_crypto_embedded.h   # Embedded crypto API definitions
+│
+├── 📁 lib/
+│   └── mbedtls/                # mbedTLS cryptographic library source
+│
+├── 📁 receiver/
+│   ├── CMakeLists.txt          # Receiver build configuration
+│   ├── 📁 config/              # Receiver-specific config files
+│   ├── 📁 src/                 # Receiver source code
+│   ├── sst.config              # Receiver runtime configuration
+│   └── update-credentials.sh   # Script to update stored credentials
+│
+├── 📁 sender/
+│   ├── CMakeLists.txt          # Sender build configuration
+│   └── 📁 src/                 # Sender source code
+│
+└── 📁 src/
+    ├── cmd_handler.c           # Command processing implementation
+    ├── config_handler.c        # Configuration management logic
+    ├── mbedtls_time_alt.c      # Custom mbedTLS time source
+    ├── pico_handler.c          # Pico helper logic
+    ├── pico_helper.c           # Additional Pico utility functions
+    └── sst_crypto_embedded.c   # Embedded crypto API implementation
+
+
 ## 🔧 Hardware Requirements
 
 ### **Sender (Pico)**
