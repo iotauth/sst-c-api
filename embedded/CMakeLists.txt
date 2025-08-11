@@ -30,7 +30,7 @@ endif()
 message(STATUS "Using mbedTLS from: ${MBEDTLS_DIR}")
 
 # === Sanity check the mbedTLS sources we require ===
-foreach(f aes.c gcm.c sha256.c sha512.c cipher.c cipher_wrap.c platform.c platform_util.c ctr_drbg.c)
+foreach(f aes.c gcm.c sha256.c sha512.c cipher.c cipher_wrap.c platform.c platform_util.c ctr_drbg.c constant_time.c)
   if(NOT EXISTS ${MBEDTLS_DIR}/library/${f})
     message(FATAL_ERROR "Missing mbedTLS source: ${MBEDTLS_DIR}/library/${f}")
   endif()
@@ -47,6 +47,7 @@ add_library(mbedcrypto
   ${MBEDTLS_DIR}/library/platform.c
   ${MBEDTLS_DIR}/library/platform_util.c
   ${MBEDTLS_DIR}/library/ctr_drbg.c
+  ${MBEDTLS_DIR}/library/constant_time.c
 )
 
 # Put YOUR repo root and config first so it wins over the SDK defaults
