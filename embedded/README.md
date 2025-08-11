@@ -47,6 +47,11 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   [Pico SDK](https://github.com/raspberrypi/pico-sdk)
 -   (Optional for Host) [iotauth](https://github.com/iotauth/iotauth) project for advanced key provisioning.
 
+
+ADD ARM sudo apt update
+sudo apt install -y gcc-arm-none-eabi libnewlib-arm-none-eabi cmake git build-essential ninja-build
+
+
 ---
 
 ## 🛠️ Setup & Build
