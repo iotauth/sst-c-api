@@ -23,6 +23,18 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ---
 
+## Project Architecture
+
+The code is organized into a clean, modular structure:
+
+-   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
+-   `include/`: Header files defining the public interface for each module.
+-   `sender/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
+-   `lib/`: External libraries, such as `mbedtls`.
+-   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
+
+---
+
 ## Project Structure
 
 ```plaintext
@@ -174,17 +186,6 @@ Interact with the Pico over the USB serial connection. All commands are prefixed
 
 ---
 
-## Project Architecture
-
-The code is organized into a clean, modular structure:
-
--   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
--   `include/`: Header files defining the public interface for each module.
--   `sender/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
--   `lib/`: External libraries, such as `mbedtls`.
--   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
-
----
 
 ## Notes & Future Work
 
