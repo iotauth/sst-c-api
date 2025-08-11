@@ -73,10 +73,8 @@ int main(int argc, char* argv[]) {
     if (fd < 0) return 1;
 
     // Initial key push retry machinery
-    bool awaiting_key_confirm = true;
     struct timespec next_send = {0};
     clock_gettime(CLOCK_MONOTONIC, &next_send);  // send immediately
-    int send_attempts = 0;
 
     const uint8_t preamble[2] = { PREAMBLE_BYTE_1, PREAMBLE_BYTE_2 };
 

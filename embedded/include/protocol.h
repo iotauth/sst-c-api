@@ -8,6 +8,10 @@
 #define PREAMBLE_BYTE_2          0xCD
 #define MSG_TYPE_ENCRYPTED       0x02
 
+// timing cooldown
+#define KEY_UPDATE_COOLDOWN_S 15
+
+
 /* -------- Sizes -------- */
 #define SESSION_KEY_SIZE         16
 #define NONCE_SIZE               12
