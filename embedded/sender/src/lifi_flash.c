@@ -72,10 +72,30 @@ int main() {
 
     if (!load_session_key(session_key)) {
         printf("No valid session key found. Waiting for one...\n");
-        if (receive_new_key_with_timeout(session_key, 10000)) {
+        if (receive_new_key_with_timeout(session_key, 20000)) { //20 seconds to set up session key
             print_hex("Received session key: ", session_key, SST_KEY_SIZE);
-            store_session_key(session_key);
-            printf("Key saved to flash slot.\n");
+            if (store_session_key(session_key)) {
+                uint8_t tmp[SST_KEY_SIZE];
+                int written_slot = -1;
+
+                if (pico_read_key_from_slot(0, tmp) && memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
+                    written_slot = 0;
+                } else if (pico_read_key_from_slot(1, tmp) && memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
+                    written_slot = 1;
+                }
+                secure_zero(tmp, sizeof(tmp));
+
+                if (written_slot >= 0) {
+                    current_slot = written_slot;
+                    store_last_used_slot((uint8_t)current_slot);
+                    printf("Key saved to flash slot %c.\n", current_slot == 0 ? 'A': 'B');
+                } else {
+                    printf("Warning: couldn't verify which slot has the new key.\n");
+                }
+            } else {
+                printf("Failed to save key to flash.\n");
+                return 1;
+            }
         } else {
             printf("Timeout. No session key received. Aborting.\n");
             return 1;
@@ -128,6 +148,14 @@ int main() {
             continue;
         }
 
+        // handle command handling before sending over Lifi
+         if (strncmp(message_buffer, "CMD:", 4) == 0) {
+            const char *cmd = message_buffer + 4;
+            handle_commands(cmd, session_key, &current_slot);
+            memset(message_buffer, 0, sizeof(message_buffer));
+            continue;
+        }
+
         uint8_t nonce[SST_NONCE_SIZE];
         get_random_bytes(nonce, SST_NONCE_SIZE);
 
@@ -152,15 +180,11 @@ int main() {
         gpio_put(25, 0);
 
         // Clear sensitive data from memory
-        explicit_bzero(ciphertext, sizeof(ciphertext));
-        explicit_bzero(tag, sizeof(tag));
-        explicit_bzero(nonce, sizeof(nonce));
+        secure_zero(ciphertext, sizeof(ciphertext));
+        secure_zero(tag, sizeof(tag));
+        secure_zero(nonce, sizeof(nonce));
+        secure_zero(message_buffer, sizeof(message_buffer));
 
-        //if trigger command handling
-         if (strncmp(message_buffer, "CMD:", 4) == 0) {
-            const char *cmd = message_buffer + 4;
-            handle_commands(cmd, session_key, &current_slot);
-        }
     }
 
     return 0;

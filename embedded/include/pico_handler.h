@@ -37,6 +37,14 @@ bool load_session_key(uint8_t *out);
 bool store_session_key(const uint8_t *key);
 // Checks if a key buffer is all zeros.
 bool is_key_zeroed(const uint8_t *key);
+// Securely wipe sensitive data from memory.
+// Securely wipe sensitive data from memory.
+static inline void secure_zero(void *p, size_t n) {
+    volatile uint8_t *v = (volatile uint8_t *)p;
+    while (n--) {
+        *v++ = 0;
+    }
+}
 
 bool keyram_valid(void);
 void keyram_set(const uint8_t *k);        // copies SST_KEY_SIZE bytes
