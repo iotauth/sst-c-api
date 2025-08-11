@@ -11,7 +11,7 @@
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
 #include "../../include/config_handler.h" // For change_directory_to_config_path and get_config_path
-#include "../../include/protocol.h" //global vars for speed, serial settings, etc
+#include "../../../include/protocol.h" //global vars for speed, serial settings, etc
 
 #include "utils.h"
 #include "serial_linux.h"
