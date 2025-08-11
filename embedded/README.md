@@ -49,13 +49,16 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 
 ADD ARM sudo apt update
+```bash
 sudo apt install -y gcc-arm-none-eabi libnewlib-arm-none-eabi cmake git build-essential ninja-build
+```
 
 confirm with arm-none-eabi-gcc --version
 - if that prints go ahead and tell the pico SDK where to look now:
+```bash
 echo 'export PICO_TOOLCHAIN_PATH=/usr' >> ~/.bashrc
 source ~/.bashrc
-
+```
 
 
 ---
