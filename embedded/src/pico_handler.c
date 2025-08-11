@@ -37,6 +37,17 @@
 #define FLASH_SLOT_INDEX_OFFSET (PICO_FLASH_SIZE_BYTES - 4096 + 2 * FLASH_SLOT_SIZE)
 #define SLOT_INDEX_MAGIC 0xA5
 
+//add fix without breaking old logic
+#define SLOT_A_SECTOR_OFFSET (PICO_FLASH_SIZE_BYTES - 2*FLASH_SECTOR_SIZE) // 4KB aligned
+#define SLOT_B_SECTOR_OFFSET (PICO_FLASH_SIZE_BYTES - 1*FLASH_SECTOR_SIZE) // 4KB aligned
+
+static uint8_t g_session_key[SST_KEY_SIZE];
+static bool g_key_valid = false;
+
+static inline uint32_t slot_to_sector_offset(int slot) {
+    return (slot == 0) ? SLOT_A_SECTOR_OFFSET : SLOT_B_SECTOR_OFFSET;
+}
+//CORRECTLY LINKING
 typedef struct {
     uint8_t key[SST_KEY_SIZE];
     uint8_t hash[32];   // SHA-256 hash
@@ -71,7 +82,7 @@ bool write_key_to_slot(uint32_t offset, const uint8_t *key) {
     block.magic = FLASH_KEY_MAGIC;
 
     uint32_t ints = save_and_disable_interrupts();
-    flash_range_erase(offset, FLASH_SLOT_SIZE);
+    flash_range_erase(offset, FLASH_SECTOR_SIZE);
     flash_range_program(offset, (const uint8_t *)&block, sizeof(block));
     restore_interrupts(ints);
     return true;
@@ -191,6 +202,22 @@ void pico_clear_slot(int slot) {
     restore_interrupts(ints);
 }
 
+bool pico_clear_slot_verify(int slot) {
+    if (slot != 0 && slot != 1) return false; //slot A or B
+    const uint32_t sector_off = slot_to_sector_offset(slot);
+ 
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(sector_off, FLASH_SECTOR_SIZE);
+    restore_interrupts(ints);
+
+    // Verify erased (XIP readback)
+    const uint8_t *p = (const uint8_t *)(XIP_BASE + sector_off);
+    for (size_t i = 0; i < FLASH_SECTOR_SIZE; i++) {
+        if (p[i] != 0xFF) return false;
+    }
+    return true;
+}
+
 bool pico_read_key_from_slot(int slot, uint8_t *out) {
     uint32_t offset = (slot == 0) ? FLASH_SLOT_A_OFFSET : FLASH_SLOT_B_OFFSET;
     return read_key_from_slot(offset, out);
@@ -210,4 +237,23 @@ void pico_print_key_from_slot(int slot) {
     } else {
         printf("Slot %c is invalid.\n", slot == 0 ? 'A' : 'B');
     }
+}
+
+bool keyram_valid(void) {
+    return g_key_valid;
+}
+
+void keyram_set(const uint8_t *k) {
+    memcpy(g_session_key, k, SST_KEY_SIZE);
+    g_key_valid = true;
+}
+
+const uint8_t* keyram_get(void) {
+    return g_key_valid ? g_session_key : NULL;
+}
+
+void keyram_clear(void) {
+    volatile uint8_t *p = g_session_key;
+    for (size_t i = 0; i < SST_KEY_SIZE; i++) p[i] = 0;
+    g_key_valid = false;
 }

@@ -23,6 +23,8 @@ void pico_reboot(void);
 void pico_print_slot_status(int current_slot);
 // Erases a specific key slot in flash.
 void pico_clear_slot(int slot);
+// Erase specific key slot in flash and confirms with 0xFF
+bool pico_clear_slot_verify(int slot);
 // Reads a key from a specific slot in flash.
 bool pico_read_key_from_slot(int slot, uint8_t *out);
 // Writes a key to a specific slot in flash.
@@ -35,5 +37,10 @@ bool load_session_key(uint8_t *out);
 bool store_session_key(const uint8_t *key);
 // Checks if a key buffer is all zeros.
 bool is_key_zeroed(const uint8_t *key);
+
+bool keyram_valid(void);
+void keyram_set(const uint8_t *k);        // copies SST_KEY_SIZE bytes
+const uint8_t* keyram_get(void);          // NULL if not set
+void keyram_clear(void);
 
 #endif // PICO_HANDLER_H
