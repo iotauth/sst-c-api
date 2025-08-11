@@ -85,7 +85,7 @@ endif()
 
 # === Platform-Specific RAM Handler ===
 if(HAS_PICO_SDK)
-  add_library(ram_handler src/pico_handler.c)
+  add_library(ram_handler src/pico_handler.c src/cmd_handler.c)
   target_include_directories(ram_handler PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${MBEDTLS_DIR}/include
@@ -99,10 +99,9 @@ else()
   endif()
 endif()
 
-# === Embedded SST Crypto Wrapper ===
+# === Embedded SST Crypto Wrapper === use for both pico and pi 4 builds
 add_library(sst_embedded
   src/sst_crypto_embedded.c
-  src/cmd_handler.c
 )
 if(NOT HAS_PICO_SDK AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_handler.c)
   target_sources(sst_embedded PRIVATE src/config_handler.c)
