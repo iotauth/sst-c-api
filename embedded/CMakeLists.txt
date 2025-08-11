@@ -50,7 +50,7 @@ add_library(mbedcrypto
   ${MBEDTLS_DIR}/library/constant_time.c
 )
 
-# Put YOUR repo root and config first so it wins over the SDK defaults
+# Put repo root and config first so it wins over the SDK defaults
 target_include_directories(mbedcrypto
   PUBLIC
     ${CMAKE_SOURCE_DIR}          # <-- allows "config/mbedtls_config.h"
@@ -59,7 +59,7 @@ target_include_directories(mbedcrypto
     ${CMAKE_SOURCE_DIR}/include
 )
 
-# Force everyone (lib + dependents) to include YOUR config file explicitly
+# Force everyone (lib + dependents) to include config file explicitly
 target_compile_definitions(mbedcrypto
   PUBLIC MBEDTLS_CONFIG_FILE="config/mbedtls_config.h"
 )
