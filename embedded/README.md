@@ -1,10 +1,10 @@
-# 🔐 Secure and Robust Li-Fi Communication for Embedded Systems
+# Secure and Robust Li-Fi Communication for Embedded Systems
 
 This project implements a secure, real-time Li-Fi communication channel between a Raspberry Pi Pico and a host computer. It is designed to be a robust and production-ready embedded system, featuring strong cryptography, persistent key storage, and a rich command interface for easy management.
 
 ---
 
-## 🚀 Project Overview
+## Project Overview
 
 This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a complete secure communication workflow, from initial key provisioning to real-time encrypted messaging.
 
@@ -23,7 +23,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ---
 
-## 📂 Project Structure
+## Project Structure
 
 ```plaintext
 sst-c-api/embedded
@@ -108,7 +108,7 @@ source ~/.bashrc
 
 ---
 
-## 🛠️ Setup & Build
+## Setup & Build
 
 ### 1. Clone the Repository
 ```bash
@@ -155,7 +155,7 @@ This project is perfect for demonstrating a complete, secure communication syste
 
 ---
 
-## 💬 Command Interface
+## Command Interface
 
 Interact with the Pico over the USB serial connection. All commands are prefixed with `CMD:`.
 
@@ -174,7 +174,7 @@ Interact with the Pico over the USB serial connection. All commands are prefixed
 
 ---
 
-## 🏛️ Project Architecture
+## Project Architecture
 
 The code is organized into a clean, modular structure:
 
@@ -186,7 +186,7 @@ The code is organized into a clean, modular structure:
 
 ---
 
-## 🧪 Notes & Future Work
+## Notes & Future Work
 
 -   The system is designed for high reliability, automatically recovering from reboots and provisioning itself on first run.
 -   Future work could include:
