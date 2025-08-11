@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # runClients.sh
-# Usage: ./runClients.sh <number-of-clients>
+# Usage: ./runClients.sh <number-of-clients> <csv-file>
 
 launch_terminal() {
   local cmd="$1"
