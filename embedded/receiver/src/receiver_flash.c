@@ -1,6 +1,3 @@
-#include <fcntl.h>
-#include <libgen.h>        // Required for dirname() and basename()
-#include <linux/limits.h>  // Required for PATH_MAX
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -15,87 +12,22 @@
 #include "../../include/sst_crypto_embedded.h"
 #include "../../include/config_handler.h" // For change_directory_to_config_path and get_config_path
 
-#define UART_DEVICE "/dev/serial0"
-#define BAUDRATE B1000000
-#define SESSION_KEY_SIZE 16
-#define NONCE_SIZE 12
-#define TAG_SIZE 16
-#define PREAMBLE_BYTE_1 0xAB
-#define PREAMBLE_BYTE_2 0xCD
-#define MSG_TYPE_ENCRYPTED 0x02
+#include "protocol.h"
+#include "utils.h"
+#include "serial_linux.h"
+#include "replay_window.h"
+#include "key_exchange.h"
 
-#define NONCE_HISTORY_SIZE 64 // For replay protection
-#define KEY_UPDATE_COOLDOWN_S 15 // For rate limiting
-
-#ifndef HAVE_EXPLICIT_BZERO
-static inline void secure_zero(void *p, size_t n) {
-    volatile uint8_t *v = (volatile uint8_t*)p;
-    while (n--) *v++ = 0;
-}
-#define explicit_bzero secure_zero
-#endif
-
-// --- State Machine Enums ---
-typedef enum {
-    STATE_IDLE,
-    STATE_WAITING_FOR_YES,
-    STATE_WAITING_FOR_ACK
-} receiver_state_t;
-
-void get_random_bytes(uint8_t* buf, size_t len) {
-    FILE* f = fopen("/dev/urandom", "rb");
-    if (f == NULL) {
-        perror("FATAL: Failed to open /dev/urandom. Cannot generate nonces");
-        // On a critical failure like this, we should not continue.
-        exit(EXIT_FAILURE);
-    }
-    size_t read_len = fread(buf, 1, len, f);
-    if (read_len < len) {
-        fprintf(stderr, "FATAL: Could not read enough random bytes from /dev/urandom.\n");
-        fclose(f);
-        exit(EXIT_FAILURE);
-    }
-    fclose(f);
-}
-
-void print_hex(const char* label, const uint8_t* data, size_t len) {
-    printf("%s", label);
-    for (size_t i = 0; i < len; ++i) printf("%02X ", data[i]);
-    printf("\n");
-}
-
-ssize_t read_exact(int fd, uint8_t* buf, size_t len) {
-    size_t total = 0;
-    while (total < len) {
-        ssize_t r = read(fd, buf + total, len - total);
-        if (r <= 0) break;
-        total += r;
-    }
-    return total;
-}
-
-int init_serial(const char* device, int baudrate) {
-    int fd = open(device, O_RDWR | O_NOCTTY);
-    if (fd == -1) { perror("Failed to open serial device"); return -1; }
-
-    struct termios options;
-    tcgetattr(fd, &options);
-    //raw mode simpler and safer for binary frames
-    cfmakeraw(&options);
-    cfsetispeed(&options, baudrate);
-    cfsetospeed(&options, baudrate);
-    options.c_cflag |= (CLOCAL | CREAD);
-    options.c_cflag &= ~(PARENB | CSTOPB | CSIZE);
-    options.c_cflag |= CS8;
-    options.c_cc[VMIN]  = 1;
-    options.c_cc[VTIME] = 1;
-    tcsetattr(fd, TCSANOW, &options);
-    return fd;
+static inline int timespec_passed(const struct timespec *dl) {
+    struct timespec now;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    return (now.tv_sec > dl->tv_sec) ||
+           (now.tv_sec == dl->tv_sec && now.tv_nsec >= dl->tv_nsec);
 }
 
 int main(int argc, char* argv[]) {
     const char* config_path = NULL;
-    
+
     if (argc > 2) {
         fprintf(stderr, "Error: Too many arguments.\n");
         fprintf(stderr, "Usage: %s [<path/to/sst.config>]\n", argv[0]);
@@ -103,71 +35,72 @@ int main(int argc, char* argv[]) {
     } else if (argc == 2) {
         config_path = argv[1];
     }
-    
-    // Call the function to handle the config path logic
+
+    // Resolve / chdir and pick the config filename (host-only; Pico stub is no-op)
     change_directory_to_config_path(config_path);
-    // Now we can safely use the config path
     config_path = get_config_path(config_path);
-    // Continue with the rest of the program logic...
     printf("Using config file: %s\n", config_path);
 
+    // --- Fetch session key from SST ---
     printf("Retrieving session key from SST...\n");
     SST_ctx_t* sst = init_SST(config_path);
-    if (!sst) return fprintf(stderr, "SST init failed.\n"), 1;
+    if (!sst) { fprintf(stderr, "SST init failed.\n"); return 1; }
 
-    session_key_list_t* key_list =
-        get_session_key(sst, init_empty_session_key_list());
-    if (!key_list || key_list->num_key == 0)
-        return fprintf(stderr, "No session key.\n"), 1;
+    session_key_list_t* key_list = get_session_key(sst, init_empty_session_key_list());
+    if (!key_list || key_list->num_key == 0) {
+        fprintf(stderr, "No session key.\n");
+        return 1;
+    }
 
     session_key_t s_key = key_list->s_key[0];
     print_hex("Session Key: ", s_key.cipher_key, SESSION_KEY_SIZE);
-    bool key_valid = true; // Flag to check if key is valid
-    uint8_t pending_key[SESSION_KEY_SIZE]; // For key updates
-    uint8_t nonce_history[NONCE_HISTORY_SIZE][NONCE_SIZE] = {0};
-    int nonce_history_idx = 0;
 
+
+    bool key_valid = true;                       // track if current key usable
+    uint8_t pending_key[SESSION_KEY_SIZE] = {0}; // for rotations
+
+    // --- Receiver state + replay window ---
     receiver_state_t state = STATE_IDLE;
-    struct timespec state_deadline;
-    time_t last_key_req_time = 0;
+    struct timespec  state_deadline = (struct timespec){0,0};
+    time_t           last_key_req_time = 0;
 
-    int fd = init_serial(UART_DEVICE, BAUDRATE);
+    // nonce setup
+    replay_window_t rwin;
+    replay_window_init(&rwin, NONCE_SIZE, NONCE_HISTORY_SIZE);
+
+    // --- Serial setup ---
+    int fd = init_serial(UART_DEVICE, UART_BAUDRATE);
     if (fd < 0) return 1;
 
-    bool stop_sending_key = false; // Flag to stop sending key after confirmation
-
-    // Step 1: Send preamble + key to Pico, 5 times with a 3-second delay
-    uint8_t preamble[2] = {0xAB, 0xCD};
-
+    // Initial key push retry machinery
     bool awaiting_key_confirm = true;
     struct timespec next_send = {0};
-    clock_gettime(CLOCK_MONOTONIC, &next_send); // send immediately
+    clock_gettime(CLOCK_MONOTONIC, &next_send);  // send immediately
     int send_attempts = 0;
 
-    uint8_t byte;
-    int uart_state = 0;
-    // Step 2: Listen for encrypted message
-    printf("Listening for encrypted message...\n");
+    const uint8_t preamble[2] = { PREAMBLE_BYTE_1, PREAMBLE_BYTE_2 };
 
-    // Flush any stale data in the input buffer before starting the loop.
+    // UART framing state
+    uint8_t byte = 0;
+    int uart_state = 0;
+
+    printf("Listening for encrypted message...\n");
     tcflush(fd, TCIFLUSH);
 
     while (1) {
         // --- Handle State Timeouts ---
-        if (state != STATE_IDLE) {
-            struct timespec now;
-            clock_gettime(CLOCK_MONOTONIC, &now);
-            if (now.tv_sec > state_deadline.tv_sec ||
-                (now.tv_sec == state_deadline.tv_sec && now.tv_nsec >= state_deadline.tv_nsec)) {
-                if (state == STATE_WAITING_FOR_YES) {
-                    printf("Confirmation for 'new key' timed out. Returning to idle.\n");
-                } else if (state == STATE_WAITING_FOR_ACK) {
-                    printf("Timeout waiting for key update ACK. Discarding new key.\n");
-                    explicit_bzero(pending_key, sizeof(pending_key));
-                }
-                state = STATE_IDLE;
-            }
+    if (state != STATE_IDLE && timespec_passed(&state_deadline)) {
+        if (state == STATE_WAITING_FOR_YES) {
+            printf("Confirmation for 'new key' timed out. Returning to idle.\n");
+            // nothing to wipe here
+        } else if (state == STATE_WAITING_FOR_ACK) {
+            printf("Timeout waiting for key update ACK. Discarding new key.\n");
+            explicit_bzero(pending_key, sizeof pending_key);
+            // keep old key; key_valid stays true
         }
+        state = STATE_IDLE;
+        state_deadline = (struct timespec){0,0};
+    }
 
         if (read(fd, &byte, 1) == 1) {
             switch (uart_state) {
@@ -192,6 +125,7 @@ int main(int argc, char* argv[]) {
                         uint8_t nonce[NONCE_SIZE];
                         uint8_t len_bytes[2];
 
+                        // Read nonce + length
                         if (read_exact(fd, nonce, NONCE_SIZE) != NONCE_SIZE ||
                             read_exact(fd, len_bytes, 2) != 2) {
                             printf("Failed to read nonce or length\n");
@@ -200,24 +134,16 @@ int main(int argc, char* argv[]) {
                         }
 
                         // --- Nonce Replay Check ---
-                        bool nonce_replayed = false;
-                        for (int i = 0; i < NONCE_HISTORY_SIZE; i++) {
-                            if (memcmp(nonce_history[i], nonce, NONCE_SIZE) == 0) {
-                                nonce_replayed = true;
-                                break;
-                            }
-                        }
-                        if (nonce_replayed) {
+                        if (replay_window_seen(&rwin, nonce)) {
                             printf("Nonce replayed! Rejecting message.\n");
                             uart_state = 0;
                             continue;
                         }
-                        memcpy(nonce_history[nonce_history_idx], nonce, NONCE_SIZE);
-                        nonce_history_idx = (nonce_history_idx + 1) % NONCE_HISTORY_SIZE;
+                        replay_window_add(&rwin, nonce);
 
-
-                        uint16_t msg_len = (len_bytes[0] << 8) | len_bytes[1];
-                        if (msg_len > 1024) {
+                        // Length -> host order + bounds check
+                        uint16_t msg_len = ((uint16_t)len_bytes[0] << 8) | len_bytes[1];
+                        if (msg_len == 0 || msg_len > 1024) {             // or use MAX_MSG_LEN from protocol.h
                             printf("Message too long: %u bytes\n", msg_len);
                             uart_state = 0;
                             continue;
