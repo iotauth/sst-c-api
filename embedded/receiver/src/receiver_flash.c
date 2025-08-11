@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
     replay_window_init(&rwin, NONCE_SIZE, NONCE_HISTORY_SIZE);
 
     // --- Serial setup ---
-    int fd = init_serial(UART_DEVICE, UART_BAUDRATE);
+    int fd = init_serial(UART_DEVICE, UART_BAUDRATE_TERMIOS); //termios for pi4
     if (fd < 0) return 1;
 
     // Initial key push retry machinery
@@ -175,7 +175,6 @@ int main(int argc, char* argv[]) {
                                 // If the decrypted message is "I have the key", stop sending the key.
                                 if (strcmp((char*)decrypted, "I have the key") == 0) {
                                     printf("Pico has confirmed receiving the key.\n");
-                                    stop_sending_key = true; // Set flag to stop key transmission
                                 }
 
                                 // Handle "new key" commands (if the flag for sending new key is set)
