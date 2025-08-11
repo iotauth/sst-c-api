@@ -68,7 +68,7 @@ sst-c-api/embedded
     └── sst_crypto_embedded.c   # Embedded crypto API implementation
 ```
 
-## 🔧 Hardware Requirements
+## Hardware Requirements
 
 ### **Sender (Pico)**
 - [Raspberry Pi Pico (RP2040)](https://www.sparkfun.com/raspberry-pi-pico.html?src=raspberrypi)
@@ -85,7 +85,7 @@ sst-c-api/embedded
 
 ---
 
-## 📦 Software Dependencies
+## Software Dependencies
 
 -   CMake ≥ 3.13
 -   ARM GCC Toolchain
@@ -136,7 +136,7 @@ cp sender/lifi_flash.uf2 /media/user/RPI-RP2
 
 ---
 
-## 🎓 How to Run the Demo (Thesis Demonstration)
+## How to Run
 
 This project is perfect for demonstrating a complete, secure communication system.
 
