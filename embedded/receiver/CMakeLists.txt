@@ -10,12 +10,13 @@ add_library(receiver_common
   ${CMAKE_CURRENT_SOURCE_DIR}/src/serial_linux.c
   ${CMAKE_CURRENT_SOURCE_DIR}/src/replay_window.c
   # ${CMAKE_CURRENT_SOURCE_DIR}/src/key_exchange.c   # enable when you add it
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../src/config_handler.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/../src/config_handler.c
 )
 
 target_include_directories(receiver_common
   PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
     ${CMAKE_CURRENT_SOURCE_DIR}/../../include
 )
 
