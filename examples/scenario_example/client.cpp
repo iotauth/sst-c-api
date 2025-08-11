@@ -12,13 +12,15 @@ enum AttackType {
     NONE,
     REPLAY,
     DOSK,
-    DOSC
+    DOSC,
+    DOSM
 };
 
 static AttackType parseAttackType(const std::string& s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
-    if (s == "DOSK" || s == "DosK" || s == "dosk") return DOSK;
+    if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" || s == "dosK" || s == "dosk") return DOSK;
     if (s == "DOSC" || s == "DoSC" || s == "DosC" || s == "Dosc" || s == "dosC" || s == "dosc") return DOSC;
+    if (s == "DOSM" || s == "DoSM" || s == "DosM" || s == "Dosc" || s == "dosM" || s == "dosm") return DOSM;
     return NONE;
 }
 
@@ -79,6 +81,7 @@ int main(int argc, char *argv[]) {
 
         switch (attack_type) {
             case REPLAY: {
+                // Replay Attack
                 if      (attack_param == "seq--") {
                     session_ctx->sent_seq_num--;
                 }
@@ -105,14 +108,27 @@ int main(int argc, char *argv[]) {
             case DOSC: {
                 // Quantity of secure_connect_to_server requests is the fourth column in the CSV
                 int repeat = std::stoi(attack_param);
-
+                SST_session_ctx_t *session_ctx[repeat];
                 // DOS Attack on secure_connect_to_server
                 for (int i = 0; i < repeat; ++i) {
-                    SST_session_ctx_t *session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
-                    // free_SST_ctx_t(ctx);
+                    s_key_list = get_session_key(ctx, NULL);
+                    session_ctx[i] = secure_connect_to_server(&s_key_list->s_key[0], ctx);
+                    free_session_key_list_t(s_key_list);
                 }
+                while(true);
             } break;
 
+            case DOSM: {
+                // Quantity of send_secure_message requests is the fourth column in the CSV
+                int repeat = std::stoi(attack_param);
+
+                // DOS Attack on send_secure_message
+                for (int i = 0; i < repeat; ++i) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1)); // A tiny delay is necessary to give the server time to read the message;
+                    send_secure_message(const_cast<char *>(message.c_str()),
+                                        message.length(), session_ctx);
+                }
+            } break;
 
             case NONE:
             default:
