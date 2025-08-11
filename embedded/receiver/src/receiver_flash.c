@@ -27,6 +27,14 @@
 #define NONCE_HISTORY_SIZE 64 // For replay protection
 #define KEY_UPDATE_COOLDOWN_S 15 // For rate limiting
 
+#ifndef HAVE_EXPLICIT_BZERO
+static inline void secure_zero(void *p, size_t n) {
+    volatile uint8_t *v = (volatile uint8_t*)p;
+    while (n--) *v++ = 0;
+}
+#define explicit_bzero secure_zero
+#endif
+
 // --- State Machine Enums ---
 typedef enum {
     STATE_IDLE,
@@ -68,22 +76,18 @@ ssize_t read_exact(int fd, uint8_t* buf, size_t len) {
 
 int init_serial(const char* device, int baudrate) {
     int fd = open(device, O_RDWR | O_NOCTTY);
-    if (fd == -1) {
-        perror("Failed to open serial device");
-        return -1;
-    }
+    if (fd == -1) { perror("Failed to open serial device"); return -1; }
 
     struct termios options;
     tcgetattr(fd, &options);
+    //raw mode simpler and safer for binary frames
+    cfmakeraw(&options);
     cfsetispeed(&options, baudrate);
     cfsetospeed(&options, baudrate);
     options.c_cflag |= (CLOCAL | CREAD);
-    options.c_cflag &= ~PARENB & ~CSTOPB & ~CSIZE;
+    options.c_cflag &= ~(PARENB | CSTOPB | CSIZE);
     options.c_cflag |= CS8;
-    options.c_lflag &= ~(ICANON | ECHO | ECHOE | ISIG);
-    options.c_iflag &= ~(IXON | IXOFF | IXANY);
-    options.c_oflag &= ~OPOST;
-    options.c_cc[VMIN] = 1;
+    options.c_cc[VMIN]  = 1;
     options.c_cc[VTIME] = 1;
     tcsetattr(fd, TCSANOW, &options);
     return fd;
@@ -134,23 +138,16 @@ int main(int argc, char* argv[]) {
 
     // Step 1: Send preamble + key to Pico, 5 times with a 3-second delay
     uint8_t preamble[2] = {0xAB, 0xCD};
-    for (int i = 0; i < 5; i++) {
-        if (!stop_sending_key) { // Only send key if flag is not set
-            write(fd, preamble, 2);
-            write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-            usleep(50000); // Wait 50ms for the write to complete before printing/sleeping
-            printf("Sent session key to Pico (attempt %d/5).\n", i + 1);
-        }
-        if (i < 4) { // Don't sleep after the last attempt
-            sleep(3);
-        }
-    }
 
-    // Step 2: Listen for encrypted message
-    printf("Listening for encrypted message...\n");
+    bool awaiting_key_confirm = true;
+    struct timespec next_send = {0};
+    clock_gettime(CLOCK_MONOTONIC, &next_send); // send immediately
+    int send_attempts = 0;
 
     uint8_t byte;
     int uart_state = 0;
+    // Step 2: Listen for encrypted message
+    printf("Listening for encrypted message...\n");
 
     // Flush any stale data in the input buffer before starting the loop.
     tcflush(fd, TCIFLUSH);
@@ -255,7 +252,7 @@ int main(int argc, char* argv[]) {
                                 }
 
                                 // Handle "new key" commands (if the flag for sending new key is set)
-                                else if (strcmp((char*)decrypted, "CMD: new key -f") == 0) {
+                                else if (strcmp((char*)decrypted, "new key -f") == 0) {
                                     // Logic to request a new key and forcefully overwrite current one
                                     printf("Received 'new key -f' command. Requesting new key...\n");
 
@@ -281,7 +278,7 @@ int main(int argc, char* argv[]) {
                                 }
 
                                 // Handle other "new key" commands
-                                else if (strcmp((char*)decrypted, "CMD: new key") == 0) {
+                                else if (strcmp((char*)decrypted, "new key") == 0) {
                                     // Logic to check key cooldown and request a new key
                                     time_t now = time(NULL);
                                     if (now - last_key_req_time < KEY_UPDATE_COOLDOWN_S) {
@@ -302,18 +299,6 @@ int main(int argc, char* argv[]) {
                                     explicit_bzero(pending_key, sizeof(pending_key));
                                     print_hex("New key is now active: ", s_key.cipher_key, SESSION_KEY_SIZE);
                                     state = STATE_IDLE;
-                                }
-
-                                // Handle "clear key" command
-                                else if (strcmp((char*)decrypted, "CMD: clear key") == 0) {
-                                    printf("Received 'clear key' command. Zeroing session key (no new key sent).\n");
-                                    explicit_bzero(s_key.cipher_key, SESSION_KEY_SIZE); // Zero out session key
-                                    key_valid = false; // Mark the key as invalid
-                                }
-
-                                // Handle unknown commands or print the current key
-                                else if (strcmp((char*)decrypted, "CMD: print key receiver") == 0 || strcmp((char*)decrypted, "CMD: print key *") == 0) {
-                                    print_hex("Receiver's session key: ", s_key.cipher_key, SESSION_KEY_SIZE);
                                 }
 
                             } else {

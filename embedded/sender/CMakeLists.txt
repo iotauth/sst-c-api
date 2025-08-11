@@ -8,8 +8,7 @@ add_executable(lifi_flash
   src/lifi_flash.c
 )
 
-
-# Make sure the app sees YOUR mbedTLS config (not the SDK default)
+# Make sure the app sees mbedTLS config (not the SDK default)
 target_include_directories(lifi_flash PRIVATE
   ${CMAKE_SOURCE_DIR}            # for "config/mbedtls_config.h"
   ${MBEDTLS_DIR}/include

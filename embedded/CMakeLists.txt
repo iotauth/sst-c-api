@@ -104,9 +104,6 @@ endif()
 add_library(sst_embedded
   src/sst_crypto_embedded.c
 )
-if(NOT HAS_PICO_SDK AND EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/config_handler.c)
-  target_sources(sst_embedded PRIVATE src/config_handler.c)
-endif()
 
 target_include_directories(sst_embedded PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
