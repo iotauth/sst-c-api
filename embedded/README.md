@@ -1,10 +1,10 @@
-# 🔐 Secure and Robust Li-Fi Communication for Embedded Systems
+# Secure and Robust Li-Fi Communication for Embedded Systems
 
 This project implements a secure, real-time Li-Fi communication channel between a Raspberry Pi Pico and a host computer. It is designed to be a robust and production-ready embedded system, featuring strong cryptography, persistent key storage, and a rich command interface for easy management.
 
 ---
 
-## 🚀 Project Overview
+## Project Overview
 
 This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a complete secure communication workflow, from initial key provisioning to real-time encrypted messaging.
 
@@ -15,15 +15,73 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 -   **Authenticated Encryption**: Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
 -   **Robust Key Persistence**: Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
--   **Secure Key Provisioning**: On first boot, the device enters a provisioning mode, waiting to securely receive its initial session key over the air.
+-   **Secure Key Provisioning**: On first boot/empty slot, listens on **UART1** with preamble 0xAB 0xCD to receive the session key (e.g., from the Pi 4/auth client). Supports `new key` and `new key -f` for controlled overwrite.
 -   **Watchdog Timer**: The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
--   **Secure Memory Handling**: Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `explicit_bzero()` to prevent data leakage.
+-   **Secure Memory Handling**: Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `secure_zero()` right after use to limit in-RAM exposure.
 -   **Interactive Command Interface**: A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
--   **Modular & Reusable Code**: The project is built with a clean, modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
+-   **Modular & Reusable Code**: The project is built with a modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
+-   **Cryptographically Secure PRNG:**: mbedTLS CTR_DRBG seeded from the RP2040 ring-oscillator via pico_hardware_entropy_poll() → high-quality randomness for salts and other needs.
 
 ---
 
-## 🔧 Hardware Requirements
+## Project Architecture
+
+The code is organized into a modular structure:
+
+-   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
+-   `include/`: Header files defining the public interface for each module.
+-   `sender/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
+-   `lib/`: External libraries, such as `mbedtls`.
+-   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
+
+---
+
+## Project Structure
+
+```plaintext
+sst-c-api/embedded
+├── CMakeLists.txt              # Root CMake build configuration
+├── CMakePresets.json           # Preset build settings for CMake
+├── README.md                   # Project documentation
+├── notes.txt                   # Developer notes and references
+│
+├── 📁 build/                   # (Generated) Build artifacts from CMake
+│
+├── 📁 config/
+│   └── mbedtls_config.h        # mbedTLS configuration settings
+│
+├── 📁 include/
+│   ├── cmd_handler.h           # Command processing interface
+│   ├── config_handler.h        # Configuration management interface
+│   ├── mbedtls_time_alt.h      # Custom time source for mbedTLS
+│   ├── pico_handler.h          # Pico-specific helper functions
+│   ├── ram_handler.h           # Session key / RAM management
+│   └── sst_crypto_embedded.h   # Embedded crypto API definitions
+│
+├── 📁 lib/
+│   └── mbedtls/                # mbedTLS cryptographic library source
+│
+├── 📁 receiver/
+│   ├── CMakeLists.txt          # Receiver build configuration
+│   ├── 📁 config/              # Receiver-specific config files
+│   ├── 📁 src/                 # Receiver source code
+│   ├── sst.config              # Receiver runtime configuration
+│   └── update-credentials.sh   # Script to update stored credentials
+│
+├── 📁 sender/
+│   ├── CMakeLists.txt          # Sender build configuration
+│   └── 📁 src/                 # Sender source code
+│
+└── 📁 src/
+    ├── cmd_handler.c           # Command processing implementation
+    ├── config_handler.c        # Configuration management logic
+    ├── mbedtls_time_alt.c      # Custom mbedTLS time source
+    ├── pico_handler.c          # Pico helper logic
+    ├── pico_helper.c           # Additional Pico utility functions
+    └── sst_crypto_embedded.c   # Embedded crypto API implementation
+```
+
+## Hardware Requirements
 
 ### **Sender (Pico)**
 - [Raspberry Pi Pico (RP2040)](https://www.sparkfun.com/raspberry-pi-pico.html?src=raspberrypi)
@@ -40,16 +98,30 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ---
 
-## 📦 Software Dependencies
+## Software Dependencies
 
 -   CMake ≥ 3.13
 -   ARM GCC Toolchain
 -   [Pico SDK](https://github.com/raspberrypi/pico-sdk)
 -   (Optional for Host) [iotauth](https://github.com/iotauth/iotauth) project for advanced key provisioning.
 
+
+ADD ARM sudo apt update
+```bash
+sudo apt install -y gcc-arm-none-eabi libnewlib-arm-none-eabi cmake git build-essential ninja-build
+```
+
+confirm with arm-none-eabi-gcc --version
+- if that prints go ahead and tell the pico SDK where to look now:
+```bash
+echo 'export PICO_TOOLCHAIN_PATH=/usr' >> ~/.bashrc
+source ~/.bashrc
+```
+
+
 ---
 
-## 🛠️ Setup & Build
+## Setup & Build
 
 ### 1. Clone the Repository
 ```bash
@@ -77,10 +149,7 @@ cp sender/lifi_flash.uf2 /media/user/RPI-RP2
 
 ---
 
-## 🎓 How to Run the Demo (Thesis Demonstration)
-
-This project is perfect for demonstrating a complete, secure communication system.
-
+## How to Run
 **1. First-Time Key Provisioning:**
    - Flash a cleared device. On the Pico's USB serial monitor, you will see the message: `No valid session key found. Waiting for one...`
    - From a host computer connected to the Li-Fi UART, send a 32-byte secret key.
@@ -96,7 +165,7 @@ This project is perfect for demonstrating a complete, secure communication syste
 
 ---
 
-## 💬 Command Interface
+## Command Interface
 
 Interact with the Pico over the USB serial connection. All commands are prefixed with `CMD:`.
 
@@ -115,19 +184,8 @@ Interact with the Pico over the USB serial connection. All commands are prefixed
 
 ---
 
-## 🏛️ Project Architecture
 
-The code is organized into a clean, modular structure:
-
--   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific functions (`pico_handler.c`).
--   `include/`: Header files defining the public interface for each module.
--   `sender/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
--   `lib/`: External libraries, such as `mbedtls`.
--   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
-
----
-
-## 🧪 Notes & Future Work
+## Notes & Future Work
 
 -   The system is designed for high reliability, automatically recovering from reboots and provisioning itself on first run.
 -   Future work could include:
