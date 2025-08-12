@@ -11,18 +11,18 @@ extern "C" {
 // Struct for arguments for each thread
 struct ThreadArgs {
     int client_sock;
-    char *config_path;
+    SST_ctx_t *ctx;
+    session_key_list_t *s_key_list;
 };
 
 // For pthread_create()
 void* receive_and_print_messages(void* thread_args) {
     ThreadArgs* args = static_cast<ThreadArgs*>(thread_args);
     int clnt_sock = args->client_sock;
-    char* config_path = args->config_path;
+    SST_ctx_t *ctx = args->ctx;
+    session_key_list_t *s_key_list = args->s_key_list;
     delete args;  // no longer needed
 
-    SST_ctx_t *ctx = init_SST(config_path);
-    session_key_list_t *s_key_list = init_empty_session_key_list();
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
@@ -56,8 +56,6 @@ void* receive_and_print_messages(void* thread_args) {
         return NULL;
     }
     free(session_ctx);
-    free_SST_ctx_t(ctx);
-    free_session_key_list_t(s_key_list);
     return NULL;
 }
 
@@ -99,6 +97,9 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
+    SST_ctx_t *ctx = init_SST(argv[1]);
+    session_key_list_t *s_key_list = init_empty_session_key_list();
+
     // Accept incoming client connections
     while (true) {
         struct sockaddr_in clnt_addr;
@@ -113,7 +114,8 @@ int main(int argc, char *argv[]) {
 
         ThreadArgs* args = new ThreadArgs;
         args->client_sock = clnt_sock;
-        args->config_path = argv[1];
+        args->ctx = ctx;
+        args->s_key_list = s_key_list;
 
         pthread_t t;
         if (pthread_create(&t, NULL, receive_and_print_messages, args) != 0) {
@@ -136,4 +138,7 @@ int main(int argc, char *argv[]) {
         std::cerr << "close() error" << std::endl;
         return EXIT_FAILURE;
     }
+
+    free_SST_ctx_t(ctx);
+    free_session_key_list_t(s_key_list);
 }

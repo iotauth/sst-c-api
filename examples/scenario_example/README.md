@@ -45,7 +45,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 1. Go to `$ROOT/entity/c/examples/scenario_example/`.
 
-2. *[Optional]* Customize `basic_messages.csv` to have client send custom messages to the server.
+2. *[Optional]* Customize `csv_files/basic_messages.csv` to have client send custom messages to the server.
     - Format of the csv should be:
         - Each entry should be on its own line.
         - The amount of time spent sleeping (in milliseconds) is listed first.
@@ -57,9 +57,11 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
     ...
     ```
 
-3. Run the server with `./server ../../server_client_example/c_server.config`.
+3. Run `cd build`.
 
-4. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../basic_messages.csv`.
+4. Run the server with `./server ../../server_client_example/c_server.config`.
+
+5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/basic_messages.csv`.
 
 
 
@@ -71,7 +73,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 1. Go to `$ROOT/entity/c/examples/scenario_example/`.
 
-2. *[Optional]* Customize `replay_attack.csv` to have client send custom messages and replay attacks to the server.
+2. *[Optional]* Customize `csv_files/replay_attack.csv` to have client send custom messages and replay attacks to the server.
     - Format of the csv should be:
         - Each entry should be on its own line.
         - Each value is separated using a comma.
@@ -88,9 +90,11 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
     ...
     ```
 
-3. Run the server with `./server ../../server_client_example/c_server.config`.
+3. Run `cd build`.
 
-4. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../replay_attack.csv`.
+4. Run the server with `./server ../../server_client_example/c_server.config`.
+
+5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/replay_attack.csv`.
 
 ## SKey DoS Attack Example
 
@@ -98,7 +102,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 1. Go to `$ROOT/entity/c/examples/scenario_example/`.
 
-2. *[Optional]* Customize `dos_attack.csv` to have client send custom messages and dos attacks to the server.
+2. *[Optional]* Customize `csv_files/dos_attack_key.csv` to have client send custom messages and dos attacks to the server.
     - Format of the csv should be:
         - Each entry should be on its own line.
         - Each value is separated using a comma.
@@ -114,9 +118,11 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
     ...
     ```
 
-3. Run the server with `./server ../../server_client_example/c_server.config`.
+3. Run `cd build`.
 
-4. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../dos_attack.csv`.
+4. Run the server with `./server ../../server_client_example/c_server.config`.
+
+5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_key.csv`.
 
 ## Client DoS Attack Example
 This attack involves using many clients to connect to the server to create the denial of service. To do that though, the Auth databases and configurations need to be modified to support this.
