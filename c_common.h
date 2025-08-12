@@ -69,31 +69,6 @@ typedef struct {
 #define SST_DEBUG_ENABLED 0
 #endif
 
-// Print out debug messages. This will be printed only when the
-// cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out log messages.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out error messages along with errno if set.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out error message and exit program.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char *fmt, ...);
-
 // Print out error message and return NULL.
 // Uses printf-style formatting.
 // @return Return NULL.
