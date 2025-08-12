@@ -9,6 +9,7 @@
 #include <string.h>
 
 #include "../c_api.h"
+#include "../c_common.h"
 #include "../c_crypto.h"
 
 int main(int argc, char *argv[]) {
