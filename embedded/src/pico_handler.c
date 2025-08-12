@@ -63,6 +63,29 @@ static mbedtls_ctr_drbg_context ctr_drbg;
 static mbedtls_entropy_context entropy;
 static bool prng_initialized = false;
 
+// ---- Nonce state (salt + counter) for 96-bit GCM IVs ----
+static uint64_t g_boot_salt = 0;
+static uint32_t g_msg_counter = 0;
+
+void pico_nonce_init(void) { // call once after pico_prng_init()
+    // Must be called after pico_prng_init() so DRBG is ready
+    get_random_bytes((uint8_t*)&g_boot_salt, sizeof(g_boot_salt)); // The boot_salt changes on each pico_nonce_init(), so nonces won't repeat
+    g_msg_counter = 0;
+}
+
+void pico_nonce_next(uint8_t out12[12]) { //call once per encryption
+    // Layout: [0..7]=salt, [8..11]=counter (opaque bytes on the wire)
+    memcpy(out12 + 0, &g_boot_salt, 8);
+    uint32_t ctr = g_msg_counter++;
+    memcpy(out12 + 8, &ctr, 4);
+}
+
+void pico_nonce_on_key_change(void) { // call whenever session key changes
+    // Safe to reset counter when key changes (new (key,nonce) space)
+    pico_nonce_init();
+}
+
+
 static inline uint32_t slot_to_sector_offset(int slot) {
     return (slot == 0) ? SLOT_A_SECTOR_OFFSET : SLOT_B_SECTOR_OFFSET;
 }

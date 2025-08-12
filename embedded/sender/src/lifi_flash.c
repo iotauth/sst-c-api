@@ -35,6 +35,7 @@ int main() {
     stdio_init_all();
     pico_prng_init();
     sleep_ms(3000); // Wait for USB serial
+    pico_nonce_init();
 
     // Enable watchdog with a 5-second timeout. It will be paused on debug.
     watchdog_enable(5000, 1);
@@ -89,6 +90,7 @@ int main() {
                 if (written_slot >= 0) {
                     current_slot = written_slot;
                     store_last_used_slot((uint8_t)current_slot);
+                    pico_nonce_on_key_change();
                     printf("Key saved to flash slot %c.\n", current_slot == 0 ? 'A': 'B');
                 } else {
                     printf("Warning: couldn't verify which slot has the new key.\n");
@@ -151,14 +153,19 @@ int main() {
 
         // handle command handling before sending over Lifi
          if (strncmp(message_buffer, "CMD:", 4) == 0) {
+            // ADD a bool to see if key changed and then 
             const char *cmd = message_buffer + 4;
+            bool key_changed = handle_commands(cmd, session_key, &current_slot);
+            if (key_changed) {
+                pico_nonce_on_key_change(); // reset salt+counter for the new key space
+            }
             handle_commands(cmd, session_key, &current_slot);
             memset(message_buffer, 0, sizeof(message_buffer));
             continue;
         }
 
         uint8_t nonce[SST_NONCE_SIZE];
-        get_random_bytes(nonce, SST_NONCE_SIZE);
+        pico_nonce_next(nonce); // 96-bit nonce = boot_salt||counter (unique per message)
 
         int ret = sst_encrypt_gcm(session_key, nonce, (const uint8_t *)message_buffer,
                                   msg_len, ciphertext, tag);
