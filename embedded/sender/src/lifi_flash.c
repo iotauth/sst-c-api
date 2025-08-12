@@ -33,6 +33,7 @@
 
 int main() {
     stdio_init_all();
+    pico_prng_init();
     sleep_ms(3000); // Wait for USB serial
 
     // Enable watchdog with a 5-second timeout. It will be paused on debug.

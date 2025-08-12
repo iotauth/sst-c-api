@@ -36,7 +36,7 @@ foreach(f aes.c gcm.c sha256.c sha512.c cipher.c cipher_wrap.c platform.c platfo
   endif()
 endforeach()
 
-# === mbedcrypto (lean AES+GCM+Cipher; no MD/Entropy) ===
+# === mbedcrypto (lean AES+GCM+Cipher; add MD/Entropy) ===
 add_library(mbedcrypto
   ${MBEDTLS_DIR}/library/aes.c
   ${MBEDTLS_DIR}/library/gcm.c
@@ -47,6 +47,8 @@ add_library(mbedcrypto
   ${MBEDTLS_DIR}/library/platform.c
   ${MBEDTLS_DIR}/library/platform_util.c
   ${MBEDTLS_DIR}/library/ctr_drbg.c
+  ${MBEDTLS_DIR}/library/entropy.c
+  ${MBEDTLS_DIR}/library/md.c
   ${MBEDTLS_DIR}/library/constant_time.c
 )
 
@@ -74,8 +76,6 @@ target_compile_options(mbedcrypto PRIVATE
   -UMBEDTLS_CHACHA20_C
   -UMBEDTLS_POLY1305_C
   -UMBEDTLS_CHACHAPOLY_C
-  -UMBEDTLS_MD_C
-  -UMBEDTLS_ENTROPY_C
 )
 
 # Pico-only: provide ms-time hook and stdlib linkage

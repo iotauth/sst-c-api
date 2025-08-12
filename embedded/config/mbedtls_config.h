@@ -8,6 +8,8 @@
 #define MBEDTLS_CTR_DRBG_C
 #define MBEDTLS_SHA256_C
 #define MBEDTLS_SHA512_C
+#define MBEDTLS_ENTROPY_C
+#define MBEDTLS_MD_C
 
 /* === Disable unused cipher backends to avoid link errors === */
 #undef MBEDTLS_ARIA_C
@@ -20,8 +22,6 @@
 #undef MBEDTLS_CHACHAPOLY_C
 
 /* === Remove modules not needed === */
-#undef MBEDTLS_MD_C
-#undef MBEDTLS_ENTROPY_C
 #undef MBEDTLS_SELF_TEST
 #undef MBEDTLS_ERROR_C
 #undef MBEDTLS_FS_IO

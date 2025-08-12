@@ -5,9 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+// Initializes the mbedTLS-based PRNG. Must be called once on startup.
+void pico_prng_init(void);
 // Prints byte data as a hex string.
 void print_hex(const char *label, const uint8_t *data, size_t len);
-// Fills a buffer with random bytes from the Pico's hardware RNG.
+// Fills a buffer with random bytes from the seeded mbedTLS PRNG.
 void get_random_bytes(uint8_t *buffer, size_t len);
 // Waits for a new key to be received over UART with a specified timeout.
 bool receive_new_key_with_timeout(uint8_t *key_out, uint32_t timeout_ms);

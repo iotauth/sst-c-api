@@ -9,7 +9,10 @@
 #include "pico/bootrom.h"
 #include "pico/stdio_usb.h"
 #include <stdio.h>
+#include <string.h>
 #include "mbedtls/sha256.h"
+#include "mbedtls/ctr_drbg.h"
+#include "mbedtls/entropy.h"
 #include "sst_crypto_embedded.h"
 #include "ram_handler.h"
 #include "config_handler.h"
@@ -55,6 +58,10 @@
 
 static uint8_t g_session_key[SST_KEY_SIZE];
 static bool g_key_valid = false;
+
+static mbedtls_ctr_drbg_context ctr_drbg;
+static mbedtls_entropy_context entropy;
+static bool prng_initialized = false;
 
 static inline uint32_t slot_to_sector_offset(int slot) {
     return (slot == 0) ? SLOT_A_SECTOR_OFFSET : SLOT_B_SECTOR_OFFSET;
@@ -158,9 +165,56 @@ bool is_key_zeroed(const uint8_t *key) {
     return true;
 }
 
+int pico_hardware_entropy_poll(void *data, unsigned char *output, size_t len, size_t *olen) {
+    (void)data;
+    uint32_t r;
+    size_t i = 0;
+    while (i < len) {
+        r = get_rand_32();
+        // Copy 4 bytes of randomness
+        for (int j = 0; j < 4 && i < len; j++) {
+            output[i++] = (uint8_t)(r >> (j * 8));
+        }
+    }
+    *olen = len;
+    return 0;
+}
+
+void pico_prng_init(void) {
+    if (prng_initialized) {
+        return;
+    }
+    mbedtls_ctr_drbg_init(&ctr_drbg);
+    mbedtls_entropy_init(&entropy);
+
+    int ret = mbedtls_entropy_add_source(&entropy, pico_hardware_entropy_poll, NULL,
+                                         32, // Minimum entropy length
+                                         MBEDTLS_ENTROPY_SOURCE_STRONG);
+    if (ret != 0) {
+        printf("Failed to add entropy source: %d\n", ret);
+        pico_reboot();
+    }
+
+    const char *pers = "sst-pico-prng";
+    ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
+                                (const unsigned char *)pers, strlen(pers));
+    if (ret != 0) {
+        printf("Failed to seed PRNG: %d\n", ret);
+        pico_reboot();
+    }
+    prng_initialized = true;
+}
+
+
 void get_random_bytes(uint8_t* buffer, size_t len) {
-    for (size_t i = 0; i < len; i++) {
-        buffer[i] = (uint8_t)(get_rand_32() & 0xFF);
+    if (!prng_initialized) {
+        printf("FATAL: PRNG not initialized. Rebooting.\n");
+        pico_reboot();
+    }
+    int ret = mbedtls_ctr_drbg_random(&ctr_drbg, buffer, len);
+    if (ret != 0) {
+        printf("Failed to get random bytes: %d. Rebooting.\n", ret);
+        pico_reboot();
     }
 }
 

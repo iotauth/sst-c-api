@@ -20,6 +20,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Secure Memory Handling**: Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `explicit_bzero()` to prevent data leakage.
 -   **Interactive Command Interface**: A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
 -   **Modular & Reusable Code**: The project is built with a modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
+-   **Cryptographically Secure PRNG:**: Employs the mbedTLS CTR_DRBG module, a NIST-standard pseudo-random number generator seeded by the Pico's hardware RNG, to ensure a high-quality source of randomness for cryptographic nonces.
 
 ---
 
