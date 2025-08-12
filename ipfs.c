@@ -288,7 +288,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
         SST_print_error_exit(
-            "Socket read eerror in receive_data_and_download_file().\n");
+            "Socket read error in receive_data_and_download_file().\n");
     }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
@@ -347,7 +347,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in send_add_reader_req_via_TCP().\n");
+                "Socket read error in send_add_reader_req_via_TCP().\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;

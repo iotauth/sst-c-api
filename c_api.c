@@ -7,9 +7,6 @@
 #include "c_secure_comm.h"
 #include "load_config.h"
 
-extern unsigned char entity_client_state;
-extern unsigned char entity_server_state;
-
 SST_ctx_t *init_SST(const char *config_path) {
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
     // By default OpenSSL will attempt to clean itself up when the process exits
@@ -105,15 +102,15 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         SST_print_error_exit("Failed to write data to socket.");
     }
     free(parsed_buf);
-    entity_client_state = HANDSHAKE_1_SENT;
+    int entity_client_state = HANDSHAKE_1_SENT;
 
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-    if (received_buf_length < 0) {
+    if (received_buf_length <= 0) {
         SST_print_error_exit(
-            "Socket read eerror in secure_connect_to_server_with_socket()\n");
+            "Socket read error in secure_connect_to_server_with_socket()\n");
     }
     unsigned char message_type;
     unsigned int data_buf_length;
@@ -195,7 +192,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     session_ctx->sent_seq_num = 0;
     session_ctx->sock = clnt_sock;
 
-    entity_server_state = IDLE;
+    int entity_server_state = IDLE;
     unsigned char server_nonce[HS_NONCE_SIZE];
 
     session_key_t *s_key = NULL;
@@ -206,7 +203,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -259,7 +256,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -324,6 +321,10 @@ int read_secure_message(unsigned char *plaintext,
     bytes_read = read_header_return_data_buf_pointer(
         session_ctx->sock, &message_type, received_buf,
         MAX_SECURE_COMM_MSG_LENGTH);
+    if (bytes_read <= 0) {
+        SST_print_error("Failed to read from socket in read_header_return_data_buf_pointer().");
+        return bytes_read;
+    }
     if (check_SECURE_COMM_MSG_type(message_type)) {
         SST_print_error_exit("Wrong message_type.");
     }
