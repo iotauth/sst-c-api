@@ -3,7 +3,6 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "../../../c_common.h"
 #include "../../../ipfs.h"
 
 int main(int argc, char* argv[]) {

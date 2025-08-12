@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 // Define a struct to hold the thread arguments
 typedef struct {

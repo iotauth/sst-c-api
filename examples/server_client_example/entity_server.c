@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {

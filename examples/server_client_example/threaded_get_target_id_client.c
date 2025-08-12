@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
     FILE *fp = fopen(file_path, "wb");

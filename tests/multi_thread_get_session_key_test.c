@@ -13,7 +13,6 @@
 #include <unistd.h>
 
 #include "../c_api.h"
-#include "../c_common.h"
 
 void *send_request(void *SST_ctx) {
     SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
