@@ -11,11 +11,11 @@
  */
 
 #include "../c_crypto.h"
-#include "../c_common.h"
 
 #include <assert.h>
 
 #include "../c_api.h"
+#include "../c_common.h"
 
 #define _unused(x) ((void)(x))  // To avoid unused-but-set-variable error.
 
