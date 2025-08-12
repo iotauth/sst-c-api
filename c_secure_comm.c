@@ -5,9 +5,6 @@
 #include "c_common.h"
 #include "c_crypto.h"
 
-unsigned char entity_client_state;
-unsigned char entity_server_state;
-
 typedef enum {
     INIT,
     AUTH_HELLO_RECEIVED,
@@ -543,7 +540,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in send_session_key_req_via_TCP().\n");
+                "Socket read error in send_session_key_req_via_TCP().\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
