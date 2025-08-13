@@ -14,14 +14,14 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 <table style="width:100%; border-collapse:collapse; border:none;">
   <tr>
     <!-- Left: image (70%) -->
-    <td style="width:70%; vertical-align:top; padding:0; border:none;">
+    <td style="width:80%; vertical-align:top; padding:0; border:none;">
       <a href="./img/physical_lifi.png">
         <img src="./img/physical_lifi.png" alt="LiFi physical setup"
              style="display:block; width:100%; height:auto; border:0;">
       </a>
     </td>
 <!-- Right: text (30%) -->
-    <td style="width:30%; vertical-align:top; padding:0; border:none;">
+    <td style="width:20%; vertical-align:top; padding:0; border:none;">
       <h2 style="margin:0 0 .75rem 0;">Hardware Overview</h2>
 
 <!-- Pad only the body text, not the header -->
