@@ -37,7 +37,9 @@ int main(int argc, char* argv[]) {
 
     std::string add_reader;
     while (std::getline(add_reader_file, add_reader)) {
-        send_add_reader_req_via_TCP(ctx, const_cast<char*>(add_reader.c_str()));
+        if (send_add_reader_req_via_TCP(ctx, const_cast<char*>(add_reader.c_str())) == -1) {
+            SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
+        }
     }
     add_reader_file.close();
 

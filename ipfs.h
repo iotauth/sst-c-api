@@ -114,6 +114,7 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
 // @param ctx config struct obtained from load_config()
 // @param add_reader_path path to the file including a list of readers to be
 // added
-void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader_path);
+// @return 0 for success, -1 for fail
+int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader_path);
 
 #endif

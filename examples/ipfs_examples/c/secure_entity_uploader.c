@@ -28,7 +28,9 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
-        send_add_reader_req_via_TCP(ctx, addReader);
+        if (send_add_reader_req_via_TCP(ctx, addReader) == -1) {
+            SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
+        }
     }
     fclose(add_reader_file);
 
