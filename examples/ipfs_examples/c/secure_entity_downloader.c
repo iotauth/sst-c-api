@@ -27,7 +27,8 @@ int main(int argc, char *argv[]) {
     sleep(3);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
     int concat_buffer_size = make_download_req_buffer(ctx, concat_buffer);
-    int msg = send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
+    int msg =
+        send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
@@ -51,7 +52,7 @@ int main(int argc, char *argv[]) {
     session_key_t *session_key =
         get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
     if (session_key == NULL) {
-        printf("There is no session key.\n");
+        printf("Failed to get_session_key_by_ID().\n");
         exit(1);
     } else {
         sleep(5);

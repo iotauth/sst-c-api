@@ -34,8 +34,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
         // Request session key by session key ID. It will be added to the
         // s_key_list.
-        get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
-                              s_key_list);
+        if (get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
+                                  s_key_list) == NULL) {
+            SST_print_error_exit("Failed get_session_key_by_ID().");
+        }
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(encrypted_filename, sizeof(encrypted_filename),
                  "encrypted%d.txt", i);

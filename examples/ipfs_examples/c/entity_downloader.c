@@ -44,6 +44,9 @@ int main(int argc, char *argv[]) {
         gettimeofday(&keygen_start, NULL);
         session_key_t *session_key =
             get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
+        if (session_key == NULL) {
+            SST_print_error_exit("Failed get_session_key_by_ID().");
+        }
         gettimeofday(&keygen_end, NULL);
         float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
         float keygen_utime = keygen_end.tv_usec - keygen_start.tv_usec;

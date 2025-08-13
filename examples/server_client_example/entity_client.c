@@ -30,7 +30,7 @@ int main(int argc, char *argv[]) {
     pthread_create(&thread, NULL, &receive_thread_read_one_each,
                    (void *)session_ctx);
     int msg = send_secure_message("Hello server", strlen("Hello server"),
-                              session_ctx);
+                                  session_ctx);
     if (< 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }

@@ -68,7 +68,7 @@ int main(int argc, char *argv[]) {
         get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
 
     if (session_key == NULL) {
-        std::cerr << "There is no session key." << std::endl;
+        std::cerr << "Failed to get_session_key_by_ID()." << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -117,7 +117,8 @@ int main(int argc, char *argv[]) {
     if (session_ctx == NULL) {
         SST_print_error_exit("Failed secure_connect_to_server().");
     }
-    int msg = send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),hash_length, session_ctx);
+    int msg = send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
+                                  hash_length, session_ctx);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }

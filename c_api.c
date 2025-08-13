@@ -181,7 +181,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
     // it does not have to request session key from Auth
     int session_key_idx = -1;
     if (existing_s_key_list == NULL) {
-        SST_print_error_exit("Session key list must be not NULL.\n");
+        SST_print_error("Session key list must be not NULL.");
+        return NULL;
     }
     session_key_idx =
         find_session_key(target_session_key_id_int, existing_s_key_list);
@@ -198,7 +199,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
             SST_print_error(
-                "Failed to send_session_key_request_check_protocol().\n");
+                "Failed to send_session_key_request_check_protocol().");
             return NULL;
         }
         s_key = s_key_list->s_key;
@@ -249,7 +250,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             s_key = get_session_key_by_ID(target_session_key_id, ctx,
                                           existing_s_key_list);
             if (s_key == NULL) {
-                SST_print_error_exit("FAILED to get session key by ID.");
+                SST_print_error("Failed to get_session_key_by_ID().");
+                return NULL;
             }
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
                 SST_print_error_exit(

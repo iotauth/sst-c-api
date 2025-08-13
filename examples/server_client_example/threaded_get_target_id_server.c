@@ -40,6 +40,9 @@ void *call_get_session_key_by_ID(void *args) {
     pthread_mutex_lock(&ctx->mutex);
     session_key_t *session_key =
         get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
+    if (session_key == NULL) {
+        SST_print_error_exit("Failed get_session_key_by_ID().");
+    }
     pthread_mutex_unlock(&ctx->mutex);
 
     if (session_key) {
