@@ -372,9 +372,9 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &encrypted,
-            &encrypted_length)) {
-        SST_print_error_exit(
-            "Error during encryption while parse_handshake_1\n");
+            &encrypted_length) < 0) {
+        SST_print_error("Failed to symmetric_encrypt_authenticate().");
+        return NULL;
     }
 
     *ret_length = encrypted_length + KEY_ID_SIZE;

@@ -106,6 +106,10 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     unsigned int parsed_buf_length;
     unsigned char *parsed_buf =
         parse_handshake_1(s_key, entity_nonce, &parsed_buf_length);
+    if (parsed_buf == NULL) {
+        SST_print_error("Failed parse_handshake_1().");
+        return NULL;
+    }
     unsigned char sender_HS_1[MAX_HS_BUF_LENGTH];
     unsigned int sender_HS_1_length;
     make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_1,
