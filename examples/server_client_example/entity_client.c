@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
                    (void *)session_ctx);
     int msg = send_secure_message("Hello server", strlen("Hello server"),
                                   session_ctx);
-    if (< 0) {
+    if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
     sleep(1);
