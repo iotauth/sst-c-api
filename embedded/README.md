@@ -11,6 +11,49 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
+<!-- Hardware Overview -->
+<table>
+  <tr>
+    <td width="46%" valign="top">
+      <a href="./img/physical_lifi.png">
+        <img src="./img/physical_lifi.png" alt="LiFi physical setup" width="100%" />
+      </a>
+      <sub>Click the image to view full size.</sub>
+    </td>
+    <td width="54%" valign="top">
+
+### Hardware Overview
+
+- **Raspberry Pi Pico**
+  - _Purpose:_ …
+  - _Connections:_ …
+  - _Notes:_ …
+
+- **Raspberry Pi 4**
+  - _Purpose:_ …
+  - _Connections:_ …
+  - _Notes:_ …
+
+- **TC4420 — MOSFET/LED Driver**
+  - _Role:_ …
+  - _Supply:_ …
+  - _Notes:_ …
+
+- **OP350 — Emitter/Photodiode**
+  - _Role:_ …
+  - _Biasing/Drive:_ …
+  - _Notes:_ …
+
+- **TLV3501 — High-Speed Comparator**
+  - _Role:_ …
+  - _Threshold/Ref:_ …
+  - _Notes:_ …
+
+    </td>
+  </tr>
+</table>
+
+
 ### Key Features:
 
 -   **Authenticated Encryption**: Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
