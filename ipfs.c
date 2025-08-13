@@ -89,11 +89,11 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     SST_print_log("Command: %s\n", command);
     fp = popen(command, "r");
     if (fp == NULL) {
-        SST_print_error_exit("popen() failed.\n");
-        exit(1);
+        SST_print_error("popen() failed.\n");
+        return -1;
     }
     if (fgets(buff, sizeof(buff), fp) == NULL) {
-        SST_print_error_exit("Failed to read CID from ipfs output.\n");
+        SST_print_error("Failed to read CID from ipfs output.\n");
         pclose(fp);
         return -1;
     }
@@ -166,8 +166,12 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     float encrypt_utime = encrypt_end.tv_usec - encrypt_start.tv_usec;
     estimate_time->enc_dec_time = encrypt_time + encrypt_utime / 1000000;
     sleep(1);
-    return execute_command_and_save_result(&file_name_buffer[0], hash_value,
-                                           estimate_time);
+    int ret = execute_command_and_save_result(&file_name_buffer[0], hash_value,
+                                              estimate_time);
+    if (ret == -1) {
+        SST_print_error("Failed execute_command_and_save_result()");
+    }
+    return ret;
 }
 
 int file_decrypt_save(session_key_t s_key, char *file_name) {
