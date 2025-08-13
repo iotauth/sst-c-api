@@ -49,7 +49,9 @@ int main(int argc, char *argv[]) {
         exit(1);
     } else {
         sleep(5);
-        file_decrypt_save(*session_key, &file_name[0]);
+        if (file_decrypt_save(*session_key, &file_name[0]) == -1) {
+            SST_print_error_exit("Failed file_decrypt_save()");
+        }
     }
     free_SST_ctx_t(ctx);
 }

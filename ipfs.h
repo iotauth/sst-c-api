@@ -22,7 +22,8 @@ typedef struct {
 // @param fin input file.
 // @param file_buf buffer to save content for the input file.
 // @param bufsize filesize size for the input file.
-void get_file_content(FILE *fin, unsigned char *file_buf,
+// @return 0 for success, -1 for fail
+int get_file_content(FILE *fin, unsigned char *file_buf,
                       unsigned long bufsize);
 
 // To return the file size.
@@ -53,6 +54,7 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
 // @param my_file_path path of the file to encrypt.
 // @param hash_value value to send to file system manager.
 // @estimate_time value to measure and store the time for each process.
+// @return 0 for success, -1 for fail
 int file_encrypt_upload(session_key_t *session_ctx, SST_ctx_t *ctx,
                         char *my_file_path, unsigned char *hash_value,
                         estimate_time_t *estimate_time);
@@ -60,7 +62,8 @@ int file_encrypt_upload(session_key_t *session_ctx, SST_ctx_t *ctx,
 // Decrypt the file with sessionkey.
 // @param session_ctx session key to decrypt the file.
 // @param file_name file name to save in my repository.
-void file_decrypt_save(session_key_t session_ctx, char *file_name);
+// @return 0 for success, -1 for fail
+int file_decrypt_save(session_key_t session_ctx, char *file_name);
 
 // Request the data to file system manager.
 // @param session_ctx session key information to send to file system manager.

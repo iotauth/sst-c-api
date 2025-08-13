@@ -54,6 +54,9 @@ int main(int argc, char* argv[]) {
     int hash_value_len = file_encrypt_upload(
         &s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()),
         &hash_value[0], &estimate_time[0]);
+    if (hash_value_len == -1) {
+        SST_print_error_exit("Failed file_encrypt_upload()");
+    }
 
     upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0],
                                   hash_value_len);

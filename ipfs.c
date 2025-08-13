@@ -16,18 +16,19 @@ const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
 const char DOWNLOAD_FILE_NAME[] = "download";
 
-void get_file_content(FILE *fin, unsigned char *file_buf,
-                      unsigned long bufsize) {
+int get_file_content(FILE *fin, unsigned char *file_buf,
+                     unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
-        SST_print_error_exit("Start point is not zero.\n");
-        exit(1);
+        SST_print_error("Start point is not zero.\n");
+        return -1;
     }
     size_t newLen = fread(file_buf, sizeof(char), bufsize, fin);
     if (ferror(fin) != 0) {
-        SST_print_error_exit("Error reading file.\n");
-        exit(1);
+        SST_print_error("Error reading file.\n");
+        return -1;
     }
     file_buf[newLen++] = '\0';
+    return 0;
 }
 
 unsigned long file_size_return(FILE *fin) {
@@ -118,7 +119,11 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
-    get_file_content(fin, file_buf, bufsize);
+    if (get_file_content(fin, file_buf, bufsize) == -1) {
+        SST_print_error("Failed get_file_content()");
+        free(file_buf);
+        return -1;
+    }
     fclose(fin);
 
     unsigned char iv[AES_128_CBC_IV_SIZE];
@@ -163,13 +168,17 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                                            estimate_time);
 }
 
-void file_decrypt_save(session_key_t s_key, char *file_name) {
+int file_decrypt_save(session_key_t s_key, char *file_name) {
     FILE *fin = fopen(file_name, "r");
     unsigned long bufsize;
     bufsize = file_size_return(fin);
     unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
-    get_file_content(fin, file_buf, bufsize);
+    if (get_file_content(fin, file_buf, bufsize) == -1) {
+        SST_print_error("Failed get_file_content()");
+        free(file_buf);
+        return -1;
+    }
     fclose(fin);
 
     unsigned int owner_name_len = file_buf[0];

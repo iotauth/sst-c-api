@@ -69,6 +69,9 @@ int main(int argc, char* argv[]) {
         hash_value_len =
             file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path,
                                 &hash_value[0], &estimate_time[i]);
+        if (hash_value_len == -1) {
+            SST_print_error_exit("Failed file_encrypt_upload()");
+        }
         sleep(1);
         struct timeval filemanager_start, filemanager_end;
         gettimeofday(&filemanager_start, NULL);

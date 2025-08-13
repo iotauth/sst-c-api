@@ -76,7 +76,9 @@ int main(int argc, char *argv[]) {
 
     std::string available_filename = getAvailableFilename(base, ext);
 
-    file_decrypt_save(*session_key, file_name.data());
+    if (file_decrypt_save(*session_key, file_name.data()) == -1) {
+        SST_print_error_exit("Failed file_decrypt_save()");
+    }
 
     // Step 1. Create Hash
 

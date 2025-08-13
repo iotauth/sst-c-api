@@ -54,7 +54,9 @@ int main(int argc, char *argv[]) {
             sleep(1);
             struct timeval decrypt_start, decrypt_end;
             gettimeofday(&decrypt_start, NULL);
-            file_decrypt_save(*session_key, &file_name[0]);
+            if (file_decrypt_save(*session_key, &file_name[0]) == -1) {
+                SST_print_error_exit("Failed file_decrypt_save()");
+            }
             gettimeofday(&decrypt_end, NULL);
             float decrypt_time = decrypt_end.tv_sec - decrypt_start.tv_sec;
             float decrypt_utime = decrypt_end.tv_usec - decrypt_start.tv_usec;
