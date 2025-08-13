@@ -23,8 +23,7 @@ typedef struct {
 // @param file_buf buffer to save content for the input file.
 // @param bufsize filesize size for the input file.
 // @return 0 for success, -1 for fail
-int get_file_content(FILE *fin, unsigned char *file_buf,
-                      unsigned long bufsize);
+int get_file_content(FILE *fin, unsigned char *file_buf, unsigned long bufsize);
 
 // To return the file size.
 // @param file_name name of the file.
@@ -72,8 +71,8 @@ int file_decrypt_save(session_key_t session_ctx, char *file_name);
 // @param hash_value_len length of value to send to file system manager.
 // @return 0 for success, -1 for fail
 int upload_to_file_system_manager(session_key_t *session_ctx, SST_ctx_t *ctx,
-                                   unsigned char *hash_value,
-                                   int hash_value_len);
+                                  unsigned char *hash_value,
+                                  int hash_value_len);
 
 // Make request buffer to upload information of the file to file system manager.
 // @param session_ctx session key information to send to file system manager.
@@ -97,10 +96,11 @@ int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer);
 // received from file system manager.
 // @param ctx config struct obtained from load_config()
 // @param file_name file name to save the file.
-// @estimate_time value to measure and store the time for each process.
-void receive_data_and_download_file(unsigned char *skey_id_in_str,
-                                    SST_ctx_t *ctx, char *file_name,
-                                    estimate_time_t *estimate_time);
+// @param value to measure and store the time for each process.
+// @return 0 for success, -1 for fail
+int receive_data_and_download_file(unsigned char *skey_id_in_str,
+                                   SST_ctx_t *ctx, char *file_name,
+                                   estimate_time_t *estimate_time);
 
 // Download the file using command received from file system manager.
 // @param received_buf buffer received from file system manager

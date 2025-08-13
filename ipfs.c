@@ -285,7 +285,7 @@ int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
     return index;
 }
 
-void receive_data_and_download_file(unsigned char *skey_id_in_str,
+int receive_data_and_download_file(unsigned char *skey_id_in_str,
                                     SST_ctx_t *ctx, char *file_name,
                                     estimate_time_t *estimate_time) {
     FILE *fin;
@@ -302,14 +302,16 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     memcpy(data + 2, ctx->config->name, name_size);
     int bytes_written = sst_write_to_socket(sock, data, 2 + name_size);
     if (bytes_written != (2 + name_size)) {
-        SST_print_error_exit("Failed to write data to socket.");
+        SST_print_error("Failed to write data to socket.");
+        return -1;
     }
     unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read eerror in receive_data_and_download_file().\n");
+        SST_print_error(
+            "Socket read error in sst_read_from_socket().\n");
+            return -1;
     }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
@@ -338,6 +340,7 @@ void receive_data_and_download_file(unsigned char *skey_id_in_str,
     float download_time = (download_end.tv_sec - download_start.tv_sec);
     float download_utime = (download_end.tv_usec - download_start.tv_usec);
     estimate_time->up_download_time = download_time + download_utime / 1000000;
+    return 0;
 }
 
 void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,

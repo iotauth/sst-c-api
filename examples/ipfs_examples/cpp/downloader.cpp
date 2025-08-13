@@ -58,8 +58,11 @@ int main(int argc, char *argv[]) {
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];
 
-    receive_data_and_download_file(received_skey_id.data(), ctx,
-                                   file_name.data(), &estimate_time[0]);
+    if (receive_data_and_download_file(received_skey_id.data(), ctx,
+                                       file_name.data(),
+                                       &estimate_time[0]) == -1) {
+        SST_print_error_exit("Failed receive_data_and_download_file().");
+    }
 
     session_key_t *session_key =
         get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);

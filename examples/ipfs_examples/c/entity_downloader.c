@@ -35,8 +35,11 @@ int main(int argc, char *argv[]) {
 
     file = fopen(filename, "a");
     for (int i = 0; i < 3; i++) {
-        receive_data_and_download_file(&received_skey_id[0], ctx, &file_name[0],
-                                       &estimate_time[i]);
+        if (receive_data_and_download_file(&received_skey_id[0], ctx,
+                                           &file_name[0],
+                                           &estimate_time[i]) == -1) {
+            SST_print_error_exit("Failed receive_data_and_download_file().");
+        }
         struct timeval keygen_start, keygen_end;
         gettimeofday(&keygen_start, NULL);
         session_key_t *session_key =
