@@ -11,22 +11,21 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
-## Hardware Overview
-<div style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:center; gap:24px; max-width:1000px; margin:0 auto;">
+<div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:24px; max-width:960px; margin:0 auto;">
 
-  <!-- Image column: 180–380px, ~28vw in between -->
-  <div style="flex:0 0 clamp(180px, 28vw, 380px);">
+  <!-- Image column: responsive without clamp() -->
+  <div style="flex:0 1 340px; min-width:220px; max-width:360px;">
     <a href="./img/physical_lifi.png">
       <img
         src="./img/physical_lifi.png"
         alt="LiFi physical setup"
-        style="width:clamp(180px, 28vw, 380px); height:auto; display:block; max-width:80%; text-align:left;"
+        style="display:block; width:100%; height:auto; max-width:360px;"
       >
     </a>
   </div>
 
-  <!-- Text column -->
-  <div style="flex:1 1 120px; min-width:20px; max-width: 200px; box-sizing:border-box; text-align:right;">
+  <!-- Text column: stays to the right when there's room -->
+  <div style="flex:1 1 320px; min-width:300px; max-width:520px; padding-left:1.5rem; box-sizing:border-box; text-align:right;">
 
 **Raspberry Pi Pico**  
 _Purpose:_ …  
@@ -54,11 +53,10 @@ _Threshold/Ref:_ …
 _Notes:_ …
 
 **⚡ 12V DC to Breadboard**  
-_Purpose:_ …  
-_Notes:_ …
 
   </div>
 </div>
+
 
 
 
