@@ -130,7 +130,8 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s\n", ptr);
-                    if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) < 0) {
+                    if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) <
+                        0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() ENTITY_INFO_NAME");
                         free_config_t(c);
@@ -244,7 +245,8 @@ config_t *load_config(const char *path) {
                 case NETWORK_PROTOCOL:
                     SST_print_debug("Network Protocol: %s\n", ptr);
                     if (safe_config_value_copy(c->network_protocol, ptr,
-                                               sizeof(c->network_protocol)) < 0) {
+                                               sizeof(c->network_protocol)) <
+                        0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() NETWORK_PROTOCOL");
                         free_config_t(c);

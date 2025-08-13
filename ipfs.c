@@ -216,6 +216,7 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     fclose(fout);
     SST_print_log("Completed decryption and saved the file: %s\n",
                   result_file_name);
+    return 0;
 }
 
 int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,

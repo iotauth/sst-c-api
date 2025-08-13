@@ -117,8 +117,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
 }
 
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num,
-                           unsigned int *var_len_int_buf_size) {
+                           unsigned int *num, int *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (unsigned int i = 0; i < buf_length; i++) {
@@ -149,7 +148,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
     if (*message_type == AUTH_ALERT) {
         return received_buf + 1;
     }
-    unsigned int var_length_buf_size;
+    int var_length_buf_size;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, received_buf_length,
                           data_buf_length, &var_length_buf_size);
     return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
@@ -178,8 +177,9 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (received_buf_length < 0) {
-        SST_print_error_exit(
+        SST_print_error(
             "Socket read error in read_header_return_data_buf_pointer().\n");
+        return -1;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
@@ -189,7 +189,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         SST_print_error("Failed to read_variable_length_one_byte_each().");
         return -1;
     }
-    unsigned int var_length_buf_size_checked;
+    int var_length_buf_size_checked;
     unsigned int ret_length;
     // Decode the variable length buffer and get the bytes to read.
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,

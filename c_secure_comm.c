@@ -303,7 +303,7 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
                                   int offset, unsigned int *return_to_length) {
     unsigned int num;
-    unsigned int var_len_int_buf_size;
+    int var_len_int_buf_size;
     var_length_int_to_num(buf + offset, buf_length, &num,
                           &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {

@@ -318,7 +318,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
         data_buf_length = read_secure_message(data_buf, session_ctx);
         if (data_buf_length < 0) {
             SST_print_error("Failed to read_secure_message().");
-            break;
+            return NULL;
         }
         printf("Received: %.*s\n", data_buf_length, data_buf);
     }
