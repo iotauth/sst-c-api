@@ -14,18 +14,18 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 ## Hardware Overview
 <div style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:center; gap:24px; max-width:1000px; margin:0 auto;">
 
-  <!-- Image column (smaller on GitHub): 200–420px, ~30vw in between -->
-  <div style="flex:0 0 clamp(200px, 30vw, 420px);">
+  <!-- Image column: 180–380px, ~28vw in between -->
+  <div style="flex:0 0 clamp(180px, 28vw, 380px);">
     <a href="./img/physical_lifi.png">
       <img
         src="./img/physical_lifi.png"
         alt="LiFi physical setup"
-        style="width:clamp(200px, 30vw, 420px); height:auto; display:block; max-width:100%;"
+        style="width:clamp(180px, 28vw, 380px); height:auto; display:block; max-width:100%;"
       >
     </a>
   </div>
 
-  <!-- Text column: right-aligned on desktop, wraps under image on narrow screens -->
+  <!-- Text column -->
   <div style="flex:1 1 320px; min-width:300px; max-width:820px; padding-left:2rem; box-sizing:border-box; text-align:right;">
 
 **Raspberry Pi Pico**  
@@ -59,6 +59,7 @@ _Notes:_ …
 
   </div>
 </div>
+
 
 
 ## Key Features:
