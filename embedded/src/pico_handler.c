@@ -260,8 +260,8 @@ bool receive_new_key_with_timeout(uint8_t *key_out, uint32_t timeout_ms) {
     while (absolute_time_diff_us(get_absolute_time(), deadline) > 0) {
         if (uart_is_readable(UART_ID) &&
             uart_getc(UART_ID) == PREAMBLE_BYTE_1) {
-            while (!uart_is_readable(UART_ID))
-                ;
+            while (!uart_is_readable(UART_ID)) {} //spin until byte available
+
             if (uart_getc(UART_ID) == PREAMBLE_BYTE_2) {
                 printf("Receiving new session key...\n");
                 size_t received = 0;
