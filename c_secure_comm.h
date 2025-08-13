@@ -66,16 +66,18 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
 // @param ctx config struct obtained from load_config()
 // @param sock socket number
 // @param requestIndex request index for purpose
-void send_auth_request_message(unsigned char *serialized,
-                               unsigned int serialized_length, SST_ctx_t *ctx,
-                               int sock, int requestIndex);
+// @return 0 for success, -1 for fail
+int send_auth_request_message(unsigned char *serialized,
+                              unsigned int serialized_length, SST_ctx_t *ctx,
+                              int sock, int requestIndex);
 
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
 // @param ctx config struct obtained from load_config()
 // @param key_size size of the public crypto key
-void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
-                           size_t key_size);
+// @return 0 for success, -1 for fail
+int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
+                          size_t key_size);
 
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec
@@ -137,16 +139,16 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 // @param decrypted_data decrypted buffer including sequence number and payload
 // @param decrypted_buf_length length of decrypted buffer
 // @param SST_session_ctx_t session ctx struct
-
-void decrypt_received_message(unsigned char *encrypted_data,
-                              unsigned int encrypted_data_length,
-                              unsigned char *decrypted_data,
-                              unsigned int *decrypted_buf_length,
-                              SST_session_ctx_t *session_ctx);
+// @return 0 for success, -1 for fail
+int decrypt_received_message(unsigned char *encrypted_data,
+                             unsigned int encrypted_data_length,
+                             unsigned char *decrypted_data,
+                             unsigned int *decrypted_buf_length,
+                             SST_session_ctx_t *session_ctx);
 
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity
-// @return 1 when expired, 0 when valid
+// @return -1 when expired, 0 when valid
 int check_session_key_validity(session_key_t *session_key);
 
 // Check if entity has session key and if not, request the session key to Auth.
@@ -217,7 +219,7 @@ void update_validity(session_key_t *session_key);
 // if the keys are valid.
 // @param requested_num_key the requested number of keys to add.
 // @param session_key_list_t session_key list to check left space for list, and
-// @return 1 when unaddable, 0 when addable
+// @return 1 when addable, 0 if cannot add.
 int check_session_key_list_addable(int requested_num_key,
                                    session_key_list_t *s_ley_list);
 

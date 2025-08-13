@@ -1,12 +1,14 @@
-#include "../../c_common.h"
 #include "block_common.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     // Open file_metadata structs.
     char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
@@ -32,8 +34,10 @@ int main(int argc, char *argv[]) {
     for (int i = 0; i < TOTAL_FILE_NUM; i++) {
         // Request session key by session key ID. It will be added to the
         // s_key_list.
-        get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
-                              s_key_list);
+        if (get_session_key_by_ID(encrypted_file_metadata[i].key_id, ctx,
+                                  s_key_list) == NULL) {
+            SST_print_error_exit("Failed get_session_key_by_ID().");
+        }
         char encrypted_filename[BLOCK_FILE_NAME_MAX_LENGTH + 1];
         snprintf(encrypted_filename, sizeof(encrypted_filename),
                  "encrypted%d.txt", i);
@@ -74,8 +78,8 @@ int main(int argc, char *argv[]) {
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
-                    &decrypted, &decrypted_length)) {
-                printf("Decryption failed!\n");
+                    &decrypted, &decrypted_length) < 0) {
+                SST_print_error_exit("Decryption failed!");
                 break;
             }
 

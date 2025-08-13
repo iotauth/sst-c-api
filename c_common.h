@@ -69,31 +69,6 @@ typedef struct {
 #define SST_DEBUG_ENABLED 0
 #endif
 
-// Print out debug messages. This will be printed only when the
-// cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out log messages.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out error messages along with errno if set.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-
-// Print out error message and exit program.
-// Uses printf-style formatting.
-// @param fmt Format string for the debug message.
-// @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char *fmt, ...);
-
 // Print out error message and return NULL.
 // Uses printf-style formatting.
 // @return Return NULL.
@@ -143,8 +118,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length);
 //  @param var_len_int_buf_size size of the buffer containing the variable
 //  length integer
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num,
-                           unsigned int *var_len_int_buf_size);
+                           unsigned int *num, int *var_len_int_buf_size);
 
 // Make the data_length to a variable length.
 // @param num number to be converted into variable length integer.
@@ -172,7 +146,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 // each, and returns the variable length buffer's size.
 // @param socket socket to read
 // @param buf buffer to save the result of read() function.
-uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf);
+int read_variable_length_one_byte_each(int socket, unsigned char *buf);
 
 // Reads the SST header, and returns the message type, start pointer of the
 // SST's payload, and the payload's length.
@@ -233,8 +207,9 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock);
 // @param nonce a nonce made by yourself
 // @param reply_nonce nonce received from the other entity or Auth
 // @param ret return_buffer:indicator_1byte + nonce_8byte + reply_nonce_8byte
-void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
-                         unsigned char *ret);
+// @return 0 for success, -1 for fail
+int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
+                        unsigned char *ret);
 
 // Parses the received buffer to struct HS_nonce_t
 // See parse_handshake() for details.
