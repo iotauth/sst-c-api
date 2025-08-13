@@ -29,7 +29,9 @@ int main(int argc, char *argv[]) {
     const char salt[] = "randomsalt";
 
     // Save the session key list with a password, and salt it.
-    if (save_session_key_list_with_password(s_key_list, "./sessionkey", password, sizeof(password), salt, sizeof(salt)) < 0) {
+    if (save_session_key_list_with_password(s_key_list, "./sessionkey",
+                                            password, sizeof(password), salt,
+                                            sizeof(salt)) < 0) {
         SST_print_error_exit("Failed save_session_key_list_with_password().");
     }
 
@@ -52,7 +54,9 @@ int main(int argc, char *argv[]) {
     session_key_list_t *new_s_key_list = init_empty_session_key_list();
 
     // Test to load the saved session key using the password.
-    if (load_session_key_list_with_password(new_s_key_list, "./sessionkey",password, sizeof(password), salt,sizeof(salt)) < 0) {
+    if (load_session_key_list_with_password(new_s_key_list, "./sessionkey",
+                                            password, sizeof(password), salt,
+                                            sizeof(salt)) < 0) {
         SST_print_error_exit("Failed load_session_key_list_with_password().");
     }
     unsigned int decrypted_length;

@@ -315,7 +315,8 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     memcpy(signed_data.sign, data_buf + key_size, key_size);
 
     // verify
-    if (SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,(EVP_PKEY *)ctx->pub_key) < 0) {
+    if (SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
+                      (EVP_PKEY *)ctx->pub_key) < 0) {
         SST_print_error("Failed SHA256_verify().");
         return -1;
     }

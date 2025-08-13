@@ -36,7 +36,8 @@ void AES_test_common(AES_encryption_mode_t mode) {
     unsigned char cipher[100];
     unsigned int length;
     memset(cipher, 0, 100);  // Set to 0 for visibility.
-    if (encrypt_AES((const unsigned char *)plaintext, strlen(plaintext), key, iv,mode, cipher, &length) < 0) {
+    if (encrypt_AES((const unsigned char *)plaintext, strlen(plaintext), key,
+                    iv, mode, cipher, &length) < 0) {
         SST_print_error_exit("Failed encrypt_AES().");
     }
 
@@ -47,7 +48,8 @@ void AES_test_common(AES_encryption_mode_t mode) {
     unsigned char decrypted[100];
     memset(decrypted, 0, 100);  // Set to 0 for visibility.
     unsigned int decrypted_length;
-    if (decrypt_AES(cipher, length, key, iv, mode, decrypted, &decrypted_length) < 0) {
+    if (decrypt_AES(cipher, length, key, iv, mode, decrypted,
+                    &decrypted_length) < 0) {
         SST_print_error_exit("Failed decrypt_AES().");
     }
     printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,

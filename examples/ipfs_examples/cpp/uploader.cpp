@@ -163,7 +163,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length) < 0) {
+    if (digest_message_SHA_256(&file_data[0], filesize, hash_of_file,
+                               &hash_length) < 0) {
         SST_print_error_exit("Failed digest_message_SHA_256().");
     }
 

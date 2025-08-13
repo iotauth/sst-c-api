@@ -77,7 +77,7 @@ int send_auth_request_message(unsigned char *serialized,
 // @param key_size size of the public crypto key
 // @return 0 for success, -1 for fail
 int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
-                           size_t key_size);
+                          size_t key_size);
 
 // Used in parse_session_key_response() for index.
 // @param buf input buffer with crypto spec
