@@ -364,9 +364,12 @@ int read_secure_message(unsigned char *plaintext,
     }
     unsigned int decrypted_length;
     unsigned char seq_num_and_plaintext[MAX_SECURE_COMM_MSG_LENGTH];
-    // TODO:
-    decrypt_received_message(received_buf, bytes_read, seq_num_and_plaintext,
-                             &decrypted_length, session_ctx);
+    if (decrypt_received_message(received_buf, bytes_read,
+                                 seq_num_and_plaintext, &decrypted_length,
+                                 session_ctx) < 0) {
+        SST_print_error("Failed decrypt_received_message().");
+        return -1;
+    }
     // Copy the plaintext payload to the buffer declared by user.
     memcpy(plaintext, seq_num_and_plaintext + SEQ_NUM_SIZE,
            decrypted_length - SEQ_NUM_SIZE);

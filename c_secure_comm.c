@@ -479,30 +479,34 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     return bytes_written;
 }
 
-void decrypt_received_message(unsigned char *encrypted_data,
-                              unsigned int encrypted_data_length,
-                              unsigned char *decrypted_data,
-                              unsigned int *decrypted_buf_length,
-                              SST_session_ctx_t *session_ctx) {
+int decrypt_received_message(unsigned char *encrypted_data,
+                             unsigned int encrypted_data_length,
+                             unsigned char *decrypted_data,
+                             unsigned int *decrypted_buf_length,
+                             SST_session_ctx_t *session_ctx) {
     if (symmetric_decrypt_authenticate_without_malloc(
             encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
             MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, session_ctx->s_key.enc_mode,
             session_ctx->s_key.hmac_mode, decrypted_data,
-            decrypted_buf_length)) {
-        SST_print_error_exit(
-            "Error during decrypting buffer with session key.\n");
+            decrypted_buf_length) < 0) {
+        SST_print_error(
+            "Failed to symmetric_decrypt_authenticate_without_malloc().");
+        return -1;
     }
     unsigned int received_seq_num =
         read_unsigned_int_BE(decrypted_data, SEQ_NUM_SIZE);
     if (received_seq_num != session_ctx->received_seq_num) {
-        SST_print_error_exit("Wrong sequence number expected.");
+        SST_print_error("Wrong sequence number expected.");
+        return -1;
     }
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        SST_print_error_exit("Session key expired!\n");
+    if (check_session_key_validity(&session_ctx->s_key) < 0) {
+        SST_print_error("Session key expired!\n");
+        return -1;
     }
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.\n", received_seq_num);
+    return 0;
 }
 
 int check_session_key_validity(session_key_t *session_key) {
