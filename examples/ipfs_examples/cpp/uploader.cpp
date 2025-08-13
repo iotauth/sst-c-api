@@ -115,7 +115,7 @@ int main(int argc, char* argv[]) {
         server_secure_comm_setup(ctx, client_socket, s_key_list_0);
 
     if (session_ctx == NULL) {
-        std::cerr << "There is no session key.\n" << std::endl;
+        std::cerr << "The session is not connected.\n" << std::endl;
         return EXIT_FAILURE;
     }
 

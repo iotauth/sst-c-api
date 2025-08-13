@@ -398,7 +398,10 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     // send handshake_3
     unsigned char buf[HS_INDICATOR_SIZE];
     memset(buf, 0, HS_INDICATOR_SIZE);
-    serialize_handshake(entity_nonce, hs.nonce, buf);
+    if (serialize_handshake(entity_nonce, hs.nonce, buf) < 0) {
+        SST_print_error("Failed serialize_handshake().");
+        return NULL;
+    }
 
     unsigned char *ret = NULL;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
@@ -696,7 +699,10 @@ unsigned char *check_handshake1_send_handshake2(
     // send handshake 2
     unsigned char buf[HS_INDICATOR_SIZE];
     memset(buf, 0, HS_INDICATOR_SIZE);
-    serialize_handshake(server_nonce, hs.nonce, buf);
+    if (serialize_handshake(server_nonce, hs.nonce, buf) < 0) {
+        SST_print_error("Failed serialize_handshake().");
+        return NULL;
+    }
 
     unsigned char *ret = NULL;
     if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,

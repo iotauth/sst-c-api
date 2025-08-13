@@ -58,7 +58,8 @@ int main(int argc, char *argv[]) {
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
-        printf("There is no session key.\n");
+        printf("The session is not connected.\n");
+        exit(1);
     } else {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
@@ -86,6 +87,10 @@ int main(int argc, char *argv[]) {
     }
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
+    if (session_ctx2 == NULL) {
+        printf("The session is not connected.\n");
+        exit(1);
+    }
 
     pthread_t thread2;
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,

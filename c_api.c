@@ -88,6 +88,10 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server_with_socket(s_key, sock);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server_with_socket().");
+        return NULL;
+    }
     return session_ctx;
 }
 
@@ -135,6 +139,10 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         unsigned int parsed_buf_length;
         unsigned char *parsed_buf = check_handshake_2_send_handshake_3(
             data_buf, data_buf_length, entity_nonce, s_key, &parsed_buf_length);
+        if (parsed_buf == NULL) {
+            SST_print_error("Failed check_handshake_2_send_handshake_3().");
+            return NULL;
+        }
         unsigned char sender_HS_2[MAX_HS_BUF_LENGTH];
         unsigned int sender_HS_2_length;
         make_sender_buf(parsed_buf, parsed_buf_length, SKEY_HANDSHAKE_3,
@@ -245,6 +253,10 @@ SST_session_ctx_t *server_secure_comm_setup(
             unsigned char *parsed_buf = check_handshake1_send_handshake2(
                 data_buf, data_buf_length, server_nonce, s_key,
                 &parsed_buf_length);
+            if (parsed_buf == NULL) {
+                SST_print_error("Failed check_handshake1_send_handshake2().");
+                return NULL;
+            }
 
             unsigned char sender[MAX_HS_BUF_LENGTH];
             unsigned int sender_length;

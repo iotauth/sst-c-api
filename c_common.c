@@ -274,11 +274,11 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     return ret;
 }
 
-void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
-                         unsigned char *ret) {
+int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
+                        unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
-        SST_print_error_exit(
-            "Error: handshake should include at least on nonce.");
+        SST_print_error("Handshake should include at least one nonce.");
+        return -1;
     }
     unsigned char indicator = 0;
     if (nonce != NULL) {

@@ -207,8 +207,9 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock);
 // @param nonce a nonce made by yourself
 // @param reply_nonce nonce received from the other entity or Auth
 // @param ret return_buffer:indicator_1byte + nonce_8byte + reply_nonce_8byte
-void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
-                         unsigned char *ret);
+// @return 0 for success, -1 for fail
+int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
+                        unsigned char *ret);
 
 // Parses the received buffer to struct HS_nonce_t
 // See parse_handshake() for details.
