@@ -151,16 +151,12 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
     return ret;
 }
 
-// Check the validity of the buffer.
-// @param validity unsigned char buffer to check.
-// @return -1 when expired, 0 when valid
+// Check absolute validity time.
+// @param abs_validity_ms  Expiration time in ms (uint64_t).
+// @return -1 when expired, 0 when still valid.
 static int check_validity(uint64_t abs_validity_ms) {
-    //get current time in ms
-    uint64_t current_time_ms = (uint64_t)time(NULL) * 1000;
-    if (current_time_ms > abs_validity_ms) {
-        return -1; // Expired
-    }
-    return 0; //Still valid
+    uint64_t current_ms = (uint64_t)time(NULL) * 1000ULL;  // seconds → ms
+    return (current_ms >= abs_validity_ms) ? -1 : 0;
 }
 
 // Separate the message received from Auth and
