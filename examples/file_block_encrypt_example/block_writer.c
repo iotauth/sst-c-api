@@ -6,6 +6,9 @@ int main(int argc, char *argv[]) {
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     // This will bring 3 keys. It is changable in the config file's
     // entityInfo.number_key=3

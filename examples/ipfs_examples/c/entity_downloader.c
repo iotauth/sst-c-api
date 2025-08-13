@@ -11,6 +11,9 @@ int main(int argc, char *argv[]) {
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     session_key_list_t *s_key_list = init_empty_session_key_list();
     ctx->config->purpose_index = 0;
     char file_name[BUFF_SIZE];

@@ -6,6 +6,9 @@ int main(int argc, char *argv[]) {
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     // Open file_metadata structs.
     char *encrypted_metadata_filename = "encrypted_file_metadata.dat";

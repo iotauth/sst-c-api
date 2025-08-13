@@ -51,6 +51,9 @@ int main(int argc, char *argv[]) {
 
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     session_key_list_t *s_key_list = init_empty_session_key_list();
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);

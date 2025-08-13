@@ -16,6 +16,9 @@ int main(int argc, char* argv[]) {
     char* my_file_path = argv[2];
     char* add_reader_path = argv[3];
     SST_ctx_t* ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     FILE* add_reader_file = fopen(add_reader_path, "r");
     char addReader[64];

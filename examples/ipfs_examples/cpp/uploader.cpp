@@ -25,6 +25,9 @@ int main(int argc, char* argv[]) {
     std::string my_file_path = argv[2];
     std::string add_reader_path = argv[3];
     SST_ctx_t* ctx = init_SST(config_path.c_str());
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     std::ifstream add_reader_file(add_reader_path);
     if (!add_reader_file) {

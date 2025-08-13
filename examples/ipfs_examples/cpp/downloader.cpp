@@ -49,6 +49,9 @@ int main(int argc, char *argv[]) {
 
     std::string config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path.c_str());
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     session_key_list_t *s_key_list = init_empty_session_key_list();
     ctx->config->purpose_index = 0;
     std::vector<char> file_name(BUFF_SIZE);
