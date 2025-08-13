@@ -23,7 +23,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 </div>
 
 <!-- Right: Text -->
-<div style="flex:1 1 360px; width:30%; text-align:left;">
+<div style="flex:1 1 120px; width:30%; text-align:left;">
 
 ## Hardware Overview
 
