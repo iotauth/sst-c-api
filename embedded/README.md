@@ -22,8 +22,9 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
       </a>
     </td>
     <td style="vertical-align: top; border: none; width: 50%;">
+--- 
 
-### Hardware Overview
+## Hardware Overview
 
 - **Raspberry Pi Pico**  
   _Purpose:_ …  
@@ -57,7 +58,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 </div>
 
 
-### Key Features:
+## Key Features:
 
 - **Authenticated Encryption:**  
 &nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
