@@ -103,9 +103,17 @@ static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
     unsigned char *encrypted =
         public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING,
                        (EVP_PKEY *)ctx->pub_key, &encrypted_length);
+    if (encrypted == NULL) {
+        SST_print_error("Failed public_encrypt().");
+        return NULL;
+    }
     size_t sigret_length;
     unsigned char *sigret = SHA256_sign(
         encrypted, encrypted_length, (EVP_PKEY *)ctx->priv_key, &sigret_length);
+    if (sigret == NULL) {
+        SST_print_error("Failed SHA256_sign().");
+        return NULL;
+    }
     *message_length = sigret_length + encrypted_length;
     unsigned char *message = (unsigned char *)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
@@ -247,6 +255,10 @@ int send_auth_request_message(unsigned char *serialized,
         unsigned int enc_length;
         unsigned char *enc =
             encrypt_and_sign(serialized, serialized_length, ctx, &enc_length);
+        if (enc == NULL) {
+            SST_print_error("Failed encrypt_and_sign().");
+            return -1;
+        }
         free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
@@ -294,8 +306,8 @@ int send_auth_request_message(unsigned char *serialized,
     return 0;
 }
 
-void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
-                           size_t key_size) {
+int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
+                          size_t key_size) {
     signed_data_t signed_data;
 
     // parse data
@@ -303,8 +315,10 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     memcpy(signed_data.sign, data_buf + key_size, key_size);
 
     // verify
-    SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
-                  (EVP_PKEY *)ctx->pub_key);
+    if (SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,(EVP_PKEY *)ctx->pub_key) < 0) {
+        SST_print_error("Failed SHA256_verify().");
+        return -1;
+    }
     SST_print_debug("Auth signature verified.\n");
 
     // decrypt encrypted_distribution_key
@@ -312,11 +326,16 @@ void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     unsigned char *decrypted_dist_key_buf = private_decrypt(
         signed_data.data, key_size, RSA_PKCS1_OAEP_PADDING,
         (EVP_PKEY *)ctx->priv_key, &decrypted_dist_key_buf_length);
+    if (decrypted_dist_key_buf == NULL) {
+        SST_print_error("Failed private_decrypt().");
+        return -1;
+    }
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
     ctx->dist_key.enc_mode = ctx->config->encryption_mode;
     free(decrypted_dist_key_buf);
+    return 0;
 }
 
 unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
@@ -639,7 +658,10 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             unsigned char encrypted_session_key[encrypted_session_key_length];
             memcpy(encrypted_session_key, data_buf + key_size * 2,
                    encrypted_session_key_length);
-            save_distribution_key(data_buf, ctx, key_size);
+            if (save_distribution_key(data_buf, ctx, key_size) < 0) {
+                SST_print_error("Failed save_distribution_key().");
+                return NULL;
+            }
 
             // decrypt session_key with decrypted_dist_key_buf
             unsigned int decrypted_session_key_response_length;

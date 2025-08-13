@@ -135,8 +135,9 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
     generate_nonce(AES_128_CBC_IV_SIZE, iv);
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
-                    encrypted, &encrypted_length)) {
+                    encrypted, &encrypted_length) < 0) {
         SST_print_error("Encryption failed!\n");
+        return -1;
     }
     free(file_buf);
     SST_print_log("\nFile encryption was successful.\n");
@@ -202,8 +203,9 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     unsigned char *ret = (unsigned char *)malloc(ret_length);
     if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
-                    &ret_length)) {
+                    &ret_length) < 0) {
         SST_print_error("Error while decrypting.\n");
+        return -1;
     }
     free(file_buf);
 
@@ -400,7 +402,10 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
             memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
                    encrypted_entity_nonce_length);
-            save_distribution_key(data_buf, ctx, key_size);
+            if (save_distribution_key(data_buf, ctx, key_size) < 0) {
+                SST_print_error("Failed save_distribution_key().");
+                return -1;
+            }
             unsigned int decrypted_entity_nonce_length;
             unsigned char *decrypted_entity_nonce = NULL;
             if (symmetric_decrypt_authenticate(

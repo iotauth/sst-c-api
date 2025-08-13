@@ -107,8 +107,11 @@ int main(int argc, char *argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(reinterpret_cast<unsigned char *>(&file_data[0]),
-                           filesize, hash_of_file.data(), &hash_length);
+    if (digest_message_SHA_256(reinterpret_cast<unsigned char *>(&file_data[0]),
+                               filesize, hash_of_file.data(),
+                               &hash_length) < 0) {
+        SST_print_error_exit("Failed digest_message_SHA_256().");
+    }
 
     // Step 2. Send hash to uploader
     // Send the computed hash (raw bytes)

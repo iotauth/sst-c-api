@@ -163,7 +163,9 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
+    if (digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length) < 0) {
+        SST_print_error_exit("Failed digest_message_SHA_256().");
+    }
 
     // Step 3: Compare the Hash Values
     if (std::memcmp(hash_of_file, received_hash_buf, HASH_SIZE) == 0) {

@@ -488,14 +488,17 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
            sizeof(session_key_t) * session_key_list->num_key);
     // Create a salted password, and digest it to 32 bytes.
     unsigned char salted_password[SHA256_DIGEST_LENGTH];
-    create_salted_password_to_32bytes(password, password_len, salt, salt_len,
-                                      salted_password);
+    if (create_salted_password_to_32bytes(password, password_len, salt,
+                                          salt_len, salted_password) < 0) {
+        SST_print_error("Failed create_salted_password_to_32bytes().");
+        return -1;
+    }
     unsigned char ciphertext[sizeof(buffer)];
     unsigned int ciphertext_len;
     // Encrypt using the session key's encryption mode.
     // The hashed salt will be the encryption key.
     if (encrypt_AES(buffer, buffer_len, salted_password, iv, AES_128_CBC,
-                    ciphertext, &ciphertext_len)) {
+                    ciphertext, &ciphertext_len) < 0) {
         SST_print_error("AES encryption failed!");
         return -1;
     }
@@ -552,12 +555,16 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     // Create a salted password, and digest it to 32 bytes.
     unsigned char salted_password[SHA256_DIGEST_LENGTH];
-    create_salted_password_to_32bytes(password, password_len, salt, salt_len,
-                                      salted_password);
+
+    if (create_salted_password_to_32bytes(password, password_len, salt,
+                                          salt_len, salted_password) < 0) {
+        SST_print_error("Failed create_salted_password_to_32bytes().");
+        return -1;
+    }
     // Decrypt the data.
     unsigned int plaintext_len;
     if (decrypt_AES(ciphertext, ciphertext_len, salted_password, iv,
-                    AES_128_CBC, buffer, &plaintext_len)) {
+                    AES_128_CBC, buffer, &plaintext_len) < 0) {
         SST_print_error("AES decryption failed!");
         return -1;
     }
