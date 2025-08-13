@@ -136,9 +136,10 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
             dist_key->mac_key_size, dist_key->cipher_key,
             dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
             0, &temp, &temp_length)) {
-        SST_print_error_exit(
+        SST_print_error(
             "Error during encryption while "
-            "serialize_session_key_req_with_distribution_key\n");
+            "symmetric_encrypt_authenticate().");
+        return NULL;
     }
     unsigned int name_length = strlen(name);
     unsigned char length_buf[] = {name_length};
@@ -261,6 +262,11 @@ int send_auth_request_message(unsigned char *serialized,
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, &ctx->dist_key, ctx->config->name,
             &enc_length);
+        if (enc == NULL) {
+            SST_print_error(
+                "Failed serialize_session_key_req_with_distribution_key().");
+            return -1;
+        }
         free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
