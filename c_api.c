@@ -59,8 +59,8 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list) {
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config->numkey,
-                                           existing_s_key_list)) {
-            SST_print_error("Failed to check_session_key_list_addable().");
+                                           existing_s_key_list) == 0) {
+            SST_print_error("The session key list is not addable.");
             return existing_s_key_list;
         }
     }

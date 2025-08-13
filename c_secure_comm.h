@@ -148,7 +148,7 @@ int decrypt_received_message(unsigned char *encrypted_data,
 
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity
-// @return 1 when expired, 0 when valid
+// @return -1 when expired, 0 when valid
 int check_session_key_validity(session_key_t *session_key);
 
 // Check if entity has session key and if not, request the session key to Auth.
@@ -219,7 +219,7 @@ void update_validity(session_key_t *session_key);
 // if the keys are valid.
 // @param requested_num_key the requested number of keys to add.
 // @param session_key_list_t session_key list to check left space for list, and
-// @return 1 when unaddable, 0 when addable
+// @return 1 when addable, 0 if cannot add.
 int check_session_key_list_addable(int requested_num_key,
                                    session_key_list_t *s_ley_list);
 
