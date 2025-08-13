@@ -26,7 +26,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
   </div>
 
   <!-- Text column -->
-  <div style="flex:1 1 320px; min-width:100px; max-width:820px; padding-left:2rem; box-sizing:border-box; text-align:right;">
+  <div style="flex:1 1 320px; min-width:100px; max-width: 400px; padding-left:2rem; box-sizing:border-box; text-align:right;">
 
 **Raspberry Pi Pico**  
 _Purpose:_ …  
