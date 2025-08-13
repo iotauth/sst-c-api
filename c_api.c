@@ -117,7 +117,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
         SST_print_error_exit(
-            "Socket read eerror in secure_connect_to_server_with_socket()\n");
+            "Socket read error in secure_connect_to_server_with_socket()\n");
     }
     unsigned char message_type;
     unsigned int data_buf_length;
@@ -210,7 +210,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -263,7 +263,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;

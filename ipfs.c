@@ -370,7 +370,7 @@ void send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read eerror in send_add_reader_req_via_TCP().\n");
+                "Socket read error in send_add_reader_req_via_TCP().\n");
         }
         unsigned char message_type;
         unsigned int data_buf_length;

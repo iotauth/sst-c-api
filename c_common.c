@@ -160,7 +160,7 @@ uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
     if (received_buf_length < 0) {
         SST_print_error_exit(
-            "Socket read eerror in read_variable_length_one_byte_each().\n");
+            "Socket read error in read_variable_length_one_byte_each().\n");
     }
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
@@ -178,7 +178,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (received_buf_length < 0) {
         SST_print_error_exit(
-            "Socket read eerror in read_header_return_data_buf_pointer().\n");
+            "Socket read error in read_header_return_data_buf_pointer().\n");
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
