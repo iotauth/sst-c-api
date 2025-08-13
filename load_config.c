@@ -117,14 +117,14 @@ config_t *load_config(const char *path) {
             }
             ptr = strtok(NULL, delimiters);
             if (ptr == NULL) {
-                SST_print_error("Config value does not exist.\n", ptr);
+                SST_print_error("Config value does not exist.\n");
                 free_config_t(c);
                 return NULL;
             }
             switch (config) {
                 case UNKNOWN_CONFIG:
                     SST_print_error(
-                        "This line must not be reached. UNKNOWN_CONFIG\n", ptr);
+                        "This line must not be reached. UNKNOWN_CONFIG\n");
                     free_config_t(c);
                     return NULL;
                     break;
