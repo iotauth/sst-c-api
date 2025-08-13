@@ -11,55 +11,55 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
-<!-- Hardware Overview -->
+<!-- Hardware Overview (responsive) -->
 <div align="center">
+  <div style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:center; gap:20px;">
 
-<table width="100%" style="border-collapse: collapse; table-layout: fixed;">
-  <tr>
-    <td style="vertical-align: top; padding-right: 20px; border: none; width: 50%;">
+<!-- Left: Image (expands on desktop, stacks on mobile) -->
+<div style="flex:1 1 360px; max-width:720px;">
       <a href="./img/physical_lifi.png">
-        <img src="./img/physical_lifi.png" alt="LiFi physical setup" width="100%" />
+        <img src="./img/physical_lifi.png" alt="LiFi physical setup" style="width:100%; height:auto; border:0;" />
       </a>
-    </td>
-    <td style="vertical-align: top; border: none; width: 50%;">
+</div>
 
+<!-- Right: Text -->
+<div style="flex:1 1 360px; min-width:280px; text-align:left;">
 
 ## Hardware Overview
 
 - **Raspberry Pi Pico**  
   _Purpose:_ …  
   _Connections:_ …  
-  _Notes:_ …  
+  _Notes:_ …
 
 - **Raspberry Pi 4**  
   _Purpose:_ …  
   _Connections:_ …  
-  _Notes:_ …  
+  _Notes:_ …
 
-- **TC4420 —> MOSFET/LED Driver**  
+- **TC4420 — MOSFET/LED Driver**  
   _Role:_ …  
   _Supply:_ …  
-  _Notes:_ …  
+  _Notes:_ …
 
-- **OP350 <— Emitter/Photodiode**  
+- **OP350 — Emitter/Photodiode**  
   _Role:_ …  
   _Biasing/Drive:_ …  
-  _Notes:_ …  
+  _Notes:_ …
 
 - **TLV3501 — High-Speed Comparator**  
   _Role:_ …  
   _Threshold/Ref:_ …  
-  _Notes:_ …  
+  _Notes:_ …
 
 - **⚡ 12V DC to Breadboard Adapter**  
   _Purpose:_ …  
   _Notes:_ …
 
-    </td>
-  </tr>
-</table>
-
+    </div>
+  </div>
 </div>
+
 
 
 ## Key Features:
