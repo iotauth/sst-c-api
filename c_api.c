@@ -34,7 +34,7 @@ SST_ctx_t *init_SST(const char *config_path) {
     ctx->priv_key =
         (void *)load_entity_private_key(ctx->config->entity_privkey_path);
     if (ctx->priv_key == NULL) {
-        SST_print_error_exit("Failed load_entity_private_key().");
+        SST_print_error("Failed load_entity_private_key().");
         return NULL;
     }
     if (numkey > MAX_SESSION_KEY) {
@@ -236,8 +236,10 @@ SST_session_ctx_t *server_secure_comm_setup(
         int received_buf_length =
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
-            SST_print_error_exit(
-                "Socket read error in server_secure_comm_setup()");
+            SST_print_error(
+                "Failed sst_read_from_socket(). Socket read error in "
+                "server_secure_comm_setup()");
+            return NULL;
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -246,9 +248,10 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_1) {
             SST_print_debug("Received session key handshake1.");
             if (entity_server_state != IDLE) {
-                SST_print_error_exit(
+                SST_print_error(
                     "Error during comm init - in wrong state, expected: IDLE, "
                     "disconnecting...");
+                return NULL;
             }
             SST_print_debug("Switching to HANDSHAKE_1_RECEIVED state.");
             entity_server_state = HANDSHAKE_1_RECEIVED;
@@ -262,9 +265,10 @@ SST_session_ctx_t *server_secure_comm_setup(
                 return NULL;
             }
             if (entity_server_state != HANDSHAKE_1_RECEIVED) {
-                SST_print_error_exit(
+                SST_print_error(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_1_RECEIVED, disconnecting...");
+                return NULL;
             }
             unsigned int parsed_buf_length;
             unsigned char *parsed_buf = check_handshake1_send_handshake2(
@@ -295,8 +299,10 @@ SST_session_ctx_t *server_secure_comm_setup(
         int received_buf_length =
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         if (received_buf_length < 0) {
-            SST_print_error_exit(
-                "Socket read error in server_secure_comm_setup()");
+            SST_print_error(
+                "Failed sst_read_from_socket().Socket read error in "
+                "server_secure_comm_setup()");
+            return NULL;
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -305,10 +311,11 @@ SST_session_ctx_t *server_secure_comm_setup(
         if (message_type == SKEY_HANDSHAKE_3) {
             SST_print_debug("Received session key handshake3!");
             if (entity_server_state != HANDSHAKE_2_SENT) {
-                SST_print_error_exit(
+                SST_print_error(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_2_SENT, "
                     "disconnecting...");
+                return NULL;
             }
             unsigned int decrypted_length;
             unsigned char *decrypted = NULL;
@@ -316,8 +323,10 @@ SST_session_ctx_t *server_secure_comm_setup(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                     AES_128_CBC, 0, &decrypted, &decrypted_length)) {
-                SST_print_error_exit(
-                    "Error during decryption in HANDSHAKE_2_SENT state.");
+                SST_print_error(
+                    "Failed symmetric_decrypt_authenticate(). Error during "
+                    "decryption in HANDSHAKE_2_SENT state.");
+                return NULL;
             }
             HS_nonce_t hs;
             parse_handshake(decrypted, &hs);
@@ -325,9 +334,10 @@ SST_session_ctx_t *server_secure_comm_setup(
             // compare my_nonce and received_nonce
             if (strncmp((const char *)hs.reply_nonce,
                         (const char *)server_nonce, HS_NONCE_SIZE) != 0) {
-                SST_print_error_exit(
+                SST_print_error(
                     "Comm init failed: server NOT verified, nonce NOT matched, "
                     "disconnecting...");
+                return NULL;
             } else {
                 SST_print_debug(
                     "Server authenticated/authorized by solving nonce!");
@@ -369,8 +379,10 @@ int read_secure_message(unsigned char *plaintext,
         SST_print_error("Failed to read_header_return_data_buf_pointer().");
         return -1;
     }
-    if (check_SECURE_COMM_MSG_type(message_type)) {
-        SST_print_error_exit("Wrong message_type.");
+    if (check_SECURE_COMM_MSG_type(message_type) < 0) {
+        SST_print_error(
+            "Failed check_SECURE_COMM_MSG_type(). Wrong message_type.");
+        return -1;
     }
     unsigned int decrypted_length;
     unsigned char seq_num_and_plaintext[MAX_SECURE_COMM_MSG_LENGTH];
