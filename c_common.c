@@ -291,6 +291,7 @@ int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
     }
     // TODO: add dhParam options.
     ret[0] = indicator;
+    return 0;
 }
 
 void parse_handshake(unsigned char *buf, HS_nonce_t *ret) {
