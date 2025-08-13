@@ -28,8 +28,8 @@ int get_file_content(FILE *fin, unsigned char *file_buf,
 
 // To return the file size.
 // @param file_name name of the file.
-// @return file size
-unsigned long file_size_return(FILE *fin);
+// @return file size or -1 for failure.
+int64_t file_size_return(FILE *fin);
 
 // To check duplication for name of the file.
 // @param file_name name of the file.
