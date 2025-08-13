@@ -59,14 +59,30 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ### Key Features:
 
- -   **Authenticated Encryption**: &nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
--   **Robust Key Persistence**: &nbsp;&nbsp;&nbsp;&nbsp;Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. >The system automatically falls back to a valid key if one slot is corrupted.
- -  **Secure Key Provisioning**: &nbsp;&nbsp;&nbsp;&nbsp;On first boot/empty slot, listens on **UART1** with preamble 0xAB 0xCD to receive the session key (e.g., from the Pi 4/auth client). Supports `new key` and `new key -f` for controlled overwrite.
--   **Watchdog Timer**: &nbsp;&nbsp;&nbsp;&nbsp;The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
- -  **Secure Memory Handling**: &nbsp;&nbsp;&nbsp;&nbsp;Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `secure_zero()` right after use to limit in-RAM exposure.
- -  **Interactive Command Interface**: &nbsp;&nbsp;&nbsp;&nbsp;A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
--   **Modular & Reusable Code**: &nbsp;&nbsp;&nbsp;&nbsp;The project is built with a modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
--   **Cryptographically Secure PRNG:**: &nbsp;&nbsp;&nbsp;&nbsp;mbedTLS CTR_DRBG seeded from the RP2040 ring-oscillator via pico_hardware_entropy_poll() → high-quality randomness for salts and other needs.
+- **Authenticated Encryption:**  
+&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+
+- **Robust Key Persistence:**  
+&nbsp;&nbsp;&nbsp;&nbsp;Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
+
+- **Secure Key Provisioning:**  
+&nbsp;&nbsp;&nbsp;&nbsp;On first boot/empty slot, listens on **UART1** with preamble 0xAB 0xCD to receive the session key (e.g., from the Pi 4/auth client). Supports `new key` and `new key -f` for controlled overwrite.
+
+- **Watchdog Timer:**  
+&nbsp;&nbsp;&nbsp;&nbsp;The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
+
+- **Secure Memory Handling:**  
+&nbsp;&nbsp;&nbsp;&nbsp;Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `secure_zero()` to limit in-RAM exposure.
+
+- **Interactive Command Interface:**  
+&nbsp;&nbsp;&nbsp;&nbsp;A rich set of commands allows for real-time management of the device, including key management, slot status checks, and diagnostics.
+
+- **Modular & Reusable Code:**  
+&nbsp;&nbsp;&nbsp;&nbsp;The project is built with a modular architecture, separating hardware-specific logic (`pico_handler`), command processing (`cmd_handler`), and the main application logic for maximum reusability and maintainability.
+
+- **Cryptographically Secure PRNG:**  
+&nbsp;&nbsp;&nbsp;&nbsp;mbedTLS CTR_DRBG seeded from the RP2040 ring-oscillator via `pico_hardware_entropy_poll()` → high-quality randomness for salts and other needs.
+
 
 ---
 
