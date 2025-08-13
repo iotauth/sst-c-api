@@ -59,7 +59,8 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 
 ### Key Features:
 
--   **Authenticated Encryption**: Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+-   **Authenticated Encryption**: 
+- - Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
 -   **Robust Key Persistence**: Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
 -   **Secure Key Provisioning**: On first boot/empty slot, listens on **UART1** with preamble 0xAB 0xCD to receive the session key (e.g., from the Pi 4/auth client). Supports `new key` and `new key -f` for controlled overwrite.
 -   **Watchdog Timer**: The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
