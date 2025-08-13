@@ -17,7 +17,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
   <!-- Left: Small fixed-size image -->
   <div style="flex: 0 0 auto; margin-right: 20px;">
     <a href="./img/physical_lifi.png">
-      <img src="./img/physical_lifi.png" alt="LiFi physical setup" width="200px" />
+      <img src="./img/physical_lifi.png" alt="LiFi physical setup" width="450px" />
     </a>
     <sub>Click to view full size</sub>
   </div>
