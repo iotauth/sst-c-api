@@ -27,8 +27,16 @@ SST_ctx_t *init_SST(const char *config_path) {
     int numkey = ctx->config->numkey;
 
     ctx->pub_key = (void *)load_auth_public_key(ctx->config->auth_pubkey_path);
+    if (ctx->pub_key == NULL) {
+        SST_print_error("Failed load_auth_public_key().");
+        return NULL;
+    }
     ctx->priv_key =
         (void *)load_entity_private_key(ctx->config->entity_privkey_path);
+    if (ctx->priv_key == NULL) {
+        SST_print_error_exit("Failed load_entity_private_key().");
+        return NULL;
+    }
     if (numkey > MAX_SESSION_KEY) {
         SST_print_error(
             "Too much requests of session keys. The max number of requestable "
@@ -139,7 +147,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         if (entity_client_state != HANDSHAKE_1_SENT) {
             SST_print_error(
                 "Comm init failed: wrong sequence of handshake, "
-                "disconnecting...\n");
+                "disconnecting...");
             return NULL;
         }
         unsigned int parsed_buf_length;
@@ -161,7 +169,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         }
         free(parsed_buf);
         update_validity(s_key);
-        SST_print_debug("Switching to IN_COMM.\n");
+        SST_print_debug("Switching to IN_COMM.");
         entity_client_state = IN_COMM;
     }
     memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
@@ -229,20 +237,20 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read error in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == SKEY_HANDSHAKE_1) {
-            SST_print_debug("Received session key handshake1.\n");
+            SST_print_debug("Received session key handshake1.");
             if (entity_server_state != IDLE) {
                 SST_print_error_exit(
                     "Error during comm init - in wrong state, expected: IDLE, "
-                    "disconnecting...\n");
+                    "disconnecting...");
             }
-            SST_print_debug("Switching to HANDSHAKE_1_RECEIVED state.\n");
+            SST_print_debug("Switching to HANDSHAKE_1_RECEIVED state.");
             entity_server_state = HANDSHAKE_1_RECEIVED;
             unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
             memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
@@ -278,7 +286,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                 return NULL;
             }
             free(parsed_buf);
-            SST_print_debug("Switching to HANDSHAKE_2_SENT.\n");
+            SST_print_debug("Switching to HANDSHAKE_2_SENT.");
             entity_server_state = HANDSHAKE_2_SENT;
         }
     }
@@ -288,19 +296,19 @@ SST_session_ctx_t *server_secure_comm_setup(
             sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
         if (received_buf_length < 0) {
             SST_print_error_exit(
-                "Socket read error in server_secure_comm_setup()\n");
+                "Socket read error in server_secure_comm_setup()");
         }
         unsigned char message_type;
         unsigned int data_buf_length;
         unsigned char *data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == SKEY_HANDSHAKE_3) {
-            SST_print_debug("Received session key handshake3!\n");
+            SST_print_debug("Received session key handshake3!");
             if (entity_server_state != HANDSHAKE_2_SENT) {
                 SST_print_error_exit(
                     "Error during comm init - in wrong state, expected: "
                     "HANDSHAKE_2_SENT, "
-                    "disconnecting...\n");
+                    "disconnecting...");
             }
             unsigned int decrypted_length;
             unsigned char *decrypted = NULL;
@@ -309,7 +317,7 @@ SST_session_ctx_t *server_secure_comm_setup(
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
                     AES_128_CBC, 0, &decrypted, &decrypted_length)) {
                 SST_print_error_exit(
-                    "Error during decryption in HANDSHAKE_2_SENT state.\n");
+                    "Error during decryption in HANDSHAKE_2_SENT state.");
             }
             HS_nonce_t hs;
             parse_handshake(decrypted, &hs);
@@ -319,13 +327,13 @@ SST_session_ctx_t *server_secure_comm_setup(
                         (const char *)server_nonce, HS_NONCE_SIZE) != 0) {
                 SST_print_error_exit(
                     "Comm init failed: server NOT verified, nonce NOT matched, "
-                    "disconnecting...\n");
+                    "disconnecting...");
             } else {
                 SST_print_debug(
-                    "Server authenticated/authorized by solving nonce!\n");
+                    "Server authenticated/authorized by solving nonce!");
             }
             update_validity(s_key);
-            SST_print_debug("Switching to IN_COMM.\n");
+            SST_print_debug("Switching to IN_COMM.");
             entity_server_state = IN_COMM;
             memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
             return session_ctx;
@@ -345,7 +353,7 @@ void *receive_thread_read_one_each(void *SST_session_ctx) {
             SST_print_error("Failed to read_secure_message().");
             return NULL;
         }
-        printf("Received: %.*s\n", data_buf_length, data_buf);
+        printf("Received: %.*s", data_buf_length, data_buf);
     }
 }
 
@@ -494,7 +502,7 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
 
     FILE *saved_file_fp = fopen(file_path, "wb");
     if (!saved_file_fp) {
-        SST_print_error("Failed to open file: %s\n", file_path);
+        SST_print_error("Failed to open file: %s", file_path);
         return -1;
     }
     // Write the IV
@@ -521,14 +529,14 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
 
     saved_file_fp = fopen(file_path, "rb");
     if (!saved_file_fp) {
-        SST_print_error("Failed to open file for reading!\n");
+        SST_print_error("Failed to open file for reading!");
         return -1;
     }
 
     // Read the IV
     size_t iv_read = fread(iv, 1, sizeof(iv), saved_file_fp);
     if (iv_read != sizeof(iv)) {
-        SST_print_error("Failed to read IV!\n");
+        SST_print_error("Failed to read IV!");
         fclose(saved_file_fp);
         return -1;
     }
@@ -538,7 +546,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     fclose(saved_file_fp);
 
     if (ciphertext_len <= 0) {
-        SST_print_error("Failed to read encrypted data!\n");
+        SST_print_error("Failed to read encrypted data!");
         return -1;
     }
 
@@ -550,7 +558,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     unsigned int plaintext_len;
     if (decrypt_AES(ciphertext, ciphertext_len, salted_password, iv,
                     AES_128_CBC, buffer, &plaintext_len)) {
-        SST_print_error("AES decryption failed!\n");
+        SST_print_error("AES decryption failed!");
         return -1;
     }
 
@@ -558,7 +566,7 @@ int load_session_key_list_with_password(session_key_list_t *session_key_list,
     memcpy(session_key_list, buffer, sizeof(session_key_list_t));
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
     if (!session_key_list->s_key) {
-        SST_print_error("Memory allocation failed!\n");
+        SST_print_error("Memory allocation failed!");
         return -1;
     }
     memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
@@ -593,7 +601,7 @@ int secure_rand(int min, int max) {
     unsigned char buffer[4];
 
     if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
-        fprintf(stderr, "RAND_bytes failed\n");
+        fprintf(stderr, "RAND_bytes failed");
         return -1;  // handle error
     }
 

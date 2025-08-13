@@ -22,6 +22,7 @@ void SST_print_debug(const char *fmt, ...) {
         va_start(args, fmt);
         printf("DEBUG: ");
         vprintf(fmt, args);
+        printf("\n");
         va_end(args);
     }
 }
@@ -29,7 +30,9 @@ void SST_print_debug(const char *fmt, ...) {
 void SST_print_log(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    printf("LOG: ");
     vprintf(fmt, args);
+    printf("\n");
     va_end(args);
 }
 
@@ -73,7 +76,7 @@ void print_buf_debug(const unsigned char *buf, size_t size) {
         // 4 = space(1) + two hex digits(2) + null charactor(1)
         snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
-    SST_print_debug("Hex:%s\n", hex);
+    SST_print_debug("Hex:%s", hex);
 }
 
 void print_buf_log(const unsigned char *buf, size_t size) {
@@ -82,7 +85,7 @@ void print_buf_log(const unsigned char *buf, size_t size) {
         // 4 = space(1) + two hex digits(2) + null charactor(1)
         snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
-    SST_print_log("Hex:%s\n", hex);
+    SST_print_log("Hex:%s", hex);
 }
 
 void generate_nonce(int length, unsigned char *buf) {
@@ -159,7 +162,7 @@ int read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
     if (received_buf_length < 0) {
         SST_print_error(
-            "Socket read error in read_variable_length_one_byte_each().\n");
+            "Socket read error in read_variable_length_one_byte_each().");
         return -1;
     }
     if (buf[0] > 127) {
@@ -178,7 +181,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (received_buf_length < 0) {
         SST_print_error(
-            "Socket read error in read_header_return_data_buf_pointer().\n");
+            "Socket read error in read_header_return_data_buf_pointer().");
         return -1;
     }
     *message_type = received_buf[0];
@@ -257,18 +260,18 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-            SST_print_error("Connection attempt %d failed. Retrying...\n",
+            SST_print_error("Connection attempt %d failed. Retrying...",
                             count_retries);
             usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
-            SST_print_debug("Successfully connected to %s:%d on attempt %d.\n",
+            SST_print_debug("Successfully connected to %s:%d on attempt %d.",
                             ip_addr, port_num, count_retries);
             break;
         }
     }
     if (ret < 0) {
-        SST_print_error("Failed to connect to %s:%d after %d attempts.\n",
+        SST_print_error("Failed to connect to %s:%d after %d attempts.",
                         ip_addr, port_num, count_retries - 1);
     }
     return ret;
