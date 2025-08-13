@@ -9,7 +9,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
     int serv_sock, clnt_sock, clnt_sock2;

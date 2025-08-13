@@ -9,7 +9,7 @@
 int main(int argc, char* argv[]) {
     if (argc != 4) {
         SST_print_error_exit(
-            "Usage: %s <config_path> <my_file_path> <add_reader_path>\n",
+            "Usage: %s <config_path> <my_file_path> <add_reader_path>",
             argv[0]);
     }
     char* config_path = argv[1];

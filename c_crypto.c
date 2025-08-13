@@ -374,14 +374,14 @@ static int get_symmetric_encrypt_authenticate_buffer(
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
         if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
                         ret + iv_size, &total_length) < 0) {
-            SST_print_error("AES encryption failed!\n");
+            SST_print_error("AES encryption failed!");
             return -1;
         }
         total_length += iv_size;
     }
     // Add other ciphers in future.
     else {
-        SST_print_error("Cipher_key_size is not supported.\n");
+        SST_print_error("Cipher_key_size is not supported.");
         return -1;
     };
     if (hmac_mode == USE_HMAC) {
@@ -393,12 +393,12 @@ static int get_symmetric_encrypt_authenticate_buffer(
         }
         // Add other MAC key sizes in future.
         else {
-            SST_print_error("HMAC_key_size is not supported.\n");
+            SST_print_error("HMAC_key_size is not supported.");
             return -1;
         }
     }
     if (expected_encrypted_total_length != total_length) {
-        SST_print_error("Encrypted length does not match with expected.\n");
+        SST_print_error("Encrypted length does not match with expected.");
         return -1;
     }
     *ret_length = total_length;
@@ -443,7 +443,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
             HMAC(EVP_sha256(), mac_key, mac_key_size, buf,
                  iv_size + encrypted_length, reproduced_tag, &mac_key_size);
         } else {
-            SST_print_error("HMAC_key_size is not supported.\n");
+            SST_print_error("HMAC_key_size is not supported.");
             return -1;
         }
         if (memcmp(reproduced_tag, buf + iv_size + encrypted_length,
@@ -454,13 +454,13 @@ static int get_symmetric_decrypt_authenticate_buffer(
             print_buf_debug(reproduced_tag, mac_key_size);
             return -1;
         } else {
-            SST_print_debug("MAC verified!\n");
+            SST_print_debug("MAC verified!");
         }
     }
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
         if (decrypt_AES(buf + iv_size, encrypted_length, cipher_key, buf,
                         enc_mode, ret, ret_length) < 0) {
-            SST_print_error("AES_CBC_128_decrypt failed!\n");
+            SST_print_error("AES_CBC_128_decrypt failed!");
             return -1;
         }
         if (expected_decrypted_total_length != *ret_length) {
@@ -470,14 +470,14 @@ static int get_symmetric_decrypt_authenticate_buffer(
                 // decrypting on block ciphers like CBC mode.
             } else {
                 SST_print_error(
-                    "Decrypted length does not match with expected.\n");
+                    "Decrypted length does not match with expected.");
                 return -1;
             }
         }
     }
     // Add other ciphers in future.
     else {
-        SST_print_error("Cipher_key_size is not supported.\n");
+        SST_print_error("Cipher_key_size is not supported.");
         return -1;
     }
     return 0;

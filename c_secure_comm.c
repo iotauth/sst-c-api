@@ -169,7 +169,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
 static int check_validity(unsigned char *validity) {
     if ((uint64_t)time(NULL) >
         read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        SST_print_error("Session key expired!\n");
+        SST_print_error("Session key expired!");
         return -1;
     } else {
         return 0;
@@ -252,7 +252,7 @@ int send_auth_request_message(unsigned char *serialized,
         0) {  // when dist_key expired
         SST_print_debug(
             "Current distribution key expired, requesting new "
-            "distribution key as well...\n");
+            "distribution key as well...");
         unsigned int enc_length;
         unsigned char *enc =
             encrypt_and_sign(serialized, serialized_length, ctx, &enc_length);
@@ -321,7 +321,7 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
         SST_print_error("Failed SHA256_verify().");
         return -1;
     }
-    SST_print_debug("Auth signature verified.\n");
+    SST_print_debug("Auth signature verified.");
 
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
@@ -412,14 +412,14 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                                                   unsigned char *entity_nonce,
                                                   session_key_t *s_key,
                                                   unsigned int *ret_length) {
-    SST_print_debug("Received session key handshake2!\n");
+    SST_print_debug("Received session key handshake2!");
     unsigned int decrypted_length;
     unsigned char *decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             s_key->enc_mode, 0, &decrypted, &decrypted_length) < 0) {
-        SST_print_error("Error during decryption in checking handshake2.\n");
+        SST_print_error("Error during decryption in checking handshake2.");
         return NULL;
     }
     HS_nonce_t hs;
@@ -431,10 +431,10 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
                 HS_NONCE_SIZE) != 0) {
         SST_print_error(
             "Comm init failed: server NOT verified, nonce NOT matched, "
-            "disconnecting...\n");
+            "disconnecting...");
         return NULL;
     } else {
-        SST_print_debug("Server authenticated/authorized by solving nonce!\n");
+        SST_print_debug("Server authenticated/authorized by solving nonce!");
     }
 
     // send handshake_3
@@ -450,7 +450,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
             buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
             s_key->enc_mode, 0, &ret, ret_length) < 0) {
-        SST_print_error("Error during encryption while send_handshake_3.\n");
+        SST_print_error("Error during encryption while send_handshake_3.");
         return NULL;
     }
     return ret;
@@ -522,11 +522,11 @@ int decrypt_received_message(unsigned char *encrypted_data,
         return -1;
     }
     if (check_session_key_validity(&session_ctx->s_key) < 0) {
-        SST_print_error("Session key expired!\n");
+        SST_print_error("Session key expired!");
         return -1;
     }
     session_ctx->received_seq_num++;
-    SST_print_debug("Received seq_num: %d.\n", received_seq_num);
+    SST_print_debug("Received seq_num: %d.", received_seq_num);
     return 0;
 }
 
@@ -550,7 +550,7 @@ session_key_list_t *send_session_key_request_check_protocol(
             SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
-        SST_print_debug("Received %d keys.\n", ctx->config->numkey);
+        SST_print_debug("Received %d keys.", ctx->config->numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -562,10 +562,10 @@ session_key_list_t *send_session_key_request_check_protocol(
             if (strncmp((const char *)s_key_list->s_key[0].key_id,
                         (const char *)target_key_id,
                         SESSION_KEY_ID_SIZE) != 0) {
-                SST_print_error("Session key id is NOT as expected\n");
+                SST_print_error("Session key id is NOT as expected");
                 return NULL;
             } else {
-                SST_print_debug("Session key id is as expected.\n");
+                SST_print_debug("Session key id is as expected.");
             }
             return s_key_list;
         }
@@ -618,7 +618,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             state = SESSION_KEY_RESP_RECEIVED;
             SST_print_debug(
                 "Received session key response encrypted with distribution "
-                "key.\n");
+                "key.");
             unsigned int decrypted_length;
             unsigned char *decrypted;
             if (symmetric_decrypt_authenticate(
@@ -645,7 +645,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                         NONCE_SIZE) != 0) {
                 return SST_print_error_return_null("Auth nonce NOT verified.");
             } else {
-                SST_print_debug("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!");
             }
             close(sock);
             state = FINISHED;
@@ -699,7 +699,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                                              // & received entity's nonce.
                 return SST_print_error_return_null("Auth nonce NOT verified.");
             } else {
-                SST_print_debug("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!");
             }
             close(sock);
             state = FINISHED;
@@ -708,16 +708,16 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             session_key_list->num_key = 0;
             switch (data_buf[0]) {
                 case INVALID_DISTRIBUTION_KEY:
-                    SST_print_error("Invalid Distribution Key.\n");
+                    SST_print_error("Invalid Distribution Key.");
                     break;
                 case INVALID_SESSION_KEY_REQ:
-                    SST_print_error("Invalid Session Key Request.\n");
+                    SST_print_error("Invalid Session Key Request.");
                     break;
                 case UNKNOWN_INTERNAL_ERROR:
-                    SST_print_error("Unknown Internal Error.\n");
+                    SST_print_error("Unknown Internal Error.");
                     break;
                 default:
-                    SST_print_error("Unknown Code.\n");
+                    SST_print_error("Unknown Code.");
                     break;
             }
             return NULL;
@@ -777,7 +777,7 @@ unsigned char *check_handshake1_send_handshake2(
             s_key->enc_mode, 0, &ret, ret_length) < 0) {
         SST_print_error(
             "Failed symmetric_encrypt_authenticate(). Error during encryption "
-            "while sending handshake2.\n");
+            "while sending handshake2.");
         return NULL;
     }
     return ret;
@@ -802,7 +802,7 @@ void add_session_key_to_list(session_key_t *s_key,
         SST_print_debug(
             "Warning: Session_key_list is full. Deleting oldest key, and "
             "adding new "
-            "key.\n");
+            "key.");
         existing_s_key_list->num_key = MAX_SESSION_KEY;
     }
     copy_session_key(&existing_s_key_list->s_key[existing_s_key_list->rear_idx],
@@ -823,7 +823,7 @@ void append_session_key_list(session_key_list_t *dest,
         int temp = dest->num_key + src->num_key - MAX_SESSION_KEY;
         SST_print_debug(
             "Warning: Losing %d keys from original list. Overwriting %d more "
-            "keys.\n",
+            "keys.",
             temp, temp);
     }
     for (int i = 0; i < src->num_key; i++) {
@@ -934,7 +934,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
             return 0;
         }
     } else {
-        SST_print_error("Session key is expired.\n");
+        SST_print_error("Session key is expired.");
         return -1;
     }
 }

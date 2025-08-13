@@ -61,7 +61,7 @@ config_type_t get_key_value(char *ptr) {
 
 int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
     if ((strlen(src) + 1) > dest_size) {
-        SST_print_error("Problem found while copying config value: %s.\n", src);
+        SST_print_error("Problem found while copying config value: %s.", src);
         return -1;
     } else {
         dest[dest_size - 1] = 0;
@@ -69,7 +69,7 @@ int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
         if (dest[dest_size - 1] != 0) {
             SST_print_error(
                 "Problem found while copying config value, dest string is not "
-                "null terminated: %s.\n",
+                "null terminated: %s.",
                 src);
             return -1;
         }
@@ -83,12 +83,12 @@ config_t *load_config(const char *path) {
     if (fp == NULL) {
         // Print an error message based on the error code
         if (errno == ENOENT) {
-            SST_print_error("SST Config file not found on path %s.\n", path);
+            SST_print_error("SST Config file not found on path %s.", path);
         } else if (errno == EACCES) {
-            SST_print_error("SST Config file permission denied on path %s.\n",
+            SST_print_error("SST Config file permission denied on path %s.",
                             path);
         } else {
-            SST_print_error("SST Config file open failed on path %s.\n", path);
+            SST_print_error("SST Config file open failed on path %s.", path);
         }
         // Print the specific error message
         SST_print_error("fopen() failed.");
@@ -104,32 +104,32 @@ config_t *load_config(const char *path) {
     c->purpose_index = 0;              // Option for ipfs.
     c->hmac_mode = USE_HMAC;           // Default with HMAC.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
-    SST_print_debug("-----SST configuration of %s.-----\n", path);
+    SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
         char *ptr = strtok(pline, "=");
         while (ptr != NULL) {
             config_type_t config = get_key_value(ptr);
             if (config == UNKNOWN_CONFIG) {
-                SST_print_error("Unknown config type %s.\n", ptr);
+                SST_print_error("Unknown config type %s.", ptr);
                 free_config_t(c);
                 return NULL;
             }
             ptr = strtok(NULL, delimiters);
             if (ptr == NULL) {
-                SST_print_error("Config value does not exist.\n");
+                SST_print_error("Config value does not exist.");
                 free_config_t(c);
                 return NULL;
             }
             switch (config) {
                 case UNKNOWN_CONFIG:
                     SST_print_error(
-                        "This line must not be reached. UNKNOWN_CONFIG\n");
+                        "This line must not be reached. UNKNOWN_CONFIG");
                     free_config_t(c);
                     return NULL;
                     break;
                 case ENTITY_INFO_NAME:
-                    SST_print_debug("Name: %s\n", ptr);
+                    SST_print_debug("Name: %s", ptr);
                     if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) <
                         0) {
                         SST_print_error(
@@ -140,7 +140,7 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_INFO_PURPOSE:
                     if (purpose_count <= 1) {
-                        SST_print_debug("Purpose #%d: %s\n", purpose_count + 1,
+                        SST_print_debug("Purpose #%d: %s", purpose_count + 1,
                                         ptr);
                         if (safe_config_value_copy(
                                 c->purpose[purpose_count], ptr,
@@ -153,16 +153,16 @@ config_t *load_config(const char *path) {
                         }
                         purpose_count += 1;
                     } else {
-                        SST_print_debug("Error for wrong number of purpose.\n");
+                        SST_print_debug("Error for wrong number of purpose.");
                     }
                     c->purpose_index = purpose_count - 1;
                     break;
                 case ENTITY_INFO_NUMKEY:
-                    SST_print_debug("Numkey: %s\n", ptr);
+                    SST_print_debug("Numkey: %s", ptr);
                     c->numkey = atoi((const char *)ptr);
                     break;
                 case ENCRYPTION_MODE:
-                    SST_print_debug("Encryption mode: %s\n", ptr);
+                    SST_print_debug("Encryption mode: %s", ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
                         c->encryption_mode = AES_128_CBC;
                     } else if (strcmp(ptr, "AES_128_CTR") == 0) {
@@ -188,21 +188,21 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case AUTH_ID:
-                    SST_print_debug("Auth ID: %s\n", ptr);
+                    SST_print_debug("Auth ID: %s", ptr);
                     c->auth_id = atoi((const char *)ptr);
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
-                    SST_print_debug("Pubkey path of Auth: %s\n", ptr);
+                    SST_print_debug("Pubkey path of Auth: %s", ptr);
                     c->auth_pubkey_path = malloc(strlen(ptr) + 1);
                     strcpy(c->auth_pubkey_path, ptr);
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
-                    SST_print_debug("Privkey path of Entity: %s\n", ptr);
+                    SST_print_debug("Privkey path of Entity: %s", ptr);
                     c->entity_privkey_path = malloc(strlen(ptr) + 1);
                     strcpy(c->entity_privkey_path, ptr);
                     break;
                 case AUTH_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of Auth: %s\n", ptr);
+                    SST_print_debug("IP address of Auth: %s", ptr);
                     if (safe_config_value_copy(c->auth_ip_addr, ptr,
                                                sizeof(c->auth_ip_addr)) < 0) {
                         SST_print_error(
@@ -215,13 +215,13 @@ config_t *load_config(const char *path) {
                 case AUTH_INFO_PORT:
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
-                        SST_print_error("Error: Invalid Auth port number.\n");
+                        SST_print_error("Error: Invalid Auth port number.");
                         free_config_t(c);
                         return NULL;
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of entity server: %s\n", ptr);
+                    SST_print_debug("IP address of entity server: %s", ptr);
                     if (safe_config_value_copy(
                             c->entity_server_ip_addr, ptr,
                             sizeof(c->entity_server_ip_addr)) < 0) {
@@ -233,17 +233,17 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
-                    SST_print_debug("Port number of entity server: %s\n", ptr);
+                    SST_print_debug("Port number of entity server: %s", ptr);
                     c->entity_server_port_num = atoi(ptr);
                     if (c->entity_server_port_num < 0 ||
                         c->entity_server_port_num > 65535) {
-                        SST_print_error("Error: Invalid server port number.\n");
+                        SST_print_error("Error: Invalid server port number.");
                         free_config_t(c);
                         return NULL;
                     }
                     break;
                 case NETWORK_PROTOCOL:
-                    SST_print_debug("Network Protocol: %s\n", ptr);
+                    SST_print_debug("Network Protocol: %s", ptr);
                     if (safe_config_value_copy(c->network_protocol, ptr,
                                                sizeof(c->network_protocol)) <
                         0) {
@@ -254,7 +254,7 @@ config_t *load_config(const char *path) {
                     }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of file system manager: %s\n",
+                    SST_print_debug("IP address of file system manager: %s",
                                     ptr);
                     if (safe_config_value_copy(
                             c->file_system_manager_ip_addr, ptr,
@@ -272,7 +272,7 @@ config_t *load_config(const char *path) {
                         c->file_system_manager_port_num > 65535) {
                         SST_print_error(
                             "Error: Invalid file system manager port "
-                            "number.\n");
+                            "number.");
                         free_config_t(c);
                         return NULL;
                     }

@@ -19,12 +19,12 @@ const char DOWNLOAD_FILE_NAME[] = "download";
 int get_file_content(FILE *fin, unsigned char *file_buf,
                      unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
-        SST_print_error("Start point is not zero.\n");
+        SST_print_error("Start point is not zero.");
         return -1;
     }
     size_t newLen = fread(file_buf, sizeof(char), bufsize, fin);
     if (ferror(fin) != 0) {
-        SST_print_error("Error reading file.\n");
+        SST_print_error("Error reading file.");
         return -1;
     }
     file_buf[newLen++] = '\0';
@@ -33,11 +33,11 @@ int get_file_content(FILE *fin, unsigned char *file_buf,
 
 int64_t file_size_return(FILE *fin) {
     if (fin == NULL) {
-        SST_print_error("Cannot read the file.\n");
+        SST_print_error("Cannot read the file.");
         return -1;
     }
     if (fseek(fin, 0L, SEEK_END) != 0) {
-        SST_print_error("Cannot move pointer to the end of file.\n");
+        SST_print_error("Cannot move pointer to the end of file.");
         return -1;
     }
     int64_t bufsize = ftell(fin);
@@ -66,7 +66,7 @@ void file_duplication_check(const char *file_name, const char *file_extension,
 
         if (access(file_name_buf, F_OK) == 0) {
             // File already exists
-            SST_print_log("File already exists: %s.\n", file_name_buf);
+            SST_print_log("File already exists: %s.", file_name_buf);
             suffix_num++;
         } else {
             // Found a non-existing name
@@ -75,7 +75,7 @@ void file_duplication_check(const char *file_name, const char *file_extension,
     }
 
     SST_print_error(
-        "Cannot save the file as file name's suffix number exceeds max.\n");
+        "Cannot save the file as file name's suffix number exceeds max.");
 }
 
 int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
@@ -86,14 +86,14 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
     snprintf(command, sizeof(command), "%s%s", IPFS_ADD_COMMAND, file_name);
-    SST_print_log("Command: %s\n", command);
+    SST_print_log("Command: %s", command);
     fp = popen(command, "r");
     if (fp == NULL) {
-        SST_print_error("popen() failed.\n");
+        SST_print_error("popen() failed.");
         return -1;
     }
     if (fgets(buff, sizeof(buff), fp) == NULL) {
-        SST_print_error("Failed to read CID from ipfs output.\n");
+        SST_print_error("Failed to read CID from ipfs output.");
         pclose(fp);
         return -1;
     }
@@ -136,11 +136,11 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     generate_nonce(AES_128_CBC_IV_SIZE, iv);
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
                     encrypted, &encrypted_length) < 0) {
-        SST_print_error("Encryption failed!\n");
+        SST_print_error("Encryption failed!");
         return -1;
     }
     free(file_buf);
-    SST_print_log("\nFile encryption was successful.\n");
+    SST_print_log("File encryption was successful.");
 
     char file_name_buffer[20];
     file_duplication_check(ENCRYPTED_FILE_NAME, TXT_FILE_EXTENSION,
@@ -160,7 +160,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     fwrite(enc_save, 1,
            encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len, fenc);
     free(enc_save);
-    SST_print_log("File was saved: %s.\n", file_name_buffer);
+    SST_print_log("File was saved: %s.", file_name_buffer);
     fclose(fenc);
     gettimeofday(&encrypt_end, NULL);
     float encrypt_time = encrypt_end.tv_sec - encrypt_start.tv_sec;
@@ -204,7 +204,7 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
                     &ret_length) < 0) {
-        SST_print_error("Error while decrypting.\n");
+        SST_print_error("Error while decrypting.");
         return -1;
     }
     free(file_buf);
@@ -216,7 +216,7 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
-    SST_print_log("Completed decryption and saved the file: %s\n",
+    SST_print_log("Completed decryption and saved the file: %s",
                   result_file_name);
     return 0;
 }
@@ -249,7 +249,7 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
         return -1;
     }
     SST_print_log(
-        "Send the data such as sessionkey id, hash value for file. \n");
+        "Send the data such as sessionkey id, hash value for file. ");
     return 0;
 }
 
@@ -318,10 +318,10 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
-        SST_print_error("Socket read error in sst_read_from_socket().\n");
+        SST_print_error("Socket read error in sst_read_from_socket().");
         return -1;
     }
-    SST_print_log("Receive the information for file.\n");
+    SST_print_log("Receive the information for file.");
     gettimeofday(&filemanager_end, NULL);
     float filemanager_time =
         (filemanager_end.tv_sec - filemanager_start.tv_sec);
@@ -340,10 +340,10 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     base_command[command_size] = '\0';  // Null-terminate it
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     snprintf(command, sizeof(command), "%s%s", base_command, file_name);
-    SST_print_log("Command: %s\n", command);
+    SST_print_log("Command: %s", command);
     fin = popen(command, "r");
     pclose(fin);
-    SST_print_log("Download the file: %s\n", file_name);
+    SST_print_log("Download the file: %s", file_name);
     gettimeofday(&download_end, NULL);
     float download_time = (download_end.tv_sec - download_start.tv_sec);
     float download_utime = (download_end.tv_usec - download_start.tv_usec);
@@ -362,10 +362,10 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
     file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION, file_name);
     memcpy(command + command_size - 1, file_name, strlen(file_name));
     memcpy(command + command_size + strlen(file_name) - 1, "\n", 1);
-    SST_print_log("Command: %s \n", command);
+    SST_print_log("Command: %s ", command);
     fin = popen(command, "r");
     pclose(fin);
-    SST_print_log("Success for downloading %s.\n", file_name);
+    SST_print_log("Success for downloading %s.", file_name);
 }
 
 int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
@@ -382,7 +382,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         if (received_buf_length < 0) {
             SST_print_error(
-                "Socket read error in send_add_reader_req_via_TCP().\n");
+                "Socket read error in send_add_reader_req_via_TCP().");
             return -1;
         }
         unsigned char message_type;
@@ -392,7 +392,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         if (message_type == AUTH_HELLO) {
             if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
                                   add_reader, 0) < 0) {
-                SST_print_error("AUTH_HELLO handling failed.\n");
+                SST_print_error("AUTH_HELLO handling failed.");
                 return -1;
             }
         } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
@@ -417,7 +417,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     &decrypted_entity_nonce_length) < 0) {
                 SST_print_error(
                     "Error during decryption after receiving "
-                    "ADD_READER_RESP_WITH_DIST_KEY.\n");
+                    "ADD_READER_RESP_WITH_DIST_KEY.");
                 return -1;
             }
             if (strncmp((const char *)decrypted_entity_nonce,
@@ -427,9 +427,9 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                 SST_print_error("Auth nonce NOT verified");
                 return -1;
             } else {
-                SST_print_debug("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!");
             }
-            SST_print_log("Add a file reader to the database.\n");
+            SST_print_log("Add a file reader to the database.");
             close(sock);
             break;
         } else if (message_type == ADD_READER_RESP) {
@@ -443,7 +443,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     &decrypted_entity_nonce_length) < 0) {
                 SST_print_error(
                     "Error during decryption after receiving "
-                    "ADD_READER_RESP.\n");
+                    "ADD_READER_RESP.");
                 return -1;
             }
             if (strncmp((const char *)decrypted_entity_nonce,
@@ -453,9 +453,9 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                 SST_print_error("Auth nonce NOT verified");
                 return -1;
             } else {
-                SST_print_debug("Auth nonce verified!\n");
+                SST_print_debug("Auth nonce verified!");
             }
-            SST_print_log("Add a file reader to the database.\n");
+            SST_print_log("Add a file reader to the database.");
             close(sock);
             break;
         }

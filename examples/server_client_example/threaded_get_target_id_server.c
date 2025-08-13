@@ -59,7 +59,7 @@ void *call_get_session_key_by_ID(void *args) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Too many arguments. Usage: %s <config_path>\n",
+        SST_print_error_exit("Too many arguments. Usage: %s <config_path>",
                              argv[0]);
     }
     char *config_path = argv[1];

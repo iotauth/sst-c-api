@@ -2,7 +2,7 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
@@ -87,7 +87,7 @@ int main(int argc, char *argv[]) {
                     bzero(plaintext_block_buf + total_block_size,
                           MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
                     SST_print_log(
-                        "Add zero paddings for the leftover %d bytes.\n",
+                        "Add zero paddings for the leftover %d bytes.",
                         MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
                     // Now the total_block_size becomes the
                     // MAX_PLAINTEXT_BLOCK_SIZE.
@@ -123,11 +123,11 @@ int main(int argc, char *argv[]) {
             encrypted_file_metadata[i].block_metadata[j].length =
                 encrypted_length;
             free(encrypted);
-            SST_print_log("Wrote encrypted block %d\n", j);
+            SST_print_log("Wrote encrypted block %d", j);
         }
         fclose(plaintext_fp);
         fclose(encrypted_fp);
-        SST_print_log("Finished writing encrypted blocks to encrypted%d.txt\n",
+        SST_print_log("Finished writing encrypted blocks to encrypted%d.txt",
                       i);
     }
 
