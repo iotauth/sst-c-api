@@ -37,7 +37,8 @@ int main(int argc, char* argv[]) {
 
     std::string add_reader;
     while (std::getline(add_reader_file, add_reader)) {
-        if (send_add_reader_req_via_TCP(ctx, const_cast<char*>(add_reader.c_str())) == -1) {
+        if (send_add_reader_req_via_TCP(
+                ctx, const_cast<char*>(add_reader.c_str())) < 0) {
             SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
         }
     }
@@ -121,7 +122,13 @@ int main(int argc, char* argv[]) {
     // Receive the hash
     unsigned char received_hash_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    if (read_secure_message(received_hash_buf, session_ctx) != HASH_SIZE) {
+    int msg_length = read_secure_message(received_hash_buf, session_ctx);
+
+    if (msg_length < 0) {
+        SST_print_error_exit("Failed to read_secure_message().");
+    }
+
+    if (msg_length != HASH_SIZE) {
         std::cerr << "Error: hash size does not match." << std::endl;
         return EXIT_FAILURE;
     }

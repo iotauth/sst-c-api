@@ -29,7 +29,7 @@ int main(int argc, char *argv[]) {
     strncpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
-    if (read_secure_message(decrypted, session_ctx) <= 0) {
+    if (read_secure_message(decrypted, session_ctx) < 0) {
         printf("Failed to read secure message.\n");
         exit(1);
     }

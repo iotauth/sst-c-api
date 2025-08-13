@@ -371,7 +371,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         if (received_buf_length < 0) {
             SST_print_error(
                 "Socket read error in send_add_reader_req_via_TCP().\n");
-                return -1;
+            return -1;
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -402,7 +402,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                 SST_print_error(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP_WITH_DIST_KEY.\n");
-                    return -1;
+                return -1;
             }
             if (strncmp((const char *)decrypted_entity_nonce,
                         (const char *)entity_nonce,
@@ -428,7 +428,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                 SST_print_error(
                     "Error during decryption after receiving "
                     "ADD_READER_RESP.\n");
-                    return -1;
+                return -1;
             }
             if (strncmp((const char *)decrypted_entity_nonce,
                         (const char *)entity_nonce,
@@ -442,7 +442,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             SST_print_log("Add a file reader to the database.\n");
             close(sock);
             break;
-        } 
+        }
     }
     return 0;
 }

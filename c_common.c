@@ -155,12 +155,13 @@ unsigned char *parse_received_message(unsigned char *received_buf,
     return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
 }
 
-uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
-    uint16_t length = 1;
+int read_variable_length_one_byte_each(int socket, unsigned char *buf) {
+    int length = 1;
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
     if (received_buf_length < 0) {
-        SST_print_error_exit(
+        SST_print_error(
             "Socket read error in read_variable_length_one_byte_each().\n");
+        return -1;
     }
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
@@ -182,8 +183,12 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
-    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
+    int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
+    if (var_length_buf_size < 0) {
+        SST_print_error("Failed to read_variable_length_one_byte_each().");
+        return -1;
+    }
     unsigned int var_length_buf_size_checked;
     unsigned int ret_length;
     // Decode the variable length buffer and get the bytes to read.
@@ -308,13 +313,13 @@ int sst_read_from_socket(int socket, unsigned char *buf,
         errno = EBADF;
         return -1;
     }
-    ssize_t length_read = read(socket, buf, buf_length);
+    int length_read = read(socket, buf, buf_length);
     if (length_read < 0) {
-        SST_print_error_exit("Reading from socket failed.");
+        SST_print_error("Reading from socket %d failed.", socket);
     } else if (length_read == 0) {
-        SST_print_error_exit("Connection closed.");
+        SST_print_error("Connection closed from socket %d.", socket);
     }
-    return (unsigned int)length_read;
+    return length_read;
 }
 
 int sst_write_to_socket(int socket, const unsigned char *buf,

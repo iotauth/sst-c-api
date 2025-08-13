@@ -147,7 +147,7 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 // each, and returns the variable length buffer's size.
 // @param socket socket to read
 // @param buf buffer to save the result of read() function.
-uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf);
+int read_variable_length_one_byte_each(int socket, unsigned char *buf);
 
 // Reads the SST header, and returns the message type, start pointer of the
 // SST's payload, and the payload's length.
