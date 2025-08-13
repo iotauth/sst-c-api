@@ -11,51 +11,56 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
-<!-- Wrapper (needed so columns don't sprawl) -->
-<div style="display:flex; flex-wrap:wrap; align-items:flex-start; gap:20px; max-width:960px; margin:0 auto;">
+<table style="width:100%; border-collapse:collapse; border:none;">
+  <tr>
+    <!-- Left: image (70%) -->
+    <td style="width:70%; vertical-align:top; padding:0; border:none;">
+      <a href="./img/physical_lifi.png">
+        <img src="./img/physical_lifi.png" alt="LiFi physical setup"
+             style="display:block; width:100%; height:auto; border:0;">
+      </a>
+    </td>
+<!-- Right: text (30%) -->
+    <td style="width:30%; vertical-align:top; padding:0; border:none;">
+      <h2 style="margin:0 0 .75rem 0;">Hardware Overview</h2>
 
-  <!-- Image column: fixed width; won't stretch -->
-  <div style="flex:0 0 320px; width:320px;">
-    <a href="./img/physical_lifi.png">
-      <img
-        src="./img/physical_lifi.png"
-        alt="LiFi physical setup"
-        style="display:block; width:100%; height:auto;"
-      >
-    </a>
-  </div>
+<!-- Pad only the body text, not the header -->
+   <div style="padding-left:2rem; box-sizing:border-box; text-align:right;">
 
-  <!-- Text column: stays on the right; wraps under on small screens -->
-  <div style="flex:1 1 360px; min-width:320px; padding-left:1.5rem; box-sizing:border-box; text-align:right;">
+   <p><strong>Raspberry Pi Pico</strong><br>
+      <em>Purpose:</em> …<br>
+      <em>Connections:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**Raspberry Pi Pico**  
-_Purpose:_ …  
-_Connections:_ …  
-_Notes:_ …
+   <p><strong>Raspberry Pi 4</strong><br>
+      <em>Purpose:</em> …<br>
+      <em>Connections:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**Raspberry Pi 4**  
-_Purpose:_ …  
-_Connections:_ …  
-_Notes:_ …
+   <p><strong>TC4420 → LED Driver</strong><br>
+      <em>Role:</em> …<br>
+      <em>Supply:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**TC4420 → LED Driver**  
-_Role:_ …  
-_Supply:_ …  
-_Notes:_ …
+   <p><strong>OP350 ← Photodiode</strong><br>
+      <em>Role:</em> …<br>
+      <em>Biasing/Drive:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**OP350 ← Photodiode**  
-_Role:_ …  
-_Biasing/Drive:_ …  
-_Notes:_ …
+   <p><strong>TLV3501 Comparator</strong><br>
+      <em>Role:</em> …<br>
+      <em>Threshold/Ref:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**TLV3501 Comparator**  
-_Role:_ …  
-_Threshold/Ref:_ …  
-_Notes:_ …
+   <p><strong>⚡ 12V DC to Breadboard</strong><br>
+      <em>Purpose:</em> …<br>
+      <em>Notes:</em> …</p>
 
-**⚡ 12V DC to Breadboard**  
-  </div>
-</div>
+   </div>
+   </td>
+  </tr>
+</table>
+
 
 
 
