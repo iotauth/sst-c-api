@@ -58,9 +58,10 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("Failed file_encrypt_upload()");
     }
 
-    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0],
-                                  hash_value_len);
-
+    if (upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx,
+                                      &hash_value[0], hash_value_len) == -1) {
+        SST_print_error_exit("Failed upload_to_file_system_manager()");
+    }
     // Step 1: Receive Hash from Downloader using Sockets
 
     int server_socket = socket(PF_INET, SOCK_STREAM, 0);

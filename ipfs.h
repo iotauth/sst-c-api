@@ -70,7 +70,8 @@ int file_decrypt_save(session_key_t session_ctx, char *file_name);
 // @param ctx config struct obtained from load_config().
 // @param hash_value value to send to file system manager.
 // @param hash_value_len length of value to send to file system manager.
-void upload_to_file_system_manager(session_key_t *session_ctx, SST_ctx_t *ctx,
+// @return 0 for success, -1 for fail
+int upload_to_file_system_manager(session_key_t *session_ctx, SST_ctx_t *ctx,
                                    unsigned char *hash_value,
                                    int hash_value_len);
 

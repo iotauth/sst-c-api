@@ -218,9 +218,9 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
                   result_file_name);
 }
 
-void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
-                                   unsigned char *hash_value,
-                                   int hash_value_len) {
+int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
+                                  unsigned char *hash_value,
+                                  int hash_value_len) {
     int sock;
     connect_as_client((const char *)ctx->config->file_system_manager_ip_addr,
                       ctx->config->file_system_manager_port_num, &sock);
@@ -238,10 +238,14 @@ void upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     int bytes_written = sst_write_to_socket(
         sock, data, 4 + name_size + key_id_size + hash_value_len);
     if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
-        SST_print_error_exit("Failed to write data to socket.");
+        SST_print_error(
+            "Failed to write data to socket. Only %d bytes written.",
+            bytes_written);
+        return -1;
     }
     SST_print_log(
         "Send the data such as sessionkey id, hash value for file. \n");
+    return 0;
 }
 
 int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,

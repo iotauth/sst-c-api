@@ -75,8 +75,11 @@ int main(int argc, char* argv[]) {
         sleep(1);
         struct timeval filemanager_start, filemanager_end;
         gettimeofday(&filemanager_start, NULL);
-        upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
-                                      &hash_value[0], hash_value_len);
+        if (upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
+                                          &hash_value[0],
+                                          hash_value_len) == -1) {
+            SST_print_error_exit("Failed upload_to_file_system_manager()");
+        }
         gettimeofday(&filemanager_end, NULL);
         float filemanager_time =
             filemanager_end.tv_sec - filemanager_start.tv_sec;
