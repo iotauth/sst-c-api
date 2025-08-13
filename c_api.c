@@ -52,7 +52,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config->numkey,
                                            existing_s_key_list)) {
-            SST_print_error("Unable to get_session_key().\n");
+            SST_print_error("Failed to check_session_key_list_addable().");
             return existing_s_key_list;
         }
     }
@@ -60,7 +60,7 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
     if (strcmp((const char *)ctx->config->network_protocol, "TCP") == 0) {
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
         if (earned_s_key_list == NULL) {
-            SST_print_error("Failed to get session key. Returning NULL.\n");
+            SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==

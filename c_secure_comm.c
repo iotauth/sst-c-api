@@ -526,6 +526,7 @@ session_key_list_t *send_session_key_request_check_protocol(
         0) {  // TCP
         session_key_list_t *s_key_list = send_session_key_req_via_TCP(ctx);
         if (s_key_list == NULL) {
+            SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
         SST_print_debug("Received %d keys.\n", ctx->config->numkey);
@@ -577,8 +578,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
         if (received_buf_length < 0) {
-            SST_print_error_exit(
-                "Socket read error in send_session_key_req_via_TCP().\n");
+            SST_print_error("Failed to sst_read_from_socket().");
+            return NULL;
         }
         unsigned char message_type;
         unsigned int data_buf_length;
