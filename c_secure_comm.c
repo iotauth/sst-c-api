@@ -204,15 +204,19 @@ static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
 // @param buf_length length of buf
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
-static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
-                                       unsigned int buf_length,
-                                       unsigned char *reply_nonce,
-                                       session_key_list_t *session_key_list) {
+static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
+                                      unsigned int buf_length,
+                                      unsigned char *reply_nonce,
+                                      session_key_list_t *session_key_list) {
     memcpy(reply_nonce, buf, NONCE_SIZE);
     unsigned int buf_idx = NONCE_SIZE;
     unsigned int ret_length;
     unsigned char *ret =
         parse_string_param(buf, buf_length, buf_idx, &ret_length);
+    if (ret == NULL) {
+        SST_print_error("Failed parse_string_param().");
+        return -1;
+    }
     // TODO: need to apply cryptoSpec?
     //~~use ret~~
     free(ret);
@@ -229,6 +233,7 @@ static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
+    return 0;
 }
 
 int send_auth_request_message(unsigned char *serialized,
@@ -320,8 +325,9 @@ unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
     var_length_int_to_num(buf + offset, buf_length, &num,
                           &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {
-        SST_print_error_exit(
+        SST_print_error(
             "Buffer size of the variable length integer cannot be 0.");
+        return NULL;
     }
     *return_to_length = num + var_len_int_buf_size;
     unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
@@ -595,8 +601,11 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     "SESSION_KEY_RESP.\n");
             }
             unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(ctx, decrypted, decrypted_length,
-                                       reply_nonce, session_key_list);
+            if (parse_session_key_response(ctx, decrypted, decrypted_length,
+                                           reply_nonce, session_key_list) < 0) {
+                SST_print_error("Failed parse_session_key_response().");
+                return NULL;
+            }
             free(decrypted);
             SST_print_debug("Reply_nonce in sessionKeyResp: ");
             print_buf_debug(reply_nonce, NONCE_SIZE);
@@ -639,9 +648,13 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             // parse decrypted_session_key_response for nonce comparison &
             // session_key.
             unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(ctx, decrypted_session_key_response,
-                                       decrypted_session_key_response_length,
-                                       reply_nonce, session_key_list);
+            if (parse_session_key_response(
+                    ctx, decrypted_session_key_response,
+                    decrypted_session_key_response_length, reply_nonce,
+                    session_key_list) < 0) {
+                SST_print_error("Failed parse_session_key_response().");
+                return NULL;
+            }
             free(decrypted_session_key_response);
             SST_print_debug("Reply_nonce in sessionKeyResp: ");
             print_buf_debug(reply_nonce, NONCE_SIZE);
