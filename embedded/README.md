@@ -12,16 +12,18 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
 <!-- Hardware Overview -->
-<div style="display: flex; flex-wrap: wrap; align-items: flex-start;">
+<div style="display: flex; align-items: flex-start;">
 
-  <div style="flex: 0 0 235px; max-width: 235px; margin-right: 20px;">
+  <!-- Left: Small fixed-size image -->
+  <div style="flex: 0 0 auto; margin-right: 20px;">
     <a href="./img/physical_lifi.png">
-      <img src="./img/physical_lifi.png" alt="LiFi physical setup" style="width: 100%; height: auto;" />
+      <img src="./img/physical_lifi.png" alt="LiFi physical setup" width="200px" />
     </a>
     <sub>Click to view full size</sub>
   </div>
 
-  <div style="flex: 1 1 300px; min-width: 250px;">
+  <!-- Right: Text content -->
+  <div style="flex: 1 1 auto;">
 
 ### Hardware Overview
 
