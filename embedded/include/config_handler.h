@@ -4,4 +4,4 @@
 void change_directory_to_config_path(const char* config_path);
 const char* get_config_path(const char* path);
 
-#endif // CONFIG_HANDLER_H
+#endif  // CONFIG_HANDLER_H

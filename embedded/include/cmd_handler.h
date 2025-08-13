@@ -5,4 +5,4 @@
 
 bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot);
 
-#endif // CMD_HANDLER_H
+#endif  // CMD_HANDLER_H

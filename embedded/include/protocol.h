@@ -1,46 +1,45 @@
 #pragma once
 
 /* -------- Protocol identity -------- */
-#define PROTO_VERSION            1
+#define PROTO_VERSION 1
 
 /* -------- Framing -------- */
-#define PREAMBLE_BYTE_1          0xAB
-#define PREAMBLE_BYTE_2          0xCD
-#define MSG_TYPE_ENCRYPTED       0x02
+#define PREAMBLE_BYTE_1 0xAB
+#define PREAMBLE_BYTE_2 0xCD
+#define MSG_TYPE_ENCRYPTED 0x02
 
 // timing cooldown
 #define KEY_UPDATE_COOLDOWN_S 15
 
-
 /* -------- Sizes -------- */
-#define SESSION_KEY_SIZE         16
-#define NONCE_SIZE               12
-#define TAG_SIZE                 16
-#define NONCE_HISTORY_SIZE       64
-#define MAX_MSG_LEN              1024
+#define SESSION_KEY_SIZE 16
+#define NONCE_SIZE 12
+#define TAG_SIZE 16
+#define NONCE_HISTORY_SIZE 64
+#define MAX_MSG_LEN 1024
 
 /* -------- Tokens (shared strings) -------- */
-#define KE_TOKEN_ACK_1           "ACK"
-#define KE_TOKEN_ACK_2           "KEY_OK"
-#define KE_TOKEN_ACK_3           "I have the key"
-#define KE_TOKEN_YES             "yes"
+#define KE_TOKEN_ACK_1 "ACK"
+#define KE_TOKEN_ACK_2 "KEY_OK"
+#define KE_TOKEN_ACK_3 "I have the key"
+#define KE_TOKEN_YES "yes"
 
 /* -------- Serial settings -------- */
-#define UART_DEVICE              "/dev/serial0"
+#define UART_DEVICE "/dev/serial0"
 
 #ifdef PICO_ON_DEVICE
-  /* Pico SDK wants a numeric baud for uart_init() */
-  #define UART_BAUDRATE_NUM      1000000
+/* Pico SDK wants a numeric baud for uart_init() */
+#define UART_BAUDRATE_NUM 1000000
 #else
-  /* Host/Linux uses termios constants */
-  #include <termios.h>
-  #define UART_BAUDRATE_TERMIOS  B1000000
+/* Host/Linux uses termios constants */
+#include <termios.h>
+#define UART_BAUDRATE_TERMIOS B1000000
 #endif
 
 /* -------- Sanity checks -------- */
 #if SESSION_KEY_SIZE != 16
-  #error "This project assumes a 16-byte session key."
+#error "This project assumes a 16-byte session key."
 #endif
 #if NONCE_SIZE != 12
-  #error "This project assumes a 12-byte GCM nonce."
+#error "This project assumes a 12-byte GCM nonce."
 #endif

@@ -43,7 +43,10 @@ void change_directory_to_config_path(const char* config_path) {
         const char* config_dir_relative = "../../receiver";
         if (chdir(config_dir_relative) != 0) {
             perror("Could not switch to default config directory");
-            fprintf(stderr, "Failed to find default config ('%s') from your current location:\n", config_dir_relative);
+            fprintf(stderr,
+                    "Failed to find default config ('%s') from your current "
+                    "location:\n",
+                    config_dir_relative);
             exit(1);
         }
 
@@ -78,7 +81,8 @@ const char* get_config_path(const char* path) {
         free(path_copy);
         return filename;
     } else {
-        // No path provided, use the default filename. After chdir, this is correct.
+        // No path provided, use the default filename. After chdir, this is
+        // correct.
         return "sst.config";
     }
 }

@@ -1,16 +1,18 @@
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
-#include "sst_crypto_embedded.h"   // print_hex, secure_zero, etc.
 #include "mbedtls_time_alt.h"
-#include "ram_handler.h"
-#include "pico_handler.h"
 #include "pico/time.h"
+#include "pico_handler.h"
+#include "ram_handler.h"
+#include "sst_crypto_embedded.h"  // print_hex, secure_zero, etc.
 
-// Return true iff the effective session key changed (loaded, replaced, or cleared)
+// Return true iff the effective session key changed (loaded, replaced, or
+// cleared)
 bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
-    if (strcmp(cmd, " print key") == 0 || strcmp(cmd, " print key sender") == 0) {
+    if (strcmp(cmd, " print key") == 0 ||
+        strcmp(cmd, " print key sender") == 0) {
         print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
         return false;
     } else if (strcmp(cmd, " print key receiver") == 0) {
@@ -29,7 +31,7 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         if (*current_slot == 0) {
             keyram_clear();
             memset(session_key, 0, SST_KEY_SIZE);
-            return true; // effective key now none
+            return true;  // effective key now none
         }
         return false;
     } else if (strcmp(cmd, " clear slot B") == 0) {
@@ -64,7 +66,7 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
             memset(session_key, 0, SST_KEY_SIZE);
             store_last_used_slot((uint8_t)*current_slot);
             printf("Slot A invalid or empty. Ready to receive new key.\n");
-            return true; // effective key changed (now none)
+            return true;  // effective key changed (now none)
         }
 
     } else if (strcmp(cmd, " use slot B") == 0) {
@@ -101,8 +103,12 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         // Figure out which slot now holds the new key
         int written_slot = -1;
         uint8_t tmp[SST_KEY_SIZE];
-        if (pico_read_key_from_slot(0, tmp) && memcmp(tmp, newk, SST_KEY_SIZE) == 0) written_slot = 0;
-        else if (pico_read_key_from_slot(1, tmp) && memcmp(tmp, newk, SST_KEY_SIZE) == 0) written_slot = 1;
+        if (pico_read_key_from_slot(0, tmp) &&
+            memcmp(tmp, newk, SST_KEY_SIZE) == 0)
+            written_slot = 0;
+        else if (pico_read_key_from_slot(1, tmp) &&
+                 memcmp(tmp, newk, SST_KEY_SIZE) == 0)
+            written_slot = 1;
         secure_zero(tmp, sizeof(tmp));
 
         if (written_slot >= 0) {
@@ -112,7 +118,8 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
 
         keyram_set(newk);
         memcpy(session_key, newk, SST_KEY_SIZE);
-        printf("New key stored (forced) and loaded to RAM (slot %c).\n", *current_slot ? 'B' : 'A');
+        printf("New key stored (forced) and loaded to RAM (slot %c).\n",
+               *current_slot ? 'B' : 'A');
         print_hex("Received new key: ", newk, SST_KEY_SIZE);
         secure_zero(newk, sizeof(newk));
         return true;
@@ -121,7 +128,8 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         // Only accept if current slot is empty
         uint8_t tmp[SST_KEY_SIZE];
         if (pico_read_key_from_slot(*current_slot, tmp)) {
-            printf("Slot %c occupied. Use 'new key -f' to overwrite.\n", *current_slot ? 'B' : 'A');
+            printf("Slot %c occupied. Use 'new key -f' to overwrite.\n",
+                   *current_slot ? 'B' : 'A');
             secure_zero(tmp, sizeof(tmp));
             return false;
         }
@@ -141,8 +149,12 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
 
         // Determine which slot took it
         int written_slot = -1;
-        if (pico_read_key_from_slot(0, tmp) && memcmp(tmp, newk, SST_KEY_SIZE) == 0) written_slot = 0;
-        else if (pico_read_key_from_slot(1, tmp) && memcmp(tmp, newk, SST_KEY_SIZE) == 0) written_slot = 1;
+        if (pico_read_key_from_slot(0, tmp) &&
+            memcmp(tmp, newk, SST_KEY_SIZE) == 0)
+            written_slot = 0;
+        else if (pico_read_key_from_slot(1, tmp) &&
+                 memcmp(tmp, newk, SST_KEY_SIZE) == 0)
+            written_slot = 1;
         secure_zero(tmp, sizeof(tmp));
 
         if (written_slot >= 0) {
@@ -152,7 +164,8 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
 
         keyram_set(newk);
         memcpy(session_key, newk, SST_KEY_SIZE);
-        printf("New key stored and loaded to RAM (slot %c).\n", *current_slot ? 'B' : 'A');
+        printf("New key stored and loaded to RAM (slot %c).\n",
+               *current_slot ? 'B' : 'A');
         print_hex("Received new key: ", newk, SST_KEY_SIZE);
         secure_zero(newk, sizeof(newk));
         return true;
@@ -180,7 +193,9 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         printf("  CMD: clear slot *\n");
         printf("  CMD: use slot A\n");
         printf("  CMD: use slot B\n");
-        printf("  CMD: new key         (request new key only if current slot is empty)\n");
+        printf(
+            "  CMD: new key         (request new key only if current slot is "
+            "empty)\n");
         printf("  CMD: new key -f      (force overwrite current slot)\n");
         printf("  CMD: slot status     (show slot validity and active slot)\n");
         printf("  CMD: reboot\n");

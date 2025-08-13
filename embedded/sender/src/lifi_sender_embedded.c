@@ -58,7 +58,8 @@ int main() {
     printf("Waiting for preamble...\n");
     while (true) {
         if (uart_is_readable(UART_ID) && uart_getc(UART_ID) == 0xAB) {
-            while (!uart_is_readable(UART_ID));
+            while (!uart_is_readable(UART_ID))
+                ;
             if (uart_getc(UART_ID) == 0xCD) {
                 printf("Preamble received. Receiving session key...\n");
                 break;

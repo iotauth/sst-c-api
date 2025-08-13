@@ -1,22 +1,20 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "pico/stdlib.h"
-#include "pico/rand.h"
-#include "hardware/gpio.h"
-#include "hardware/uart.h"
-#include "hardware/flash.h"
-#include "hardware/watchdog.h"
-#include "hardware/sync.h"
-#include "pico/time.h"
-#include "pico/bootrom.h"
-
-#include "mbedtls/sha256.h"
-#include "pico/stdio_usb.h"
-
-#include "../../include/sst_crypto_embedded.h"
-#include "../../include/pico_handler.h"
 #include "../../include/cmd_handler.h"
+#include "../../include/pico_handler.h"
+#include "../../include/sst_crypto_embedded.h"
+#include "hardware/flash.h"
+#include "hardware/gpio.h"
+#include "hardware/sync.h"
+#include "hardware/uart.h"
+#include "hardware/watchdog.h"
+#include "mbedtls/sha256.h"
+#include "pico/bootrom.h"
+#include "pico/rand.h"
+#include "pico/stdio_usb.h"
+#include "pico/stdlib.h"
+#include "pico/time.h"
 
 #define UART_ID_DEBUG uart0
 #define UART_RX_PIN_DEBUG 1
@@ -34,7 +32,7 @@
 int main() {
     stdio_init_all();
     pico_prng_init();
-    sleep_ms(3000); // Wait for USB serial
+    sleep_ms(3000);  // Wait for USB serial
     pico_nonce_init();
 
     // Enable watchdog with a 5-second timeout. It will be paused on debug.
@@ -47,12 +45,12 @@ int main() {
     } else {
         printf("Fresh power-on boot or reboot via flash.\n");
     }
-    //boot with last saved slot
+    // boot with last saved slot
     int saved_slot = load_last_used_slot();
     if (saved_slot == 0 || saved_slot == 1) {
         current_slot = saved_slot;
     } else {
-        current_slot = 0; // Default to A if not found
+        current_slot = 0;  // Default to A if not found
     }
 
     printf("PICO STARTED\n");
@@ -68,21 +66,26 @@ int main() {
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
-    while (uart_is_readable(UART_ID)) { volatile uint8_t _ = uart_getc(UART_ID); }
+    while (uart_is_readable(UART_ID)) {
+        volatile uint8_t _ = uart_getc(UART_ID);
+    }
 
     uint8_t session_key[SST_KEY_SIZE] = {0};
 
     if (!load_session_key(session_key)) {
         printf("No valid session key found. Waiting for one...\n");
-        if (receive_new_key_with_timeout(session_key, 20000)) { //20 seconds to set up session key
+        if (receive_new_key_with_timeout(
+                session_key, 20000)) {  // 20 seconds to set up session key
             print_hex("Received session key: ", session_key, SST_KEY_SIZE);
             if (store_session_key(session_key)) {
                 uint8_t tmp[SST_KEY_SIZE];
                 int written_slot = -1;
 
-                if (pico_read_key_from_slot(0, tmp) && memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
+                if (pico_read_key_from_slot(0, tmp) &&
+                    memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
                     written_slot = 0;
-                } else if (pico_read_key_from_slot(1, tmp) && memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
+                } else if (pico_read_key_from_slot(1, tmp) &&
+                           memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
                     written_slot = 1;
                 }
                 secure_zero(tmp, sizeof(tmp));
@@ -91,9 +94,12 @@ int main() {
                     current_slot = written_slot;
                     store_last_used_slot((uint8_t)current_slot);
                     pico_nonce_on_key_change();
-                    printf("Key saved to flash slot %c.\n", current_slot == 0 ? 'A': 'B');
+                    printf("Key saved to flash slot %c.\n",
+                           current_slot == 0 ? 'A' : 'B');
                 } else {
-                    printf("Warning: couldn't verify which slot has the new key.\n");
+                    printf(
+                        "Warning: couldn't verify which slot has the new "
+                        "key.\n");
                 }
             } else {
                 printf("Failed to save key to flash.\n");
@@ -118,7 +124,7 @@ int main() {
         uint8_t tag[SST_TAG_SIZE] = {0};
 
         while (1) {
-            ch = getchar_timeout_us(500000); // 0.5 second timeout
+            ch = getchar_timeout_us(500000);  // 0.5 second timeout
             if (ch == PICO_ERROR_TIMEOUT) {
                 watchdog_update();
                 continue;
@@ -152,12 +158,13 @@ int main() {
         }
 
         // handle command handling before sending over Lifi
-         if (strncmp(message_buffer, "CMD:", 4) == 0) {
-            // ADD a bool to see if key changed and then 
+        if (strncmp(message_buffer, "CMD:", 4) == 0) {
+            // ADD a bool to see if key changed and then
             const char *cmd = message_buffer + 4;
             bool key_changed = handle_commands(cmd, session_key, &current_slot);
             if (key_changed) {
-                pico_nonce_on_key_change(); // reset salt+counter for the new key space
+                pico_nonce_on_key_change();  // reset salt+counter for the new
+                                             // key space
             }
             handle_commands(cmd, session_key, &current_slot);
             memset(message_buffer, 0, sizeof(message_buffer));
@@ -165,10 +172,12 @@ int main() {
         }
 
         uint8_t nonce[SST_NONCE_SIZE];
-        pico_nonce_next(nonce); // 96-bit nonce = boot_salt||counter (unique per message)
+        pico_nonce_next(
+            nonce);  // 96-bit nonce = boot_salt||counter (unique per message)
 
-        int ret = sst_encrypt_gcm(session_key, nonce, (const uint8_t *)message_buffer,
-                                  msg_len, ciphertext, tag);
+        int ret =
+            sst_encrypt_gcm(session_key, nonce, (const uint8_t *)message_buffer,
+                            msg_len, ciphertext, tag);
         if (ret != 0) {
             printf("Encryption failed! ret=%d\n", ret);
             continue;
@@ -192,7 +201,6 @@ int main() {
         secure_zero(tag, sizeof(tag));
         secure_zero(nonce, sizeof(nonce));
         secure_zero(message_buffer, sizeof(message_buffer));
-
     }
 
     return 0;

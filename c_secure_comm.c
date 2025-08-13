@@ -166,7 +166,8 @@ static int check_validity(uint64_t abs_validity_ms) {
 // @param buf input buffer with distribution key
 static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
                                    unsigned char *buf) {
-    parsed_distribution_key->abs_validity = read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
+    parsed_distribution_key->abs_validity =
+        read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
 
     unsigned int cipher_key_size = buf[cur_index];
@@ -316,11 +317,13 @@ unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
 
-	ret->abs_validity = read_unsigned_long_int_BE(buf + cur_idx, ABS_VALIDITY_SIZE);
-	cur_idx += ABS_VALIDITY_SIZE;
-	
-	ret->rel_validity = read_unsigned_long_int_BE(buf + cur_idx, REL_VALIDITY_SIZE);
-	cur_idx += REL_VALIDITY_SIZE;
+    ret->abs_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, ABS_VALIDITY_SIZE);
+    cur_idx += ABS_VALIDITY_SIZE;
+
+    ret->rel_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, REL_VALIDITY_SIZE);
+    cur_idx += REL_VALIDITY_SIZE;
 
     // copy cipher_key
     ret->cipher_key_size = buf[cur_idx];
@@ -756,8 +759,8 @@ void append_session_key_list(session_key_list_t *dest,
 }
 
 void update_validity(session_key_t *session_key) {
-    session_key->abs_validity = ((uint64_t)time(NULL) * 1000) +
-        session_key->rel_validity;
+    session_key->abs_validity =
+        ((uint64_t)time(NULL) * 1000) + session_key->rel_validity;
 }
 
 int check_session_key_list_addable(int requested_num_key,

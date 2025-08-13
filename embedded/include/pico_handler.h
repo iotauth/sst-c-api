@@ -49,14 +49,16 @@ static inline void secure_zero(void *p, size_t n) {
 }
 
 bool keyram_valid(void);
-void keyram_set(const uint8_t *k);        // copies SST_KEY_SIZE bytes
-const uint8_t* keyram_get(void);          // NULL if not set
+void keyram_set(const uint8_t *k);  // copies SST_KEY_SIZE bytes
+const uint8_t *keyram_get(void);    // NULL if not set
 void keyram_clear(void);
 
 // per-boot salt for uniqueness under the same key
-void pico_nonce_init(void); // resets the 32-bit message counter to 0
-void pico_nonce_next(uint8_t out12[12]); // Guarantees uniqueness for every message within the same boot/key lifetime.
-void pico_nonce_on_key_change(void); //call this when a new session key is installed
+void pico_nonce_init(void);  // resets the 32-bit message counter to 0
+void pico_nonce_next(
+    uint8_t out12[12]);  // Guarantees uniqueness for every message within the
+                         // same boot/key lifetime.
+void pico_nonce_on_key_change(
+    void);  // call this when a new session key is installed
 
-
-#endif // PICO_HANDLER_H
+#endif  // PICO_HANDLER_H
