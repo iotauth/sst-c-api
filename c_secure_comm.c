@@ -396,9 +396,9 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, 0, &decrypted, &decrypted_length)) {
-        SST_print_error_exit(
-            "Error during decryption in checking handshake2.\n");
+            s_key->enc_mode, 0, &decrypted, &decrypted_length) < 0) {
+        SST_print_error("Error during decryption in checking handshake2.\n");
+        return NULL;
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
@@ -407,9 +407,10 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     // compare my_nonce and received_nonce
     if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
                 HS_NONCE_SIZE) != 0) {
-        SST_print_error_exit(
+        SST_print_error(
             "Comm init failed: server NOT verified, nonce NOT matched, "
             "disconnecting...\n");
+        return NULL;
     } else {
         SST_print_debug("Server authenticated/authorized by solving nonce!\n");
     }
@@ -423,12 +424,12 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     }
 
     unsigned char *ret = NULL;
-    if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
-                                       MAC_KEY_SIZE, s_key->cipher_key,
-                                       CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                                       s_key->enc_mode, 0, &ret, ret_length)) {
-        SST_print_error_exit(
-            "Error during encryption while send_handshake_3.\n");
+    if (symmetric_encrypt_authenticate(
+            buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
+            s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
+            s_key->enc_mode, 0, &ret, ret_length) < 0) {
+        SST_print_error("Error during encryption while send_handshake_3.\n");
+        return NULL;
     }
     return ret;
 }
