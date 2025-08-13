@@ -114,6 +114,9 @@ int main(int argc, char *argv[]) {
     // Send the computed hash (raw bytes)
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server().");
+    }
     send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
                         hash_length, session_ctx);
 

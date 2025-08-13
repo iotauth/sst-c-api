@@ -242,7 +242,8 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
-        SST_print_error_exit("socket() error");
+        SST_print_error("socket() error");
+        return -1;
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4

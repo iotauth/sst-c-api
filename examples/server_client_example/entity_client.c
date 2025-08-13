@@ -22,6 +22,9 @@ int main(int argc, char *argv[]) {
     }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server().");
+    }
     sleep(1);
     pthread_t thread;
     pthread_create(&thread, NULL, &receive_thread_read_one_each,
@@ -42,6 +45,9 @@ int main(int argc, char *argv[]) {
     sleep(3);
     pthread_t thread2;
     session_ctx = secure_connect_to_server(&s_key_list->s_key[1], ctx);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server().");
+    }
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,
                    (void *)session_ctx);
     send_secure_message("Hello server 2", strlen("Hello server 2"),

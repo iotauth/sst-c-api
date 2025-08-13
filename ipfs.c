@@ -223,8 +223,12 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
                                   unsigned char *hash_value,
                                   int hash_value_len) {
     int sock;
-    connect_as_client((const char *)ctx->config->file_system_manager_ip_addr,
-                      ctx->config->file_system_manager_port_num, &sock);
+    if (connect_as_client(
+            (const char *)ctx->config->file_system_manager_ip_addr,
+            ctx->config->file_system_manager_port_num, &sock) < 0) {
+        SST_print_error("Failed connect_as_client().");
+        return -1;
+    }
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
     name_size = sizeof(ctx->config->name);
@@ -293,8 +297,12 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     int sock;
     struct timeval filemanager_start, filemanager_end;
     gettimeofday(&filemanager_start, NULL);
-    connect_as_client((const char *)ctx->config->file_system_manager_ip_addr,
-                      ctx->config->file_system_manager_port_num, &sock);
+    if (connect_as_client(
+            (const char *)ctx->config->file_system_manager_ip_addr,
+            ctx->config->file_system_manager_port_num, &sock) < 0) {
+        SST_print_error_exit("Failed connect_as_client().");
+        return -1;
+    }
     int name_size;
     name_size = sizeof(ctx->config->name);
     unsigned char data[BUFF_SIZE];
@@ -362,8 +370,11 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
 
 int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
-    connect_as_client((const char *)ctx->config->auth_ip_addr,
-                      ctx->config->auth_port_num, &sock);
+    if (connect_as_client((const char *)ctx->config->auth_ip_addr,
+                          ctx->config->auth_port_num, &sock) < 0) {
+        SST_print_error_exit("Failed connect_as_client().");
+        return -1;
+    }
     unsigned char entity_nonce[NONCE_SIZE];
     for (;;) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];

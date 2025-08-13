@@ -21,6 +21,9 @@ int main(int argc, char *argv[]) {
     session_key_list_t *s_key_list_0 = get_session_key(ctx, NULL);
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server().");
+    }
     sleep(3);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
     int concat_buffer_size = make_download_req_buffer(ctx, concat_buffer);

@@ -526,8 +526,11 @@ session_key_list_t *send_session_key_request_check_protocol(
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;
-    connect_as_client((const char *)ctx->config->auth_ip_addr,
-                      ctx->config->auth_port_num, &sock);
+    if (connect_as_client((const char *)ctx->config->auth_ip_addr,
+                          ctx->config->auth_port_num, &sock) < 0) {
+        SST_print_error("Failed connect_as_client().");
+        return NULL;
+    }
 
     session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
 

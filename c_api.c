@@ -59,14 +59,14 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
     session_key_list_t *earned_s_key_list = NULL;
     if (strcmp((const char *)ctx->config->network_protocol, "TCP") == 0) {
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
+        if (earned_s_key_list == NULL) {
+            SST_print_error("Failed to get session key. Returning NULL.\n");
+            return NULL;
+        }
     } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
                0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
-    }
-    if (earned_s_key_list == NULL) {
-        SST_print_error("Failed to get session key. Returning NULL.\n");
-        return NULL;
     }
 
     if (existing_s_key_list == NULL) {
@@ -81,8 +81,11 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx) {
     int sock;
-    connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                      ctx->config->entity_server_port_num, &sock);
+    if (connect_as_client((const char *)ctx->config->entity_server_ip_addr,
+                          ctx->config->entity_server_port_num, &sock) < 0) {
+        SST_print_error("Failed connect_as_client().");
+        return NULL;
+    }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server_with_socket(s_key, sock);
     return session_ctx;
