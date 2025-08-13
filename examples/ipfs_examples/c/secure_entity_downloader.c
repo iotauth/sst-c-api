@@ -27,7 +27,10 @@ int main(int argc, char *argv[]) {
     sleep(3);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
     int concat_buffer_size = make_download_req_buffer(ctx, concat_buffer);
-    send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
+    int msg = send_secure_message(concat_buffer, concat_buffer_size, session_ctx);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
     char file_name[BUFF_SIZE];
     strncpy(file_name, "0", BUFF_SIZE);
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];

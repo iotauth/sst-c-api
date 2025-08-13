@@ -117,8 +117,10 @@ int main(int argc, char *argv[]) {
     if (session_ctx == NULL) {
         SST_print_error_exit("Failed secure_connect_to_server().");
     }
-    send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
-                        hash_length, session_ctx);
+    int msg = send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),hash_length, session_ctx);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
 
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list);

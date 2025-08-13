@@ -66,12 +66,19 @@ int main(int argc, char *argv[]) {
                        (void *)session_ctx);
         sleep(1);
 
-        send_secure_message("Hello client", strlen("Hello client"),
-                            session_ctx);
+        int msg = send_secure_message("Hello client", strlen("Hello client"),
+                                  session_ctx);
+
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
         sleep(1);
-        send_secure_message("Hello client - second message",
-                            strlen("Hello client - second message"),
-                            session_ctx);
+        msg = send_secure_message("Hello client - second message",
+                                  strlen("Hello client - second message"),
+                                  session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
         sleep(2);
         pthread_cancel(thread);
         pthread_join(thread,
@@ -97,12 +104,19 @@ int main(int argc, char *argv[]) {
                    (void *)session_ctx2);
     sleep(1);
 
-    send_secure_message("Hello client 2", strlen("Hello client 2"),
-                        session_ctx2);
+    int msg;
+    msg = send_secure_message("Hello client 2", strlen("Hello client 2"),
+                              session_ctx2);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
     sleep(1);
-    send_secure_message("Hello client 2 - second message",
-                        strlen("Hello client 2 - second message"),
-                        session_ctx2);
+    msg = send_secure_message("Hello client 2 - second message",
+                              strlen("Hello client 2 - second message"),
+                              session_ctx2);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
     sleep(1);
 
     sleep(3);
