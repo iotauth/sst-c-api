@@ -605,15 +605,16 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
                     ctx->config->encryption_mode, 0, &decrypted,
-                    &decrypted_length)) {
-                SST_print_error_exit(
-                    "Error during decryption after receiving "
-                    "SESSION_KEY_RESP.\n");
+                    &decrypted_length) < 0) {
+                SST_print_error(
+                    "Failed to symmetric_decrypt_authenticate() after "
+                    "receiving SESSION_KEY_RESP.");
+                return NULL;
             }
             unsigned char reply_nonce[NONCE_SIZE];
             if (parse_session_key_response(ctx, decrypted, decrypted_length,
                                            reply_nonce, session_key_list) < 0) {
-                SST_print_error("Failed parse_session_key_response().");
+                SST_print_error("Failed to parse_session_key_response().");
                 return NULL;
             }
             free(decrypted);
@@ -649,10 +650,11 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
                     AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
                     &decrypted_session_key_response,
-                    &decrypted_session_key_response_length)) {
-                SST_print_error_exit(
-                    "Error during decryption after receiving "
-                    "SESSION_KEY_RESP_WITH_DIST_KEY\n");
+                    &decrypted_session_key_response_length) < 0) {
+                SST_print_error(
+                    "Failed to symmetric_decrypt_authenticate() after "
+                    "receiving SESSION_KEY_RESP_WITH_DIST_KEY.");
+                return NULL;
             }
 
             // parse decrypted_session_key_response for nonce comparison &
@@ -704,7 +706,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 // session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
 //     session_key_list_t *s_key_list;
 //     return s_key_list;
-//     SST_print_error_exit("This function is not implemented yet.");
+//     SST_print_error("This function is not implemented yet.");
 // }
 
 unsigned char *check_handshake1_send_handshake2(
@@ -718,8 +720,11 @@ unsigned char *check_handshake1_send_handshake2(
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &decrypted,
-            &decrypted_length)) {
-        SST_print_error_exit("Error during decrypting handshake1.\n");
+            &decrypted_length) < 0) {
+        SST_print_error(
+            "Failed to symmetric_decrypt_authenticate(). Error during "
+            "decrypting handshake1.");
+        return NULL;
     }
 
     HS_nonce_t hs;
@@ -742,12 +747,14 @@ unsigned char *check_handshake1_send_handshake2(
     }
 
     unsigned char *ret = NULL;
-    if (symmetric_encrypt_authenticate(buf, HS_INDICATOR_SIZE, s_key->mac_key,
-                                       MAC_KEY_SIZE, s_key->cipher_key,
-                                       CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                                       s_key->enc_mode, 0, &ret, ret_length)) {
-        SST_print_error_exit(
-            "Error during encryption while send_handshake2.\n");
+    if (symmetric_encrypt_authenticate(
+            buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
+            s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
+            s_key->enc_mode, 0, &ret, ret_length) < 0) {
+        SST_print_error(
+            "Failed symmetric_encrypt_authenticate(). Error during encryption "
+            "while sending handshake2.\n");
+        return NULL;
     }
     return ret;
 }
@@ -844,9 +851,11 @@ int encrypt_or_decrypt_buf_with_session_key(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
-                    output, output_length)) {
-                SST_print_error_exit(
-                    "Error during encrypting buffer with session key.\n");
+                    output, output_length) < 0) {
+                SST_print_error(
+                    "Failed to symmetric_encrypt_authenticate(). Error during "
+                    "encrypting buffer with session key.");
+                return -1;
             }
             return 0;
         } else {
@@ -855,14 +864,16 @@ int encrypt_or_decrypt_buf_with_session_key(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
-                    output, output_length)) {
-                SST_print_error_exit(
-                    "Error during decrypting buffer with session key.\n");
+                    output, output_length) < 0) {
+                SST_print_error(
+                    "Failed to symmetric_decrypt_authenticate(). Error during "
+                    "decrypting buffer with session key.");
+                return -1;
             }
             return 0;
         }
     } else {
-        SST_print_error("Session key is expired.\n");
+        SST_print_error("Session key is expired.");
         return -1;
     }
 }
@@ -877,8 +888,11 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                SST_print_error_exit(
-                    "Error during encrypting buffer with session key.\n");
+                SST_print_error(
+                    "Failed to "
+                    "symmetric_encrypt_authenticate_without_malloc(). Error "
+                    "during encrypting buffer with session key.");
+                return -1;
             }
             return 0;
         } else {
@@ -887,8 +901,11 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
                     output, output_length)) {
-                SST_print_error_exit(
-                    "Error during decrypting buffer with session key.\n");
+                SST_print_error(
+                    "Failed to "
+                    "symmetric_decrypt_authenticate_without_malloc(). Error "
+                    "during decrypting buffer with session key.");
+                return -1;
             }
             return 0;
         }
