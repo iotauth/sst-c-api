@@ -537,11 +537,11 @@ session_key_list_t *send_session_key_request_check_protocol(
         //  callback_params.target_session_key_cache_length) == 0){}
         if (strncmp((const char *)target_session_key_cache, "none",
                     target_session_key_cache_length) == 0) {
-            // check received (keyId from auth == keyId from entity_client)
             if (strncmp((const char *)s_key_list->s_key[0].key_id,
                         (const char *)target_key_id,
                         SESSION_KEY_ID_SIZE) != 0) {
-                SST_print_error_exit("Session key id is NOT as expected\n");
+                SST_print_error("Session key id is NOT as expected\n");
+                return NULL;
             } else {
                 SST_print_debug("Session key id is as expected.\n");
             }

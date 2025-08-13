@@ -198,7 +198,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         if (s_key_list == NULL) {
             SST_print_error(
-                "Getting target session key by id failed. Returning NULL.\n");
+                "Failed to send_session_key_request_check_protocol().\n");
             return NULL;
         }
         s_key = s_key_list->s_key;
