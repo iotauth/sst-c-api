@@ -42,7 +42,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
                <em>Role:</em> …<br>
                <em>Threshold/Ref:</em> …<br>
                <em>Notes:</em> …</p>
-            <p><strong>⚡ 12V DC to Breadboard</strong><br>
+            <p><strong>12V ⚡ DC to Breadboard</strong><br>
         </div>
       </td>
     </tr>
