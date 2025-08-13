@@ -20,6 +20,10 @@ SST_ctx_t *init_SST(const char *config_path) {
     // there are still messages to be sent after the atexit handler.
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
     ctx->config = load_config(config_path);
+    if (ctx->config == NULL) {
+        SST_print_error("Failed to load_config()");
+        return NULL;
+    }
     int numkey = ctx->config->numkey;
 
     ctx->pub_key = (void *)load_auth_public_key(ctx->config->auth_pubkey_path);

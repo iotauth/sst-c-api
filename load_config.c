@@ -59,19 +59,21 @@ config_type_t get_key_value(char *ptr) {
     }
 }
 
-void safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
+int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
     if ((strlen(src) + 1) > dest_size) {
-        SST_print_error_exit("Problem found while copying config value: %s.\n",
-                             src);
+        SST_print_error("Problem found while copying config value: %s.\n", src);
+        return -1;
     } else {
         dest[dest_size - 1] = 0;
         strncpy(dest, src, dest_size);
         if (dest[dest_size - 1] != 0) {
-            SST_print_error_exit(
+            SST_print_error(
                 "Problem found while copying config value, dest string is not "
                 "null terminated: %s.\n",
                 src);
+            return -1;
         }
+        return 1;
     }
 }
 
@@ -120,15 +122,27 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s\n", ptr);
-                    safe_config_value_copy(c->name, ptr, sizeof(c->name));
+                    if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) ==
+                        -1) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() ENTITY_INFO_NAME");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case ENTITY_INFO_PURPOSE:
                     if (purpose_count <= 1) {
                         SST_print_debug("Purpose #%d: %s\n", purpose_count + 1,
                                         ptr);
-                        safe_config_value_copy(
-                            c->purpose[purpose_count], ptr,
-                            sizeof(c->purpose[purpose_count]));
+                        if (safe_config_value_copy(
+                                c->purpose[purpose_count], ptr,
+                                sizeof(c->purpose[purpose_count])) == -1) {
+                            SST_print_error(
+                                "Failed safe_config_value_copy() "
+                                "ENTITY_INFO_PURPOSE");
+                            free_config_t(c);
+                            return NULL;
+                        }
                         purpose_count += 1;
                     } else {
                         SST_print_debug("Error for wrong number of purpose.\n");
@@ -179,8 +193,14 @@ config_t *load_config(const char *path) {
                     break;
                 case AUTH_INFO_IP_ADDRESS:
                     SST_print_debug("IP address of Auth: %s\n", ptr);
-                    safe_config_value_copy(c->auth_ip_addr, ptr,
-                                           sizeof(c->auth_ip_addr));
+                    if (safe_config_value_copy(c->auth_ip_addr, ptr,
+                                               sizeof(c->auth_ip_addr)) == -1) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "AUTH_INFO_IP_ADDRESS");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case AUTH_INFO_PORT:
                     c->auth_port_num = atoi(ptr);
@@ -190,8 +210,15 @@ config_t *load_config(const char *path) {
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
                     SST_print_debug("IP address of entity server: %s\n", ptr);
-                    safe_config_value_copy(c->entity_server_ip_addr, ptr,
-                                           sizeof(c->entity_server_ip_addr));
+                    if (safe_config_value_copy(
+                            c->entity_server_ip_addr, ptr,
+                            sizeof(c->entity_server_ip_addr)) == -1) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "ENTITY_SERVER_INFO_IP_ADDRESS");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
                     SST_print_debug("Port number of entity server: %s\n", ptr);
@@ -203,15 +230,27 @@ config_t *load_config(const char *path) {
                     break;
                 case NETWORK_PROTOCOL:
                     SST_print_debug("Network Protocol: %s\n", ptr);
-                    safe_config_value_copy(c->network_protocol, ptr,
-                                           sizeof(c->network_protocol));
+                    if (safe_config_value_copy(c->network_protocol, ptr,
+                                               sizeof(c->network_protocol)) ==
+                        -1) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() NETWORK_PROTOCOL");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
                     SST_print_debug("IP address of file system manager: %s\n",
                                     ptr);
-                    safe_config_value_copy(
-                        c->file_system_manager_ip_addr, ptr,
-                        sizeof(c->file_system_manager_ip_addr));
+                    if (safe_config_value_copy(
+                            c->file_system_manager_ip_addr, ptr,
+                            sizeof(c->file_system_manager_ip_addr)) == -1) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
                     c->file_system_manager_port_num = atoi(ptr);
