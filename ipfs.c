@@ -286,8 +286,8 @@ int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
 }
 
 int receive_data_and_download_file(unsigned char *skey_id_in_str,
-                                    SST_ctx_t *ctx, char *file_name,
-                                    estimate_time_t *estimate_time) {
+                                   SST_ctx_t *ctx, char *file_name,
+                                   estimate_time_t *estimate_time) {
     FILE *fin;
     int sock;
     struct timeval filemanager_start, filemanager_end;
@@ -309,9 +309,8 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
-        SST_print_error(
-            "Socket read error in sst_read_from_socket().\n");
-            return -1;
+        SST_print_error("Socket read error in sst_read_from_socket().\n");
+        return -1;
     }
     SST_print_log("Receive the information for file.\n");
     gettimeofday(&filemanager_end, NULL);
