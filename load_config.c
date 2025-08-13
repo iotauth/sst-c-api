@@ -91,7 +91,9 @@ config_t *load_config(const char *path) {
             SST_print_error("SST Config file open failed on path %s.\n", path);
         }
         // Print the specific error message
-        SST_print_error_exit("fopen() failed.");
+        SST_print_error("fopen() failed.");
+        free(c);
+        return NULL;
     }
     char buffer[MAX_CONFIG_BUF_SIZE] = {
         0,
@@ -109,16 +111,22 @@ config_t *load_config(const char *path) {
         while (ptr != NULL) {
             config_type_t config = get_key_value(ptr);
             if (config == UNKNOWN_CONFIG) {
-                SST_print_error_exit("Unknown config type %s.\n", ptr);
+                SST_print_error("Unknown config type %s.\n", ptr);
+                free_config_t(c);
+                return NULL;
             }
             ptr = strtok(NULL, delimiters);
             if (ptr == NULL) {
-                SST_print_error_exit("Config value does not exist.\n", ptr);
+                SST_print_error("Config value does not exist.\n", ptr);
+                free_config_t(c);
+                return NULL;
             }
             switch (config) {
                 case UNKNOWN_CONFIG:
-                    SST_print_error_exit("This line must not be reached.\n",
-                                         ptr);
+                    SST_print_error(
+                        "This line must not be reached. UNKNOWN_CONFIG\n", ptr);
+                    free_config_t(c);
+                    return NULL;
                     break;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s\n", ptr);
@@ -170,11 +178,13 @@ config_t *load_config(const char *path) {
                                strcmp(ptr, "1") == 0) {
                         c->hmac_mode = USE_HMAC;
                     } else {
-                        SST_print_error_exit(
+                        SST_print_error(
                             "Wrong input for hmac_mode.\n Please type "
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
+                        free_config_t(c);
+                        return NULL;
                     }
                     break;
                 case AUTH_ID:
@@ -205,7 +215,9 @@ config_t *load_config(const char *path) {
                 case AUTH_INFO_PORT:
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
-                        SST_print_error_exit("Error: Invalid port number.\n");
+                        SST_print_error("Error: Invalid Auth port number.\n");
+                        free_config_t(c);
+                        return NULL;
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
@@ -225,7 +237,9 @@ config_t *load_config(const char *path) {
                     c->entity_server_port_num = atoi(ptr);
                     if (c->entity_server_port_num < 0 ||
                         c->entity_server_port_num > 65535) {
-                        SST_print_error_exit("Error: Invalid port number.\n");
+                        SST_print_error("Error: Invalid server port number.\n");
+                        free_config_t(c);
+                        return NULL;
                     }
                     break;
                 case NETWORK_PROTOCOL:
@@ -256,7 +270,11 @@ config_t *load_config(const char *path) {
                     c->file_system_manager_port_num = atoi(ptr);
                     if (c->file_system_manager_port_num < 0 ||
                         c->file_system_manager_port_num > 65535) {
-                        SST_print_error_exit("Error: Invalid port number.\n");
+                        SST_print_error(
+                            "Error: Invalid file system manager port "
+                            "number.\n");
+                        free_config_t(c);
+                        return NULL;
                     }
                     break;
             }
