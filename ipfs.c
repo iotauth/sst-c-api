@@ -300,7 +300,7 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     if (connect_as_client(
             (const char *)ctx->config->file_system_manager_ip_addr,
             ctx->config->file_system_manager_port_num, &sock) < 0) {
-        SST_print_error_exit("Failed connect_as_client().");
+        SST_print_error("Failed connect_as_client().");
         return -1;
     }
     int name_size;
@@ -372,7 +372,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
     if (connect_as_client((const char *)ctx->config->auth_ip_addr,
                           ctx->config->auth_port_num, &sock) < 0) {
-        SST_print_error_exit("Failed connect_as_client().");
+        SST_print_error("Failed connect_as_client().");
         return -1;
     }
     unsigned char entity_nonce[NONCE_SIZE];
