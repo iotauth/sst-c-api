@@ -11,46 +11,49 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
-<a href="./img/physical_lifi.png">
-  <img src="./img/physical_lifi.png" alt="LiFi physical setup" align="left" width="420">
-</a>
+<div style="display:flex; flex-wrap:wrap; align-items:flex-start; justify-content:center; gap:24px;">
 
-<div style="margin-left: 3em;">
+  <div style="flex:0 0 525px; max-width:100%;">
+    <a href="./img/physical_lifi.png">
+      <img src="./img/physical_lifi.png" alt="LiFi physical setup" style="width:100%; height:auto; display:block;">
+    </a>
+  </div>
 
-## Hardware Overview
+  <div style="flex:1 1 300px; min-width:280px; max-width:820px; padding-left:2rem; box-sizing:border-box; text-align:right;">
+    <h2 style="text-align:right;">Hardware Overview</h2>
 
-- **Raspberry Pi Pico**  
+**Raspberry Pi Pico**  
   _Purpose:_ …  
   _Connections:_ …  
   _Notes:_ …
 
-- **Raspberry Pi 4**  
+**Raspberry Pi 4**  
   _Purpose:_ …  
   _Connections:_ …  
   _Notes:_ …
 
-- **TC4420 — MOSFET/LED Driver**  
+**TC4420 → MOSFET/LED Driver**  
   _Role:_ …  
   _Supply:_ …  
   _Notes:_ …
 
-- **OP350 — Emitter/Photodiode**  
+**OP350 ← Emitter/Photodiode**  
   _Role:_ …  
   _Biasing/Drive:_ …  
   _Notes:_ …
 
-- **TLV3501 — High-Speed Comparator**  
+**TLV3501 – High-Speed Comparator**  
   _Role:_ …  
   _Threshold/Ref:_ …  
   _Notes:_ …
 
-- **⚡ 12V DC to Breadboard Adapter**  
+**⚡ 12V – DC to Breadboard Adapter**  
   _Purpose:_ …  
   _Notes:_ …
 
+  </div>
 </div>
 
-<br clear="left" />
 
 
 
