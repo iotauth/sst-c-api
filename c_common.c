@@ -195,14 +195,17 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           &ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        SST_print_error_exit("Wrong header calculation... Exiting...");
+        SST_print_error("Wrong header calculation... Exiting...");
+        return -1;
     }
     if (ret_length > buf_length) {
-        SST_print_error_exit("Larger buffer size required.");
+        SST_print_error("Larger buffer size required.");
+        return -1;
     }
     int bytes_read = sst_read_from_socket(socket, buf, buf_length);
     if ((unsigned int)bytes_read != ret_length) {
-        SST_print_error_exit("Wrong read... Exiting..");
+        SST_print_error("Wrong read... Exiting..");
+        return -1;
     }
     return bytes_read;
 }
