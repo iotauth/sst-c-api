@@ -349,10 +349,13 @@ int sst_write_to_socket(int socket, const unsigned char *buf,
         }
         if (length_written < 0) {
             // Error occurred while writing
-            SST_print_error_exit("Writing to socket failed.");
+            SST_print_error("Writing to socket %d failed.", socket);
+            return -1;
         } else if (length_written == 0) {
             // Socket closed unexpectedly
-            SST_print_error_exit("Connection closed while writing.");
+            SST_print_error("Connection from socket %d closed while writing.",
+                            socket);
+            return -1;
         }
 
         // Update the total number of bytes written

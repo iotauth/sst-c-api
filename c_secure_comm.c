@@ -82,8 +82,11 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
     unsigned char *serialized = serialize_message_for_auth(
         entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
         &serialized_length);
-    send_auth_request_message(serialized, serialized_length, ctx, sock,
-                              requestIndex);
+    if (send_auth_request_message(serialized, serialized_length, ctx, sock,
+                                  requestIndex) < 0) {
+        SST_print_error("Failed send_auth_request_message().");
+        return -1;
+    }
     return 0;
 }
 
@@ -227,9 +230,9 @@ static void parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
 }
 
-void send_auth_request_message(unsigned char *serialized,
-                               unsigned int serialized_length, SST_ctx_t *ctx,
-                               int sock, int requestIndex) {
+int send_auth_request_message(unsigned char *serialized,
+                              unsigned int serialized_length, SST_ctx_t *ctx,
+                              int sock, int requestIndex) {
     if (check_validity(ctx->dist_key.abs_validity)) {  // when dist_key expired
         SST_print_debug(
             "Current distribution key expired, requesting new "
@@ -248,8 +251,9 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         int bytes_written = sst_write_to_socket(sock, message, message_length);
-        if ((unsigned int)bytes_written != message_length) {
-            SST_print_error_exit("Failed to write data to socket.");
+        if (bytes_written < 0) {
+            SST_print_error("Failed sst_write_to_socket().");
+            return -1;
         }
         OPENSSL_free(enc);
     } else {
@@ -268,11 +272,14 @@ void send_auth_request_message(unsigned char *serialized,
                             &message_length);
         }
         int bytes_written = sst_write_to_socket(sock, message, message_length);
-        if ((unsigned int)bytes_written != message_length) {
-            SST_print_error_exit("Failed to write data to socket.");
+        if (bytes_written < 0) {
+            SST_print_error("Failed sst_write_to_socket().");
+            return -1;
         }
+
         OPENSSL_free(enc);
     }
+    return 0;
 }
 
 void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
@@ -448,8 +455,9 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 
     int bytes_written =
         sst_write_to_socket(session_ctx->sock, sender_buf, sender_buf_length);
-    if ((unsigned int)bytes_written != sender_buf_length) {
-        SST_print_error_exit("Failed to write data to socket.");
+    if (bytes_written < 0) {
+        SST_print_error("Failed sst_write_to_socket().");
+        return -1;
     }
     return bytes_written;
 }
@@ -559,7 +567,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             state = AUTH_HELLO_RECEIVED;
             if (handle_AUTH_HELLO(
                     data_buf, ctx, entity_nonce, sock, ctx->config->numkey,
-                    ctx->config->purpose[ctx->config->purpose_index], 1)) {
+                    ctx->config->purpose[ctx->config->purpose_index], 1) < 0) {
                 return NULL;
             }
         } else if (state == AUTH_HELLO_RECEIVED &&

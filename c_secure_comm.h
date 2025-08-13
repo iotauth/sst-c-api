@@ -66,9 +66,10 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
 // @param ctx config struct obtained from load_config()
 // @param sock socket number
 // @param requestIndex request index for purpose
-void send_auth_request_message(unsigned char *serialized,
-                               unsigned int serialized_length, SST_ctx_t *ctx,
-                               int sock, int requestIndex);
+// @return 0 for success, -1 for fail
+int send_auth_request_message(unsigned char *serialized,
+                              unsigned int serialized_length, SST_ctx_t *ctx,
+                              int sock, int requestIndex);
 
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer

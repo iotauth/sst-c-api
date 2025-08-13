@@ -242,10 +242,8 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     memcpy(data + 4 + name_size + key_id_size, hash_value, hash_value_len);
     int bytes_written = sst_write_to_socket(
         sock, data, 4 + name_size + key_id_size + hash_value_len);
-    if (bytes_written != (4 + name_size + key_id_size + hash_value_len)) {
-        SST_print_error(
-            "Failed to write data to socket. Only %d bytes written.",
-            bytes_written);
+    if (bytes_written < 0) {
+        SST_print_error("Failed sst_write_to_socket().");
         return -1;
     }
     SST_print_log(
@@ -310,8 +308,8 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     data[1] = name_size;
     memcpy(data + 2, ctx->config->name, name_size);
     int bytes_written = sst_write_to_socket(sock, data, 2 + name_size);
-    if (bytes_written != (2 + name_size)) {
-        SST_print_error("Failed to write data to socket.");
+    if (bytes_written < 0) {
+        SST_print_error("Failed sst_write_to_socket().");
         return -1;
     }
     unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
@@ -391,7 +389,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
             if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
-                                  add_reader, 0)) {
+                                  add_reader, 0) < 0) {
                 SST_print_error("AUTH_HELLO handling failed.\n");
                 return -1;
             }

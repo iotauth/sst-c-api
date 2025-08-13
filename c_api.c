@@ -89,7 +89,7 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server_with_socket(s_key, sock);
     if (session_ctx == NULL) {
-        SST_print_error_exit("Failed secure_connect_to_server_with_socket().");
+        SST_print_error("Failed secure_connect_to_server_with_socket().");
         return NULL;
     }
     return session_ctx;
@@ -112,8 +112,9 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                     sender_HS_1, &sender_HS_1_length);
     int bytes_written =
         sst_write_to_socket(sock, sender_HS_1, sender_HS_1_length);
-    if ((unsigned int)bytes_written != sender_HS_1_length) {
-        SST_print_error_exit("Failed to write data to socket.");
+    if (bytes_written < 0) {
+        SST_print_error("Failed sst_write_to_socket().");
+        return NULL;
     }
     free(parsed_buf);
     entity_client_state = HANDSHAKE_1_SENT;
@@ -123,8 +124,8 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
     if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read error in secure_connect_to_server_with_socket()\n");
+        SST_print_error("Failed sst_read_from_socket().");
+        return NULL;
     }
     unsigned char message_type;
     unsigned int data_buf_length;
@@ -132,9 +133,10 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         received_buf, received_buf_length, &message_type, &data_buf_length);
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
-            SST_print_error_exit(
+            SST_print_error(
                 "Comm init failed: wrong sequence of handshake, "
                 "disconnecting...\n");
+            return NULL;
         }
         unsigned int parsed_buf_length;
         unsigned char *parsed_buf = check_handshake_2_send_handshake_3(
@@ -149,8 +151,9 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
                         sender_HS_2, &sender_HS_2_length);
         int bytes_written =
             sst_write_to_socket(sock, sender_HS_2, sender_HS_2_length);
-        if ((unsigned int)bytes_written != sender_HS_2_length) {
-            SST_print_error_exit("Failed to write data to socket.");
+        if (bytes_written < 0) {
+            SST_print_error("Failed sst_write_to_socket().");
+            return NULL;
         }
         free(parsed_buf);
         update_validity(s_key);
@@ -264,8 +267,9 @@ SST_session_ctx_t *server_secure_comm_setup(
                             sender, &sender_length);
             int bytes_written =
                 sst_write_to_socket(clnt_sock, sender, sender_length);
-            if ((unsigned int)bytes_written != sender_length) {
-                SST_print_error_exit("Failed to write data to socket.");
+            if (bytes_written < 0) {
+                SST_print_error("Failed sst_write_to_socket().");
+                return NULL;
             }
             free(parsed_buf);
             SST_print_debug("Switching to HANDSHAKE_2_SENT.\n");
