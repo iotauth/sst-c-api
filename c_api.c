@@ -322,7 +322,7 @@ SST_session_ctx_t *server_secure_comm_setup(
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                    AES_128_CBC, 0, &decrypted, &decrypted_length)) {
+                    AES_128_CBC, 0, &decrypted, &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed symmetric_decrypt_authenticate(). Error during "
                     "decryption in HANDSHAKE_2_SENT state.");
@@ -452,6 +452,7 @@ int load_session_key_list(session_key_list_t *session_key_list,
                           const char *file_path) {
     FILE *load_file_fp;
     if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
+        SST_print_error("Failed to fopen()");
         return -1;  // Error opening file
     } else {
         // Save the malloced pointer
@@ -462,7 +463,8 @@ int load_session_key_list(session_key_list_t *session_key_list,
                                   1, load_file_fp);
         if (items_read != 1) {
             fclose(load_file_fp);
-            return 2;  // Error reading session_key_list_t structure
+            SST_print_error("Failed to fread()");
+            return -1;  // Error reading session_key_list_t structure
         }
 
         // Reload the saved pointer
@@ -473,7 +475,8 @@ int load_session_key_list(session_key_list_t *session_key_list,
                            MAX_SESSION_KEY, load_file_fp);
         if (items_read != MAX_SESSION_KEY) {
             fclose(load_file_fp);
-            return 3;  // Error reading session keys
+            SST_print_error("Failed to fread()");
+            return -1;  // Error reading session keys
         }
 
         fclose(load_file_fp);

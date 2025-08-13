@@ -373,7 +373,7 @@ static int get_symmetric_encrypt_authenticate_buffer(
     // Attach encrypted buffer
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {
         if (encrypt_AES(buf, buf_length, cipher_key, ret, enc_mode,
-                        ret + iv_size, &total_length)) {
+                        ret + iv_size, &total_length) < 0) {
             SST_print_error("AES encryption failed!\n");
             return -1;
         }

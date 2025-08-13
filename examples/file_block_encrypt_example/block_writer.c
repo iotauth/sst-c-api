@@ -115,8 +115,8 @@ int main(int argc, char *argv[]) {
             unsigned char *encrypted = NULL;
             if (encrypt_buf_with_session_key(
                     &s_key_list->s_key[i], plaintext_block_buf,
-                    total_block_size, &encrypted, &encrypted_length)) {
-                SST_print_log("Encryption failed!\n");
+                    total_block_size, &encrypted, &encrypted_length) < 0) {
+                SST_print_error_exit("Encryption failed!");
             }
             // Save the encrypted block.
             fwrite(encrypted, encrypted_length, 1, encrypted_fp);
@@ -141,7 +141,9 @@ int main(int argc, char *argv[]) {
 
     fclose(encrypted_metadata_fp);
     fclose(plaintext_metadata_fp);
-    save_session_key_list(s_key_list, "s_key_list.bin");
+    if (save_session_key_list(s_key_list, "s_key_list.bin") < 0) {
+        SST_print_error_exit("Failed save_session_key_list().");
+    }
     // Free memory.
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);

@@ -143,7 +143,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
             dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
-            0, &temp, &temp_length)) {
+            0, &temp, &temp_length) < 0) {
         SST_print_error(
             "Error during encryption while "
             "symmetric_encrypt_authenticate().");
@@ -248,7 +248,8 @@ static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
 int send_auth_request_message(unsigned char *serialized,
                               unsigned int serialized_length, SST_ctx_t *ctx,
                               int sock, int requestIndex) {
-    if (check_validity(ctx->dist_key.abs_validity)) {  // when dist_key expired
+    if (check_validity(ctx->dist_key.abs_validity) <
+        0) {  // when dist_key expired
         SST_print_debug(
             "Current distribution key expired, requesting new "
             "distribution key as well...\n");
@@ -910,7 +911,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
-                    output, output_length)) {
+                    output, output_length) < 0) {
                 SST_print_error(
                     "Failed to "
                     "symmetric_encrypt_authenticate_without_malloc(). Error "
@@ -923,7 +924,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
                     AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
-                    output, output_length)) {
+                    output, output_length) < 0) {
                 SST_print_error(
                     "Failed to "
                     "symmetric_decrypt_authenticate_without_malloc(). Error "
