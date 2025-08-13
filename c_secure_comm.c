@@ -161,6 +161,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
 static int check_validity(unsigned char *validity) {
     if ((uint64_t)time(NULL) >
         read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
+        SST_print_error("Session key expired!\n");
         return -1;
     } else {
         return 0;
@@ -436,8 +437,9 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
 
 int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                              SST_session_ctx_t *session_ctx) {
-    if (check_session_key_validity(&session_ctx->s_key)) {
-        SST_print_error_exit("Session key expired!\n");
+    if (check_session_key_validity(&session_ctx->s_key) < 0) {
+        SST_print_error("Failed at check_session_key_validity().");
+        return -1;
     }
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);
@@ -452,8 +454,10 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     unsigned int encrypted_length;
     if (encrypt_buf_with_session_key_without_malloc(
             &session_ctx->s_key, buf, SEQ_NUM_SIZE + msg_length,
-            encrypted_stack, &encrypted_length)) {
-        SST_print_error_exit("Encryption failed.");
+            encrypted_stack, &encrypted_length) < 0) {
+        SST_print_error(
+            "Failed to encrypt_buf_with_session_key_without_malloc().");
+        return -1;
     }
 
     session_ctx->sent_seq_num++;
