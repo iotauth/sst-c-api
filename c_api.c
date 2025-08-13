@@ -169,7 +169,7 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         find_session_key(target_session_key_id_int, existing_s_key_list);
     if (session_key_idx >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_idx];
-    } else if (session_key_idx == -1) {
+    } else if (session_key_idx < 0) {
         // WARNING: The following line overwrites the purpose.
         snprintf(ctx->config->purpose[ctx->config->purpose_index],
                  sizeof(ctx->config->purpose[ctx->config->purpose_index]),

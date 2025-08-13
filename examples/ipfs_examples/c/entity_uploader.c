@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
-        if (send_add_reader_req_via_TCP(ctx, addReader) == -1) {
+        if (send_add_reader_req_via_TCP(ctx, addReader) < 0) {
             SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
         }
     }
@@ -71,7 +71,7 @@ int main(int argc, char* argv[]) {
         hash_value_len =
             file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path,
                                 &hash_value[0], &estimate_time[i]);
-        if (hash_value_len == -1) {
+        if (hash_value_len < 0) {
             SST_print_error_exit("Failed file_encrypt_upload()");
         }
         sleep(1);
@@ -79,7 +79,7 @@ int main(int argc, char* argv[]) {
         gettimeofday(&filemanager_start, NULL);
         if (upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
                                           &hash_value[0],
-                                          hash_value_len) == -1) {
+                                          hash_value_len) < 0) {
             SST_print_error_exit("Failed upload_to_file_system_manager()");
         }
         gettimeofday(&filemanager_end, NULL);

@@ -60,7 +60,7 @@ int main(int argc, char *argv[]) {
 
     if (receive_data_and_download_file(received_skey_id.data(), ctx,
                                        file_name.data(),
-                                       &estimate_time[0]) == -1) {
+                                       &estimate_time[0]) < 0) {
         SST_print_error_exit("Failed receive_data_and_download_file().");
     }
 
@@ -79,7 +79,7 @@ int main(int argc, char *argv[]) {
 
     std::string available_filename = getAvailableFilename(base, ext);
 
-    if (file_decrypt_save(*session_key, file_name.data()) == -1) {
+    if (file_decrypt_save(*session_key, file_name.data()) < 0) {
         SST_print_error_exit("Failed file_decrypt_save()");
     }
 

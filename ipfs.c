@@ -116,12 +116,12 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     gettimeofday(&encrypt_start, NULL);
     FILE *fin = fopen(my_file_path, "r");
     int64_t bufsize = file_size_return(fin);
-    if (bufsize == -1) {
+    if (bufsize < 0) {
         SST_print_error("Failed file_size_return()");
     }
     unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
-    if (get_file_content(fin, file_buf, bufsize) == -1) {
+    if (get_file_content(fin, file_buf, bufsize) < 0) {
         SST_print_error("Failed get_file_content()");
         free(file_buf);
         return -1;
@@ -168,7 +168,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     sleep(1);
     int ret = execute_command_and_save_result(&file_name_buffer[0], hash_value,
                                               estimate_time);
-    if (ret == -1) {
+    if (ret < 0) {
         SST_print_error("Failed execute_command_and_save_result()");
     }
     return ret;
@@ -177,12 +177,12 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
 int file_decrypt_save(session_key_t s_key, char *file_name) {
     FILE *fin = fopen(file_name, "r");
     int64_t bufsize = file_size_return(fin);
-    if (bufsize == -1) {
+    if (bufsize < 0) {
         SST_print_error("Failed file_size_return()");
     }
     unsigned char *file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
-    if (get_file_content(fin, file_buf, bufsize) == -1) {
+    if (get_file_content(fin, file_buf, bufsize) < 0) {
         SST_print_error("Failed get_file_content()");
         free(file_buf);
         return -1;

@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
-        if (send_add_reader_req_via_TCP(ctx, addReader) == -1) {
+        if (send_add_reader_req_via_TCP(ctx, addReader) < 0) {
             SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
         }
     }
@@ -43,7 +43,7 @@ int main(int argc, char* argv[]) {
     hash_value_len =
         file_encrypt_upload(&s_key_list_0->s_key[0], ctx, my_file_path,
                             &hash_value[0], &estimate_time[0]);
-    if (hash_value_len == -1) {
+    if (hash_value_len < 0) {
         SST_print_error_exit("Failed file_encrypt_upload()");
     }
     char concat_buffer[MAX_PAYLOAD_LENGTH];

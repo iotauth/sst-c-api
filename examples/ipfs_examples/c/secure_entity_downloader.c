@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
         exit(1);
     } else {
         sleep(5);
-        if (file_decrypt_save(*session_key, &file_name[0]) == -1) {
+        if (file_decrypt_save(*session_key, &file_name[0]) < 0) {
             SST_print_error_exit("Failed file_decrypt_save()");
         }
     }
