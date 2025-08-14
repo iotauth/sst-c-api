@@ -24,6 +24,15 @@ set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/pico-sdk"
 
 # Import Pico SDK *only* for Pico builds (before project())
 if(BUILD_TARGET STREQUAL "pico")
+  ## ------ AVOID DEFAULT CONFIGURE MESSAGES ---------- ##
+  if(NOT CMAKE_CONFIGURATION_TYPES AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type")
+    set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release RelWithDebInfo MinSizeRel)
+  endif()
+  set(PICO_COMPILER pico_arm_cortex_m0plus_gcc CACHE STRING "Pico toolchain")
+  set(PICO_PLATFORM rp2040 CACHE STRING "Pico platform")
+  set(PICO_BOARD    pico   CACHE STRING "Pico board")
+  ## ------- END OF AVOID DEFAULT CONFIGURE ------ ##
   if(NOT EXISTS "${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
     message(FATAL_ERROR "pico-sdk submodule missing at ${PICO_SDK_PATH}. Run: git submodule update --init --recursive")
   endif()
