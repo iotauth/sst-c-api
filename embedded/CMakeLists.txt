@@ -67,7 +67,7 @@ set(MBEDTLS_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/mbedtls"
 if(NOT EXISTS "${MBEDTLS_DIR}/library/aes.c")
   message(FATAL_ERROR
     "mbedTLS submodule not found at:\n  ${MBEDTLS_DIR}\n"
-    "Run: git submodule update --init --recursive")
+    "\nRun: git submodule update --init --recursive")
 endif()
 message(STATUS "Using mbedTLS from: ${MBEDTLS_DIR}")
 

@@ -22,3 +22,60 @@ jobs=4; command -v nproc >/dev/null 2>&1 && jobs="$(nproc)"
 cmake --build "$build_dir" -j"$jobs"
 
 echo "✅ Build complete: $BUILD_TARGET (artifacts in build/${OUT_DIR:-$BUILD_TARGET})"
+# === Collect artifacts (history + 'latest' symlink + checksum + manifest) ===
+art_dir="$here/artifacts/$BUILD_TARGET"
+mkdir -p "$art_dir"
+
+ts="$(date +%Y%m%d-%H%M%S)"
+git_desc="$(git -C "$here/.." describe --always --dirty --tags 2>/dev/null || git -C "$here/.." rev-parse --short HEAD)"
+ver_tag="${git_desc:-unknown}"
+
+if [[ "$BUILD_TARGET" == "pico" ]]; then
+  uf2="$(find "$build_dir/sender" -maxdepth 1 -name '*.uf2' -print -quit)"
+  if [[ -n "$uf2" ]]; then
+    base="pico-${ver_tag}-${ts}.uf2"
+    cp -f "$uf2" "$art_dir/$base"
+
+    # checksum (store in sha256sum-compatible format: "<hash>  <filename>")
+    (cd "$art_dir" && sha256sum "$base" > "$base.sha256")
+
+    # manifest
+    manifest="pico-${ver_tag}-${ts}.json"
+    cat > "$art_dir/$manifest" <<EOF
+{ "target":"pico", "version":"$ver_tag", "timestamp":"$ts", "file":"$base" }
+EOF
+
+    # stable pointers
+    ln -sfn "$base"        "$art_dir/latest.uf2"
+    ln -sfn "$base.sha256" "$art_dir/latest.uf2.sha256"
+    ln -sfn "$manifest"    "$art_dir/latest.json"
+
+    echo "📦 UF2: $art_dir/$base"
+  fi
+else
+  exe="$(find "$build_dir/receiver" -maxdepth 1 -type f -executable -print -quit)"
+  if [[ -n "$exe" ]]; then
+    exename="$(basename "$exe")"
+    stamped="${exename}-${ver_tag}-${ts}"
+    cp -f "$exe" "$art_dir/$stamped"
+
+    (cd "$art_dir" && sha256sum "$stamped" > "$stamped.sha256")
+
+    manifest="${exename}-${ver_tag}-${ts}.json"
+    cat > "$art_dir/$manifest" <<EOF
+{ "target":"pi4", "version":"$ver_tag", "timestamp":"$ts", "file":"$stamped" }
+EOF
+
+    ln -sfn "$stamped"        "$art_dir/latest"
+    ln -sfn "$stamped.sha256" "$art_dir/latest.sha256"
+    ln -sfn "$manifest"       "$art_dir/latest.json"
+
+    echo "📦 EXE: $art_dir/$stamped"
+  fi
+fi
+
+# keep only last N artifacts for this target
+N=5
+ls -1t "$art_dir"/* 2>/dev/null | sed "1,${N}d" | xargs -r rm -f
+
+echo "🗂  Collected: $art_dir (latest → newest build)"
