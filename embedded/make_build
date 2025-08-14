@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+set -euo pipefail
+here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+if [[ ! -f "$here/.build_target" ]]; then
+  echo "No build target selected. Run: ./set_build pico   OR   ./set_build pi4"
+  exit 1
+fi
+
+# shellcheck disable=SC1090
+source "$here/.build_target"
+
+[[ -z "${BUILD_TARGET:-}" ]] && { echo "Malformed .build_target (missing BUILD_TARGET)."; exit 2; }
+
+build_dir="$here/build/${OUT_DIR:-$BUILD_TARGET}"
+
+echo "🏗️  Building: $BUILD_TARGET  →  build/${OUT_DIR:-$BUILD_TARGET}"
+
+mkdir -p "$build_dir"
+cmake -S "$here" -B "$build_dir"
+jobs=4; command -v nproc >/dev/null 2>&1 && jobs="$(nproc)"
+cmake --build "$build_dir" -j"$jobs"
+
+echo "✅ Build complete: $BUILD_TARGET (artifacts in build/${OUT_DIR:-$BUILD_TARGET})"

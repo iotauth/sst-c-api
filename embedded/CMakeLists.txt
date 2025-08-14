@@ -1,31 +1,73 @@
 cmake_minimum_required(VERSION 3.13)
 
-# === Pico SDK Setup ===
-if(DEFINED ENV{PICO_SDK_PATH})
-  set(PICO_SDK_PATH "$ENV{PICO_SDK_PATH}" CACHE PATH "Path to the Pico SDK")
+# --- Read .build_target (supports either BUILD_TARGET=... or TARGET=...) ---
+set(BUILD_TARGET "")
+set(_bt_file "${CMAKE_CURRENT_LIST_DIR}/.build_target")
+if(EXISTS "${_bt_file}")
+  file(STRINGS "${_bt_file}" _bt_lines)
+  foreach(line IN LISTS _bt_lines)
+    if(line MATCHES "^BUILD_TARGET=([^\r\n]*)")
+      set(BUILD_TARGET "${CMAKE_MATCH_1}")
+    elseif(line MATCHES "^TARGET=([^\r\n]*)")
+      set(BUILD_TARGET "${CMAKE_MATCH_1}")
+    endif()
+  endforeach()
+endif()
+
+if(BUILD_TARGET STREQUAL "")
+  message(FATAL_ERROR "No build target selected. Run: ./set_build pico | pi4")
+endif()
+
+# --- Lock Pico SDK to submodule ---
+set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/pico-sdk"
+    CACHE PATH "Path to the Pico SDK (fixed to submodule)" FORCE)
+
+# Import Pico SDK *only* for Pico builds (before project())
+if(BUILD_TARGET STREQUAL "pico")
+  if(NOT EXISTS "${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
+    message(FATAL_ERROR "pico-sdk submodule missing at ${PICO_SDK_PATH}. Run: git submodule update --init --recursive")
+  endif()
+  include("${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
+endif()
+
+project(sst_embedded LANGUAGES C CXX ASM)
+
+# Initialize SDK & sanity (Pico only)
+if(BUILD_TARGET STREQUAL "pico")
   set(PICO_SKIP_TOOLCHAIN_TEST 1)
-  # We provide our own mbedTLS build
   set(PICO_SDK_DISABLE_MBEDTLS 1)
-  include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
-  set(HAS_PICO_SDK TRUE)
-else()
-  set(HAS_PICO_SDK FALSE)
-endif()
-
-project(sst_embedded_project C CXX ASM)
-if(HAS_PICO_SDK)
   pico_sdk_init()
+
+  find_program(ARM_GCC arm-none-eabi-gcc)
+  if(NOT ARM_GCC)
+    message(FATAL_ERROR "ARM GCC not found. Install: sudo apt install gcc-arm-none-eabi libnewlib-arm-none-eabi")
+  endif()
 endif()
 
-# === Resolve mbedTLS location (vendored first, else Pico SDK copy) ===
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls/library/aes.c)
-  set(MBEDTLS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls)
-elseif(HAS_PICO_SDK AND EXISTS ${PICO_SDK_PATH}/lib/mbedtls/library/aes.c)
-  set(MBEDTLS_DIR ${PICO_SDK_PATH}/lib/mbedtls)
+message(STATUS "BUILD_TARGET=${BUILD_TARGET}")
+message(STATUS "PICO_SDK_PATH=${PICO_SDK_PATH}")
+
+
+# Choose a per-subproject binary dir under the target root
+if(BUILD_TARGET STREQUAL "pico")
+  set(_SUB_BIN "${CMAKE_BINARY_DIR}/sender")
+  add_subdirectory(sender "${_SUB_BIN}")
+elseif(BUILD_TARGET STREQUAL "pi4")
+  set(_SUB_BIN "${CMAKE_BINARY_DIR}/receiver")
+  add_subdirectory(receiver "${_SUB_BIN}")
 else()
-  message(FATAL_ERROR "mbedTLS not found. Expected either:
-   - ${CMAKE_CURRENT_SOURCE_DIR}/lib/mbedtls, or
-   - ${PICO_SDK_PATH}/lib/mbedtls")
+  message(FATAL_ERROR "Unknown BUILD_TARGET='${BUILD_TARGET}'")
+endif()
+
+
+# === mbedTLS (lock to submodule) ===
+set(MBEDTLS_DIR "${CMAKE_CURRENT_LIST_DIR}/lib/mbedtls"
+    CACHE PATH "Path to vendored mbedTLS" FORCE)
+
+if(NOT EXISTS "${MBEDTLS_DIR}/library/aes.c")
+  message(FATAL_ERROR
+    "mbedTLS submodule not found at:\n  ${MBEDTLS_DIR}\n"
+    "Run: git submodule update --init --recursive")
 endif()
 message(STATUS "Using mbedTLS from: ${MBEDTLS_DIR}")
 
@@ -66,7 +108,7 @@ target_compile_definitions(mbedcrypto
   PUBLIC MBEDTLS_CONFIG_FILE="config/mbedtls_config.h"
 )
 
-# Belt & suspenders: truly UNDEFINE unwanted SDK cipher modules for this lib
+# no Belt & suspenders lol: truly UNDEFINE unwanted SDK cipher modules for this lib
 target_compile_options(mbedcrypto PRIVATE
   -UMBEDTLS_ARIA_C
   -UMBEDTLS_CAMELLIA_C
@@ -79,13 +121,13 @@ target_compile_options(mbedcrypto PRIVATE
 )
 
 # Pico-only: provide ms-time hook and stdlib linkage
-if(HAS_PICO_SDK)
+if(BUILD_TARGET STREQUAL "pico")
   target_sources(mbedcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/mbedtls_time_alt.c)
   target_link_libraries(mbedcrypto PRIVATE pico_stdlib)
 endif()
 
 # === Platform-Specific RAM Handler ===
-if(HAS_PICO_SDK)
+if(BUILD_TARGET STREQUAL "pico")
   add_library(ram_handler src/pico_handler.c src/cmd_handler.c)
   target_include_directories(ram_handler PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/include
@@ -111,14 +153,7 @@ target_include_directories(sst_embedded PUBLIC
 )
 
 target_link_libraries(sst_embedded PUBLIC mbedcrypto)
-if(HAS_PICO_SDK)
+if(BUILD_TARGET STREQUAL "pico")
   target_link_libraries(sst_embedded PRIVATE pico_stdlib)
 endif()
 target_link_libraries(sst_embedded PRIVATE ram_handler)
-
-# === Add sender/receiver subprojects ===
-if(HAS_PICO_SDK)
-  add_subdirectory(sender)
-else()
-  add_subdirectory(receiver)
-endif()
