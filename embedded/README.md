@@ -45,7 +45,6 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
          <p><strong>⚡ 12V DC to Breadboard</strong><br>
          <em>Purpose:</em> Power LED driver circuit<br>
          <em>Notes:</em> Feeds TC4420 module</p>
-            <p><strong>12V ⚡ DC to Breadboard</strong><br>
         </div>
       </td>
     </tr>
