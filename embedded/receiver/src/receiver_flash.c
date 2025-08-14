@@ -6,6 +6,7 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "../../../c_api.h"
 #include "../../../include/protocol.h"  //global vars for speed, serial settings, etc
@@ -22,6 +23,23 @@ static inline int timespec_passed(const struct timespec* dl) {
     return (now.tv_sec > dl->tv_sec) ||
            (now.tv_sec == dl->tv_sec && now.tv_nsec >= dl->tv_nsec);
 }
+
+// write_exact: loop until all bytes are written (or error)
+static int write_all(int fd, const void *buf, size_t len) {
+    const uint8_t *p = (const uint8_t *)buf;
+    size_t sent = 0;
+    while (sent < len) {
+        ssize_t n = write(fd, p + sent, len - sent);
+        if (n < 0) {
+            if (errno == EINTR) continue; // interrupted -> retry
+            return -1;                    // real error
+        }
+        if (n == 0) break;                // shouldn't happen on tty, treat as error
+        sent += (size_t)n;
+    }
+    return (sent == len) ? 0 : -1;
+}
+
 
 int main(int argc, char* argv[]) {
     const char* config_path = NULL;
@@ -80,6 +98,17 @@ int main(int argc, char* argv[]) {
     clock_gettime(CLOCK_MONOTONIC, &next_send);  // send immediately
 
     const uint8_t preamble[2] = {PREAMBLE_BYTE_1, PREAMBLE_BYTE_2};
+    // Send preamble + session key (robust, handles partial writes)
+    if (write_all(fd, preamble, sizeof preamble) < 0) {
+        perror("write preamble");
+        // handle error (return -1; or set a flag)
+    }
+    if (write_all(fd, s_key.cipher_key, SESSION_KEY_SIZE) < 0) {
+        perror("write session key");
+        // handle error
+    }
+    tcdrain(fd);  // ensure bytes actually leave the UART
+    printf("Sent preamble + session key over UART.\n");
 
     // UART framing state
     uint8_t byte = 0;

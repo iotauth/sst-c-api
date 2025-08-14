@@ -7,6 +7,7 @@
 #include <string.h>
 #include <termios.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "../../../c_api.h"
 #include "../../include/sst_crypto_embedded.h"
@@ -19,6 +20,22 @@
 #define PREAMBLE_BYTE_1 0xAA
 #define PREAMBLE_BYTE_2 0x55
 #define MSG_TYPE_ENCRYPTED 0x02
+
+// write_exact: loop until all bytes are written (or error)
+static int write_all(int fd, const void *buf, size_t len) {
+    const uint8_t *p = (const uint8_t *)buf;
+    size_t sent = 0;
+    while (sent < len) {
+        ssize_t n = write(fd, p + sent, len - sent);
+        if (n < 0) {
+            if (errno == EINTR) continue; // interrupted -> retry
+            return -1;                    // real error
+        }
+        if (n == 0) break;                // shouldn't happen on tty, treat as error
+        sent += (size_t)n;
+    }
+    return (sent == len) ? 0 : -1;
+}
 
 void print_hex(const char* label, const uint8_t* data, size_t len) {
     printf("%s", label);
@@ -152,10 +169,16 @@ int main(int argc, char* argv[]) {
     if (fd < 0) return 1;
 
     // Step 1: Send preamble + key to Pico
-    uint8_t preamble[2] = {0xAB, 0xCD};
-    write(fd, preamble, 2);
-    write(fd, s_key.cipher_key, SESSION_KEY_SIZE);
-    usleep(5000);  // short delay to flush
+    static const uint8_t PREAMBLE[] = { 0xAB, 0xCD };
+    if (write_all(fd, PREAMBLE, sizeof PREAMBLE) < 0) {
+        perror("write preamble");
+        return -1;
+    }
+    if (write_all(fd, s_key.cipher_key, SESSION_KEY_SIZE) < 0) {
+        perror("write session key");
+        return -1;
+    }
+    tcdrain(fd); // ensure bytes actually left the UART
     printf("Sent preamble + session key over UART.\n");
 
     // Step 2: Listen for encrypted message
