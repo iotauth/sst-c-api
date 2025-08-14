@@ -20,8 +20,7 @@ if(USE_OPENSSL AND ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
   find_package(OpenSSL REQUIRED)
   find_package(Threads REQUIRED)
 endif()
-# and call with cmake -DUSE_OPENSSL=OFF .. -------------------------
-# ------------------------------------------------------------------
+
 
 add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/c_api.c
