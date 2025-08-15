@@ -204,9 +204,10 @@ git submodule update --init --recursive
 > We pin the Pico SDK, Mbed TLS, and picotool as submodules under `embedded/lib/`.
 
 ## 2) Pick a target (one-liner)
+> from inside sst-c-api/embedded/
 
 ```bash
-./set_build pico    # or: ./set_build pi4
+./set_build.sh pico    # or: ./set_build pi4
 ```
 
 This writes `.build_target` and tells the scripts which tree to build.
@@ -214,9 +215,9 @@ This writes `.build_target` and tells the scripts which tree to build.
 ## 3) Build
 
 ```bash
-./run_build pico    # builds to build/pico/, copies artifacts to artifacts/pico/
+./run_build.sh pico    # builds to build/pico/, copies artifacts to artifacts/pico/
 # or
-./run_build pi4     # builds to build/pi4/,   copies artifacts to artifacts/pi4/
+./run_build.sh pi4     # builds to build/pi4/,   copies artifacts to artifacts/pi4/
 ```
 
 * On the **first Pico build**, we will build and “install” a local **picotool** under `embedded/.tooling/picotool/` and wire CMake to use it automatically.
@@ -230,7 +231,7 @@ This writes `.build_target` and tells the scripts which tree to build.
 We also keep a short **history** of prior builds next to `latest*`, and prune to the last **3** build sets by default. Override per run:
 
 ```bash
-KEEP_BUILDS=5 ./run_build pi4
+KEEP_BUILDS=5 ./run_build.sh pi4
 ```
 
 ### Verify checksum (optional)
@@ -270,13 +271,13 @@ From `embedded/`:
 * **Build type:** default is `Release`. Override per run:
 
   ```bash
-  BUILD_TYPE=Debug ./run_build pico
+  BUILD_TYPE=Debug ./run_build.sh pico
   ```
 
 * **Verbose build (debug the script):**
 
   ```bash
-  RUN_VERBOSE=1 ./run_build pico
+  RUN_VERBOSE=1 ./run_build.sh pico
   ```
 
 ---
@@ -327,7 +328,7 @@ embedded/
 
 ### 4) Flash the Pico 
 
-After `./run_build pico`, your firmware is here: `artifacts/pico/latest.uf2`.
+After `./run_build.sh pico`, your firmware is here: `artifacts/pico/latest.uf2`.
 
 **Option A — Drag & drop (BOOTSEL mode)**
 
