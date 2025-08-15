@@ -110,7 +110,6 @@ sst-c-api/embedded
 ├── 📁 include/
 │   ├── cmd_handler.h           # Command processing interface
 │   ├── config_handler.h        # Configuration management interface
-│   ├── mbedtls_time_alt.h      # Custom time source for mbedTLS
 │   ├── pico_handler.h          # Pico-specific helper functions
 │   ├── ram_handler.h           # Session key / RAM management
 │   └── sst_crypto_embedded.h   # Embedded crypto API definitions
@@ -132,7 +131,6 @@ sst-c-api/embedded
 └── 📁 src/
     ├── cmd_handler.c           # Command processing implementation
     ├── config_handler.c        # Configuration management logic
-    ├── mbedtls_time_alt.c      # Custom mbedTLS time source
     ├── pico_handler.c          # Pico helper logic
     └── sst_crypto_embedded.c   # Embedded crypto API implementation
 ```

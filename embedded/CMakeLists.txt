@@ -133,7 +133,6 @@ target_compile_options(mbedcrypto PRIVATE
 
 # Pico-only: provide ms-time hook and stdlib linkage
 if(BUILD_TARGET STREQUAL "pico")
-  target_sources(mbedcrypto PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/mbedtls_time_alt.c)
   target_link_libraries(mbedcrypto PRIVATE pico_stdlib)
 endif()
 

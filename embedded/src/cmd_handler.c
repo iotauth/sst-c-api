@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "mbedtls_time_alt.h"
 #include "pico/time.h"
 #include "pico_handler.h"
 #include "ram_handler.h"
