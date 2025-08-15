@@ -73,15 +73,20 @@ int main() {
 
     uint8_t session_key[SST_KEY_SIZE] = {0};
 
+    // Try to load an existing valid session key from flash
     if (!load_session_key(session_key)) {
         printf("No valid session key found. Waiting for one...\n");
+
+        // Wait up to 20 seconds to receive a new session key over UART
         if (receive_new_key_with_timeout(
                 session_key, 20000)) {  // 20 seconds to set up session key
             print_hex("Received session key: ", session_key, SST_KEY_SIZE);
+            // Attempt to save the newly received key to flash
             if (store_session_key(session_key)) {
                 uint8_t tmp[SST_KEY_SIZE];
                 int written_slot = -1;
 
+                // Find which flash slot (A or B) the key was written to
                 for (int slot = 0; slot <= 1; slot++) {
                     if (pico_read_key_from_slot(slot, tmp) &&
                         memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
@@ -93,7 +98,10 @@ int main() {
 
                 if (written_slot >= 0) {
                     current_slot = written_slot;
+                    // Save the last used slot index in flash
                     store_last_used_slot((uint8_t)current_slot);
+
+                    // Reset the nonce tracking since the key has changed
                     pico_nonce_on_key_change();
                     printf("Key saved to flash slot %c.\n",
                            current_slot == 0 ? 'A' : 'B');
@@ -120,7 +128,7 @@ int main() {
         printf("Enter a message to send over LiFi:\n");
 
         size_t msg_len = 0;
-        int ch;
+        int ch;  // character
         uint8_t ciphertext[256] = {0};
         uint8_t tag[SST_TAG_SIZE] = {0};
 
@@ -132,26 +140,30 @@ int main() {
             }
 
             if (ch == '\r' || ch == '\n') {
+                // User pressed Enter: end of input
                 message_buffer[msg_len] = '\0';
                 putchar('\n');
                 break;
             }
             if ((ch == 127 || ch == 8) && msg_len > 0) {
+                // Handle backspace
                 msg_len--;
-                printf("\b \b");
+                printf("\b \b");  // visually erase the character in terminal
                 continue;
             }
             if (msg_len < sizeof(message_buffer) - 1 && ch >= 32 && ch < 127) {
+                // Accept only printable ASCII characters
                 message_buffer[msg_len++] = ch;
                 putchar(ch);
             }
         }
 
+        // Check if message exceeds the encryption buffer size
         if (msg_len > sizeof(ciphertext)) {
             printf("Message too long!\n");
             continue;
         }
-
+        // Ensure session key is valid before proceeding with encryption
         if (is_key_zeroed(session_key)) {
             printf("No valid key in the current slot. Cannot send message.\n");
             printf("Use 'CMD: new key' or switch to a valid slot.\n");
