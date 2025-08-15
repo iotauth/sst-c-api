@@ -66,6 +66,7 @@ int main() {
     gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
     gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 
+    // Flush UART input buffer to discard any leftover or garbage data.
     while (uart_is_readable(UART_ID)) {
         volatile uint8_t _ = uart_getc(UART_ID);
     }
@@ -81,12 +82,12 @@ int main() {
                 uint8_t tmp[SST_KEY_SIZE];
                 int written_slot = -1;
 
-                if (pico_read_key_from_slot(0, tmp) &&
-                    memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
-                    written_slot = 0;
-                } else if (pico_read_key_from_slot(1, tmp) &&
-                           memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
-                    written_slot = 1;
+                for (int slot = 0; slot <= 1; slot++) {
+                    if (pico_read_key_from_slot(slot, tmp) &&
+                        memcmp(tmp, session_key, SST_KEY_SIZE) == 0) {
+                        written_slot = slot;
+                        break;
+                    }
                 }
                 secure_zero(tmp, sizeof(tmp));
 
