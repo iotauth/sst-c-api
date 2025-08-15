@@ -117,14 +117,26 @@ void compute_key_hash(const uint8_t *data, size_t len, uint8_t *out_hash) {
     mbedtls_sha256(data, len, out_hash, 0);  // 0 = SHA-256, not SHA-224
 }
 
+// Validates a flash key block by checking its magic value and hash.
+// @param block Pointer to validate
+// @return true if the block is valid, false otherwise
+// TODO: Check if static.
 bool validate_flash_block(const key_flash_block_t *block) {
+    // Check if the block has the correct magic identifier.
     if (block->magic != FLASH_KEY_MAGIC) return false;
 
     uint8_t expected_hash[32];
     compute_key_hash(block->key, SST_KEY_SIZE, expected_hash);
+
+    // Compare the stored hash with the computed hash.
     return memcmp(block->hash, expected_hash, 32) == 0;
 }
 
+// Reads a key from the specified flash memory slot and validates it.
+// @param offset Offset from XIP_BASE where the key block is stored
+// @param out Output buffer to copy the valid key into (must be SST_KEY_SIZE bytes)
+// @return true if a valid key was found and copied, false otherwise
+// TODO: Check if static.
 bool read_key_from_slot(uint32_t offset, uint8_t *out) {
     const key_flash_block_t *slot =
         (const key_flash_block_t *)(XIP_BASE + offset);
