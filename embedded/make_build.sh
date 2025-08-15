@@ -90,7 +90,7 @@ if [[ "$BUILD_TARGET" == "pico" ]]; then
   if (( need_build )); then
     if ! pkg-config --exists libusb-1.0 2>/dev/null; then
       echo "❌ Missing deps: libusb-1.0-0-dev pkg-config (Ubuntu/WSL)"
-      echo "   sudo apt update && sudo apt install -y libusb-1.0-0-dev pkg-config"
+      echo "   sudo apt install -y libusb-1.0-0-dev pkg-config"
       exit 1
     fi
 
