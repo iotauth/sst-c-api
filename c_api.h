@@ -36,8 +36,8 @@ typedef enum {
 
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
-    unsigned char rel_validity[KEY_EXPIRATION_TIME_SIZE];
+    uint64_t abs_validity;
+    uint64_t rel_validity;
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
@@ -51,7 +51,7 @@ typedef struct {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
+    uint64_t abs_validity;
     AES_encryption_mode_t enc_mode;
 } distribution_key_t;
 
