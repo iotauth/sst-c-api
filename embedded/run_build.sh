@@ -10,7 +10,7 @@ fi
 target="$1"
 noclean="${2:-}"
 
-"$here/set_build" "$target" >/dev/null
+"$here/set_build.sh" "$target" >/dev/null
 # shellcheck disable=SC1090
 source "$here/.build_target"
 
@@ -21,4 +21,4 @@ if [[ "$noclean" != "--no-clean" ]] && [[ -d "$build_dir" ]]; then
   rm -rf "$build_dir"
 fi
 
-"$here/make_build"
+"$here/make_build.sh"
