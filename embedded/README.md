@@ -366,7 +366,7 @@ Here’s a friendlier, clearer “How to Run” you can drop in:
 
 ---
 
-## How to Run
+## How to Run (details will be changed) - FIX TOMORROW
 
 ### 1) First-time key provisioning (one-time)
 
@@ -378,11 +378,11 @@ What you’ll see and do the very first time you flash the Pico:
    * macOS: `/dev/tty.usbmodem*`
    * Windows: `COMx` (Putty/TeraTerm)
 
-2. On boot you should see:
+* Use `CMD: new key` (or `CMD: new key -f`) on the Pico **USB console** to *arm* provisioning.
+* * triggers key to be sent over uart
+* Within 3 seconds, receive **preamble (0xAB 0xCD) + 32 raw bytes** on the **Li-Fi UART** from the host.
+* On success you’ll see “Received new key … Saved to slot …”.
 
-   ```
-   No valid session key found. Waiting for one...
-   ```
 
 3. **Send a 32-byte session key** from the host connected to the Li-Fi UART.
 
