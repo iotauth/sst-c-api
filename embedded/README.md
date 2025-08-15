@@ -134,7 +134,6 @@ sst-c-api/embedded
     ├── config_handler.c        # Configuration management logic
     ├── mbedtls_time_alt.c      # Custom mbedTLS time source
     ├── pico_handler.c          # Pico helper logic
-    ├── pico_helper.c           # Additional Pico utility functions
     └── sst_crypto_embedded.c   # Embedded crypto API implementation
 ```
 
@@ -206,7 +205,7 @@ git submodule update --init --recursive
 ```
 
 > We pin the Pico SDK, Mbed TLS, and picotool as submodules under `embedded/lib/`.
-## set a /pico-sdk path (fix later)
+## set a /pico-sdk path (fix laterc)
 ```
 echo 'export PICO_SDK_PATH="$HOME/sst-c-api/embedded/lib/pico-sdk"' >> ~/.bashrc
 ```
