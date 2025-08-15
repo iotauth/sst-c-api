@@ -113,7 +113,8 @@ void pico_nonce_init(void);
 // @param out12 Output buffer (12 bytes)
 void pico_nonce_next(uint8_t out12[12]);
 
-// Call this when a new session key is installed to reset nonce tracking.
+// Resets the nonce state when a new session key is installed.
+// Must be called whenever the session key changes to ensure nonce uniqueness.
 void pico_nonce_on_key_change(void);
 
 #endif  // PICO_HANDLER_H
