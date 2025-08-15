@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>  // to use bool type check if key is valid
 #include <stdint.h>
 #include <stdio.h>
@@ -6,7 +7,6 @@
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
-#include <errno.h>
 
 #include "../../../c_api.h"
 #include "../../../include/protocol.h"  //global vars for speed, serial settings, etc
@@ -25,21 +25,20 @@ static inline int timespec_passed(const struct timespec* dl) {
 }
 
 // write_exact: loop until all bytes are written (or error)
-static int write_all(int fd, const void *buf, size_t len) {
-    const uint8_t *p = (const uint8_t *)buf;
+static int write_all(int fd, const void* buf, size_t len) {
+    const uint8_t* p = (const uint8_t*)buf;
     size_t sent = 0;
     while (sent < len) {
         ssize_t n = write(fd, p + sent, len - sent);
         if (n < 0) {
-            if (errno == EINTR) continue; // interrupted -> retry
-            return -1;                    // real error
+            if (errno == EINTR) continue;  // interrupted -> retry
+            return -1;                     // real error
         }
-        if (n == 0) break;                // shouldn't happen on tty, treat as error
+        if (n == 0) break;  // shouldn't happen on tty, treat as error
         sent += (size_t)n;
     }
     return (sent == len) ? 0 : -1;
 }
-
 
 int main(int argc, char* argv[]) {
     const char* config_path = NULL;
@@ -66,8 +65,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
 
-    session_key_list_t* key_list =
-        get_session_key(sst, init_empty_session_key_list());
+    session_key_list_t* key_list = get_session_key(sst, NULL);
     if (!key_list || key_list->num_key == 0) {
         fprintf(stderr, "No session key.\n");
         return 1;
