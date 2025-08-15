@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.13)
 
+set(PICO_SDK_DISABLE_MBEDTLS 1)   # stops the SDK from bringing its mbedTLS
+
 # --- Read .build_target (supports either BUILD_TARGET=... or TARGET=...) ---
 set(BUILD_TARGET "")
 set(_bt_file "${CMAKE_CURRENT_LIST_DIR}/.build_target")
