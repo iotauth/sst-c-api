@@ -188,6 +188,10 @@ sudo apt install -y build-essential cmake git pkg-config \
 # (pi4 builds will use your system gcc; if OpenSSL is missing:)
 sudo apt install -y libssl-dev
 ```
+### Also install for scripts:
+```
+sudo apt install -y libusb-1.0-0-dev pkg-config
+```
 
 **Optional speed-ups:**
 Install `ninja-build` to make builds faster on repeats
@@ -202,7 +206,14 @@ git submodule update --init --recursive
 ```
 
 > We pin the Pico SDK, Mbed TLS, and picotool as submodules under `embedded/lib/`.
+## set a /pico-sdk path (fix later)
+```
+echo 'export PICO_SDK_PATH="$HOME/sst-c-api/embedded/lib/pico-sdk"' >> ~/.bashrc
+```
+```
+source ~/.bashrc
 
+```
 ## 2) Pick a target (one-liner)
 > from inside sst-c-api/embedded/
 
