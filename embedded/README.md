@@ -54,7 +54,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 ## Key Features:
 
 - **Authenticated Encryption:**  
-&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-128-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
 
 - **Robust Key Persistence:**  
 &nbsp;&nbsp;&nbsp;&nbsp;Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
@@ -429,85 +429,80 @@ We vendor & auto-install picotool at `embedded/.tooling/picotool/bin/picotool`.
 This replaces the old `cp sender/lifi_flash.uf2 ...` line and always uses the canonical `artifacts/pico/latest.uf2`.
 
 
----
-
-
-Here’s a friendlier, clearer “How to Run” you can drop in:
 
 ---
 
-## How to Run
+## How to Run (functionality to be updgraded)
 
-This guide outlines the steps to provision the Pico with a session key from the host and establish secure communication.
+### 1) First-time key provisioning (one-time)
 
-### 1. Prerequisites
+What you’ll see and do the very first time you flash the Pico:
 
--   All hardware is connected, especially the **Pico ↔ Pi 4 UART** connection (see [wiring details](#-uart1-wiring-pico--pi-4)).
--   The firmware and executables have been built successfully using `./run_build.sh`.
--   The `sst.config` file is present in the `embedded/` directory and correctly configured for your SST service.
+1. **Flash fresh firmware** (see “Flash the Pico” above) and open a serial monitor to the Pico’s USB port
 
-### 2. Configure and Start the Receiver (Pi 4 / Host)
+   * Linux/WSL: `/dev/ttyACM0` (e.g., `screen /dev/ttyACM0 115200`)
+   * macOS: `/dev/tty.usbmodem*`
+   * Windows: `COMx` (Putty/TeraTerm)
 
-Before the receiver can fetch a session key, you must provide it with the necessary credentials to authenticate with the SST service.
+* Use `CMD: new key` (or `CMD: new key -f`) on the Pico **USB console** to *arm* provisioning.
+* * triggers key to be sent over uart
+* Within 3 seconds, receive **preamble (0xAB 0xCD) + 32 raw bytes** on the **Li-Fi UART** from the host.
+* On success you’ll see “Received new key … Saved to slot …”.
 
-1.  **Update Credentials**:  
-    Run the interactive script to configure the client certificate, private key, and CA certificate paths that the receiver will use.
 
-    ```bash
-    ./receiver/update-credentials.sh
-    ```
-    Follow the prompts to provide the paths to your PEM-encoded credential files. This will update the `sst.config` file.
+3. **Send a 32-byte session key** from the host connected to the Li-Fi UART.
 
-2.  **Start the Receiver**:  
-    With the credentials configured, run the receiver program. It will connect to the SST service to get a 16-byte session key and then send it to the Pico.
+   * Default framing expects a **2-byte preamble** `0xAB 0xCD` followed by the **32 raw key bytes**.
+   * After the key arrives you’ll see something like:
 
-    ```bash
-    ./artifacts/pi4/latest sst.config
-    ```
+     ```
+     Received session key: <hex>
+     Saved to slot 0
+     ```
+   * From now on, sender & receiver share this key for encrypted comms.
 
-3.  **Monitor Output**:  
-    The receiver will print "Retrieving session key from SST..." and, upon success, "Sent preamble + session key over UART." It is now actively listening for encrypted messages from the Pico.
+> Tip (Linux): if you have the 32-byte key in hex as `key.hex`, you can push it like this:
+>
+> ```bash
+> # prepend the 0xAB 0xCD preamble, then the 32-byte key
+> ( printf '\xAB\xCD'; xxd -r -p key.hex ) > /dev/ttyUSB0
+> ```
+>
+> Replace `/dev/ttyUSB0` with your Li-Fi UART device.
 
-### 3. Provision the Sender (Pico)
+---
 
-Next, power on the Pico. If it's the first time running or its key slots are empty, it will automatically enter provisioning mode.
+### 2) Secure communication
 
-1.  **Flash the firmware** (`artifacts/pico/latest.uf2`) to the Pico. If it's already flashed, simply reset it or unplug and plug it back in.
-2.  Connect to the Pico's **USB serial port** with a terminal emulator (e.g., `screen`, `minicom`, PuTTY) to monitor its status.
-3.  On boot, the Pico will fail to find a key and print:
-    ```
-    No valid session key found. Waiting for one...
-    ```
-4.  The **Receiver**, which was already waiting, will send the key. The Pico will receive it, save it to flash, and confirm with:
-    ```
-    Received session key: <hex>
-    Key saved to flash slot A.
-    ```
+1. **Reboot the Pico.** On boot it will load the saved key and print:
 
-The Pico is now provisioned and ready to communicate securely.
+   ```
+   Using session key: <hex>
+   ```
+2. Type a message in the serial monitor (e.g., `This is a secret message!`).
+   The Pico encrypts it and sends it over the Li-Fi LED.
+3. Your **receiver** (built as `artifacts/pi4/latest` on Linux) can decrypt/authenticate when configured with the same key.
 
-### 4. Send Encrypted Messages
+---
 
-Once provisioned, the system is ready for use.
+### 3) Live commands (remote management)
 
-1.  In the Pico's USB serial terminal, type any message (e.g., `hello world`) and press Enter.
-2.  The Pico will encrypt the message and send it over the Li-Fi UART.
-3.  The Receiver's terminal will display the decrypted message:
-    ```
-    Decrypted: hello world
-    ```
+Use the on-device command interface over the Pico’s USB serial:
 
-### 5. Key Rotation and Management
+* Check key status:
 
-You can manage the session key from the Pico's serial console.
+  ```
+  CMD: slot status
+  ```
+* (Other commands live here; see the “Command reference” section if you add more.)
 
--   **Request a New Key from SST**: To have the receiver fetch and send a new session key, simply type `new key` or `new key -f` (force) as a message in the Pico's terminal. The receiver will handle the request and provision the Pico with the new key.
+---
 
--   **Local Pico Commands**: For direct management of the Pico's flash storage and status, use commands prefixed with `CMD:`. These are handled locally on the Pico and are not sent to the receiver. For a full list, type `CMD: help`.
-    ```
-    # Example: Check the status of the key storage slots
-    CMD: slot status
-    ```
+### Troubleshooting quickies
+
+* **Nothing prints on USB:** Ensure your terminal is on the Pico’s USB CDC port and baud is 115200. Unplug/replug while holding **BOOTSEL** to reflash if needed.
+* **Key not accepted:** Make sure you sent exactly **2 bytes of preamble** (`AB CD`) + **32 bytes of key** (not ASCII text unless your firmware converts it).
+* **Receiver can’t decrypt:** Double-check both sides use the **same 32-byte key** and the receiver was restarted/reloaded after provisioning.
 
 ---
 
@@ -515,7 +510,7 @@ You can manage the session key from the Pico's serial console.
 
 Interact with the Pico over the USB serial connection. All commands are prefixed with `CMD:`.
 
-| Command                    | Description | 
+| Command                    | Description |
 | -------------------------- | -------------------------------------------------------------------- |
 | `help`                     | Displays a list of all available commands.                           |
 | `print key`                | Prints the currently active session key.                             |
