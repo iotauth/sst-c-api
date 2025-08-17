@@ -286,7 +286,12 @@ This writes `.build_target` and tells the scripts which tree to build.
 * Subsequent runs **reuse** it (no warning spam, no re-build).
 
 ### Where to find results
+#### Build Artifacts Layout
 
+
+<p align="center">
+  <img src="./img/build_artifacts_layout.PNG" alt="Build artifacts folder layout" width="600"/>
+</p>
 * **Pico:** `artifacts/pico/latest.uf2` (+ `latest.uf2.sha256`, `latest.json`)
 * **Pi4:**  `artifacts/pi4/latest` (executable) (+ `latest.sha256`, `latest.json`)
 
