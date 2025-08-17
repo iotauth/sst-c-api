@@ -54,7 +54,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 ## Key Features:
 
 - **Authenticated Encryption:**  
-&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-128-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
 
 - **Robust Key Persistence:**  
 &nbsp;&nbsp;&nbsp;&nbsp;Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
@@ -500,11 +500,26 @@ You can manage the session key from the Pico's serial console.
 
 -   **Request a New Key from SST**: To have the receiver fetch and send a new session key, simply type `new key` or `new key -f` (force) as a message in the Pico's terminal. The receiver will handle the request and provision the Pico with the new key.
 
--   **Local Pico Commands**: For direct management of the Pico's flash storage and status, use commands prefixed with `CMD:`. These are handled locally on the Pico and are not sent to the receiver. For a full list, type `CMD: help`.
-    ```
-    # Example: Check the status of the key storage slots
-    CMD: slot status
-    ```
+---
+
+### 3) Live commands (remote management)
+
+Use the on-device command interface over the Pico’s USB serial:
+
+* Check key status:
+
+  ```
+  CMD: slot status
+  ```
+* (Other commands live here; see the “Command reference” section if you add more.)
+
+---
+
+### Troubleshooting quickies
+
+* **Nothing prints on USB:** Ensure your terminal is on the Pico’s USB CDC port and baud is 115200. Unplug/replug while holding **BOOTSEL** to reflash if needed.
+* **Key not accepted:** Make sure you sent exactly **2 bytes of preamble** (`AB CD`) + **32 bytes of key** (not ASCII text unless your firmware converts it).
+* **Receiver can’t decrypt:** Double-check both sides use the **same 32-byte key** and the receiver was restarted/reloaded after provisioning.
 
 ---
 
@@ -512,7 +527,7 @@ You can manage the session key from the Pico's serial console.
 
 Interact with the Pico over the USB serial connection. All commands are prefixed with `CMD:`.
 
-| Command                    | Description | 
+| Command                    | Description |
 | -------------------------- | -------------------------------------------------------------------- |
 | `help`                     | Displays a list of all available commands.                           |
 | `print key`                | Prints the currently active session key.                             |
