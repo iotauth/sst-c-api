@@ -119,51 +119,64 @@ target_compile_definitions(mbedcrypto
   PUBLIC MBEDTLS_CONFIG_FILE="config/mbedtls_config.h"
 )
 
-# no Belt & suspenders lol: truly UNDEFINE unwanted SDK cipher modules for this lib
-target_compile_options(mbedcrypto PRIVATE
-  -UMBEDTLS_ARIA_C
-  -UMBEDTLS_CAMELLIA_C
-  -UMBEDTLS_DES_C
-  -UMBEDTLS_NIST_KW_C
-  -UMBEDTLS_CCM_C
-  -UMBEDTLS_CHACHA20_C
-  -UMBEDTLS_POLY1305_C
-  -UMBEDTLS_CHACHAPOLY_C
-)
-
 # Pico-only: provide ms-time hook and stdlib linkage
 if(BUILD_TARGET STREQUAL "pico")
   target_link_libraries(mbedcrypto PRIVATE pico_stdlib)
 endif()
 
-# === Platform-Specific RAM Handler ===
+# === Platform-Specific handler (Pico vs Pi4) ===
+# Build a normal STATIC lib on Pico; on Pi4 build either a real impl or a stub.
 if(BUILD_TARGET STREQUAL "pico")
-  add_library(ram_handler src/pico_handler.c src/cmd_handler.c)
-  target_include_directories(ram_handler PRIVATE
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${MBEDTLS_DIR}/include
+  add_library(ram_handler STATIC
+    src/pico_handler.c
+    src/cmd_handler.c
+    src/config_handler.c
   )
-  target_link_libraries(ram_handler PRIVATE pico_stdlib pico_rand pico_stdio_usb mbedcrypto hardware_adc)
-else()
-  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/pi_handler.c)
-    add_library(ram_handler src/pi_handler.c)
+  target_include_directories(ram_handler
+    PUBLIC
+      ${CMAKE_CURRENT_LIST_DIR}/include
+    PRIVATE
+      ${MBEDTLS_DIR}/include
+  )
+  target_link_libraries(ram_handler
+    PUBLIC
+      pico_stdlib
+      pico_rand
+      hardware_uart
+      hardware_flash
+      hardware_sync
+      hardware_watchdog
+      pico_stdio_usb
+      mbedcrypto
+  )
+else()  # pi4
+  if(EXISTS ${CMAKE_CURRENT_LIST_DIR}/src/pi_handler.c)
+    add_library(ram_handler STATIC src/pi_handler.c)
+    target_include_directories(ram_handler PUBLIC ${CMAKE_CURRENT_LIST_DIR}/include)
+    # link normal Linux libs here if needed (pthread, rt, etc.)
   else()
     add_library(ram_handler INTERFACE)
+    target_include_directories(ram_handler INTERFACE ${CMAKE_CURRENT_LIST_DIR}/include)
   endif()
 endif()
 
-# === Embedded SST Crypto Wrapper === use for both pico and pi 4 builds
+# === Embedded SST Crypto Wrapper (common) ===
 add_library(sst_embedded
   src/sst_crypto_embedded.c
 )
 
 target_include_directories(sst_embedded PUBLIC
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_CURRENT_LIST_DIR}/include
   ${MBEDTLS_DIR}/include
 )
 
-target_link_libraries(sst_embedded PUBLIC mbedcrypto)
+target_link_libraries(sst_embedded
+  PUBLIC
+    mbedcrypto
+  PRIVATE
+    ram_handler
+)
+
 if(BUILD_TARGET STREQUAL "pico")
   target_link_libraries(sst_embedded PRIVATE pico_stdlib)
 endif()
-target_link_libraries(sst_embedded PRIVATE ram_handler)

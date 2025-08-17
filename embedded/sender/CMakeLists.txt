@@ -24,7 +24,6 @@ target_link_libraries(lifi_flash PRIVATE
   pico_rand
   pico_platform
   sst_embedded
-  ram_handler
 )
 
 # stdio + binary artifacts

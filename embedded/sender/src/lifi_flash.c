@@ -170,22 +170,35 @@ int main() {
             continue;
         }
 
-        // handle command handling before sending over Lifi
+                // Check if the message is actually a command (starts with "CMD:")
         if (strncmp(message_buffer, "CMD:", 4) == 0) {
-            // ADD a bool to see if key changed and then
+            // Extract the command part (skip the "CMD:" prefix)
             const char *cmd = message_buffer + 4;
+
+            // Run the command handler and check if it modified the active session key
+            // (e.g., load new key, clear key, or switch slots).
             bool key_changed = handle_commands(cmd, session_key, &current_slot);
+
+            // If the key was changed, reset the nonce generator so future messages
+            // start fresh with a new salt+counter sequence tied to the new key.
             if (key_changed) {
-                pico_nonce_on_key_change();  // reset salt+counter for the new
-                                             // key space
+                pico_nonce_on_key_change();
             }
+
+            // Run the command handler again for side effects that don’t change the key
+            // (such as printing, status queries, or debug commands).
             handle_commands(cmd, session_key, &current_slot);
+
+            // Clear out the message buffer so stale command data isn’t reused.
             memset(message_buffer, 0, sizeof(message_buffer));
+
+            // Skip the normal "send over LiFi" logic since this was a command.
             continue;
         }
 
+
         uint8_t nonce[SST_NONCE_SIZE];
-        pico_nonce_next(
+        pico_nonce_generate(
             nonce);  // 96-bit nonce = boot_salt||counter (unique per message)
 
         int ret =

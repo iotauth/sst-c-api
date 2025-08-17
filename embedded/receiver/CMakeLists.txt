@@ -15,9 +15,8 @@ add_library(receiver_common
 
 target_include_directories(receiver_common
   PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../../include
+    ${CMAKE_CURRENT_LIST_DIR}/include       # embedded/receiver/include
+    ${CMAKE_CURRENT_LIST_DIR}/../include    # embedded/include (protocol.h, config_handler.h)
 )
 
 # ---- Executable ----
@@ -31,18 +30,21 @@ add_executable(receiver_flash
   ${CMAKE_CURRENT_SOURCE_DIR}/../../ipfs.c
 )
 
-target_include_directories(receiver_flash PRIVATE
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../include
-  ${CMAKE_CURRENT_SOURCE_DIR}/../../
-  ${OPENSSL_INCLUDE_DIR}
+target_include_directories(receiver_flash
+  PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/include       # receiver/include
+    ${CMAKE_CURRENT_LIST_DIR}/../include    # embedded/include
+    ${CMAKE_CURRENT_LIST_DIR}/../../        # repo root for c_api.h, etc.
+    ${OPENSSL_INCLUDE_DIR}
 )
 
 target_link_libraries(receiver_flash
   PRIVATE
     receiver_common
-    sst_embedded
+    sst_embedded          
     OpenSSL::Crypto
 )
+
 
 # Nice-to-haves
 set_property(TARGET receiver_common receiver_flash PROPERTY C_STANDARD 11)

@@ -111,7 +111,6 @@ sst-c-api/embedded
 │   ├── cmd_handler.h           # Command processing interface
 │   ├── config_handler.h        # Configuration management interface
 │   ├── pico_handler.h          # Pico-specific helper functions
-│   ├── ram_handler.h           # Session key / RAM management
 │   └── sst_crypto_embedded.h   # Embedded crypto API definitions
 │
 ├── 📁 lib/
@@ -146,9 +145,64 @@ sst-c-api/embedded
 - [Raspberry Pi 4 Model B (4 GB)](https://www.sparkfun.com/raspberry-pi-4-model-b-4-gb.html?src=raspberrypi)
 - Li-Fi receiver module
 
-### **Connection (UART1)**
-- **Pico TX (GPIO 4)** → **Pi 4 RX (GPIO14, Pin 8)**
-- **Pico RX (GPIO 5)** ← **Pi 4 TX (GPIO15, Pin 10)**
+---
+
+## 📖 Pinout References
+
+For full details on the board headers:
+
+* **Raspberry Pi Pico (RP2040)** → [Pico Pinout (official PDF)](https://datasheets.raspberrypi.com/pico/Pico-R3-A4-Pinout.pdf)
+* **Raspberry Pi 4 (40-pin header)** → [Pi 4 GPIO Pinout (pinout.xyz)](https://pinout.xyz/pinout/pin8_gpio14#)
+
+---
+
+## 🔌 UART1 Wiring (Pico ↔ Pi 4)
+
+| Function     | Pico Pin (RP2040) | Pi 4 Header Pin | Pi 4 GPIO | Notes                      |
+| ------------ | ----------------- | --------------- | --------- | -------------------------- |
+| **UART1 TX** | GPIO4 (Pin 6)     | Pin 10          | GPIO15 RX | Pico sends → Pi 4 receives |
+| **UART1 RX** | GPIO5 (Pin 7)     | Pin 8           | GPIO14 TX | Pico receives ← Pi 4 sends |
+| **Ground**   | GND (Pin 38)      | Pin 6           | GND       | Common ground required     |
+
+> ⚠️ TX ↔ RX must cross: Pico TX → Pi RX, Pico RX ← Pi TX.
+
+---
+
+## ⚙️ Pico Firmware Setup
+
+```c
+#define UART_ID uart1
+#define UART_TX_PIN 4
+#define UART_RX_PIN 5
+#define BAUD_RATE 1000000
+
+uart_init(UART_ID, BAUD_RATE);
+gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
+gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+```
+
+---
+
+## ⚙️ Raspberry Pi 4 Setup
+
+1. Enable UART in `/boot/config.txt`:
+
+   ```ini
+   enable_uart=1
+   ```
+2. Reboot, then check:
+
+   ```bash
+   ls -l /dev/serial0
+   ```
+
+   It should link to `/dev/ttyAMA0` or `/dev/ttyS0`.
+3. Open the port at 1 Mbps:
+
+   ```bash
+   stty -F /dev/serial0 1000000
+   screen /dev/serial0 1000000
+   ```
 
 ---
 

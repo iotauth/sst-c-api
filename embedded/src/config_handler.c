@@ -1,10 +1,15 @@
 #include <fcntl.h>
 #include <libgen.h>
-#include <linux/limits.h>
+#include <limits.h>   // portable first choice
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#ifndef PATH_MAX
+  // Bare-metal Pico doesn't define PATH_MAX; pick a sane bound for use.
+  #define PATH_MAX 256
+#endif
 
 void change_directory_to_config_path(const char* config_path) {
     char original_dir[PATH_MAX];

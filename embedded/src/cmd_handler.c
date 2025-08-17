@@ -4,7 +4,6 @@
 
 #include "pico/time.h"
 #include "pico_handler.h"
-#include "ram_handler.h"
 #include "sst_crypto_embedded.h"  // print_hex, secure_zero, etc.
 
 // Return true iff the effective session key changed (loaded, replaced, or
@@ -13,9 +12,6 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
     if (strcmp(cmd, " print key") == 0 ||
         strcmp(cmd, " print key sender") == 0) {
         print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
-        return false;
-    } else if (strcmp(cmd, " print key receiver") == 0) {
-        printf("Check receiver printed key.\n");
         return false;
     } else if (strcmp(cmd, " print key *") == 0) {
         print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
@@ -184,7 +180,6 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         printf("Available Commands:\n");
         printf("  CMD: print key\n");
         printf("  CMD: print key sender\n");
-        printf("  CMD: print key receiver\n");
         printf("  CMD: print key *\n");
         printf("  CMD: print slot keys *\n");
         printf("  CMD: clear slot A\n");

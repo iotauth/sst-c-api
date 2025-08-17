@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+
 // Initializes the mbedTLS-based PRNG. Must be called once during startup.
 void pico_prng_init(void);
 
@@ -109,12 +110,32 @@ void keyram_clear(void);
 // Resets the 32-bit message counter to 0.
 void pico_nonce_init(void);
 
-// Generates a unique 12-byte nonce for a message.
-// @param out12 Output buffer (12 bytes)
-void pico_nonce_next(uint8_t out12[12]);
+// Generate the next unique 12-byte GCM nonce (IV).
+// Nonce layout: [0..7] = random salt, [8..11] = big-endian message counter.
+// Safe to call once per encryption. Guaranteed unique until counter wrap.
+// Call pico_nonce_on_key_change() or pico_nonce_init() when the session key changes.
+//
+// @param out12 Caller-allocated output buffer (must be 12 bytes).
+void pico_nonce_generate(uint8_t out12[12]);
 
 // Resets the nonce state when a new session key is installed.
 // Must be called whenever the session key changes to ensure nonce uniqueness.
 void pico_nonce_on_key_change(void);
+// Store a 32-bit integer into a 4-byte buffer in **big-endian** order.
+// Big-endian = most significant byte first (network byte order).
+//
+// @param out  Caller-provided 4-byte buffer (e.g., part of a nonce/IV).
+// @param v    32-bit integer value to store.
+static inline void store_be32(uint8_t *out, uint32_t v) {
+    // Extract the highest 8 bits (bits 31–24) and put it in out[0].
+    out[0] = (uint8_t)(v >> 24);
+    // Next 8 bits (bits 23–16) go in out[1].
+    out[1] = (uint8_t)(v >> 16);
+    // Next 8 bits (bits 15–8) go in out[2].
+    out[2] = (uint8_t)(v >> 8);
+    // Lowest 8 bits (bits 7–0) go in out[3].
+    out[3] = (uint8_t)(v);
+}
+
 
 #endif  // PICO_HANDLER_H

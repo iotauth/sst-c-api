@@ -8,38 +8,35 @@
 #define PREAMBLE_BYTE_2 0xCD
 #define MSG_TYPE_ENCRYPTED 0x02
 
-// timing cooldown
+/* Cooldown to avoid thrashing key updates */
 #define KEY_UPDATE_COOLDOWN_S 15
 
 /* -------- Sizes -------- */
-#define SESSION_KEY_SIZE 16
-#define NONCE_SIZE 12
-#define TAG_SIZE 16
+#define SESSION_KEY_SIZE 32      // AES-256-GCM (keep in sync with Pico)
+#define NONCE_SIZE       12      // 96-bit GCM IV
+#define TAG_SIZE         16
 #define NONCE_HISTORY_SIZE 64
-#define MAX_MSG_LEN 1024
+#define MAX_MSG_LEN      1024
 
-/* -------- Tokens (shared strings) -------- */
+/* -------- Shared tokens -------- */
 #define KE_TOKEN_ACK_1 "ACK"
 #define KE_TOKEN_ACK_2 "KEY_OK"
 #define KE_TOKEN_ACK_3 "I have the key"
-#define KE_TOKEN_YES "yes"
+#define KE_TOKEN_YES   "yes"
 
-/* -------- Serial settings -------- */
-#define UART_DEVICE "/dev/serial0"
-
-#ifdef PICO_ON_DEVICE
-/* Pico SDK wants a numeric baud for uart_init() */
-#define UART_BAUDRATE_NUM 1000000
-#else
-/* Host/Linux uses termios constants */
-#include <termios.h>
-#define UART_BAUDRATE_TERMIOS B1000000
+/* -------- Serial settings (Linux host only) -------- */
+#ifdef __linux__
+  #define UART_DEVICE "/dev/serial0"
+  #include <termios.h>
+  #ifndef UART_BAUDRATE_TERMIOS
+    #define UART_BAUDRATE_TERMIOS B1000000
+  #endif
 #endif
 
 /* -------- Sanity checks -------- */
-#if SESSION_KEY_SIZE != 16
-#error "This project assumes a 16-byte session key."
+#if SESSION_KEY_SIZE != 32
+  #error "This project assumes a 32-byte session key for AES-256-GCM."
 #endif
 #if NONCE_SIZE != 12
-#error "This project assumes a 12-byte GCM nonce."
+  #error "This project assumes a 12-byte GCM nonce."
 #endif

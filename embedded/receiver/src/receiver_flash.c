@@ -1,21 +1,23 @@
 #include <errno.h>
-#include <stdbool.h>  // to use bool type check if key is valid
+#include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h>
+#include <termios.h>   // Linux serial
 #include <time.h>
 #include <unistd.h>
 
-#include "../../../c_api.h"
-#include "../../../include/protocol.h"  //global vars for speed, serial settings, etc
-#include "../../include/config_handler.h"  // For change_directory_to_config_path and get_config_path
-#include "../../include/sst_crypto_embedded.h"
+// Project headers (use -I include dirs instead of ../../../)
+#include "c_api.h"
+#include "protocol.h"            // protocol constants & sizes
+#include "config_handler.h"      // change_directory_to_config_path, get_config_path
 #include "key_exchange.h"
 #include "replay_window.h"
 #include "serial_linux.h"
 #include "utils.h"
+#include "sst_crypto_embedded.h"   // brings in sst_decrypt_gcm prototype and sizes
+
 
 static inline int timespec_passed(const struct timespec* dl) {
     struct timespec now;

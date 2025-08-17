@@ -17,7 +17,6 @@
 #include "pico/stdio_usb.h"
 #include "pico/stdlib.h"
 #include "pico/time.h"
-#include "ram_handler.h"
 #include "sst_crypto_embedded.h"
 
 #define UART_ID_DEBUG uart0
@@ -28,14 +27,18 @@
 #define UART_RX_PIN 5
 #define UART_TX_PIN 4
 
-#define BAUD_RATE 1000000
 #define PREAMBLE_BYTE_1 0xAB
 #define PREAMBLE_BYTE_2 0xCD
 
-// --- Key/Index layout (from end of flash upward) ---
-// [-12 KB] Slot A sector
-// [- 8 KB] Slot B sector
-// [- 4 KB] Index/metadata sector
+// --- Nonce parameters (12-byte GCM IV) ---
+#define GCM_IV_LEN         12
+#define NONCE_SALT_LEN      8
+#define NONCE_COUNTER_LEN   4
+_Static_assert(GCM_IV_LEN == NONCE_SALT_LEN + NONCE_COUNTER_LEN, "IV layout");
+
+// Nonce state
+static uint8_t  g_boot_salt[NONCE_SALT_LEN];
+static uint32_t g_msg_counter = 0;
 
 #define FLASH_SLOT_SIZE 256
 #define FLASH_KEY_MAGIC 0x53455353  // 'SESS'
@@ -66,10 +69,6 @@ static mbedtls_ctr_drbg_context ctr_drbg;
 static mbedtls_entropy_context entropy;
 static bool prng_initialized = false;
 
-// ---- Nonce state (salt + counter) for 96-bit GCM IVs ----
-static uint64_t g_boot_salt = 0;
-static uint32_t g_msg_counter = 0;
-
 void pico_nonce_init(void) {  // call once after pico_prng_init()
     // Must be called after pico_prng_init() so DRBG is ready
     get_random_bytes(
@@ -79,11 +78,23 @@ void pico_nonce_init(void) {  // call once after pico_prng_init()
     g_msg_counter = 0;
 }
 
-void pico_nonce_next(uint8_t out12[12]) {  // call once per encryption
-    // Layout: [0..7]=salt, [8..11]=counter (opaque bytes on the wire)
-    memcpy(out12 + 0, &g_boot_salt, 8);
+void pico_nonce_generate(uint8_t out12[GCM_IV_LEN]) {
+    // Critical section: ensure counter increment is atomic
+    uint32_t ints = save_and_disable_interrupts();
     uint32_t ctr = g_msg_counter++;
-    memcpy(out12 + 8, &ctr, 4);
+    bool wrapped = (g_msg_counter == 0);  // detect 32-bit wrap
+    restore_interrupts(ints);
+
+    // Nonce reuse under the same key is catastrophic for GCM.
+    // On wrap, force a reboot (caller must rotate key/salt on restart).
+    if (wrapped) {
+        printf("ERROR: nonce counter exhausted; rotate key/salt.\n");
+        pico_reboot();
+    }
+
+    // Construct the 96-bit IV: salt + counter
+    memcpy(out12, g_boot_salt, NONCE_SALT_LEN);
+    store_be32(out12 + NONCE_SALT_LEN, ctr);
 }
 
 void pico_nonce_on_key_change(void) {  // call whenever session key changes

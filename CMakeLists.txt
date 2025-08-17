@@ -12,17 +12,6 @@ endif()
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
-# if I do need above use this:  -----------------------
-option(USE_OPENSSL "Enable OpenSSL support" ON)
-
-if(USE_OPENSSL AND ${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-  set(OPENSSL_ROOT_DIR "/usr/local/lib64")
-  find_package(OpenSSL REQUIRED)
-  find_package(Threads REQUIRED)
-endif()
-# and call with cmake -DUSE_OPENSSL=OFF .. -------------------------
-# ------------------------------------------------------------------
-
 add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/c_api.c
   ${CMAKE_CURRENT_LIST_DIR}/c_common.c
