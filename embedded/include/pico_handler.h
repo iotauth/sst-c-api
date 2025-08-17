@@ -5,7 +5,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-
 // Initializes the mbedTLS-based PRNG. Must be called once during startup.
 void pico_prng_init(void);
 
@@ -113,7 +112,8 @@ void pico_nonce_init(void);
 // Generate the next unique 12-byte GCM nonce (IV).
 // Nonce layout: [0..7] = random salt, [8..11] = big-endian message counter.
 // Safe to call once per encryption. Guaranteed unique until counter wrap.
-// Call pico_nonce_on_key_change() or pico_nonce_init() when the session key changes.
+// Call pico_nonce_on_key_change() or pico_nonce_init() when the session key
+// changes.
 //
 // @param out12 Caller-allocated output buffer (must be 12 bytes).
 void pico_nonce_generate(uint8_t out12[12]);
@@ -136,6 +136,5 @@ static inline void store_be32(uint8_t *out, uint32_t v) {
     // Lowest 8 bits (bits 7–0) go in out[3].
     out[3] = (uint8_t)(v);
 }
-
 
 #endif  // PICO_HANDLER_H

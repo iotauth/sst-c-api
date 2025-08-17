@@ -4,20 +4,19 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <termios.h>   // Linux serial
+#include <termios.h>  // Linux serial
 #include <time.h>
 #include <unistd.h>
 
 // Project headers (use -I include dirs instead of ../../../)
 #include "c_api.h"
-#include "protocol.h"            // protocol constants & sizes
-#include "config_handler.h"      // change_directory_to_config_path, get_config_path
+#include "config_handler.h"  // change_directory_to_config_path, get_config_path
 #include "key_exchange.h"
+#include "protocol.h"  // protocol constants & sizes
 #include "replay_window.h"
 #include "serial_linux.h"
+#include "sst_crypto_embedded.h"  // brings in sst_decrypt_gcm prototype and sizes
 #include "utils.h"
-#include "sst_crypto_embedded.h"   // brings in sst_decrypt_gcm prototype and sizes
-
 
 static inline int timespec_passed(const struct timespec* dl) {
     struct timespec now;

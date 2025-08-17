@@ -1,10 +1,10 @@
 #ifndef CMD_HANDLER_H
 #define CMD_HANDLER_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot);
 
 #endif  // CMD_HANDLER_H
-// \n at bottom
+        // \n at bottom

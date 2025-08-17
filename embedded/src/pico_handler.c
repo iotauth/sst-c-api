@@ -31,13 +31,13 @@
 #define PREAMBLE_BYTE_2 0xCD
 
 // --- Nonce parameters (12-byte GCM IV) ---
-#define GCM_IV_LEN         12
-#define NONCE_SALT_LEN      8
-#define NONCE_COUNTER_LEN   4
+#define GCM_IV_LEN 12
+#define NONCE_SALT_LEN 8
+#define NONCE_COUNTER_LEN 4
 _Static_assert(GCM_IV_LEN == NONCE_SALT_LEN + NONCE_COUNTER_LEN, "IV layout");
 
 // Nonce state
-static uint8_t  g_boot_salt[NONCE_SALT_LEN];
+static uint8_t g_boot_salt[NONCE_SALT_LEN];
 static uint32_t g_msg_counter = 0;
 
 #define FLASH_SLOT_SIZE 256
@@ -145,7 +145,8 @@ bool validate_flash_block(const key_flash_block_t *block) {
 
 // Reads a key from the specified flash memory slot and validates it.
 // @param offset Offset from XIP_BASE where the key block is stored
-// @param out Output buffer to copy the valid key into (must be SST_KEY_SIZE bytes)
+// @param out Output buffer to copy the valid key into (must be SST_KEY_SIZE
+// bytes)
 // @return true if a valid key was found and copied, false otherwise
 // TODO: Check if static.
 bool read_key_from_slot(uint32_t offset, uint8_t *out) {
