@@ -280,18 +280,13 @@ This writes `.build_target` and tells the scripts which tree to build.
 ./run_build.sh pico    # builds to build/pico/, copies artifacts to artifacts/pico/
 # or
 ./run_build.sh pi4     # builds to build/pi4/,   copies artifacts to artifacts/pi4/
-```
+````
 
 * On the **first Pico build**, we will build and “install” a local **picotool** under `embedded/.tooling/picotool/` and wire CMake to use it automatically.
 * Subsequent runs **reuse** it (no warning spam, no re-build).
 
 ### Where to find results
-#### Build Artifacts Layout
 
-
-<p align="center">
-  <img src="./img/build_artifacts_layout.PNG" alt="Build artifacts folder layout" width="600"/>
-</p>
 * **Pico:** `artifacts/pico/latest.uf2` (+ `latest.uf2.sha256`, `latest.json`)
 * **Pi4:**  `artifacts/pi4/latest` (executable) (+ `latest.sha256`, `latest.json`)
 
@@ -299,6 +294,13 @@ We also keep a short **history** of prior builds next to `latest*`, and prune to
 
 ```bash
 KEEP_BUILDS=5 ./run_build.sh pi4
+```
+
+#### Build Artifacts Layout
+
+<p align="center">
+  <img src="./img/build_artifacts_layout.PNG" alt="Build artifacts folder layout" width="1400"/>
+</p>
 ```
 
 ### Verify checksum (optional)
