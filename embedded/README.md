@@ -432,9 +432,6 @@ This replaces the old `cp sender/lifi_flash.uf2 ...` line and always uses the ca
 ---
 
 
-Here’s a friendlier, clearer “How to Run” you can drop in:
-
----
 
 ## How to Run
 
