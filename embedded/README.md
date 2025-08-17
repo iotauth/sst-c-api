@@ -301,7 +301,6 @@ KEEP_BUILDS=5 ./run_build.sh pi4
 <p align="center">
   <img src="./img/build_artifacts_layout.PNG" alt="Build artifacts folder layout" width="1400"/>
 </p>
-```
 
 ### Verify checksum (optional)
 
