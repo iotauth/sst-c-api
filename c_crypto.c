@@ -2,6 +2,8 @@
 
 #include "c_common.h"
 
+// Print OpenSSL crypto error message to stderr with message.
+// @param msg Message to print with.
 static void print_crypto_error(const char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 
@@ -10,6 +12,8 @@ static void print_crypto_error(const char *msg) {
     printf("%s ERROR: %s\n", msg, err);
 }
 
+// Print OpenSSL crypto error message, and return NULL.
+// @param msg Message to print with.
 static void *print_crypto_error_return_NULL(const char *msg) {
     print_crypto_error(msg);
     return NULL;
@@ -211,7 +215,10 @@ int digest_message_SHA_256(const unsigned char *data, size_t data_len,
     return 0;
 }
 
-const EVP_CIPHER *get_EVP_CIPHER(AES_encryption_mode_t enc_mode) {
+// Get OpenSSL EVP_CIPHER structure corresponding to the given encryption mode.
+// @param enc_mode AES encryption mode enum (e.g., AES_128_CBC)
+// @return OpenSSL EVP_CIPHER*, or NULL if unsupported
+static const EVP_CIPHER *get_EVP_CIPHER(AES_encryption_mode_t enc_mode) {
     if (enc_mode == AES_128_CBC) {
         return EVP_aes_128_cbc();
     } else if (enc_mode == AES_128_CTR) {
