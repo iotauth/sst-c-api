@@ -69,13 +69,6 @@ typedef struct {
 #define SST_DEBUG_ENABLED 0
 #endif
 
-// Print out error message and return NULL.
-// Uses printf-style formatting.
-// @return Return NULL.
-// @param fmt Format string for the error message.
-// @param ... Additional arguments for formatting.
-void *SST_print_error_return_null(const char *fmt, ...);
-
 // Utility function for printing unsigned char buffer in hex string.
 // Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // @param buf given buffer of unsigned chars.

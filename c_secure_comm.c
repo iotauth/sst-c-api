@@ -575,7 +575,8 @@ session_key_list_t *send_session_key_request_check_protocol(
         // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         // return s_key_list;
     }
-    return SST_print_error_return_null("Invalid network protocol name.");
+    SST_print_error("Invalid network protocol name.");
+    return NULL;
 }
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
@@ -643,7 +644,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             print_buf_debug(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {
-                return SST_print_error_return_null("Auth nonce NOT verified.");
+                SST_print_error("Auth nonce NOT verified.");
+                return NULL;
             } else {
                 SST_print_debug("Auth nonce verified!");
             }
@@ -696,8 +698,9 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             print_buf_debug(reply_nonce, NONCE_SIZE);
             if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                                             // & received entity's nonce.
-                return SST_print_error_return_null("Auth nonce NOT verified.");
+                // & received entity's nonce.
+                SST_print_error("Auth nonce NOT verified.");
+                return NULL;
             } else {
                 SST_print_debug("Auth nonce verified!");
             }

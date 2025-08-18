@@ -349,8 +349,8 @@ SST_session_ctx_t *server_secure_comm_setup(
             return session_ctx;
         }
     }
-    return SST_print_error_return_null(
-        "Unrecognized or invalid state for server.");
+    SST_print_error("Unrecognized or invalid state for server.");
+    return NULL;
 }
 
 void *receive_thread_read_one_each(void *SST_session_ctx) {

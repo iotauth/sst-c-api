@@ -62,14 +62,6 @@ void SST_print_error_exit(const char *fmt, ...) {
     exit(1);
 }
 
-void *SST_print_error_return_null(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    SST_print_error(fmt, args);
-    va_end(args);
-    return NULL;
-}
-
 void print_buf_debug(const unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
