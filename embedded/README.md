@@ -8,7 +8,7 @@ This project implements a secure, real-time Li-Fi communication channel between 
 
 This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a complete secure communication workflow, from initial key provisioning to real-time encrypted messaging.
 
--   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using AES-GCM and a persistent session key. It operates autonomously and can be managed remotely via a command interface.
+-   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using a persistent session key with AES-GCM mode. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
 
 <div style="text-align:center;">
@@ -63,7 +63,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 &nbsp;&nbsp;&nbsp;&nbsp;On first boot/empty slot, listens on **UART1** with preamble 0xAB 0xCD to receive the session key (e.g., from the Pi 4/auth client). Supports `new key` and `new key -f` for controlled overwrite.
 
 - **Watchdog Timer:**  
-&nbsp;&nbsp;&nbsp;&nbsp;The system is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
+&nbsp;&nbsp;&nbsp;&nbsp;The Pico (sender) is monitored by a hardware watchdog that automatically reboots the device if it becomes unresponsive, ensuring high availability.
 
 - **Secure Memory Handling:**  
 &nbsp;&nbsp;&nbsp;&nbsp;Sensitive data like keys, nonces, and ciphertext are securely zeroed from memory after use with `secure_zero()` to limit in-RAM exposure.
@@ -85,10 +85,10 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 The code is organized into a modular structure:
 
 -   `src/`: Core logic, including the command handler (`cmd_handler.c`) and Pico-specific/Pi-4 specific functions (`pico_handler.c`)/(`pi_handler.c`).
-- - `note`: pi_handler.c is under construction
+- - `note`: `pi_handler.c` is under construction
 -   `include/`: Header files defining the public interface for each module.
 -   `sender/src/`: The main application firmware (`lifi_flash.c`) for the Pico transmitter.
--   `lib/`: External libraries, such as `mbedtls`.
+-   `lib/`: External libraries, including `mbedtls`, `pico-sdk`, and `picotool`.
 -   `CMakeLists.txt`: The main build file that orchestrates the compilation of all modules and targets.
 
 ---
@@ -115,6 +115,8 @@ sst-c-api/embedded
 │
 ├── 📁 lib/
 │   └── mbedtls/                # mbedTLS cryptographic library source
+│   ├── 📁 pico-sdk/            # Raspberry Pi Pico C/C++ SDK
+│   └── 📁 picotool/            # CLI utility for Pico boards
 │
 ├── 📁 receiver/
 │   ├── CMakeLists.txt          # Receiver build configuration
@@ -441,11 +443,11 @@ This guide outlines the steps to provision the Pico with a session key from the 
 
 -   All hardware is connected, especially the **Pico ↔ Pi 4 UART** connection (see [wiring details](#-uart1-wiring-pico--pi-4)).
 -   The firmware and executables have been built successfully using `./run_build.sh`.
--   The `sst.config` file is present in the `embedded/` directory and correctly configured for your SST service.
+-   The `sst.config` file is present in the `embedded/` directory and all paths are correct.
 
 ### 2. Configure and Start the Receiver (Pi 4 / Host)
 
-Before the receiver can fetch a session key, you must provide it with the necessary credentials to authenticate with the SST service.
+Before the receiver can fetch a session key, you must provide it with the necessary credentials to authenticate with the SST Auth.
 
 1.  **Update Credentials**:  
     Run the interactive script to configure the client certificate, private key, and CA certificate paths that the receiver will use.
@@ -456,7 +458,7 @@ Before the receiver can fetch a session key, you must provide it with the necess
     Follow the prompts to provide the paths to your PEM-encoded credential files. This will update the `sst.config` file.
 
 2.  **Start the Receiver**:  
-    With the credentials configured, run the receiver program. It will connect to the SST service to get a 16-byte session key and then send it to the Pico.
+    With the credentials configured, run the receiver program. It will connect to the SST Auth to get a 16-byte session key and then send it to the Pico.
 
     ```bash
     ./artifacts/pi4/latest sst.config
