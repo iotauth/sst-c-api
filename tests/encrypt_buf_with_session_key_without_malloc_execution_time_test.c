@@ -41,6 +41,9 @@ int main(int argc, char *argv[]) {
     }
 
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
 
     unsigned char plaintext_buf[BLOCK_SIZE];
 

@@ -13,6 +13,9 @@ int main(int argc, char *argv[]) {
     // This will bring 3 keys. It is changable in the config file's
     // entityInfo.number_key=3
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
 
     // Initialization of RAND, should only be called once.
     srand((unsigned int)time(NULL));

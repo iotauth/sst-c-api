@@ -37,6 +37,9 @@ int main(int argc, char* argv[]) {
     // Set purpose to make session key request for file sharing.
     ctx->config->purpose_index = 1;
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
+    if (s_key_list_0 == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
     unsigned char hash_value[BUFF_SIZE];
     int hash_value_len;
     estimate_time_t estimate_time[5];
@@ -52,6 +55,9 @@ int main(int argc, char* argv[]) {
                                hash_value_len, &concat_buffer[0]);
     ctx->config->purpose_index = 0;
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
     if (session_ctx == NULL) {

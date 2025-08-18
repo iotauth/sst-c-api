@@ -17,8 +17,7 @@ int main(int argc, char *argv[]) {
 
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
-        printf("Failed to get session key. Returning NULL.\n");
-        exit(1);
+        SST_print_error_exit("Failed get_session_key().");
     }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
@@ -47,8 +46,17 @@ int main(int argc, char *argv[]) {
     free(session_ctx);
 
     s_key_list = get_session_key(ctx, s_key_list);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
     s_key_list = get_session_key(ctx, s_key_list);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
     s_key_list = get_session_key(ctx, s_key_list);  // Intended to fail.
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
 
     sleep(3);
     pthread_t thread2;

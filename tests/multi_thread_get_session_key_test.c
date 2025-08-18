@@ -21,6 +21,9 @@ void *send_request(void *SST_ctx) {
         // pthread_mutex_lock(&ctx->mutex);
         session_key_list_t *s_key_list = NULL;
         s_key_list = get_session_key(ctx, s_key_list);
+        if (s_key_list == NULL) {
+            SST_print_error_exit("Failed get_session_key().");
+        }
         // pthread_mutex_unlock(&ctx->mutex);
         free_session_key_list_t(s_key_list);
     }

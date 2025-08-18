@@ -19,6 +19,9 @@ int main(int argc, char *argv[]) {
     session_key_list_t *s_key_list = init_empty_session_key_list();
     ctx->config->purpose_index = 0;
     session_key_list_t *s_key_list_0 = get_session_key(ctx, NULL);
+    if (s_key_list_0 == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
     if (session_ctx == NULL) {
