@@ -295,7 +295,8 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 // This is used not to directly #include OpenSSL libraries.
 // @param length Length of the nonce
 // @param buf Pointer of the buffer with the random nonce.
-void generate_random_nonce(int length, unsigned char *buf);
+// @return 0 for success, -1 for fail
+int generate_random_nonce(int length, unsigned char *buf);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free
@@ -331,5 +332,36 @@ void free_SST_ctx_t(SST_ctx_t *ctx);
  * @endcode
  */
 int secure_rand(int min, int max);
+
+#if defined(__GNUC__)
+#define ATTRIBUTE_FORMAT_PRINTF(f, s) __attribute__((format(printf, f, s)))
+#else
+#define ATTRIBUTE_FORMAT_PRINTF(f, s)
+#endif
+
+// Print out debug messages. This will be printed only when the
+// cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
+// Uses printf-style formatting.
+// @param fmt Format string for the debug message.
+// @param ... Additional arguments for formatting.
+void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out log messages.
+// Uses printf-style formatting.
+// @param fmt Format string for the debug message.
+// @param ... Additional arguments for formatting.
+void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out error messages along with errno if set.
+// Uses printf-style formatting.
+// @param fmt Format string for the debug message.
+// @param ... Additional arguments for formatting.
+void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
+// Print out error message and exit program.
+// Uses printf-style formatting.
+// @param fmt Format string for the debug message.
+// @param ... Additional arguments for formatting.
+void SST_print_error_exit(const char *fmt, ...);
 
 #endif  // C_API_H

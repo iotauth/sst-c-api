@@ -1,4 +1,3 @@
-#include "../../c_common.h"
 #include "block_common.h"
 
 int main() {
@@ -21,7 +20,9 @@ int main() {
 
     // Macro initializing session_key_list.
     session_key_list_t *s_key_list = init_empty_session_key_list();
-    load_session_key_list(s_key_list, "s_key_list.bin");
+    if (load_session_key_list(s_key_list, "s_key_list.bin") < 0) {
+        SST_print_error_exit("Failed load_session_key_list().");
+    }
 
     //  ----Decrypt and compare with plaintext----
     // Read files.
@@ -69,8 +70,8 @@ int main() {
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
-                    &decrypted, &decrypted_length)) {
-                printf("Decryption failed!\n");
+                    &decrypted, &decrypted_length) < 0) {
+                SST_print_error_exit("Decryption failed!");
                 break;
             }
 

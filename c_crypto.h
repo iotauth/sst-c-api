@@ -43,10 +43,6 @@ typedef struct {
     unsigned char sign[RSA_KEY_SIZE];
 } signed_data_t;
 
-// Print error message when the code has error.
-// @param msg message to print the error
-void print_last_error(const char *msg);
-
 // Loads auth's public key from path
 // @param path path of auth's public key
 EVP_PKEY *load_auth_public_key(const char *path);
@@ -98,8 +94,8 @@ unsigned char *SHA256_sign(const unsigned char *encrypted,
 // @param sign signature buffer
 // @param sign_length length of signiture
 // @param path public key path
-void SHA256_verify(const unsigned char *data, unsigned int data_length,
-                   unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key);
+int SHA256_verify(const unsigned char *data, unsigned int data_length,
+                  unsigned char *sig, size_t sig_length, EVP_PKEY *pub_key);
 
 // Digest the message using the SHA256 digest function.
 // @param data Data to digest
@@ -108,8 +104,8 @@ void SHA256_verify(const unsigned char *data, unsigned int data_length,
 // message
 // @param md_len The length of the message digest. This cannot be given in a
 // integer.
-void digest_message_SHA_256(const unsigned char *data, size_t data_len,
-                            unsigned char *md5_hash, unsigned int *md_len);
+int digest_message_SHA_256(const unsigned char *data, size_t data_len,
+                           unsigned char *md5_hash, unsigned int *md_len);
 
 // Encrypt the message with the cipher key of the session key obtained from Auth
 // by using Cipher Block Chaining(CBC) encryption of OpenSSL.
@@ -276,9 +272,10 @@ int symmetric_decrypt_authenticate_without_malloc(
 // @param salt_len Length of salt.
 // @param ret The pointer assigned by the caller, filled with the digested
 // password.
-void create_salted_password_to_32bytes(const char *password,
-                                       unsigned int password_len,
-                                       const char *salt, unsigned int salt_len,
-                                       unsigned char *ret);
+// @return 0 for success, -1 for error.
+int create_salted_password_to_32bytes(const char *password,
+                                      unsigned int password_len,
+                                      const char *salt, unsigned int salt_len,
+                                      unsigned char *ret);
 
 #endif  // C_CRYPTO_H

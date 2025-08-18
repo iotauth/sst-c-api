@@ -3,29 +3,32 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "../../../c_common.h"
 #include "../../../ipfs.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
         SST_print_error_exit(
-            "Usage: %s <config_path> <my_file_path> <add_reader_path>\n",
+            "Usage: %s <config_path> <my_file_path> <add_reader_path>",
             argv[0]);
     }
     char* config_path = argv[1];
     char* my_file_path = argv[2];
     char* add_reader_path = argv[3];
     SST_ctx_t* ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     FILE* add_reader_file = fopen(add_reader_path, "r");
     char addReader[64];
     if (add_reader_file == NULL) {
         fputs("Cannot open file.", stderr);
-        fputc('\n', stderr);
-        exit(1);
+        SST_print_error_exit("File open failed.");
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
-        send_add_reader_req_via_TCP(ctx, addReader);
+        if (send_add_reader_req_via_TCP(ctx, addReader) < 0) {
+            SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
+        }
     }
     fclose(add_reader_file);
     // Set purpose to make session key request for file sharing.
@@ -35,8 +38,7 @@ int main(int argc, char* argv[]) {
     gettimeofday(&keygen_start, NULL);
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
-        printf("Failed to get session key. Returning NULL.\n");
-        exit(1);
+        SST_print_error_exit("Failed get_session_key().");
     }
     gettimeofday(&keygen_end, NULL);
     float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
@@ -67,11 +69,16 @@ int main(int argc, char* argv[]) {
         hash_value_len =
             file_encrypt_upload(&s_key_list_0->s_key[i], ctx, my_file_path,
                                 &hash_value[0], &estimate_time[i]);
+        if (hash_value_len < 0) {
+            SST_print_error_exit("Failed file_encrypt_upload()");
+        }
         sleep(1);
         struct timeval filemanager_start, filemanager_end;
         gettimeofday(&filemanager_start, NULL);
-        upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
-                                      &hash_value[0], hash_value_len);
+        if (upload_to_file_system_manager(&s_key_list_0->s_key[i], ctx,
+                                          &hash_value[0], hash_value_len) < 0) {
+            SST_print_error_exit("Failed upload_to_file_system_manager()");
+        }
         gettimeofday(&filemanager_end, NULL);
         float filemanager_time =
             filemanager_end.tv_sec - filemanager_start.tv_sec;
