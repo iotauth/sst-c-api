@@ -148,8 +148,8 @@ bool validate_flash_block(const key_flash_block_t *block) {
 // @param out Output buffer to copy the valid key into (must be SST_KEY_SIZE
 // bytes)
 // @return true if a valid key was found and copied, false otherwise
-// TODO: Check if static.
-bool read_key_from_slot(uint32_t offset, uint8_t *out) {
+// Set to static.
+static bool read_key_from_slot(uint32_t offset, uint8_t *out) {
     const key_flash_block_t *slot =
         (const key_flash_block_t *)(XIP_BASE + offset);
     if (validate_flash_block(slot)) {
