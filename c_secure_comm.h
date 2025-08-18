@@ -101,7 +101,6 @@ int decrypt_received_message(unsigned char *encrypted_data,
                              unsigned int *decrypted_buf_length,
                              SST_session_ctx_t *session_ctx);
 
-
 // Check if entity has session key and if not, request the session key to Auth.
 // @param ctx config struct obtained from load_config()
 // @param target_key_id id of session key
@@ -148,7 +147,6 @@ int find_session_key(unsigned int key_id, session_key_list_t *s_key_list);
 // @param existing_s_key_list Destination session_key_list
 void add_session_key_to_list(session_key_t *s_key,
                              session_key_list_t *existing_s_key_list);
-
 
 // Appends src list to dest list.
 // Appends at the destination list's rear_idx.
