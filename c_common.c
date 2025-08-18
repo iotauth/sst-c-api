@@ -150,7 +150,11 @@ unsigned char *parse_received_message(unsigned char *received_buf,
     return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
 }
 
-int read_variable_length_one_byte_each(int socket, unsigned char *buf) {
+// Reads the variable length one byte each. The read() function reads one byte
+// each, and returns the variable length buffer's size.
+// @param socket socket to read
+// @param buf buffer to save the result of read() function.
+static int read_variable_length_one_byte_each(int socket, unsigned char *buf) {
     int length = 1;
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
     if (received_buf_length < 0) {
@@ -206,8 +210,23 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     return bytes_read;
 }
 
-void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
-                        unsigned char *header, unsigned int *header_length) {
+// ----------------Header Parsing functions----------------
+// Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
+// The four functions num_to_var_length_int(), make_buffer_header(),
+// concat_buffer_header_and_payload(), make_sender_buf()
+// parses a header to the the data to send.
+// Actual usage only needs make_sender_buf()
+
+// Make the header buffer including the message type and payload buffer.
+// @param data_length input data buffer length
+// @param MESSAGE_TYPE message type according to purpose
+// @param header output header buffer including the message type and payload
+// buffer
+// @param header_length header buffer length
+static void make_buffer_header(unsigned int data_length,
+                               unsigned char MESSAGE_TYPE,
+                               unsigned char *header,
+                               unsigned int *header_length) {
     unsigned char payload_buf[MAX_PAYLOAD_BUF_SIZE];
     unsigned int payload_buf_len;
     num_to_var_length_int(data_length, payload_buf, &payload_buf_len);
@@ -216,7 +235,14 @@ void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
     memcpy(header + MESSAGE_TYPE_SIZE, payload_buf, payload_buf_len);
 }
 
-void concat_buffer_header_and_payload(
+// Concat the two buffers into a new return buffer
+// @param header buffer to be copied the beginning of the return buffer
+// @param header_length length of header buffer
+// @param payload buffer to be copied to the back of the return buffer
+// @param payload_length length of payload buffer
+// @param ret header new return buffer
+// @param ret_length length of return buffer
+static void concat_buffer_header_and_payload(
     unsigned char *header, unsigned int header_length, unsigned char *payload,
     unsigned int payload_length, unsigned char *ret, unsigned int *ret_length) {
     memcpy(ret, header, header_length);
@@ -233,6 +259,8 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
     concat_buffer_header_and_payload(header, header_length, payload,
                                      payload_length, sender, sender_length);
 }
+
+// ------------------------------------------------
 
 int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;

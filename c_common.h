@@ -136,12 +136,6 @@ unsigned char *parse_received_message(unsigned char *received_buf,
                                       unsigned char *message_type,
                                       unsigned int *data_buf_length);
 
-// Reads the variable length one byte each. The read() function reads one byte
-// each, and returns the variable length buffer's size.
-// @param socket socket to read
-// @param buf buffer to save the result of read() function.
-int read_variable_length_one_byte_each(int socket, unsigned char *buf);
-
 // Reads the SST header, and returns the message type, start pointer of the
 // SST's payload, and the payload's length.
 // @param socket socket to read
@@ -151,32 +145,6 @@ int read_variable_length_one_byte_each(int socket, unsigned char *buf);
 int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
                                         unsigned char *buf,
                                         unsigned int buf_length);
-
-// Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
-// The four functions num_to_var_length_int(), make_buffer_header(),
-// concat_buffer_header_and_payload(), make_sender_buf()
-// parses a header to the the data to send.
-// Actual usage only needs make_sender_buf()
-
-// Make the header buffer including the message type and payload buffer.
-// @param data_length input data buffer length
-// @param MESSAGE_TYPE message type according to purpose
-// @param header output header buffer including the message type and payload
-// buffer
-// @param header_length header buffer length
-void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
-                        unsigned char *header, unsigned int *header_length);
-
-// Concat the two buffers into a new return buffer
-// @param header buffer to be copied the beginning of the return buffer
-// @param header_length length of header buffer
-// @param payload buffer to be copied to the back of the return buffer
-// @param payload_length length of payload buffer
-// @param ret header new return buffer
-// @param ret_length length of return buffer
-void concat_buffer_header_and_payload(
-    unsigned char *header, unsigned int header_length, unsigned char *payload,
-    unsigned int payload_length, unsigned char *ret, unsigned int *ret_length);
 
 // Make the buffer sending to Auth by using make_buffer_header() and
 // concat_buffer_header_and_payload().
