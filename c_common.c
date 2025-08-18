@@ -94,6 +94,7 @@ int generate_nonce(int length, unsigned char *buf) {
         SST_print_error("Failed to create Random Nonce");
         return -1;
     }
+    return 0;
 }
 
 void write_in_n_bytes(uint64_t num, int n, unsigned char *buf) {
