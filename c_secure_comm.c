@@ -16,11 +16,23 @@ typedef enum {
     FINISHED,
 } send_state;
 
-unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
-                                          unsigned char *auth_nonce,
-                                          int num_key, char *sender,
-                                          char *purpose,
-                                          unsigned int *ret_length) {
+// Parses the the reply message sending to Auth.
+// Concat entity, auth nonce and information such as sender
+// and purpose obtained from the config file.
+// @param entity_nonce entity's nonce
+// @param auth_nonce received auth's nonce
+// @param num_key number of keys to receive from auth
+// @param sender name of sender
+// @param sender_length length of sender
+// @param purpose purpose to get session key
+// @param purpose_length length of purpose
+// @param ret_length length of return buffer
+// @return concated total buffer
+static unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
+                                                 unsigned char *auth_nonce,
+                                                 int num_key, char *sender,
+                                                 char *purpose,
+                                                 unsigned int *ret_length) {
     size_t sender_length = strlen(sender);
     size_t purpose_length = strlen(purpose);
 
@@ -65,29 +77,6 @@ unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
     *ret_length = offset;
 
     return ret;
-}
-
-int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
-                      unsigned char *entity_nonce, int sock, int num_key,
-                      char *purpose, int requestIndex) {
-    unsigned char auth_nonce[NONCE_SIZE];
-    unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
-    if (auth_id != (unsigned int)ctx->config->auth_id) {
-        SST_print_error("Auth ID NOT matched.");
-        return -1;
-    }
-    memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-    RAND_bytes(entity_nonce, NONCE_SIZE);
-    unsigned int serialized_length;
-    unsigned char *serialized = serialize_message_for_auth(
-        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
-        &serialized_length);
-    if (send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                  requestIndex) < 0) {
-        SST_print_error("Failed send_auth_request_message().");
-        return -1;
-    }
-    return 0;
 }
 
 // Encrypt the message and sign the encrypted message.
@@ -208,6 +197,58 @@ static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
     s_key->hmac_mode = ctx->config->hmac_mode;
 }
 
+// Used in parse_session_key_response() for index.
+// @param buf input buffer with crypto spec
+// @param buf_length length of buf
+// @param offset buffer index
+// @param return_to_length length of return buffer
+// @return buffer with crypto spec
+static unsigned char *parse_string_param(unsigned char *buf,
+                                         unsigned int buf_length, int offset,
+                                         unsigned int *return_to_length) {
+    unsigned int num;
+    int var_len_int_buf_size;
+    var_length_int_to_num(buf + offset, buf_length, &num,
+                          &var_len_int_buf_size);
+    if (var_len_int_buf_size == 0) {
+        SST_print_error(
+            "Buffer size of the variable length integer cannot be 0.");
+        return NULL;
+    }
+    *return_to_length = num + var_len_int_buf_size;
+    unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
+    memcpy(return_to, buf + offset + var_len_int_buf_size, num);
+    return return_to;
+}
+
+// Store the session key in the session key struct
+// Must free when session_key expired or usage finished.
+// @param ret session key struct to save key info
+// @param buf input buffer with session key
+// @return index number for another session key
+static unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
+    memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
+    unsigned int cur_idx = SESSION_KEY_ID_SIZE;
+    memcpy(ret->abs_validity, buf + cur_idx, ABS_VALIDITY_SIZE);
+    cur_idx += ABS_VALIDITY_SIZE;
+    memcpy(ret->rel_validity, buf + cur_idx, REL_VALIDITY_SIZE);
+    cur_idx += REL_VALIDITY_SIZE;
+
+    // copy cipher_key
+    ret->cipher_key_size = buf[cur_idx];
+    cur_idx += 1;
+    memcpy(ret->cipher_key, buf + cur_idx, ret->cipher_key_size);
+    cur_idx += ret->cipher_key_size;
+
+    // copy mac_key
+    ret->mac_key_size = buf[cur_idx];
+    cur_idx += 1;
+    memcpy(ret->mac_key, buf + cur_idx, ret->mac_key_size);
+    cur_idx += ret->mac_key_size;
+
+    return cur_idx;
+}
+
 // Separate the session key, nonce, and crypto spec from the message.
 // @param buf input buffer with session key, nonce, and crypto spec
 // @param buf_length length of buf
@@ -245,9 +286,17 @@ static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     return 0;
 }
 
-int send_auth_request_message(unsigned char *serialized,
-                              unsigned int serialized_length, SST_ctx_t *ctx,
-                              int sock, int requestIndex) {
+// Encrypt the message and send the request message to Auth.
+// @param serialized total message
+// @param serialized_length length of message
+// @param ctx config struct obtained from load_config()
+// @param sock socket number
+// @param requestIndex request index for purpose
+// @return 0 for success, -1 for fail
+static int send_auth_request_message(unsigned char *serialized,
+                                     unsigned int serialized_length,
+                                     SST_ctx_t *ctx, int sock,
+                                     int requestIndex) {
     if (check_validity(ctx->dist_key.abs_validity) <
         0) {  // when dist_key expired
         SST_print_debug(
@@ -307,6 +356,29 @@ int send_auth_request_message(unsigned char *serialized,
     return 0;
 }
 
+int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
+                      unsigned char *entity_nonce, int sock, int num_key,
+                      char *purpose, int requestIndex) {
+    unsigned char auth_nonce[NONCE_SIZE];
+    unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
+    if (auth_id != (unsigned int)ctx->config->auth_id) {
+        SST_print_error("Auth ID NOT matched.");
+        return -1;
+    }
+    memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
+    RAND_bytes(entity_nonce, NONCE_SIZE);
+    unsigned int serialized_length;
+    unsigned char *serialized = serialize_message_for_auth(
+        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
+        &serialized_length);
+    if (send_auth_request_message(serialized, serialized_length, ctx, sock,
+                                  requestIndex) < 0) {
+        SST_print_error("Failed send_auth_request_message().");
+        return -1;
+    }
+    return 0;
+}
+
 int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
                           size_t key_size) {
     signed_data_t signed_data;
@@ -338,46 +410,6 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     ctx->dist_key.enc_mode = ctx->config->encryption_mode;
     free(decrypted_dist_key_buf);
     return 0;
-}
-
-unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
-                                  int offset, unsigned int *return_to_length) {
-    unsigned int num;
-    int var_len_int_buf_size;
-    var_length_int_to_num(buf + offset, buf_length, &num,
-                          &var_len_int_buf_size);
-    if (var_len_int_buf_size == 0) {
-        SST_print_error(
-            "Buffer size of the variable length integer cannot be 0.");
-        return NULL;
-    }
-    *return_to_length = num + var_len_int_buf_size;
-    unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
-    memcpy(return_to, buf + offset + var_len_int_buf_size, num);
-    return return_to;
-}
-
-unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
-    memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
-    unsigned int cur_idx = SESSION_KEY_ID_SIZE;
-    memcpy(ret->abs_validity, buf + cur_idx, ABS_VALIDITY_SIZE);
-    cur_idx += ABS_VALIDITY_SIZE;
-    memcpy(ret->rel_validity, buf + cur_idx, REL_VALIDITY_SIZE);
-    cur_idx += REL_VALIDITY_SIZE;
-
-    // copy cipher_key
-    ret->cipher_key_size = buf[cur_idx];
-    cur_idx += 1;
-    memcpy(ret->cipher_key, buf + cur_idx, ret->cipher_key_size);
-    cur_idx += ret->cipher_key_size;
-
-    // copy mac_key
-    ret->mac_key_size = buf[cur_idx];
-    cur_idx += 1;
-    memcpy(ret->mac_key, buf + cur_idx, ret->mac_key_size);
-    cur_idx += ret->mac_key_size;
-
-    return cur_idx;
 }
 
 unsigned char *parse_handshake_1(session_key_t *s_key,
@@ -456,6 +488,13 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
+// Check the validity of session key by checking abs_validity
+// @param session_key_t session_key to check validity
+// @return -1 when expired, 0 when valid
+static int check_session_key_validity(session_key_t *session_key) {
+    return check_validity(session_key->abs_validity);
+}
+
 int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
                              SST_session_ctx_t *session_ctx) {
     if (check_session_key_validity(&session_ctx->s_key) < 0) {
@@ -528,10 +567,6 @@ int decrypt_received_message(unsigned char *encrypted_data,
     session_ctx->received_seq_num++;
     SST_print_debug("Received seq_num: %d.", received_seq_num);
     return 0;
-}
-
-int check_session_key_validity(session_key_t *session_key) {
-    return check_validity(session_key->abs_validity);
 }
 
 session_key_list_t *send_session_key_request_check_protocol(
@@ -798,6 +833,16 @@ int find_session_key(unsigned int key_id, session_key_list_t *s_key_list) {
     return -1;
 }
 
+// Copys session key from src to dest.
+// Does not free the src's session key. Free must needed.
+// @param dest Session key destination pointer to copy to.
+// @param src Session key src pointer to copy.
+static void copy_session_key(session_key_t *dest, session_key_t *src) {
+    memcpy(dest, src, sizeof(session_key_t));
+    memcpy(dest->mac_key, src->mac_key, src->mac_key_size);
+    memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
+}
+
 void add_session_key_to_list(session_key_t *s_key,
                              session_key_list_t *existing_s_key_list) {
     existing_s_key_list->num_key++;
@@ -812,12 +857,6 @@ void add_session_key_to_list(session_key_t *s_key,
                      s_key);
     existing_s_key_list->rear_idx =
         (existing_s_key_list->rear_idx + 1) % MAX_SESSION_KEY;
-}
-
-void copy_session_key(session_key_t *dest, session_key_t *src) {
-    memcpy(dest, src, sizeof(session_key_t));
-    memcpy(dest->mac_key, src->mac_key, src->mac_key_size);
-    memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
 }
 
 void append_session_key_list(session_key_list_t *dest,
