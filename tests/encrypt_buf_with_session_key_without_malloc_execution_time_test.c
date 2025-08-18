@@ -69,14 +69,12 @@ int main(int argc, char *argv[]) {
             if (encrypt_buf_with_session_key_without_malloc(
                     &s_key_list->s_key[0], plaintext_buf, BLOCK_SIZE,
                     encrypted_data, &processed_size) < 0) {
-                printf("Encryption failed!\n");
-                exit(1);
+                SST_print_error_exit("Failed encrypt_buf_with_session_key_without_malloc().");
             }
             if (decrypt_buf_with_session_key_without_malloc(
                     &s_key_list->s_key[0], encrypted_data, processed_size,
                     decrypted_data, &processed_size) < 0) {
-                printf("Encryption failed!\n");
-                exit(1);
+                SST_print_error_exit("Failed decrypt_buf_with_session_key_without_malloc().");
             }
             // End measuring time for the inner loop
             clock_gettime(CLOCK_MONOTONIC, &end_inner);

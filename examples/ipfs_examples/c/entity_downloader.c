@@ -53,9 +53,7 @@ int main(int argc, char *argv[]) {
         estimate_time[i].keygenerate_time =
             keygen_time + keygen_utime / 1000000;
         if (session_key == NULL) {
-            fputs("There is no session key.\n", stderr);
-            fputc('\n', stderr);
-            exit(1);
+            SST_print_error_exit("There is no session key.");
         } else {
             sleep(1);
             struct timeval decrypt_start, decrypt_end;

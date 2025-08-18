@@ -58,8 +58,7 @@ int main(int argc, char *argv[]) {
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
-        printf("The session is not connected.\n");
-        exit(1);
+        SST_print_error_exit("Failed server_secure_comm_setup().");
     } else {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
@@ -95,8 +94,8 @@ int main(int argc, char *argv[]) {
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
     if (session_ctx2 == NULL) {
-        printf("The session is not connected.\n");
-        exit(1);
+        SST_print_error_exit("Failed server_secure_comm_setup().");
+
     }
 
     pthread_t thread2;

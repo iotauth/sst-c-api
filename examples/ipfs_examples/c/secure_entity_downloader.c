@@ -40,13 +40,10 @@ int main(int argc, char *argv[]) {
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
     if (read_secure_message(decrypted, session_ctx) < 0) {
-        printf("Failed to read secure message.\n");
-        exit(1);
+        SST_print_error_exit("Failed read_secure_message()");
     }
     if (decrypted[0] != DOWNLOAD_RESP) {
-        fputs("Not download response!!", stderr);
-        fputc('\n', stderr);
-        exit(1);
+        SST_print_error_exit("Not download response!!");
     }
     printf("Session key id size: %x\n", decrypted[1]);
     printf("Command size: %d\n", decrypted[SESSION_KEY_ID_SIZE + 2]);
@@ -55,8 +52,7 @@ int main(int argc, char *argv[]) {
     session_key_t *session_key =
         get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
     if (session_key == NULL) {
-        printf("Failed to get_session_key_by_ID().\n");
-        exit(1);
+        SST_print_error_exit("Failed to get_session_key_by_ID().");
     } else {
         sleep(5);
         if (file_decrypt_save(*session_key, &file_name[0]) < 0) {

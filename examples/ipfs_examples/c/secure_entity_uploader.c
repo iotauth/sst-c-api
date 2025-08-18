@@ -24,8 +24,7 @@ int main(int argc, char* argv[]) {
     char addReader[64];
     if (add_reader_file == NULL) {
         fputs("Cannot open file.", stderr);
-        fputc('\n', stderr);
-        exit(1);
+        SST_print_error_exit("File open failed.");
     }
     while (fgets(addReader, sizeof(addReader), add_reader_file) != NULL) {
         if (send_add_reader_req_via_TCP(ctx, addReader) < 0) {
