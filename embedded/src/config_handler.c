@@ -45,7 +45,7 @@ void change_directory_to_config_path(const char* config_path) {
         free(path_copy);
     } else {
         // No path provided, change to the default directory.
-        const char* config_dir_relative = "../../receiver";
+        const char* config_dir_relative = "../../lifi_receiver.config";
         if (chdir(config_dir_relative) != 0) {
             perror("Could not switch to default config directory");
             fprintf(stderr,
