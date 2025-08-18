@@ -95,7 +95,6 @@ int main(int argc, char *argv[]) {
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
     if (session_ctx2 == NULL) {
         SST_print_error_exit("Failed server_secure_comm_setup().");
-
     }
 
     pthread_t thread2;
