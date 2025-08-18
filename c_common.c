@@ -22,6 +22,7 @@ void SST_print_debug(const char *fmt, ...) {
         va_start(args, fmt);
         printf("DEBUG: ");
         vprintf(fmt, args);
+        printf("\n");
         va_end(args);
     }
 }
@@ -29,7 +30,9 @@ void SST_print_debug(const char *fmt, ...) {
 void SST_print_log(const char *fmt, ...) {
     va_list args;
     va_start(args, fmt);
+    printf("LOG: ");
     vprintf(fmt, args);
+    printf("\n");
     va_end(args);
 }
 
@@ -59,21 +62,13 @@ void SST_print_error_exit(const char *fmt, ...) {
     exit(1);
 }
 
-void *SST_print_error_return_null(const char *fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    SST_print_error(fmt, args);
-    va_end(args);
-    return NULL;
-}
-
 void print_buf_debug(const unsigned char *buf, size_t size) {
     char hex[size * 3 + 1];
     for (size_t i = 0; i < size; i++) {
         // 4 = space(1) + two hex digits(2) + null charactor(1)
         snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
-    SST_print_debug("Hex:%s\n", hex);
+    SST_print_debug("Hex:%s", hex);
 }
 
 void print_buf_log(const unsigned char *buf, size_t size) {
@@ -82,15 +77,16 @@ void print_buf_log(const unsigned char *buf, size_t size) {
         // 4 = space(1) + two hex digits(2) + null charactor(1)
         snprintf(hex + 3 * i, 4, " %.2x", buf[i]);
     }
-    SST_print_log("Hex:%s\n", hex);
+    SST_print_log("Hex:%s", hex);
 }
 
-void generate_nonce(int length, unsigned char *buf) {
+int generate_nonce(int length, unsigned char *buf) {
     int x = RAND_bytes(buf, length);
     if (x == -1) {
         SST_print_error("Failed to create Random Nonce");
-        exit(1);
+        return -1;
     }
+    return 0;
 }
 
 void write_in_n_bytes(uint64_t num, int n, unsigned char *buf) {
@@ -117,8 +113,7 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length) {
 }
 
 void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num,
-                           unsigned int *var_len_int_buf_size) {
+                           unsigned int *num, int *var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
     for (unsigned int i = 0; i < buf_length; i++) {
@@ -149,18 +144,23 @@ unsigned char *parse_received_message(unsigned char *received_buf,
     if (*message_type == AUTH_ALERT) {
         return received_buf + 1;
     }
-    unsigned int var_length_buf_size;
+    int var_length_buf_size;
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, received_buf_length,
                           data_buf_length, &var_length_buf_size);
     return received_buf + MESSAGE_TYPE_SIZE + var_length_buf_size;
 }
 
-uint16_t read_variable_length_one_byte_each(int socket, unsigned char *buf) {
-    uint16_t length = 1;
+// Reads the variable length one byte each. The read() function reads one byte
+// each, and returns the variable length buffer's size.
+// @param socket socket to read
+// @param buf buffer to save the result of read() function.
+static int read_variable_length_one_byte_each(int socket, unsigned char *buf) {
+    int length = 1;
     int received_buf_length = sst_read_from_socket(socket, buf, 1);
     if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read eerror in read_variable_length_one_byte_each().\n");
+        SST_print_error(
+            "Socket read error in read_variable_length_one_byte_each().");
+        return -1;
     }
     if (buf[0] > 127) {
         return length + read_variable_length_one_byte_each(socket, buf + 1);
@@ -177,33 +177,56 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read eerror in read_header_return_data_buf_pointer().\n");
+        SST_print_error(
+            "Socket read error in read_header_return_data_buf_pointer().");
+        return -1;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
-    unsigned int var_length_buf_size = read_variable_length_one_byte_each(
+    int var_length_buf_size = read_variable_length_one_byte_each(
         socket, received_buf + MESSAGE_TYPE_SIZE);
-    unsigned int var_length_buf_size_checked;
+    if (var_length_buf_size < 0) {
+        SST_print_error("Failed to read_variable_length_one_byte_each().");
+        return -1;
+    }
+    int var_length_buf_size_checked;
     unsigned int ret_length;
     // Decode the variable length buffer and get the bytes to read.
     var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
                           &ret_length, &var_length_buf_size_checked);
     if (var_length_buf_size != var_length_buf_size_checked) {
-        SST_print_error_exit("Wrong header calculation... Exiting...");
+        SST_print_error("Wrong header calculation... Exiting...");
+        return -1;
     }
     if (ret_length > buf_length) {
-        SST_print_error_exit("Larger buffer size required.");
+        SST_print_error("Larger buffer size required.");
+        return -1;
     }
     int bytes_read = sst_read_from_socket(socket, buf, buf_length);
     if ((unsigned int)bytes_read != ret_length) {
-        SST_print_error_exit("Wrong read... Exiting..");
+        SST_print_error("Wrong read... Exiting..");
+        return -1;
     }
     return bytes_read;
 }
 
-void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
-                        unsigned char *header, unsigned int *header_length) {
+// ----------------Header Parsing functions----------------
+// Makes sender_buf with 'payload' and 'MESSAGE_TYPE' to 'sender'.
+// The four functions num_to_var_length_int(), make_buffer_header(),
+// concat_buffer_header_and_payload(), make_sender_buf()
+// parses a header to the the data to send.
+// Actual usage only needs make_sender_buf()
+
+// Make the header buffer including the message type and payload buffer.
+// @param data_length input data buffer length
+// @param MESSAGE_TYPE message type according to purpose
+// @param header output header buffer including the message type and payload
+// buffer
+// @param header_length header buffer length
+static void make_buffer_header(unsigned int data_length,
+                               unsigned char MESSAGE_TYPE,
+                               unsigned char *header,
+                               unsigned int *header_length) {
     unsigned char payload_buf[MAX_PAYLOAD_BUF_SIZE];
     unsigned int payload_buf_len;
     num_to_var_length_int(data_length, payload_buf, &payload_buf_len);
@@ -212,7 +235,14 @@ void make_buffer_header(unsigned int data_length, unsigned char MESSAGE_TYPE,
     memcpy(header + MESSAGE_TYPE_SIZE, payload_buf, payload_buf_len);
 }
 
-void concat_buffer_header_and_payload(
+// Concat the two buffers into a new return buffer
+// @param header buffer to be copied the beginning of the return buffer
+// @param header_length length of header buffer
+// @param payload buffer to be copied to the back of the return buffer
+// @param payload_length length of payload buffer
+// @param ret header new return buffer
+// @param ret_length length of return buffer
+static void concat_buffer_header_and_payload(
     unsigned char *header, unsigned int header_length, unsigned char *payload,
     unsigned int payload_length, unsigned char *ret, unsigned int *ret_length) {
     memcpy(ret, header, header_length);
@@ -230,11 +260,14 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
                                      payload_length, sender, sender_length);
 }
 
+// ------------------------------------------------
+
 int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
     *sock = socket(PF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
-        SST_print_error_exit("socket() error");
+        SST_print_error("socket() error");
+        return -1;
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
@@ -248,28 +281,28 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
         if (ret < 0) {
-            SST_print_error("Connection attempt %d failed. Retrying...\n",
+            SST_print_error("Connection attempt %d failed. Retrying...",
                             count_retries);
             usleep(500);  // Wait 500 microseconds before retrying.
             continue;
         } else {
-            SST_print_debug("Successfully connected to %s:%d on attempt %d.\n",
+            SST_print_debug("Successfully connected to %s:%d on attempt %d.",
                             ip_addr, port_num, count_retries);
             break;
         }
     }
     if (ret < 0) {
-        SST_print_error("Failed to connect to %s:%d after %d attempts.\n",
+        SST_print_error("Failed to connect to %s:%d after %d attempts.",
                         ip_addr, port_num, count_retries - 1);
     }
     return ret;
 }
 
-void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
-                         unsigned char *ret) {
+int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
+                        unsigned char *ret) {
     if (nonce == NULL && reply_nonce == NULL) {
-        SST_print_error_exit(
-            "Error: handshake should include at least on nonce.");
+        SST_print_error("Handshake should include at least one nonce.");
+        return -1;
     }
     unsigned char indicator = 0;
     if (nonce != NULL) {
@@ -282,6 +315,7 @@ void serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
     }
     // TODO: add dhParam options.
     ret[0] = indicator;
+    return 0;
 }
 
 void parse_handshake(unsigned char *buf, HS_nonce_t *ret) {
@@ -308,13 +342,13 @@ int sst_read_from_socket(int socket, unsigned char *buf,
         errno = EBADF;
         return -1;
     }
-    ssize_t length_read = read(socket, buf, buf_length);
+    int length_read = read(socket, buf, buf_length);
     if (length_read < 0) {
-        SST_print_error_exit("Reading from socket failed.");
+        SST_print_error("Reading from socket %d failed.", socket);
     } else if (length_read == 0) {
-        SST_print_error_exit("Connection closed.");
+        SST_print_error("Connection closed from socket %d.", socket);
     }
-    return (unsigned int)length_read;
+    return length_read;
 }
 
 int sst_write_to_socket(int socket, const unsigned char *buf,
@@ -339,10 +373,13 @@ int sst_write_to_socket(int socket, const unsigned char *buf,
         }
         if (length_written < 0) {
             // Error occurred while writing
-            SST_print_error_exit("Writing to socket failed.");
+            SST_print_error("Writing to socket %d failed.", socket);
+            return -1;
         } else if (length_written == 0) {
             // Socket closed unexpectedly
-            SST_print_error_exit("Connection closed while writing.");
+            SST_print_error("Connection from socket %d closed while writing.",
+                            socket);
+            return -1;
         }
 
         // Update the total number of bytes written
