@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
 
     if (argc > 2) {
         fprintf(stderr, "Error: Too many arguments.\n");
-        fprintf(stderr, "Usage: %s [<path/to/sst.config>]\n", argv[0]);
+        fprintf(stderr, "Usage: %s [<path/to/lifi_receiver.config>]\n", argv[0]);
         return 1;
     } else if (argc == 2) {
         config_path = argv[1];

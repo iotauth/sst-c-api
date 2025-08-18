@@ -16,7 +16,7 @@
 AUTH_PROJECT_ROOT="../../../iotauth"
 
 # The stable staging directory for the receiver's credentials.
-# This path should match what's in sst.config.
+# This path should match what's in lifi_receiver.config
 RECEIVER_STAGING_DIR="./config/credentials"
 
 # --- Script ---

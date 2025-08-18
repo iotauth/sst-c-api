@@ -6,7 +6,7 @@ This project implements a secure, real-time Li-Fi communication channel between 
 
 ## Project Overview
 
-This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a complete secure communication workflow, from initial key provisioning to real-time encrypted messaging.
+This repository contains the embedded software for a secure Li-Fi transmitter (the Pico) and the necessary host-side components to manage it. The system is designed to showcase a secure communication workflow example, from initial key provisioning to real-time encrypted messaging.
 
 -   **Sender (Raspberry Pi Pico)**: A powerful Li-Fi transmitter that encrypts messages using a persistent session key with AES-GCM mode. It operates autonomously and can be managed remotely via a command interface.
 -   **Receiver/Controller (Host)**: A host system (like a Raspberry Pi 4 or a PC) is responsible for the initial provisioning of the session key and can be used to receive and decrypt the Li-Fi messages.
@@ -54,7 +54,7 @@ This repository contains the embedded software for a secure Li-Fi transmitter (t
 ## Key Features:
 
 - **Authenticated Encryption:**  
-&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-256-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
+&nbsp;&nbsp;&nbsp;&nbsp;Utilizes **AES-12-GCM** for state-of-the-art encryption and message authentication, protecting against both eavesdropping and tampering.
 
 - **Robust Key Persistence:**  
 &nbsp;&nbsp;&nbsp;&nbsp;Implements a redundant **A/B slot system** in the Pico's flash memory to ensure the session key survives reboots and power loss. The system automatically falls back to a valid key if one slot is corrupted.
@@ -114,7 +114,7 @@ sst-c-api/embedded
 │   └── sst_crypto_embedded.h   # Embedded crypto API definitions
 │
 ├── 📁 lib/
-│   └── mbedtls/                # mbedTLS cryptographic library source
+│   └── 📁 mbedtls/             # mbedTLS cryptographic library source
 │   ├── 📁 pico-sdk/            # Raspberry Pi Pico C/C++ SDK
 │   └── 📁 picotool/            # CLI utility for Pico boards
 │
@@ -122,7 +122,7 @@ sst-c-api/embedded
 │   ├── CMakeLists.txt          # Receiver build configuration
 │   ├── 📁 config/              # Receiver-specific config files
 │   ├── 📁 src/                 # Receiver source code
-│   ├── sst.config              # Receiver runtime configuration
+│   ├── lifi_receiver.config    # Receiver runtime configuration
 │   └── update-credentials.sh   # Script to update stored credentials
 │
 ├── 📁 sender/
@@ -167,20 +167,25 @@ For full details on the board headers:
 | **Ground**   | GND (Pin 38)      | Pin 6           | GND       | Common ground required     |
 
 > ⚠️ TX ↔ RX must cross: Pico TX → Pi RX, Pico RX ← Pi TX.
+#### TX = Transmit: The pin that sends data. 
+#### RX = Receive: The pin that receives data.
+#### Should not be RX -> RX only TX -> RX or RX -> TX
 
 ---
 
 ## ⚙️ Pico Firmware Setup
 
 ```c
-#define UART_ID uart1
-#define UART_TX_PIN 4
-#define UART_RX_PIN 5
-#define BAUD_RATE 1000000
+#define UART_ID uart1  // Use hardware UART1 (separate from USB debug/stdio)
+#define UART_TX_PIN 4 // GPIO4 → TX line for Pico → Pi4 (sending data out)
+#define UART_RX_PIN 5 // GPIO5 → RX line for Pico ← Pi4 (receiving session keys)
+#define BAUD_RATE 1000000 // 1 Mbps for high-throughput, low-latency key exchange
 
 uart_init(UART_ID, BAUD_RATE);
+// Map the chosen GPIO pins to the UART hardware.
 gpio_set_function(UART_TX_PIN, GPIO_FUNC_UART);
 gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
+// Allowing the pico to retrieve the session key over UART.
 ```
 
 ---
@@ -202,8 +207,9 @@ gpio_set_function(UART_RX_PIN, GPIO_FUNC_UART);
 3. Open the port at 1 Mbps:
 
    ```bash
-   stty -F /dev/serial0 1000000
-   screen /dev/serial0 1000000
+   # Configure 1M Baud rate and interface to type messages to send on pico
+   stty -F /dev/serial0 1000000 # setting to 1M Baud matches pico's firmware -> #define BAUD_RATE 1000000
+   screen /dev/serial0 1000000 # setting pico CMD interface so you can type commands like CMD: new key, CMD: print key sender, etc. directly into the Pico.
    ```
 
 ---
@@ -318,10 +324,10 @@ KEEP_BUILDS=5 ./run_build.sh pi4
 From `embedded/`:
 
 ```bash
-./artifacts/pi4/latest sst.config
+./artifacts/pi4/latest lifi_receiver.config
 ```
 
-> The receiver expects a valid `sst.config` (paths, endpoints, keys). If you get something like “Failed to find default config”, run it from `embedded/` or pass an explicit config path.
+> The receiver expects a valid `lifi_receiver.config` (paths, endpoints, keys). If you get something like “Failed to find default config”, run it from `embedded/` or pass an explicit config path.
 
 ---
 
@@ -443,7 +449,7 @@ This guide outlines the steps to provision the Pico with a session key from the 
 
 -   All hardware is connected, especially the **Pico ↔ Pi 4 UART** connection (see [wiring details](#-uart1-wiring-pico--pi-4)).
 -   The firmware and executables have been built successfully using `./run_build.sh`.
--   The `sst.config` file is present in the `embedded/` directory and all paths are correct.
+-   The `lifi_receiver.config` file is present in the `embedded/` directory and all paths are correct.
 
 ### 2. Configure and Start the Receiver (Pi 4 / Host)
 
@@ -455,13 +461,13 @@ Before the receiver can fetch a session key, you must provide it with the necess
     ```bash
     ./receiver/update-credentials.sh
     ```
-    Follow the prompts to provide the paths to your PEM-encoded credential files. This will update the `sst.config` file.
+    Follow the prompts to provide the paths to your PEM-encoded credential files. This will update the `lifi_receiver.config` file.
 
 2.  **Start the Receiver**:  
     With the credentials configured, run the receiver program. It will connect to the SST Auth to get a 16-byte session key and then send it to the Pico.
 
     ```bash
-    ./artifacts/pi4/latest sst.config
+    ./artifacts/pi4/latest lifi_receiver.config
     ```
 
 3.  **Monitor Output**:  
@@ -504,7 +510,7 @@ You can manage the session key from the Pico's serial console.
 
 ---
 
-### 3) Live commands (remote management)
+### Live commands (remote management)
 
 Use the on-device command interface over the Pico’s USB serial:
 

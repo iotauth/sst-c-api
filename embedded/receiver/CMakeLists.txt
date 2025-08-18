@@ -52,5 +52,5 @@ target_compile_options(receiver_flash PRIVATE -Wall -Wextra -Wno-unused-paramete
 
 # Quote the default config path define
 target_compile_definitions(receiver_flash PRIVATE
-  DEFAULT_SST_CONFIG_PATH=\"../../receiver/sst.config\"
+  DEFAULT_SST_CONFIG_PATH=\"../../receiver/lifi_receiver.config\"
 )

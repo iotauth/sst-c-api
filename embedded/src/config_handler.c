@@ -88,6 +88,6 @@ const char* get_config_path(const char* path) {
     } else {
         // No path provided, use the default filename. After chdir, this is
         // correct.
-        return "sst.config";
+        return "lifi_receiver.config";
     }
 }
