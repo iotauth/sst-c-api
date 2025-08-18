@@ -443,11 +443,11 @@ This guide outlines the steps to provision the Pico with a session key from the 
 
 -   All hardware is connected, especially the **Pico ↔ Pi 4 UART** connection (see [wiring details](#-uart1-wiring-pico--pi-4)).
 -   The firmware and executables have been built successfully using `./run_build.sh`.
--   The `sst.config` file is present in the `embedded/` directory and correctly configured for your SST service.
+-   The `sst.config` file is present in the `embedded/` directory and all paths are correct.
 
 ### 2. Configure and Start the Receiver (Pi 4 / Host)
 
-Before the receiver can fetch a session key, you must provide it with the necessary credentials to authenticate with the SST service.
+Before the receiver can fetch a session key, you must provide it with the necessary credentials to authenticate with the SST Auth.
 
 1.  **Update Credentials**:  
     Run the interactive script to configure the client certificate, private key, and CA certificate paths that the receiver will use.
@@ -458,7 +458,7 @@ Before the receiver can fetch a session key, you must provide it with the necess
     Follow the prompts to provide the paths to your PEM-encoded credential files. This will update the `sst.config` file.
 
 2.  **Start the Receiver**:  
-    With the credentials configured, run the receiver program. It will connect to the SST service to get a 16-byte session key and then send it to the Pico.
+    With the credentials configured, run the receiver program. It will connect to the SST Auth to get a 16-byte session key and then send it to the Pico.
 
     ```bash
     ./artifacts/pi4/latest sst.config
