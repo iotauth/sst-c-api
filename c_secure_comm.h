@@ -26,24 +26,6 @@ typedef enum {
     UNKNOWN_INTERNAL_ERROR,
 } auth_alert_code;
 
-// Parses the the reply message sending to Auth.
-// Concat entity, auth nonce and information such as sender
-// and purpose obtained from the config file.
-// @param entity_nonce entity's nonce
-// @param auth_nonce received auth's nonce
-// @param num_key number of keys to receive from auth
-// @param sender name of sender
-// @param sender_length length of sender
-// @param purpose purpose to get session key
-// @param purpose_length length of purpose
-// @param ret_length length of return buffer
-// @return concated total buffer
-unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
-                                          unsigned char *auth_nonce,
-                                          int num_key, char *sender,
-                                          char *purpose,
-                                          unsigned int *ret_length);
-
 // Handles the AUTH_HELLO message.
 // Checks if the auth_id received from the Auth matches with the auth_id loaded
 // from the config. Then, creates the entity_nonce, and sends an auth request
@@ -60,38 +42,13 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
                       unsigned char *entity_nonce, int sock, int num_key,
                       char *purpose, int requestIndex);
 
-// Encrypt the message and send the request message to Auth.
-// @param serialized total message
-// @param serialized_length length of message
-// @param ctx config struct obtained from load_config()
-// @param sock socket number
-// @param requestIndex request index for purpose
-void send_auth_request_message(unsigned char *serialized,
-                               unsigned int serialized_length, SST_ctx_t *ctx,
-                               int sock, int requestIndex);
-
 // Parse the data buffer and save distribution key into ctx
 // @param data_buf total data buffer
 // @param ctx config struct obtained from load_config()
 // @param key_size size of the public crypto key
-void save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
-                           size_t key_size);
-
-// Used in parse_session_key_response() for index.
-// @param buf input buffer with crypto spec
-// @param buf_length length of buf
-// @param offset buffer index
-// @param return_to_length length of return buffer
-// @return buffer with crypto spec
-unsigned char *parse_string_param(unsigned char *buf, unsigned int buf_length,
-                                  int offset, unsigned int *return_to_length);
-
-// Store the session key in the session key struct
-// Must free when session_key expired or usage finished.
-// @param ret session key struct to save key info
-// @param buf input buffer with session key
-// @return index number for another session key
-unsigned int parse_session_key(session_key_t *ret, unsigned char *buf);
+// @return 0 for success, -1 for fail
+int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
+                          size_t key_size);
 
 // Parses the handshake1 buffer to send.
 // First generates the entity client's nonce to send to entity server,
@@ -137,17 +94,12 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
 // @param decrypted_data decrypted buffer including sequence number and payload
 // @param decrypted_buf_length length of decrypted buffer
 // @param SST_session_ctx_t session ctx struct
-
-void decrypt_received_message(unsigned char *encrypted_data,
-                              unsigned int encrypted_data_length,
-                              unsigned char *decrypted_data,
-                              unsigned int *decrypted_buf_length,
-                              SST_session_ctx_t *session_ctx);
-
-// Check the validity of session key by checking abs_validity
-// @param session_key_t session_key to check validity
-// @return 1 when expired, 0 when valid
-int check_session_key_validity(session_key_t *session_key);
+// @return 0 for success, -1 for fail
+int decrypt_received_message(unsigned char *encrypted_data,
+                             unsigned int encrypted_data_length,
+                             unsigned char *decrypted_data,
+                             unsigned int *decrypted_buf_length,
+                             SST_session_ctx_t *session_ctx);
 
 // Check if entity has session key and if not, request the session key to Auth.
 // @param ctx config struct obtained from load_config()
@@ -196,12 +148,6 @@ int find_session_key(unsigned int key_id, session_key_list_t *s_key_list);
 void add_session_key_to_list(session_key_t *s_key,
                              session_key_list_t *existing_s_key_list);
 
-// Copys session key from src to dest.
-// Does not free the src's session key. Free must needed.
-// @param dest Session key destination pointer to copy to.
-// @param src Session key src pointer to copy.
-void copy_session_key(session_key_t *dest, session_key_t *src);
-
 // Appends src list to dest list.
 // Appends at the destination list's rear_idx.
 // @param dest Destination session_key_list
@@ -217,7 +163,7 @@ void update_validity(session_key_t *session_key);
 // if the keys are valid.
 // @param requested_num_key the requested number of keys to add.
 // @param session_key_list_t session_key list to check left space for list, and
-// @return 1 when unaddable, 0 when addable
+// @return 1 when addable, 0 if cannot add.
 int check_session_key_list_addable(int requested_num_key,
                                    session_key_list_t *s_ley_list);
 

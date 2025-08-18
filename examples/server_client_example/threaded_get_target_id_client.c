@@ -10,7 +10,6 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
     FILE *fp = fopen(file_path, "wb");
@@ -25,13 +24,19 @@ void write_session_key_to_file(session_key_t *s_key, const char *file_path) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Too many arguments. Usage: %s <config_path>\n",
+        SST_print_error_exit("Too many arguments. Usage: %s <config_path>",
                              argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
 
     const char *file_paths[] = {"s_key_id0.dat", "s_key_id1.dat",
                                 "s_key_id2.dat"};

@@ -49,20 +49,26 @@ int main(int argc, char *argv[]) {
 
     std::string config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path.c_str());
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     session_key_list_t *s_key_list = init_empty_session_key_list();
     ctx->config->purpose_index = 0;
     std::vector<char> file_name(BUFF_SIZE);
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];
 
-    receive_data_and_download_file(received_skey_id.data(), ctx,
-                                   file_name.data(), &estimate_time[0]);
+    if (receive_data_and_download_file(received_skey_id.data(), ctx,
+                                       file_name.data(),
+                                       &estimate_time[0]) < 0) {
+        SST_print_error_exit("Failed receive_data_and_download_file().");
+    }
 
     session_key_t *session_key =
         get_session_key_by_ID(received_skey_id.data(), ctx, s_key_list);
 
     if (session_key == NULL) {
-        std::cerr << "There is no session key." << std::endl;
+        std::cerr << "Failed to get_session_key_by_ID()." << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -73,7 +79,9 @@ int main(int argc, char *argv[]) {
 
     std::string available_filename = getAvailableFilename(base, ext);
 
-    file_decrypt_save(*session_key, file_name.data());
+    if (file_decrypt_save(*session_key, file_name.data()) < 0) {
+        SST_print_error_exit("Failed file_decrypt_save()");
+    }
 
     // Step 1. Create Hash
 
@@ -99,15 +107,24 @@ int main(int argc, char *argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    digest_message_SHA_256(reinterpret_cast<unsigned char *>(&file_data[0]),
-                           filesize, hash_of_file.data(), &hash_length);
+    if (digest_message_SHA_256(reinterpret_cast<unsigned char *>(&file_data[0]),
+                               filesize, hash_of_file.data(),
+                               &hash_length) < 0) {
+        SST_print_error_exit("Failed digest_message_SHA_256().");
+    }
 
     // Step 2. Send hash to uploader
     // Send the computed hash (raw bytes)
     SST_session_ctx_t *session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
-                        hash_length, session_ctx);
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed secure_connect_to_server().");
+    }
+    int msg = send_secure_message(reinterpret_cast<char *>(hash_of_file.data()),
+                                  hash_length, session_ctx);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
 
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list);
