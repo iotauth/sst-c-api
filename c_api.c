@@ -609,6 +609,7 @@ int generate_random_nonce(int length, unsigned char *buf) {
         SST_print_error("Failed generate_nonce().");
         return -1;
     }
+    return 0;
 }
 
 void free_session_key_list_t(session_key_list_t *session_key_list) {
