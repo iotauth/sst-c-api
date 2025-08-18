@@ -2,7 +2,7 @@
 
 #include "c_common.h"
 
-void print_crypto_error(const char *msg) {
+static void print_crypto_error(const char *msg) {
     char err[MAX_ERROR_MESSAGE_LENGTH];
 
     ERR_load_crypto_strings();
@@ -10,7 +10,7 @@ void print_crypto_error(const char *msg) {
     printf("%s ERROR: %s\n", msg, err);
 }
 
-void *print_crypto_error_return_NULL(const char *msg) {
+static void *print_crypto_error_return_NULL(const char *msg) {
     print_crypto_error(msg);
     return NULL;
 }

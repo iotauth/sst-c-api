@@ -43,10 +43,6 @@ typedef struct {
     unsigned char sign[RSA_KEY_SIZE];
 } signed_data_t;
 
-// Print error message when the code has error.
-// @param msg message to print the error
-void print_last_error(const char *msg);
-
 // Loads auth's public key from path
 // @param path path of auth's public key
 EVP_PKEY *load_auth_public_key(const char *path);
