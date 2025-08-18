@@ -88,11 +88,11 @@ void print_buf_log(const unsigned char *buf, size_t size) {
     SST_print_log("Hex:%s", hex);
 }
 
-void generate_nonce(int length, unsigned char *buf) {
+int generate_nonce(int length, unsigned char *buf) {
     int x = RAND_bytes(buf, length);
     if (x == -1) {
         SST_print_error("Failed to create Random Nonce");
-        exit(1);
+        return -1;
     }
 }
 

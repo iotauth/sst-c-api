@@ -295,7 +295,8 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 // This is used not to directly #include OpenSSL libraries.
 // @param length Length of the nonce
 // @param buf Pointer of the buffer with the random nonce.
-void generate_random_nonce(int length, unsigned char *buf);
+// @return 0 for success, -1 for fail
+int generate_random_nonce(int length, unsigned char *buf);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free

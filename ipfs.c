@@ -133,7 +133,10 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     unsigned int encrypted_length =
         (((bufsize) / AES_128_CBC_IV_SIZE) + 1) * AES_128_CBC_IV_SIZE;
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
-    generate_nonce(AES_128_CBC_IV_SIZE, iv);
+    if (generate_nonce(AES_128_CBC_IV_SIZE, iv) < 0) {
+        SST_print_error("Failed generate_nonce().");
+        return -1;
+    }
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
                     encrypted, &encrypted_length) < 0) {
         SST_print_error("Encryption failed!");
@@ -248,8 +251,7 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
         SST_print_error("Failed sst_write_to_socket().");
         return -1;
     }
-    SST_print_log(
-        "Send the data such as sessionkey id, hash value for file. ");
+    SST_print_log("Send the data such as sessionkey id, hash value for file. ");
     return 0;
 }
 

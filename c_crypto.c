@@ -368,7 +368,10 @@ static int get_symmetric_encrypt_authenticate_buffer(
     // The return of encrypt_AES will look like this.
     // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
     // First attach IV.
-    generate_nonce(iv_size, ret);
+    if (generate_nonce(iv_size, ret) < 0) {
+        SST_print_error("Failed generate_nonce().");
+        return -1;
+    }
     unsigned int total_length = 0;
     // Attach encrypted buffer
     if (cipher_key_size == AES_128_KEY_SIZE_IN_BYTES) {

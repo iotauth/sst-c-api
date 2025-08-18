@@ -90,7 +90,8 @@ void print_buf_log(const unsigned char *buf, size_t size);
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.
 // @param buf buffer to save the generated nonce.
-void generate_nonce(int length, unsigned char *buf);
+// @return 0 for success, -1 for fail
+int generate_nonce(int length, unsigned char *buf);
 
 // Write number num in buffer size of n.
 // @param num number to write in buffer

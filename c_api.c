@@ -492,7 +492,10 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
                                         unsigned int salt_len) {
     // Generate IV.
     unsigned char iv[AES_BLOCK_SIZE];
-    generate_nonce(AES_BLOCK_SIZE, iv);
+    if (generate_nonce(AES_BLOCK_SIZE, iv) < 0) {
+        SST_print_error("Failed generate_nonce().");
+        return -1;
+    }
 
     // Serialize session_key_list into buffer.
     unsigned int buffer_len = sizeof(session_key_list_t) +
@@ -601,8 +604,11 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
 }
 
-void generate_random_nonce(int length, unsigned char *buf) {
-    generate_nonce(length, buf);
+int generate_random_nonce(int length, unsigned char *buf) {
+    if (generate_nonce(length, buf) < 0) {
+        SST_print_error("Failed generate_nonce().");
+        return -1;
+    }
 }
 
 void free_session_key_list_t(session_key_list_t *session_key_list) {
