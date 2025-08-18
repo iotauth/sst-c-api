@@ -9,4 +9,3 @@ format:
 .PHONY: format-check
 format-check:
 	clang-format --dry-run --Werror -style=file $(FILES)
-	
