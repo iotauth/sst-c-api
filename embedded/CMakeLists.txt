@@ -1,9 +1,18 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_SDK_DISABLE_MBEDTLS 1)   # stops the SDK from bringing its mbedTLS
-# --- Lock Pico SDK to the submodule in embedded/lib/pico-sdk ---
-set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/embedded/lib/pico-sdk"
-    CACHE PATH "Path to the Pico SDK" FORCE)
+
+# --- Handle PICO_SDK_PATH ---
+if(NOT DEFINED PICO_SDK_PATH AND DEFINED ENV{PICO_SDK_PATH})
+  set(PICO_SDK_PATH $ENV{PICO_SDK_PATH} CACHE PATH "Path to the Pico SDK")
+endif()
+if(NOT DEFINED PICO_SDK_PATH)
+  set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/pico-sdk"
+      CACHE PATH "Path to the Pico SDK")
+endif()
+# Re-export for tools/sub-configs
+set(ENV{PICO_SDK_PATH} "${PICO_SDK_PATH}")
+message(STATUS "PICO_SDK_PATH=${PICO_SDK_PATH}")
 
 # --- Read .build_target (supports either BUILD_TARGET=... or TARGET=...) ---
 set(BUILD_TARGET "")
@@ -23,10 +32,6 @@ if(BUILD_TARGET STREQUAL "")
   message(FATAL_ERROR "No build target selected. Run: ./set_build pico | pi4")
 endif()
 
-# --- Lock Pico SDK to submodule ---
-set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/lib/pico-sdk"
-    CACHE PATH "Path to the Pico SDK (fixed to submodule)" FORCE)
-
 # Import Pico SDK *only* for Pico builds (before project())
 if(BUILD_TARGET STREQUAL "pico")
   ## ------ AVOID DEFAULT CONFIGURE MESSAGES ---------- ##
@@ -38,12 +43,14 @@ if(BUILD_TARGET STREQUAL "pico")
   set(PICO_PLATFORM rp2040 CACHE STRING "Pico platform")
   set(PICO_BOARD    pico   CACHE STRING "Pico board")
   ## ------- END OF AVOID DEFAULT CONFIGURE ------ ##
-  if(NOT EXISTS "${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
+
+  if(NOT EXISTS "${PICO_SDK_PATH}/pico_sdk_init.cmake")
     message(FATAL_ERROR "pico-sdk submodule missing at ${PICO_SDK_PATH}. Run: git submodule update --init --recursive")
   endif()
-  include("${PICO_SDK_PATH}/external/pico_sdk_import.cmake")
+  include("${PICO_SDK_PATH}/pico_sdk_init.cmake")
 endif()
 
+message(STATUS "BUILD_TARGET=${BUILD_TARGET}")
 project(sst_embedded LANGUAGES C CXX ASM)
 
 # Initialize SDK & sanity (Pico only)
@@ -57,9 +64,6 @@ if(BUILD_TARGET STREQUAL "pico")
     message(FATAL_ERROR "ARM GCC not found. Install: sudo apt install gcc-arm-none-eabi libnewlib-arm-none-eabi")
   endif()
 endif()
-
-message(STATUS "BUILD_TARGET=${BUILD_TARGET}")
-message(STATUS "PICO_SDK_PATH=${PICO_SDK_PATH}")
 
 
 # Choose a per-subproject binary dir under the target root

@@ -95,10 +95,18 @@ if [[ "$BUILD_TARGET" == "pico" ]]; then
     fi
 
     echo "🔧 Building local picotool (once) ..."
+    : "${PICO_SDK_PATH:=$here/lib/pico-sdk}"   # default to our submodule
+    if [[ ! -f "$PICO_SDK_PATH/pico_sdk_init.cmake" ]]; then
+      echo "Error: pico-sdk submodule missing at: $PICO_SDK_PATH"
+      echo "Run: git submodule update --init --recursive"
+      exit 1
+    fi
+    export PICO_SDK_PATH
     cmake -S "$here/lib/picotool" -B "$here/build/_picotool" \
           -DCMAKE_BUILD_TYPE=Release \
           -DCMAKE_INSTALL_PREFIX="$tool_prefix" \
-          -DCMAKE_INSTALL_LIBDIR=lib
+          -DCMAKE_INSTALL_LIBDIR=lib \
+          -DPICO_SDK_PATH="$PICO_SDK_PATH"
     cmake --build "$here/build/_picotool" -j
     cmake --install "$here/build/_picotool"
 
