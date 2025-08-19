@@ -255,50 +255,48 @@ sudo apt install -y libusb-1.0-0-dev pkg-config
 **Optional speed-ups:**
 Install `ninja-build` to make builds faster on repeats
 
-## 1) Clone (with submodules)
+## 1) Clone (+ submodules) with ssh
 
 ```bash
 git clone --recurse-submodules https://github.com/iotauth/sst-c-api.git
 cd sst-c-api/embedded
+```
+If already inside clone:
+```bash
 # (If you forgot --recurse-submodules)
 git submodule update --init --recursive
 ```
-
-> We pin the Pico SDK, Mbed TLS, and picotool as submodules under `embedded/lib/`.
-## set a /pico-sdk path (fix laterc)
-```
-echo 'export PICO_SDK_PATH="$HOME/sst-c-api/embedded/lib/pico-sdk"' >> ~/.bashrc
-```
-```
-source ~/.bashrc
-
-```
+- Note: perform right inside `/sst-c-api` project root folder
+- We pin the Pico SDK, Mbed TLS, and picotool as submodules under `sst-c-api/embedded/lib/`.
+## OPTIONAL: set a 'pico-sdk' path
+> you can set a global PICO_SDK_PATH for embedded/CMakeLists.txt, but it will automatically configure to embedded/lib/pico-sdk
+- handled when running `make_build.sh` and `run_build.sh` scripts
 ## 2) Pick a target (one-liner)
 > from inside sst-c-api/embedded/
-
 ```bash
+cd embedded
 ./set_build.sh pico    # or: ./set_build pi4
 ```
 
-This writes `.build_target` and tells the scripts which tree to build.
+This writes `.build_target` and tells the scripts which tree to build (pico OR pi 4).
 
 ## 3) Build
 
 ```bash
-./run_build.sh pico    # builds to build/pico/, copies artifacts to artifacts/pico/
-# or
-./run_build.sh pi4     # builds to build/pi4/,   copies artifacts to artifacts/pi4/
+./run_build.sh pico    # --- OR pi4 --- builds to build/pico/, copies artifacts to artifacts/pico/
 ````
-
-* On the **first Pico build**, we will build and “install” a local **picotool** under `embedded/.tooling/picotool/` and wire CMake to use it automatically.
-* Subsequent runs **reuse** it (no warning spam, no re-build).
-
+* Very first `./run_build.sh pico` will take a while but after that it'll run faster (by reusing .tooling/)
+* ^ it will build and “install” a local **picotool** under `embedded/.tooling/picotool/` and wire CMake to use it automatically.
+* Subsequent runs:
+* * **reuse** .tooling/ (no warning spam, no re-build).
+* * cleans the build so no need to `rm -rf build`.
+* * cleans the `artifacts/pico` (or pi4) folder based on how many `KEEP_BUILDS` are set
 ### Where to find results
 
 * **Pico:** `artifacts/pico/latest.uf2` (+ `latest.uf2.sha256`, `latest.json`)
 * **Pi4:**  `artifacts/pi4/latest` (executable) (+ `latest.sha256`, `latest.json`)
 
-We also keep a short **history** of prior builds next to `latest*`, and prune to the last **3** build sets by default. Override per run:
+We keep a short **history** of prior builds next to `latest*`, and prune to the last **3** build sets by default. Override per run:
 
 ```bash
 KEEP_BUILDS=5 ./run_build.sh pi4
@@ -320,6 +318,12 @@ KEEP_BUILDS=5 ./run_build.sh pi4
 ---
 
 ## 4) Running the receiver (Pi4/Linux)
+The paths are updated under /receiver/credentials and is handled by first running from inside receiver:
+```bash
+cd receiver
+./update-credentials
+cd .. # return to embedded
+```
 
 From `embedded/`:
 
