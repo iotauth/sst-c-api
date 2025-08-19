@@ -1,6 +1,6 @@
 /**
  * @file multi_thread_get_session_key_test.c
- * @author your name (you@domain.com)
+ * @author Dongha Kim
  * @brief Test get_session_key() in multiple threads.
  * This tests if get_session_key() can be called in multiple threads without
  * mutex locks. However, this test nondeterministically fails.
