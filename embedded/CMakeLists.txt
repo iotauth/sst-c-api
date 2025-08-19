@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.13)
 
 set(PICO_SDK_DISABLE_MBEDTLS 1)   # stops the SDK from bringing its mbedTLS
+# --- Lock Pico SDK to the submodule in embedded/lib/pico-sdk ---
+set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/embedded/lib/pico-sdk"
+    CACHE PATH "Path to the Pico SDK" FORCE)
 
 # --- Read .build_target (supports either BUILD_TARGET=... or TARGET=...) ---
 set(BUILD_TARGET "")
