@@ -1,0 +1,2 @@
+BUILD_TARGET=pico
+OUT_DIR=pico
