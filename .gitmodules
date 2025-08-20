@@ -1,3 +1,0 @@
-[submodule "embedded"]
-	path = embedded
-	url = git@github.com:JFelix000/sst-embedded.git
