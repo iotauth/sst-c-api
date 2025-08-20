@@ -1,6 +1,5 @@
 // sst_crypto_embedded.c
 #include "../include/sst_crypto_embedded.h"
-
 #include "mbedtls/gcm.h"
 
 int sst_encrypt_gcm(const uint8_t *key, const uint8_t *nonce,
