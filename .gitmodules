@@ -1,7 +1,3 @@
-[submodule "embedded/lib/mbedtls"]
-	path = embedded/lib/mbedtls
-	url = https://github.com/Mbed-TLS/mbedtls.git
-	branch = mbedtls-3.5.1
 [submodule "embedded/lib/pico-sdk"]
 	path = embedded/lib/pico-sdk
 	url = https://github.com/raspberrypi/pico-sdk.git
