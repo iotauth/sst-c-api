@@ -152,17 +152,12 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
     return ret;
 }
 
-// Check the validity of the buffer.
-// @param validity unsigned char buffer to check.
-// @return -1 when expired, 0 when valid
-static int check_validity(unsigned char *validity) {
-    if ((uint64_t)time(NULL) >
-        read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        SST_print_error("Session key expired!");
-        return -1;
-    } else {
-        return 0;
-    }
+// Check absolute validity time.
+// @param abs_validity_ms  Expiration time in ms (uint64_t).
+// @return -1 when expired, 0 when still valid.
+static int check_validity(uint64_t abs_validity_ms) {
+    uint64_t current_ms = (uint64_t)time(NULL) * 1000ULL;  // seconds → ms
+    return (current_ms >= abs_validity_ms) ? -1 : 0;
 }
 
 // Separate the message received from Auth and
@@ -172,9 +167,10 @@ static int check_validity(unsigned char *validity) {
 // @param buf input buffer with distribution key
 static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
                                    unsigned char *buf) {
-    memcpy(parsed_distribution_key->abs_validity, buf,
-           DIST_KEY_EXPIRATION_TIME_SIZE);
+    parsed_distribution_key->abs_validity =
+        read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
+
     unsigned int cipher_key_size = buf[cur_index];
     parsed_distribution_key->cipher_key_size = cipher_key_size;
     cur_index += 1;
@@ -229,9 +225,13 @@ static unsigned char *parse_string_param(unsigned char *buf,
 static unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
-    memcpy(ret->abs_validity, buf + cur_idx, ABS_VALIDITY_SIZE);
+
+    ret->abs_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, ABS_VALIDITY_SIZE);
     cur_idx += ABS_VALIDITY_SIZE;
-    memcpy(ret->rel_validity, buf + cur_idx, REL_VALIDITY_SIZE);
+
+    ret->rel_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, REL_VALIDITY_SIZE);
     cur_idx += REL_VALIDITY_SIZE;
 
     // copy cipher_key
@@ -877,12 +877,8 @@ void append_session_key_list(session_key_list_t *dest,
 }
 
 void update_validity(session_key_t *session_key) {
-    write_in_n_bytes(
-        (time(NULL) + read_unsigned_long_int_BE(session_key->rel_validity,
-                                                KEY_EXPIRATION_TIME_SIZE) /
-                          1000) *
-            1000,
-        KEY_EXPIRATION_TIME_SIZE, session_key->abs_validity);
+    session_key->abs_validity =
+        ((uint64_t)time(NULL) * 1000) + session_key->rel_validity;
 }
 
 int check_session_key_list_addable(int requested_num_key,
