@@ -214,7 +214,7 @@ int main(int argc, char* argv[]) {
                                 decrypted[msg_len] =
                                     '\0';  // Null-terminate the decrypted
                                            // message
-                                printf("Decrypted: %s\n", decrypted);
+                                printf("%s\n", decrypted);
 
                                 // If the decrypted message is "I have the key",
                                 // stop sending the key.

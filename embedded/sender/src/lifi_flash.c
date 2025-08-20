@@ -36,7 +36,7 @@ int main() {
     pico_nonce_init();
 
     // Enable watchdog with a 5-second timeout. It will be paused on debug.
-    watchdog_enable(5000, 1);
+    // watchdog_enable(5000, 1);
 
     int current_slot = 0;  // 0 = A, 1 = B
 
@@ -79,7 +79,8 @@ int main() {
 
         // Wait up to 20 seconds to receive a new session key over UART
         if (receive_new_key_with_timeout(
-                session_key, 20000)) {  // 20 seconds to set up session key
+                session_key,
+                20000)) {  // changed to a long time for testing
             print_hex("Received session key: ", session_key, SST_KEY_SIZE);
             // Attempt to save the newly received key to flash
             if (store_session_key(session_key)) {
@@ -126,16 +127,17 @@ int main() {
 
     while (true) {
         printf("Enter a message to send over LiFi:\n");
-
+        // can add function to show A(VALID): or A(INVALID): or B(VALID): etc..
+        //  in message preview -- show validity and which slot we are on !
         size_t msg_len = 0;
         int ch;  // character
         uint8_t ciphertext[256] = {0};
         uint8_t tag[SST_TAG_SIZE] = {0};
 
-        while (1) {
-            ch = getchar_timeout_us(500000);  // 0.5 second timeout
+        for (;;) {
+            ch = getchar_timeout_us(1000);  // poll USB CDC every 1 ms
             if (ch == PICO_ERROR_TIMEOUT) {
-                watchdog_update();
+                // watchdog_update(); //when enabled
                 continue;
             }
 
@@ -158,18 +160,6 @@ int main() {
             }
         }
 
-        // Check if message exceeds the encryption buffer size
-        if (msg_len > sizeof(ciphertext)) {
-            printf("Message too long!\n");
-            continue;
-        }
-        // Ensure session key is valid before proceeding with encryption
-        if (is_key_zeroed(session_key)) {
-            printf("No valid key in the current slot. Cannot send message.\n");
-            printf("Use 'CMD: new key' or switch to a valid slot.\n");
-            continue;
-        }
-
         // Check if the message is actually a command (starts with "CMD:")
         if (strncmp(message_buffer, "CMD:", 4) == 0) {
             // Extract the command part (skip the "CMD:" prefix)
@@ -186,14 +176,22 @@ int main() {
                 pico_nonce_on_key_change();
             }
 
-            // Run the command handler again for side effects that don’t change
-            // the key (such as printing, status queries, or debug commands).
-            handle_commands(cmd, session_key, &current_slot);
-
             // Clear out the message buffer so stale command data isn’t reused.
             memset(message_buffer, 0, sizeof(message_buffer));
 
             // Skip the normal "send over LiFi" logic since this was a command.
+            continue;
+        }
+
+        // Check if message exceeds the encryption buffer size
+        if (msg_len > sizeof(ciphertext)) {
+            printf("Message too long!\n");
+            continue;
+        }
+        // Ensure session key is valid before proceeding with encryption
+        if (is_key_zeroed(session_key)) {
+            printf("No valid key in the current slot. Cannot send message.\n");
+            printf("Use 'CMD: new key' or switch to a valid slot.\n");
             continue;
         }
 

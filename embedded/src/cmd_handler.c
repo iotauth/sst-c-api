@@ -9,13 +9,8 @@
 // Return true iff the effective session key changed (loaded, replaced, or
 // cleared)
 bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
-    if (strcmp(cmd, " print key") == 0 ||
-        strcmp(cmd, " print key sender") == 0) {
-        print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
-        return false;
-    } else if (strcmp(cmd, " print key *") == 0) {
-        print_hex("Sender's session key: ", session_key, SST_KEY_SIZE);
-        printf("Check receiver printed key.\n");
+    if (strcmp(cmd, " print slot key") == 0) {
+        print_hex("slot's session key: ", session_key, SST_KEY_SIZE);
         return false;
     } else if (strcmp(cmd, " slot status") == 0) {
         pico_print_slot_status(*current_slot);
@@ -165,7 +160,7 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
         secure_zero(newk, sizeof(newk));
         return true;
 
-    } else if (strcmp(cmd, " print slot keys *") == 0) {
+    } else if (strcmp(cmd, " print slot key *") == 0) {
         pico_print_key_from_slot(0);
         pico_print_key_from_slot(1);
         return false;
@@ -178,20 +173,19 @@ bool handle_commands(const char *cmd, uint8_t *session_key, int *current_slot) {
 
     } else if (strcmp(cmd, " help") == 0) {
         printf("Available Commands:\n");
-        printf("  CMD: print key\n");
-        printf("  CMD: print key sender\n");
-        printf("  CMD: print key *\n");
-        printf("  CMD: print slot keys *\n");
+        printf("  CMD: print slot key      (print key in current slot)\n");
+        printf("  CMD: print slot key *    (print keys in all slots)\n");
         printf("  CMD: clear slot A\n");
         printf("  CMD: clear slot B\n");
-        printf("  CMD: clear slot *\n");
+        printf("  CMD: clear slot *        (clear all slot keys)\n");
         printf("  CMD: use slot A\n");
         printf("  CMD: use slot B\n");
         printf(
-            "  CMD: new key         (request new key only if current slot is "
+            "  CMD: new key           (request new key only if current slot is "
             "empty)\n");
-        printf("  CMD: new key -f      (force overwrite current slot)\n");
-        printf("  CMD: slot status     (show slot validity and active slot)\n");
+        printf("  CMD: new key -f        (force overwrite current slot)\n");
+        printf(
+            "  CMD: slot status       (show slot validity and active slot)\n");
         printf("  CMD: reboot\n");
         printf("  CMD: help\n");
         return false;
