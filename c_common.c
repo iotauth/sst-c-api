@@ -203,6 +203,10 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         return -1;
     }
     int bytes_read = sst_read_from_socket(socket, buf, buf_length);
+    if (bytes_read <= 0) {
+        SST_print_error("Failed to read from socket reading the payload.");
+        return bytes_read;
+    }
     if ((unsigned int)bytes_read != ret_length) {
         SST_print_error("Wrong read... Exiting..");
         return -1;

@@ -7,9 +7,6 @@
 #include "c_secure_comm.h"
 #include "load_config.h"
 
-extern unsigned char entity_client_state;
-extern unsigned char entity_server_state;
-
 SST_ctx_t *init_SST(const char *config_path) {
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
     // By default OpenSSL will attempt to clean itself up when the process exits
@@ -129,7 +126,7 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
         return NULL;
     }
     free(parsed_buf);
-    entity_client_state = HANDSHAKE_1_SENT;
+    int entity_client_state = HANDSHAKE_1_SENT;
 
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
@@ -226,7 +223,7 @@ SST_session_ctx_t *server_secure_comm_setup(
     session_ctx->sent_seq_num = 0;
     session_ctx->sock = clnt_sock;
 
-    entity_server_state = IDLE;
+    int entity_server_state = IDLE;
     unsigned char server_nonce[HS_NONCE_SIZE];
 
     session_key_t *s_key = NULL;

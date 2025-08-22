@@ -5,9 +5,6 @@
 #include "c_common.h"
 #include "c_crypto.h"
 
-unsigned char entity_client_state;
-unsigned char entity_server_state;
-
 typedef enum {
     INIT,
     AUTH_HELLO_RECEIVED,
