@@ -16,8 +16,8 @@ struct ThreadArgs {
 };
 
 // For pthread_create()
-void* receive_and_print_messages(void* thread_args) {
-    ThreadArgs* args = static_cast<ThreadArgs*>(thread_args);
+void *receive_and_print_messages(void *thread_args) {
+    ThreadArgs *args = static_cast<ThreadArgs *>(thread_args);
     int clnt_sock = args->client_sock;
     SST_ctx_t *ctx = args->ctx;
     session_key_list_t *s_key_list = args->s_key_list;
@@ -36,8 +36,7 @@ void* receive_and_print_messages(void* thread_args) {
     unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     // Receive messages from client
     for (;;) {
-        int ret =
-            read_secure_message(received_buf, session_ctx);
+        int ret = read_secure_message(received_buf, session_ctx);
         if (ret < 0) {
             std::cerr << "Failed to read secure message." << std::endl;
             break;
@@ -47,7 +46,7 @@ void* receive_and_print_messages(void* thread_args) {
         }
         // Process the received_buf message
         std::cout.write(reinterpret_cast<const char *>(received_buf), ret);
-        std::cout << std::endl; // if you want a newline
+        std::cout << std::endl;  // if you want a newline
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";
@@ -112,7 +111,7 @@ int main(int argc, char *argv[]) {
         }
         std::cout << "New client: socket " << clnt_sock << std::endl;
 
-        ThreadArgs* args = new ThreadArgs;
+        ThreadArgs *args = new ThreadArgs;
         args->client_sock = clnt_sock;
         args->ctx = ctx;
         args->s_key_list = s_key_list;
