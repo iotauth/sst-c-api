@@ -155,7 +155,6 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
 static int check_validity(unsigned char *validity) {
     if ((uint64_t)time(NULL) >
         read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        SST_print_error("Session key expired!");
         return -1;
     } else {
         return 0;
@@ -283,6 +282,24 @@ static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
     return 0;
 }
 
+// Check the validity of session key by checking abs_validity
+// @param session_key_t session_key to check validity
+// @return -1 when expired, 0 when valid
+static int check_session_key_validity(session_key_t *session_key) {
+    int ret = check_validity(session_key->abs_validity);
+    SST_print_debug("Session key expired!");
+    return ret;
+}
+
+// Check the validity of distribution key by checking abs_validity
+// @param distribution_key_t distribution_key to check validity
+// @return -1 when expired, 0 when valid
+static int check_distribution_key_validity(distribution_key_t *dist_key) {
+    int ret = check_validity(dist_key->abs_validity);
+    SST_print_debug("Distribution key expired!");
+    return ret;
+}
+
 // Encrypt the message and send the request message to Auth.
 // @param serialized total message
 // @param serialized_length length of message
@@ -294,7 +311,7 @@ static int send_auth_request_message(unsigned char *serialized,
                                      unsigned int serialized_length,
                                      SST_ctx_t *ctx, int sock,
                                      int requestIndex) {
-    if (check_validity(ctx->dist_key.abs_validity) <
+    if (check_distribution_key_validity(&ctx->dist_key) <
         0) {  // when dist_key expired
         SST_print_debug(
             "Current distribution key expired, requesting new "
@@ -483,13 +500,6 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
         return NULL;
     }
     return ret;
-}
-
-// Check the validity of session key by checking abs_validity
-// @param session_key_t session_key to check validity
-// @return -1 when expired, 0 when valid
-static int check_session_key_validity(session_key_t *session_key) {
-    return check_validity(session_key->abs_validity);
 }
 
 int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
