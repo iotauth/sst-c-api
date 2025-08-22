@@ -177,8 +177,9 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
     if (received_buf_length < 0) {
-        SST_print_error_exit(
-            "Socket read eerror in read_header_return_data_buf_pointer().\n");
+        SST_print_error(
+            "Socket read error in read_header_return_data_buf_pointer().");
+        return -1;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.
