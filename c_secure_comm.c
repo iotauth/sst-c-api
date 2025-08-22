@@ -286,9 +286,12 @@ static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
 // @param session_key_t session_key to check validity
 // @return -1 when expired, 0 when valid
 static int check_session_key_validity(session_key_t *session_key) {
-    int ret = check_validity(session_key->abs_validity);
-    SST_print_debug("Session key expired!");
-    return ret;
+    if (check_validity(session_key->abs_validity) < 0) {
+        SST_print_error("Failed check_validity().");
+        return -1;
+    } else {
+        return 0;
+    }
 }
 
 // Check the validity of distribution key by checking abs_validity
