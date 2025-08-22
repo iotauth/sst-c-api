@@ -37,7 +37,7 @@ int main(int argc, char *argv[]) {
 
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
-        std::cerr << "Failed to get session key. Returning NULL.\n"
+        std::cerr << "Client failed to get session key.\n"
                   << ::std::endl;
         exit(1);
     }
@@ -102,6 +102,11 @@ int main(int argc, char *argv[]) {
                 // DOS Attack on get_session_key
                 for (int i = 0; i < repeat; ++i) {
                     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+                    if (s_key_list == NULL) {
+                        std::cerr << "Client failed to get session key in DOS Key attack.\n"
+                                << ::std::endl;
+                        exit(1);
+                    }
                 }
             } break;
 
@@ -112,6 +117,11 @@ int main(int argc, char *argv[]) {
                 // DOS Attack on secure_connect_to_server
                 for (int i = 0; i < repeat; ++i) {
                     s_key_list = get_session_key(ctx, NULL);
+                    if (s_key_list == NULL) {
+                        std::cerr << "Client failed to get session key in DOS Connect attack.\n"
+                                << ::std::endl;
+                        exit(1);
+                    }
                     session_ctx[i] = secure_connect_to_server(&s_key_list->s_key[0], ctx);
                     free_session_key_list_t(s_key_list);
                 }
