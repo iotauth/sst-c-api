@@ -12,7 +12,6 @@
 #include <stdio.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 // Define a struct to hold the thread arguments
 typedef struct {
@@ -41,6 +40,9 @@ void *call_get_session_key_by_ID(void *args) {
     pthread_mutex_lock(&ctx->mutex);
     session_key_t *session_key =
         get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
+    if (session_key == NULL) {
+        SST_print_error_exit("Failed get_session_key_by_ID().");
+    }
     pthread_mutex_unlock(&ctx->mutex);
 
     if (session_key) {
@@ -57,11 +59,14 @@ void *call_get_session_key_by_ID(void *args) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Too many arguments. Usage: %s <config_path>\n",
+        SST_print_error_exit("Too many arguments. Usage: %s <config_path>",
                              argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     pthread_mutex_init(&ctx->mutex, NULL);
 
     pthread_t threads[3];

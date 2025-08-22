@@ -13,7 +13,6 @@
 #include <unistd.h>
 
 #include "../c_api.h"
-#include "../c_common.h"
 
 void *send_request(void *SST_ctx) {
     SST_ctx_t *ctx = (SST_ctx_t *)SST_ctx;
@@ -22,6 +21,9 @@ void *send_request(void *SST_ctx) {
         // pthread_mutex_lock(&ctx->mutex);
         session_key_list_t *s_key_list = NULL;
         s_key_list = get_session_key(ctx, s_key_list);
+        if (s_key_list == NULL) {
+            SST_print_error_exit("Failed get_session_key().");
+        }
         // pthread_mutex_unlock(&ctx->mutex);
         free_session_key_list_t(s_key_list);
     }
@@ -30,10 +32,13 @@ void *send_request(void *SST_ctx) {
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     // Request one session key to just ensure getting the distribution key.
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);

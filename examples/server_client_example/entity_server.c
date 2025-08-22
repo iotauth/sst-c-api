@@ -6,11 +6,10 @@
 #include <unistd.h>
 
 #include "../../c_api.h"
-#include "../../c_common.h"
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
@@ -52,23 +51,33 @@ int main(int argc, char *argv[]) {
 
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
     session_key_list_t *s_key_list = init_empty_session_key_list();
     SST_session_ctx_t *session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
-        printf("There is no session key.\n");
+        SST_print_error_exit("Failed server_secure_comm_setup().");
     } else {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void *)session_ctx);
         sleep(1);
 
-        send_secure_message("Hello client", strlen("Hello client"),
-                            session_ctx);
+        int msg = send_secure_message("Hello client", strlen("Hello client"),
+                                      session_ctx);
+
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
         sleep(1);
-        send_secure_message("Hello client - second message",
-                            strlen("Hello client - second message"),
-                            session_ctx);
+        msg = send_secure_message("Hello client - second message",
+                                  strlen("Hello client - second message"),
+                                  session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
         sleep(2);
         pthread_cancel(thread);
         pthread_join(thread,
@@ -84,18 +93,28 @@ int main(int argc, char *argv[]) {
     }
     SST_session_ctx_t *session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
+    if (session_ctx2 == NULL) {
+        SST_print_error_exit("Failed server_secure_comm_setup().");
+    }
 
     pthread_t thread2;
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,
                    (void *)session_ctx2);
     sleep(1);
 
-    send_secure_message("Hello client 2", strlen("Hello client 2"),
-                        session_ctx2);
+    int msg;
+    msg = send_secure_message("Hello client 2", strlen("Hello client 2"),
+                              session_ctx2);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
     sleep(1);
-    send_secure_message("Hello client 2 - second message",
-                        strlen("Hello client 2 - second message"),
-                        session_ctx2);
+    msg = send_secure_message("Hello client 2 - second message",
+                              strlen("Hello client 2 - second message"),
+                              session_ctx2);
+    if (msg < 0) {
+        SST_print_error_exit("Failed send_secure_message().");
+    }
     sleep(1);
 
     sleep(3);

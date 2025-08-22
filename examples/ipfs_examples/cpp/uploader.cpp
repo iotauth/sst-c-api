@@ -25,6 +25,9 @@ int main(int argc, char* argv[]) {
     std::string my_file_path = argv[2];
     std::string add_reader_path = argv[3];
     SST_ctx_t* ctx = init_SST(config_path.c_str());
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     std::ifstream add_reader_file(add_reader_path);
     if (!add_reader_file) {
@@ -34,7 +37,10 @@ int main(int argc, char* argv[]) {
 
     std::string add_reader;
     while (std::getline(add_reader_file, add_reader)) {
-        send_add_reader_req_via_TCP(ctx, const_cast<char*>(add_reader.c_str()));
+        if (send_add_reader_req_via_TCP(
+                ctx, const_cast<char*>(add_reader.c_str())) < 0) {
+            SST_print_error_exit("Failed send_add_reader_req_via_TCP().");
+        }
     }
     add_reader_file.close();
 
@@ -51,10 +57,14 @@ int main(int argc, char* argv[]) {
     int hash_value_len = file_encrypt_upload(
         &s_key_list_0->s_key[0], ctx, const_cast<char*>(my_file_path.c_str()),
         &hash_value[0], &estimate_time[0]);
+    if (hash_value_len < 0) {
+        SST_print_error_exit("Failed file_encrypt_upload()");
+    }
 
-    upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx, &hash_value[0],
-                                  hash_value_len);
-
+    if (upload_to_file_system_manager(&s_key_list_0->s_key[0], ctx,
+                                      &hash_value[0], hash_value_len) < 0) {
+        SST_print_error_exit("Failed upload_to_file_system_manager()");
+    }
     // Step 1: Receive Hash from Downloader using Sockets
 
     int server_socket = socket(PF_INET, SOCK_STREAM, 0);
@@ -105,14 +115,20 @@ int main(int argc, char* argv[]) {
         server_secure_comm_setup(ctx, client_socket, s_key_list_0);
 
     if (session_ctx == NULL) {
-        std::cerr << "There is no session key.\n" << std::endl;
+        std::cerr << "The session is not connected.\n" << std::endl;
         return EXIT_FAILURE;
     }
 
     // Receive the hash
     unsigned char received_hash_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    if (read_secure_message(received_hash_buf, session_ctx) != HASH_SIZE) {
+    int msg_length = read_secure_message(received_hash_buf, session_ctx);
+
+    if (msg_length < 0) {
+        SST_print_error_exit("Failed to read_secure_message().");
+    }
+
+    if (msg_length != HASH_SIZE) {
         std::cerr << "Error: hash size does not match." << std::endl;
         return EXIT_FAILURE;
     }
@@ -147,7 +163,10 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    digest_message_SHA_256(&file_data[0], filesize, hash_of_file, &hash_length);
+    if (digest_message_SHA_256(&file_data[0], filesize, hash_of_file,
+                               &hash_length) < 0) {
+        SST_print_error_exit("Failed digest_message_SHA_256().");
+    }
 
     // Step 3: Compare the Hash Values
     if (std::memcmp(hash_of_file, received_hash_buf, HASH_SIZE) == 0) {

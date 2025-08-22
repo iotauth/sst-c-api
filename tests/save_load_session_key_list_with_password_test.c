@@ -14,20 +14,29 @@
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>\n", argv[0]);
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
     char *config_path = argv[1];
     SST_ctx_t *ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
 
     // Request one session key.
     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key().");
+    }
 
     const char password[] = "examplepassword";
     const char salt[] = "randomsalt";
 
     // Save the session key list with a password, and salt it.
-    save_session_key_list_with_password(s_key_list, "./sessionkey", password,
-                                        sizeof(password), salt, sizeof(salt));
+    if (save_session_key_list_with_password(s_key_list, "./sessionkey",
+                                            password, sizeof(password), salt,
+                                            sizeof(salt)) < 0) {
+        SST_print_error_exit("Failed save_session_key_list_with_password().");
+    }
 
     // Generate buffer
     const char plaintext[] = "Testing save_session_key_list_with_password().";
@@ -48,9 +57,11 @@ int main(int argc, char *argv[]) {
     session_key_list_t *new_s_key_list = init_empty_session_key_list();
 
     // Test to load the saved session key using the password.
-    load_session_key_list_with_password(new_s_key_list, "./sessionkey",
-                                        password, sizeof(password), salt,
-                                        sizeof(salt));
+    if (load_session_key_list_with_password(new_s_key_list, "./sessionkey",
+                                            password, sizeof(password), salt,
+                                            sizeof(salt)) < 0) {
+        SST_print_error_exit("Failed load_session_key_list_with_password().");
+    }
     unsigned int decrypted_length;
     unsigned char *decrypted = NULL;
     ret = symmetric_decrypt_authenticate(
