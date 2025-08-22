@@ -398,7 +398,11 @@ int read_secure_message(unsigned char *plaintext,
 
 int send_secure_message(char *msg, unsigned int msg_length,
                         SST_session_ctx_t *session_ctx) {
-    return send_SECURE_COMM_message(msg, msg_length, session_ctx);
+    if (send_SECURE_COMM_message(msg, msg_length, session_ctx) < 0) {
+        SST_print_error("Failed to send_SECURE_COMM_message().");
+        return -1;
+    }
+    return 0;
 }
 
 int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
