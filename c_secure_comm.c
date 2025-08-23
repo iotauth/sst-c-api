@@ -843,8 +843,12 @@ static void copy_session_key(session_key_t *dest, session_key_t *src) {
     memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
 }
 
-void add_session_key_to_list(session_key_t *s_key,
-                             session_key_list_t *existing_s_key_list) {
+int add_session_key_to_list(session_key_t *s_key,
+                            session_key_list_t *existing_s_key_list) {
+    if (s_key == NULL || existing_s_key_list == NULL) {
+        return -1;
+    }
+
     existing_s_key_list->num_key++;
     if (existing_s_key_list->num_key > MAX_SESSION_KEY) {
         SST_print_debug(
@@ -853,10 +857,12 @@ void add_session_key_to_list(session_key_t *s_key,
             "key.");
         existing_s_key_list->num_key = MAX_SESSION_KEY;
     }
-    copy_session_key(&existing_s_key_list->s_key[existing_s_key_list->rear_idx],
-                     s_key);
+    int index = existing_s_key_list->rear_idx;
+    copy_session_key(&existing_s_key_list->s_key[index], s_key);
     existing_s_key_list->rear_idx =
         (existing_s_key_list->rear_idx + 1) % MAX_SESSION_KEY;
+
+    return index;
 }
 
 void append_session_key_list(session_key_list_t *dest,

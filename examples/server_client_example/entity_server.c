@@ -82,6 +82,7 @@ int main(int argc, char *argv[]) {
         pthread_cancel(thread);
         pthread_join(thread,
                      NULL);  // Needs to wait until the thread is joined.
+        free_session_ctx(session_ctx);
         printf("Finished first communication\n");
     }
     // Second connection. session_key_list caches the session key.
@@ -120,6 +121,8 @@ int main(int argc, char *argv[]) {
     sleep(3);
     pthread_cancel(thread2);
     pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
+    free_session_ctx(session_ctx2);
+    free_session_key_list_t(s_key_list);
     close(clnt_sock);
     close(clnt_sock2);
     close(serv_sock);

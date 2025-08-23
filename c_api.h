@@ -299,8 +299,12 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 int generate_random_nonce(int length, unsigned char *buf);
 
 // Frees memory used in session_key_list recursively.
-// @param session_key_list_t session_key_list to free
+// @param session_key_list_t session_key_list to free.
 void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Frees memory used in SST_session_ctx_t.
+// @param SST_session_ctx_t SST_session_ctx_t to free.
+void free_session_ctx(SST_session_ctx_t *session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free

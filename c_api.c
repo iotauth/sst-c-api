@@ -210,9 +210,14 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
                 "Failed to send_session_key_request_check_protocol().");
             return NULL;
         }
-        s_key = s_key_list->s_key;
-        add_session_key_to_list(s_key, existing_s_key_list);
-        free(s_key_list);
+        int index =
+            add_session_key_to_list(s_key_list->s_key, existing_s_key_list);
+        if (index < 0) {
+            SST_print_error("Failed to add_session_key_to_list().");
+            return NULL;
+        }
+        free_session_key_list_t(s_key_list);
+        s_key = &existing_s_key_list->s_key[index];
     }
     return s_key;
 }
@@ -616,6 +621,8 @@ void free_session_key_list_t(session_key_list_t *session_key_list) {
     free(session_key_list->s_key);
     free(session_key_list);
 }
+
+void free_session_ctx(SST_session_ctx_t *session_ctx) { free(session_ctx); }
 
 void free_SST_ctx_t(SST_ctx_t *ctx) {
     EVP_PKEY_free((EVP_PKEY *)ctx->priv_key);
