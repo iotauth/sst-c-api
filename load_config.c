@@ -193,13 +193,27 @@ config_t *load_config(const char *path) {
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
                     SST_print_debug("Pubkey path of Auth: %s", ptr);
-                    c->auth_pubkey_path = malloc(strlen(ptr) + 1);
-                    strcpy(c->auth_pubkey_path, ptr);
+                    if (safe_config_value_copy(c->auth_pubkey_path, ptr,
+                                               sizeof(c->auth_pubkey_path)) <
+                        0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "AUTH_INFO_PUBKEY_PATH");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
                     SST_print_debug("Privkey path of Entity: %s", ptr);
-                    c->entity_privkey_path = malloc(strlen(ptr) + 1);
-                    strcpy(c->entity_privkey_path, ptr);
+                    if (safe_config_value_copy(c->auth_pubkey_path, ptr,
+                                               sizeof(c->auth_pubkey_path)) <
+                        0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "AUTH_INFO_PUBKEY_PATH");
+                        free_config_t(c);
+                        return NULL;
+                    }
                     break;
                 case AUTH_INFO_IP_ADDRESS:
                     SST_print_debug("IP address of Auth: %s", ptr);
@@ -286,7 +300,5 @@ config_t *load_config(const char *path) {
 }
 
 void free_config_t(config_t *config) {
-    free(config->auth_pubkey_path);
-    free(config->entity_privkey_path);
     free(config);
 }
