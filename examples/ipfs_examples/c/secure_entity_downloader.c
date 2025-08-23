@@ -59,5 +59,8 @@ int main(int argc, char *argv[]) {
             SST_print_error_exit("Failed file_decrypt_save()");
         }
     }
+    free_session_ctx(session_ctx);
+    free_session_key_list_t(s_key_list_0);
+    free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
 }

@@ -178,6 +178,7 @@ int main(int argc, char* argv[]) {
     }
 
     free(hash_of_file);
+    free_session_ctx(session_ctx);
     free_SST_ctx_t(ctx);
     free_session_key_list_t(s_key_list_0);
     close(client_socket);
