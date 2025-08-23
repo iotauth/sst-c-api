@@ -65,8 +65,8 @@ typedef struct {
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
     int auth_id;
-    char auth_pubkey_path[MAX_PATH_LEN];
-    char entity_privkey_path[MAX_PATH_LEN];
+    const char auth_pubkey_path[MAX_PATH_LEN];
+    const char entity_privkey_path[MAX_PATH_LEN];
     char auth_ip_addr[INET_ADDRSTRLEN];
     int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
@@ -98,7 +98,7 @@ typedef struct {
 // keys.
 typedef struct {
     distribution_key_t dist_key;
-    config_t *config;
+    config_t config;
     void *pub_key;
     void *priv_key;
     pthread_mutex_t mutex;
