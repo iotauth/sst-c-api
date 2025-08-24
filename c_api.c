@@ -19,20 +19,19 @@ SST_ctx_t *init_SST(const char *config_path) {
     // This is needed because, Lingua Franca uses the "atexit" handler, and
     // there are still messages to be sent after the atexit handler.
     SST_ctx_t *ctx = malloc(sizeof(SST_ctx_t));
-    ctx->config = load_config(config_path);
-    if (ctx->config == NULL) {
+    if (load_config(&ctx->config, config_path) < 0) {
         SST_print_error("Failed to load_config()");
         return NULL;
     }
-    int numkey = ctx->config->numkey;
+    int numkey = ctx->config.numkey;
 
-    ctx->pub_key = (void *)load_auth_public_key(ctx->config->auth_pubkey_path);
+    ctx->pub_key = (void *)load_auth_public_key(ctx->config.auth_pubkey_path);
     if (ctx->pub_key == NULL) {
         SST_print_error("Failed load_auth_public_key().");
         return NULL;
     }
     ctx->priv_key =
-        (void *)load_entity_private_key(ctx->config->entity_privkey_path);
+        (void *)load_entity_private_key(ctx->config.entity_privkey_path);
     if (ctx->priv_key == NULL) {
         SST_print_error("Failed load_entity_private_key().");
         return NULL;
@@ -58,21 +57,20 @@ session_key_list_t *init_empty_session_key_list(void) {
 session_key_list_t *get_session_key(SST_ctx_t *ctx,
                                     session_key_list_t *existing_s_key_list) {
     if (existing_s_key_list != NULL) {
-        if (check_session_key_list_addable(ctx->config->numkey,
+        if (check_session_key_list_addable(ctx->config.numkey,
                                            existing_s_key_list) == 0) {
             SST_print_error("The session key list is not addable.");
             return existing_s_key_list;
         }
     }
     session_key_list_t *earned_s_key_list = NULL;
-    if (strcmp((const char *)ctx->config->network_protocol, "TCP") == 0) {
+    if (strcmp((const char *)ctx->config.network_protocol, "TCP") == 0) {
         earned_s_key_list = send_session_key_req_via_TCP(ctx);
         if (earned_s_key_list == NULL) {
             SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
-    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
-               0) {
+    } else if (strcmp((const char *)ctx->config.network_protocol, "UDP") == 0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         // earned_s_key_list = send_session_key_req_via_UDP(ctx);
     }
@@ -89,8 +87,8 @@ session_key_list_t *get_session_key(SST_ctx_t *ctx,
 SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
                                             SST_ctx_t *ctx) {
     int sock;
-    if (connect_as_client((const char *)ctx->config->entity_server_ip_addr,
-                          ctx->config->entity_server_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.entity_server_ip_addr,
+                          ctx->config.entity_server_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
@@ -198,8 +196,8 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx < 0) {
         // WARNING: The following line overwrites the purpose.
-        snprintf(ctx->config->purpose[ctx->config->purpose_index],
-                 sizeof(ctx->config->purpose[ctx->config->purpose_index]),
+        snprintf(ctx->config.purpose[ctx->config.purpose_index],
+                 sizeof(ctx->config.purpose[ctx->config.purpose_index]),
                  "{\"keyId\":%d}", target_session_key_id_int);
 
         session_key_list_t *s_key_list;
@@ -627,7 +625,6 @@ void free_session_ctx(SST_session_ctx_t *session_ctx) { free(session_ctx); }
 void free_SST_ctx_t(SST_ctx_t *ctx) {
     EVP_PKEY_free((EVP_PKEY *)ctx->priv_key);
     EVP_PKEY_free((EVP_PKEY *)ctx->pub_key);
-    free_config_t(ctx->config);
     free(ctx);
 }
 

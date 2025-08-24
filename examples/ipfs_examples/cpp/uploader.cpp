@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
     add_reader_file.close();
 
     // Set purpose to make session key request for file sharing.
-    ctx->config->purpose_index = 1;
+    ctx->config.purpose_index = 1;
     estimate_time_t estimate_time[5];
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {

@@ -34,7 +34,7 @@ int main(int argc, char* argv[]) {
     fclose(add_reader_file);
 
     // Set purpose to make session key request for file sharing.
-    ctx->config->purpose_index = 1;
+    ctx->config.purpose_index = 1;
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
         SST_print_error_exit("Failed get_session_key().");
@@ -52,7 +52,7 @@ int main(int argc, char* argv[]) {
     int concat_buffer_size =
         make_upload_req_buffer(&s_key_list_0->s_key[0], ctx, &hash_value[0],
                                hash_value_len, &concat_buffer[0]);
-    ctx->config->purpose_index = 0;
+    ctx->config.purpose_index = 0;
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key().");

@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
         SST_print_error_exit("init_SST() failed.");
     }
     session_key_list_t *s_key_list = init_empty_session_key_list();
-    ctx->config->purpose_index = 0;
+    ctx->config.purpose_index = 0;
     std::vector<char> file_name(BUFF_SIZE);
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];

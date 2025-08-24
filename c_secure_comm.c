@@ -189,8 +189,8 @@ static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // @param s_key The target session key to set the modes.
 static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
                                                          session_key_t *s_key) {
-    s_key->enc_mode = ctx->config->encryption_mode;
-    s_key->hmac_mode = ctx->config->hmac_mode;
+    s_key->enc_mode = ctx->config.encryption_mode;
+    s_key->hmac_mode = ctx->config.hmac_mode;
 }
 
 // Used in parse_session_key_response() for index.
@@ -328,7 +328,7 @@ static int send_auth_request_message(unsigned char *serialized,
     } else {
         unsigned int enc_length;
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
-            serialized, serialized_length, &ctx->dist_key, ctx->config->name,
+            serialized, serialized_length, &ctx->dist_key, ctx->config.name,
             &enc_length);
         if (enc == NULL) {
             SST_print_error(
@@ -361,7 +361,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
                       char *purpose, int requestIndex) {
     unsigned char auth_nonce[NONCE_SIZE];
     unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
-    if (auth_id != (unsigned int)ctx->config->auth_id) {
+    if (auth_id != (unsigned int)ctx->config.auth_id) {
         SST_print_error("Auth ID NOT matched.");
         return -1;
     }
@@ -369,7 +369,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
     RAND_bytes(entity_nonce, NONCE_SIZE);
     unsigned int serialized_length;
     unsigned char *serialized = serialize_message_for_auth(
-        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
+        entity_nonce, auth_nonce, num_key, ctx->config.name, purpose,
         &serialized_length);
     if (send_auth_request_message(serialized, serialized_length, ctx, sock,
                                   requestIndex) < 0) {
@@ -407,7 +407,7 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
-    ctx->dist_key.enc_mode = ctx->config->encryption_mode;
+    ctx->dist_key.enc_mode = ctx->config.encryption_mode;
     free(decrypted_dist_key_buf);
     return 0;
 }
@@ -578,14 +578,14 @@ session_key_list_t *send_session_key_request_check_protocol(
     target_session_key_cache_length =
         (unsigned char)sizeof("none") / sizeof(unsigned char) - 1;
     memcpy(target_session_key_cache, "none", target_session_key_cache_length);
-    if (strcmp((const char *)ctx->config->network_protocol, "TCP") ==
+    if (strcmp((const char *)ctx->config.network_protocol, "TCP") ==
         0) {  // TCP
         session_key_list_t *s_key_list = send_session_key_req_via_TCP(ctx);
         if (s_key_list == NULL) {
             SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
-        SST_print_debug("Received %d keys.", ctx->config->numkey);
+        SST_print_debug("Received %d keys.", ctx->config.numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -604,8 +604,7 @@ session_key_list_t *send_session_key_request_check_protocol(
             }
             return s_key_list;
         }
-    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
-               0) {
+    } else if (strcmp((const char *)ctx->config.network_protocol, "UDP") == 0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         // return s_key_list;
@@ -616,8 +615,8 @@ session_key_list_t *send_session_key_request_check_protocol(
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;
-    if (connect_as_client((const char *)ctx->config->auth_ip_addr,
-                          ctx->config->auth_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.auth_ip_addr,
+                          ctx->config.auth_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
@@ -645,8 +644,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
             if (handle_AUTH_HELLO(
-                    data_buf, ctx, entity_nonce, sock, ctx->config->numkey,
-                    ctx->config->purpose[ctx->config->purpose_index], 1) < 0) {
+                    data_buf, ctx, entity_nonce, sock, ctx->config.numkey,
+                    ctx->config.purpose[ctx->config.purpose_index], 1) < 0) {
                 return NULL;
             }
         } else if (state == AUTH_HELLO_RECEIVED &&
@@ -661,7 +660,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config->encryption_mode, 0, &decrypted,
+                    ctx->config.encryption_mode, 0, &decrypted,
                     &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate() after "
@@ -709,7 +708,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config.encryption_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length) < 0) {
                 SST_print_error(
