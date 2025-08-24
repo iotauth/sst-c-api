@@ -77,8 +77,7 @@ int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
     }
 }
 
-config_t *load_config(const char *path) {
-    config_t *c = malloc(sizeof(config_t));
+int load_config(config_t *c, const char *path) {
     FILE *fp = fopen(path, "r");
     if (fp == NULL) {
         // Print an error message based on the error code
@@ -92,8 +91,7 @@ config_t *load_config(const char *path) {
         }
         // Print the specific error message
         SST_print_error("fopen() failed.");
-        free(c);
-        return NULL;
+        return -1;
     }
     char buffer[MAX_CONFIG_BUF_SIZE] = {
         0,
@@ -112,21 +110,18 @@ config_t *load_config(const char *path) {
             config_type_t config = get_key_value(ptr);
             if (config == UNKNOWN_CONFIG) {
                 SST_print_error("Unknown config type %s.", ptr);
-                free_config_t(c);
-                return NULL;
+                return -1;
             }
             ptr = strtok(NULL, delimiters);
             if (ptr == NULL) {
                 SST_print_error("Config value does not exist.");
-                free_config_t(c);
-                return NULL;
+                return -1;
             }
             switch (config) {
                 case UNKNOWN_CONFIG:
                     SST_print_error(
                         "This line must not be reached. UNKNOWN_CONFIG");
-                    free_config_t(c);
-                    return NULL;
+                    return -1;
                     break;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s", ptr);
@@ -134,8 +129,7 @@ config_t *load_config(const char *path) {
                         0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() ENTITY_INFO_NAME");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case ENTITY_INFO_PURPOSE:
@@ -148,8 +142,7 @@ config_t *load_config(const char *path) {
                             SST_print_error(
                                 "Failed safe_config_value_copy() "
                                 "ENTITY_INFO_PURPOSE");
-                            free_config_t(c);
-                            return NULL;
+                            return -1;
                         }
                         purpose_count += 1;
                     } else {
@@ -183,8 +176,7 @@ config_t *load_config(const char *path) {
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case AUTH_ID:
@@ -199,8 +191,7 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "AUTH_INFO_PUBKEY_PATH");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
@@ -211,8 +202,7 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "AUTH_INFO_PUBKEY_PATH");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case AUTH_INFO_IP_ADDRESS:
@@ -222,16 +212,14 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "AUTH_INFO_IP_ADDRESS");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case AUTH_INFO_PORT:
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
                         SST_print_error("Error: Invalid Auth port number.");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
@@ -242,8 +230,7 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "ENTITY_SERVER_INFO_IP_ADDRESS");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
@@ -252,8 +239,7 @@ config_t *load_config(const char *path) {
                     if (c->entity_server_port_num < 0 ||
                         c->entity_server_port_num > 65535) {
                         SST_print_error("Error: Invalid server port number.");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case NETWORK_PROTOCOL:
@@ -263,8 +249,7 @@ config_t *load_config(const char *path) {
                         0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() NETWORK_PROTOCOL");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
@@ -276,8 +261,7 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
@@ -287,8 +271,7 @@ config_t *load_config(const char *path) {
                         SST_print_error(
                             "Error: Invalid file system manager port "
                             "number.");
-                        free_config_t(c);
-                        return NULL;
+                        return -1;
                     }
                     break;
             }
@@ -296,9 +279,5 @@ config_t *load_config(const char *path) {
         }
     }
     fclose(fp);
-    return c;
-}
-
-void free_config_t(config_t *config) {
-    free(config);
+    return 0;
 }
