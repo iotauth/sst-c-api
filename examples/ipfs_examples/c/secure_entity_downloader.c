@@ -17,7 +17,7 @@ int main(int argc, char *argv[]) {
         SST_print_error_exit("init_SST() failed.");
     }
     session_key_list_t *s_key_list = init_empty_session_key_list();
-    ctx->config->purpose_index = 0;
+    ctx->config.purpose_index = 0;
     session_key_list_t *s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
         SST_print_error_exit("Failed get_session_key().");
@@ -59,5 +59,8 @@ int main(int argc, char *argv[]) {
             SST_print_error_exit("Failed file_decrypt_save()");
         }
     }
+    free_session_ctx(session_ctx);
+    free_session_key_list_t(s_key_list_0);
+    free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
 }
