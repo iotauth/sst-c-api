@@ -65,8 +65,8 @@ typedef struct {
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
     int auth_id;
-    const char auth_pubkey_path[MAX_PATH_LEN];
-    const char entity_privkey_path[MAX_PATH_LEN];
+    char auth_pubkey_path[MAX_PATH_LEN];
+    char entity_privkey_path[MAX_PATH_LEN];
     char auth_ip_addr[INET_ADDRSTRLEN];
     int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
