@@ -196,12 +196,12 @@ int load_config(config_t *c, const char *path) {
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
                     SST_print_debug("Privkey path of Entity: %s", ptr);
-                    if (safe_config_value_copy(c->auth_pubkey_path, ptr,
-                                               sizeof(c->auth_pubkey_path)) <
+                    if (safe_config_value_copy(c->entity_privkey_path, ptr,
+                                               sizeof(c->entity_privkey_path)) <
                         0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
-                            "AUTH_INFO_PUBKEY_PATH");
+                            "ENTITY_INFO_PRIVKEY_PATH");
                         return -1;
                     }
                     break;
