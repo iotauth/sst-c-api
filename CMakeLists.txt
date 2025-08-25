@@ -4,11 +4,6 @@
 cmake_minimum_required(VERSION 3.19)
 project(sst-lib VERSION 1.0.0 LANGUAGES C)
 
-# Check `openssl version -d` and copy the path to OPENSSL_ROOT_DIR
-if(${CMAKE_SYSTEM_NAME} STREQUAL "Linux")
-  set(OPENSSL_ROOT_DIR "/usr/local/lib64")
-endif()
-
 find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
