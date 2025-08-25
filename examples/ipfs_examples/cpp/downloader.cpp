@@ -126,9 +126,9 @@ int main(int argc, char *argv[]) {
         SST_print_error_exit("Failed send_secure_message().");
     }
 
-    free_SST_ctx_t(ctx);
     free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list);
+    free_SST_ctx_t(ctx);
 
     return EXIT_SUCCESS;
 }

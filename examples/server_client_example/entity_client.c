@@ -84,6 +84,5 @@ int main(int argc, char *argv[]) {
     free_session_ctx(session_ctx);
 
     free_session_key_list_t(s_key_list);
-
     free_SST_ctx_t(ctx);
 }
