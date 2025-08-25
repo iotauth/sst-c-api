@@ -23,30 +23,26 @@ add_library(sst-c-api STATIC
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Statically link OpenSSL into sst-c-api
-target_link_libraries(sst-c-api PRIVATE ${OPENSSL_LIBRARIES} Threads::Threads)
+target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
 
 target_include_directories(sst-c-api PUBLIC
   $<INSTALL_INTERFACE:include>
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}>
-  ${OPENSSL_INCLUDE_DIR}
 )
-
-# Ensure OpenSSL is installed along with sst-c-api
-install(FILES ${OPENSSL_LIBRARIES} DESTINATION lib)
 
 # Compiler flags
 if(MSVC)
-  target_compile_options(sst-c-api PUBLIC /W4 /WX)
+  target_compile_options(sst-c-api PRIVATE /W4 /WX)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
 # Exclude errors, because some can use GNU-specific variadic arguments. This is done for only compiling the SST library.
 else()
-  target_compile_options(sst-c-api PUBLIC -Wall -Wextra -Wpedantic -Werror)
+  target_compile_options(sst-c-api PRIVATE -Wall -Wextra -Wpedantic -Werror)
 endif()
 
 # Set DEBUG flag for Debug builds
 if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   message(STATUS "Enabling DEBUG flag")
-  target_compile_definitions(sst-c-api PUBLIC DEBUG=1)
+  target_compile_definitions(sst-c-api PRIVATE DEBUG=1)
 endif()
 
 # Install the library
@@ -93,5 +89,5 @@ install(FILES c_api.h DESTINATION include/sst-c-api)
 enable_testing()
 
 add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
-target_link_libraries(crypto_test sst-c-api)
+target_link_libraries(crypto_test PRIVATE sst-c-api)
 add_test(NAME crypto_test COMMAND crypto_test)
