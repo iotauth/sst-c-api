@@ -202,7 +202,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         SST_print_error("Larger buffer size required.");
         return -1;
     }
-    int bytes_read = sst_read_from_socket(socket, buf, buf_length);
+    int bytes_read = sst_read_from_socket(socket, buf, ret_length);
     if (bytes_read <= 0) {
         SST_print_error("Failed to read from socket reading the payload.");
         return bytes_read;
