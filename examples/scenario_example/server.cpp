@@ -8,6 +8,10 @@ extern "C" {
 #include "../../c_api.h"
 }
 
+volatile int active_clients = 0;
+volatile sig_atomic_t stop_server = 0;
+pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 // Struct for arguments for each thread
 struct ThreadArgs {
     int client_sock;
@@ -30,6 +34,14 @@ void *receive_and_print_messages(void *thread_args) {
         close(clnt_sock);
         free_SST_ctx_t(ctx);
         free_session_key_list_t(s_key_list);
+
+        // Decrement active client count on failure path
+        pthread_mutex_lock(&count_mutex);
+        active_clients--;
+        // If this was the last (or only) client, tell main to stop
+        if (active_clients == 0) stop_server = 1;
+        pthread_mutex_unlock(&count_mutex);
+
         return NULL;
     }
 
@@ -47,7 +59,7 @@ void *receive_and_print_messages(void *thread_args) {
         // Process the received_buf message
         std::cout << "Received message from socket: " << clnt_sock << ": ";
         std::cout.write(reinterpret_cast<const char *>(received_buf), ret);
-        std::cout << std::endl;  // if you want a newline
+        std::cout << std::endl;
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";
@@ -56,6 +68,15 @@ void *receive_and_print_messages(void *thread_args) {
         return NULL;
     }
     free(session_ctx);
+
+    // Once the thread has finished, decrement the number of active clients
+    // Use a mutex to protect the counter
+    pthread_mutex_lock(&count_mutex);
+    --active_clients;
+    if (active_clients == 0)
+        stop_server = 1;  // If this was the last client, tell main to stop
+    pthread_mutex_unlock(&count_mutex);
+
     return NULL;
 }
 
@@ -101,7 +122,35 @@ int main(int argc, char *argv[]) {
     session_key_list_t *s_key_list = init_empty_session_key_list();
 
     // Accept incoming client connections
-    while (true) {
+    // Run until all clients are done
+    while (!stop_server) {
+        // rfds with select() watches the sets/sockets and tells when a
+        // descriptor is ready (ready means the listening socket has an incoming
+        // connection)
+        fd_set rfds;
+        FD_ZERO(&rfds);
+        FD_SET(serv_sock, &rfds);
+
+        // Using a timeout with select() allows us to periodically check
+        // stop_server instead of blocking forever in accept()
+        struct timeval tv;
+        tv.tv_sec = 0;
+        tv.tv_usec = 100000;  // 100 ms timeout
+
+        // ready will be > 0 if there is an incoming connection
+        int ready = select(serv_sock + 1, &rfds, NULL, NULL, &tv);
+        if (ready < 0) {
+            if (errno == EINTR) continue;  // Interrupted by signal; retry
+            std::cerr << "select() error" << std::endl;
+            break;
+        }
+        if (stop_server) break;  // all clients are done; exit loop
+
+        if (ready == 0) {
+            // timeout: no incoming connection; loop to re-check stop_server
+            continue;
+        }
+
         struct sockaddr_in clnt_addr;
         socklen_t clnt_addr_size = sizeof(clnt_addr);
         int clnt_sock =
@@ -112,6 +161,12 @@ int main(int argc, char *argv[]) {
         }
         std::cout << "New client: socket " << clnt_sock << std::endl;
 
+        // Update the number of active clients
+        // Use a mutex to protect the counter
+        pthread_mutex_lock(&count_mutex);
+        active_clients++;
+        pthread_mutex_unlock(&count_mutex);
+
         ThreadArgs *args = new ThreadArgs;
         args->client_sock = clnt_sock;
         args->ctx = ctx;
@@ -120,6 +175,12 @@ int main(int argc, char *argv[]) {
         pthread_t t;
         if (pthread_create(&t, NULL, receive_and_print_messages, args) != 0) {
             std::cerr << "pthread_create() error" << std::endl;
+
+            // Thread creation failed, so decrement active_clients
+            pthread_mutex_lock(&count_mutex);
+            active_clients--;
+            if (active_clients == 0) stop_server = 1; // If this was the last client, tell main to stop
+            pthread_mutex_unlock(&count_mutex);
 
             if (close(clnt_sock) < 0) {
                 std::cerr << "close() error" << std::endl;

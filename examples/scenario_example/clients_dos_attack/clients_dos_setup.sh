@@ -124,4 +124,4 @@ cd "$SCRIPT_DIR"
 node config_generator.js "$COUNT"
 
 echo
-echo "The setup for doing DoS attacks using multiple clients is complete."
+echo "The setup for doing DoS attacks using $COUNT clients is complete."
