@@ -189,8 +189,9 @@ This attack involves using many clients to connect to the server to create the d
 
 2. Do `chmod +x clients_dos_setup.sh`.
 
-3. Run `client_dos_setup.sh <number-of-clients>`.
+3. Run `client_dos_setup.sh <number-of-clients> -p <password>`.
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
+    - `<password>` is the password of the generated Auth.
 
 4. Insert a password when prompted.
 
