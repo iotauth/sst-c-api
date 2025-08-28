@@ -644,7 +644,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         int received_buf_length =
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
-        if (received_buf_length < 0) {
+        if (received_buf_length <= 0) {
             SST_print_error("Failed to sst_read_from_socket().");
             return NULL;
         }
