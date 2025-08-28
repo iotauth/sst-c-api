@@ -300,12 +300,12 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
         }
 
         SST_print_error("Connection attempt %d failed: %s. Retrying...",
-                        count_retries, strerror(errno));
+                        count_retries);
 
         close(*sock);
         *sock = socket(AF_INET, SOCK_STREAM, 0);
         if (*sock == -1) {
-            SST_print_error("socket() error during retry: %s", strerror(errno));
+            SST_print_error("socket() error during retry: %s");
             ret = -1;
             break;
         }
