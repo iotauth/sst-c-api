@@ -16,7 +16,6 @@ pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 struct ThreadArgs {
     int client_sock;
     SST_ctx_t *ctx;
-    session_key_list_t *s_key_list;
 };
 
 // For pthread_create()
@@ -24,7 +23,7 @@ void *receive_and_print_messages(void *thread_args) {
     ThreadArgs *args = static_cast<ThreadArgs *>(thread_args);
     int clnt_sock = args->client_sock;
     SST_ctx_t *ctx = args->ctx;
-    session_key_list_t *s_key_list = args->s_key_list;
+    session_key_list_t *s_key_list = init_empty_session_key_list();
     delete args;  // no longer needed
 
     SST_session_ctx_t *session_ctx =
@@ -32,7 +31,6 @@ void *receive_and_print_messages(void *thread_args) {
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
         close(clnt_sock);
-        free_SST_ctx_t(ctx);
         free_session_key_list_t(s_key_list);
 
         // Decrement active client count on failure path
@@ -170,7 +168,6 @@ int main(int argc, char *argv[]) {
         ThreadArgs *args = new ThreadArgs;
         args->client_sock = clnt_sock;
         args->ctx = ctx;
-        args->s_key_list = s_key_list;
 
         pthread_t t;
         if (pthread_create(&t, NULL, receive_and_print_messages, args) != 0) {
@@ -179,7 +176,9 @@ int main(int argc, char *argv[]) {
             // Thread creation failed, so decrement active_clients
             pthread_mutex_lock(&count_mutex);
             active_clients--;
-            if (active_clients == 0) stop_server = 1; // If this was the last client, tell main to stop
+            if (active_clients == 0) {
+                stop_server = 1; // If this was the last client, tell main to stop
+            }
             pthread_mutex_unlock(&count_mutex);
 
             if (close(clnt_sock) < 0) {

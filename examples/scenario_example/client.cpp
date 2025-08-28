@@ -66,8 +66,11 @@ int main(int argc, char *argv[]) {
         std::string message = line.substr(comma1 + 1, comma2 - comma1 - 1);
         std::cout << "Sending message: " << message << std::endl;
 
-        send_secure_message(const_cast<char *>(message.c_str()),
-                            message.length(), session_ctx);
+        int msg = send_secure_message(const_cast<char *>(message.c_str()),
+                                      message.length(), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
 
         // Parse the attack type
         std::string attack_type_str =
@@ -140,7 +143,13 @@ int main(int argc, char *argv[]) {
 
                     session_ctx[i] =
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-
+                    if (session_ctx[i] == NULL) {
+                        std::cerr
+                            << "Client failed to connect to server in DOS "
+                               "Connect attack.\n"
+                            << ::std::endl;
+                        exit(1);
+                    }
                     free_session_key_list_t(s_key_list);
                 }
             } break;

@@ -149,16 +149,12 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
     return ret;
 }
 
-// Check the validity of the buffer.
-// @param validity unsigned char buffer to check.
-// @return -1 when expired, 0 when valid
-static int check_validity(unsigned char *validity) {
-    if ((uint64_t)time(NULL) >
-        read_unsigned_long_int_BE(validity, KEY_EXPIRATION_TIME_SIZE) / 1000) {
-        return -1;
-    } else {
-        return 0;
-    }
+// Check absolute validity time.
+// @param abs_validity_ms  Expiration time in ms (uint64_t).
+// @return -1 when expired, 0 when still valid.
+static int check_validity(uint64_t abs_validity_ms) {
+    uint64_t current_ms = (uint64_t)time(NULL) * 1000ULL;  // seconds → ms
+    return (current_ms >= abs_validity_ms) ? -1 : 0;
 }
 
 // Separate the message received from Auth and
@@ -168,9 +164,10 @@ static int check_validity(unsigned char *validity) {
 // @param buf input buffer with distribution key
 static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
                                    unsigned char *buf) {
-    memcpy(parsed_distribution_key->abs_validity, buf,
-           DIST_KEY_EXPIRATION_TIME_SIZE);
+    parsed_distribution_key->abs_validity =
+        read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
+
     unsigned int cipher_key_size = buf[cur_index];
     parsed_distribution_key->cipher_key_size = cipher_key_size;
     cur_index += 1;
@@ -189,8 +186,8 @@ static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // @param s_key The target session key to set the modes.
 static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
                                                          session_key_t *s_key) {
-    s_key->enc_mode = ctx->config->encryption_mode;
-    s_key->hmac_mode = ctx->config->hmac_mode;
+    s_key->enc_mode = ctx->config.encryption_mode;
+    s_key->hmac_mode = ctx->config.hmac_mode;
 }
 
 // Used in parse_session_key_response() for index.
@@ -225,9 +222,13 @@ static unsigned char *parse_string_param(unsigned char *buf,
 static unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
     memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
-    memcpy(ret->abs_validity, buf + cur_idx, ABS_VALIDITY_SIZE);
+
+    ret->abs_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, ABS_VALIDITY_SIZE);
     cur_idx += ABS_VALIDITY_SIZE;
-    memcpy(ret->rel_validity, buf + cur_idx, REL_VALIDITY_SIZE);
+
+    ret->rel_validity =
+        read_unsigned_long_int_BE(buf + cur_idx, REL_VALIDITY_SIZE);
     cur_idx += REL_VALIDITY_SIZE;
 
     // copy cipher_key
@@ -345,7 +346,7 @@ static int send_auth_request_message(unsigned char *serialized,
     } else {
         unsigned int enc_length;
         unsigned char *enc = serialize_session_key_req_with_distribution_key(
-            serialized, serialized_length, &ctx->dist_key, ctx->config->name,
+            serialized, serialized_length, &ctx->dist_key, ctx->config.name,
             &enc_length);
         if (enc == NULL) {
             SST_print_error(
@@ -378,7 +379,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
                       char *purpose, int requestIndex) {
     unsigned char auth_nonce[NONCE_SIZE];
     unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
-    if (auth_id != (unsigned int)ctx->config->auth_id) {
+    if (auth_id != (unsigned int)ctx->config.auth_id) {
         SST_print_error("Auth ID NOT matched.");
         return -1;
     }
@@ -386,7 +387,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
     RAND_bytes(entity_nonce, NONCE_SIZE);
     unsigned int serialized_length;
     unsigned char *serialized = serialize_message_for_auth(
-        entity_nonce, auth_nonce, num_key, ctx->config->name, purpose,
+        entity_nonce, auth_nonce, num_key, ctx->config.name, purpose,
         &serialized_length);
     if (send_auth_request_message(serialized, serialized_length, ctx, sock,
                                   requestIndex) < 0) {
@@ -424,7 +425,7 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
-    ctx->dist_key.enc_mode = ctx->config->encryption_mode;
+    ctx->dist_key.enc_mode = ctx->config.encryption_mode;
     free(decrypted_dist_key_buf);
     return 0;
 }
@@ -588,14 +589,14 @@ session_key_list_t *send_session_key_request_check_protocol(
     target_session_key_cache_length =
         (unsigned char)sizeof("none") / sizeof(unsigned char) - 1;
     memcpy(target_session_key_cache, "none", target_session_key_cache_length);
-    if (strcmp((const char *)ctx->config->network_protocol, "TCP") ==
+    if (strcmp((const char *)ctx->config.network_protocol, "TCP") ==
         0) {  // TCP
         session_key_list_t *s_key_list = send_session_key_req_via_TCP(ctx);
         if (s_key_list == NULL) {
             SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
         }
-        SST_print_debug("Received %d keys.", ctx->config->numkey);
+        SST_print_debug("Received %d keys.", ctx->config.numkey);
 
         // SecureCommServer.js handleSessionKeyResp
         //  if(){} //TODO: migration
@@ -614,8 +615,7 @@ session_key_list_t *send_session_key_request_check_protocol(
             }
             return s_key_list;
         }
-    } else if (strcmp((const char *)ctx->config->network_protocol, "UDP") ==
-               0) {
+    } else if (strcmp((const char *)ctx->config.network_protocol, "UDP") == 0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         // return s_key_list;
@@ -626,8 +626,8 @@ session_key_list_t *send_session_key_request_check_protocol(
 
 session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
     int sock;
-    if (connect_as_client((const char *)ctx->config->auth_ip_addr,
-                          ctx->config->auth_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.auth_ip_addr,
+                          ctx->config.auth_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
@@ -644,7 +644,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         int received_buf_length =
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
-        if (received_buf_length < 0) {
+        if (received_buf_length <= 0) {
             SST_print_error("Failed to sst_read_from_socket().");
             return NULL;
         }
@@ -655,8 +655,8 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
             if (handle_AUTH_HELLO(
-                    data_buf, ctx, entity_nonce, sock, ctx->config->numkey,
-                    ctx->config->purpose[ctx->config->purpose_index], 1) < 0) {
+                    data_buf, ctx, entity_nonce, sock, ctx->config.numkey,
+                    ctx->config.purpose[ctx->config.purpose_index], 1) < 0) {
                 return NULL;
             }
         } else if (state == AUTH_HELLO_RECEIVED &&
@@ -671,7 +671,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config->encryption_mode, 0, &decrypted,
+                    ctx->config.encryption_mode, 0, &decrypted,
                     &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate() after "
@@ -719,7 +719,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config.encryption_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length) < 0) {
                 SST_print_error(
@@ -853,8 +853,12 @@ static void copy_session_key(session_key_t *dest, session_key_t *src) {
     memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
 }
 
-void add_session_key_to_list(session_key_t *s_key,
-                             session_key_list_t *existing_s_key_list) {
+int add_session_key_to_list(session_key_t *s_key,
+                            session_key_list_t *existing_s_key_list) {
+    if (s_key == NULL || existing_s_key_list == NULL) {
+        return -1;
+    }
+
     existing_s_key_list->num_key++;
     if (existing_s_key_list->num_key > MAX_SESSION_KEY) {
         SST_print_debug(
@@ -863,10 +867,12 @@ void add_session_key_to_list(session_key_t *s_key,
             "key.");
         existing_s_key_list->num_key = MAX_SESSION_KEY;
     }
-    copy_session_key(&existing_s_key_list->s_key[existing_s_key_list->rear_idx],
-                     s_key);
+    int index = existing_s_key_list->rear_idx;
+    copy_session_key(&existing_s_key_list->s_key[index], s_key);
     existing_s_key_list->rear_idx =
         (existing_s_key_list->rear_idx + 1) % MAX_SESSION_KEY;
+
+    return index;
 }
 
 void append_session_key_list(session_key_list_t *dest,
@@ -887,12 +893,8 @@ void append_session_key_list(session_key_list_t *dest,
 }
 
 void update_validity(session_key_t *session_key) {
-    write_in_n_bytes(
-        (time(NULL) + read_unsigned_long_int_BE(session_key->rel_validity,
-                                                KEY_EXPIRATION_TIME_SIZE) /
-                          1000) *
-            1000,
-        KEY_EXPIRATION_TIME_SIZE, session_key->abs_validity);
+    session_key->abs_validity =
+        ((uint64_t)time(NULL) * 1000) + session_key->rel_validity;
 }
 
 int check_session_key_list_addable(int requested_num_key,

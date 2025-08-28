@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
     }
     fclose(add_reader_file);
     // Set purpose to make session key request for file sharing.
-    ctx->config->purpose_index = 1;
+    ctx->config.purpose_index = 1;
     estimate_time_t estimate_time[5];
     struct timeval keygen_start, keygen_end;
     gettimeofday(&keygen_start, NULL);
@@ -62,7 +62,7 @@ int main(int argc, char* argv[]) {
     }
 
     file = fopen(filename, "a");
-    for (int i = 0; i < ctx->config->numkey; i++) {
+    for (int i = 0; i < ctx->config.numkey; i++) {
         if (i != 0) {
             estimate_time[i].keygenerate_time = 0;
         }

@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
     sleep(1);
     pthread_cancel(thread);
     pthread_join(thread, NULL);  // Needs to wait until the thread is joined.
-    free(session_ctx);
+    free_session_ctx(session_ctx);
 
     s_key_list = get_session_key(ctx, s_key_list);
     if (s_key_list == NULL) {
@@ -81,11 +81,8 @@ int main(int argc, char *argv[]) {
     sleep(3);
     pthread_cancel(thread2);
     pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
-    free(session_ctx);
+    free_session_ctx(session_ctx);
 
     free_session_key_list_t(s_key_list);
-
     free_SST_ctx_t(ctx);
-
-    sleep(3);
 }
