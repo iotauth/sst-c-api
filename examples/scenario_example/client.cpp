@@ -131,6 +131,12 @@ int main(int argc, char *argv[]) {
                     }
                     session_ctx[i] =
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+                    if (session_ctx[i] == NULL) {
+                        std::cerr << "Client failed to connect to server in DOS "
+                                     "Connect attack.\n"
+                                  << ::std::endl;
+                        exit(1);
+                    }
                     free_session_key_list_t(s_key_list);
                 }
             } break;
