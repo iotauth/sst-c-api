@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
         if (ready < 0) {
             if (errno == EINTR) continue;  // Interrupted by signal; retry
             std::cerr << "select() error" << std::endl;
-            break;
+            continue;
         }
         if (stop_server) break;  // all clients are done; exit loop
 
@@ -182,7 +182,7 @@ int main(int argc, char *argv[]) {
             accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
         if (clnt_sock < 0) {
             std::cerr << "accept() error" << std::endl;
-            return EXIT_FAILURE;
+            continue;
         }
         std::cout << "New client: socket " << clnt_sock << std::endl;
 
