@@ -64,6 +64,8 @@ int main(int argc, char *argv[]) {
 
         // Send message to server
         std::string message = line.substr(comma1 + 1, comma2 - comma1 - 1);
+        std::cout << "Sending message: " << message << std::endl;
+
         send_secure_message(const_cast<char *>(message.c_str()),
                             message.length(), session_ctx);
 
@@ -87,6 +89,8 @@ int main(int argc, char *argv[]) {
         switch (attack_type) {
             case REPLAY: {
                 // Replay Attack
+                std::cout << "Performing Replay Attack with parameter: "
+                          << attack_param << std::endl;
                 if (attack_param == "seq--") {
                     session_ctx->sent_seq_num--;
                 } else if (attack_param == "seq++") {
@@ -105,6 +109,8 @@ int main(int argc, char *argv[]) {
 
                 // DOS Attack on get_session_key
                 for (int i = 0; i < repeat; ++i) {
+                    std::cout << "Getting session key: " << (i + 1)
+                              << " of " << repeat << std::endl;
                     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
                     if (s_key_list == NULL) {
                         std::cerr << "Client failed to get session key in DOS "
@@ -129,8 +135,12 @@ int main(int argc, char *argv[]) {
                                   << ::std::endl;
                         exit(1);
                     }
+                    std::cout << "Connecting to server: " << (i + 1)
+                              << " of " << repeat << std::endl;
+
                     session_ctx[i] =
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+
                     free_session_key_list_t(s_key_list);
                 }
             } break;
@@ -142,9 +152,8 @@ int main(int argc, char *argv[]) {
 
                 // DOS Attack on send_secure_message
                 for (int i = 0; i < repeat; ++i) {
-                    std::this_thread::sleep_for(std::chrono::milliseconds(
-                        1));  // A tiny delay is necessary to give the server
-                              // time to read the message;
+                    std::cout << "Sending message: " << message << " (" << (i + 1) << " of "
+                              << repeat << ")" << std::endl;
                     send_secure_message(const_cast<char *>(message.c_str()),
                                         message.length(), session_ctx);
                 }
@@ -155,6 +164,8 @@ int main(int argc, char *argv[]) {
                 break;
         }
     }
+
+    std::cout << "\nSuccessfully finished communication." << std::endl;
 
     free(session_ctx);
     free_session_key_list_t(s_key_list);
