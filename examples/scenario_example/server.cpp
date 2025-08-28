@@ -7,6 +7,32 @@
 extern "C" {
 #include "../../c_api.h"
 }
+// #include <execinfo.h>  // backtrace, backtrace_symbols_fd
+// #include <signal.h>
+// // --- crash handler (no ucontext, no longjmp) ---
+// static void crash_handler(int sig, siginfo_t *si, void *unused) {
+//     (void)unused;
+//     dprintf(STDERR_FILENO, "\n*** fatal signal %d at %p ***\n", sig,
+//             si ? si->si_addr : NULL);
+
+//     void *bt[64];
+//     int n = backtrace(bt, 64);
+//     backtrace_symbols_fd(bt, n, STDERR_FILENO);
+
+//     _exit(128 + sig);  // 안전 종료
+// }
+
+// static void install_crash_handlers(void) {
+//     struct sigaction sa;
+//     sigemptyset(&sa.sa_mask);
+//     sa.sa_sigaction = crash_handler;
+//     sa.sa_flags = SA_SIGINFO;  // ucontext.h 없이 si_addr 사용 가능
+
+//     sigaction(SIGSEGV, &sa, NULL);
+//     sigaction(SIGBUS, &sa, NULL);
+//     sigaction(SIGILL, &sa, NULL);
+//     sigaction(SIGABRT, &sa, NULL);
+// }
 
 volatile int active_clients = 0;
 volatile sig_atomic_t stop_server = 0;
@@ -79,6 +105,7 @@ void *receive_and_print_messages(void *thread_args) {
 }
 
 int main(int argc, char *argv[]) {
+    // install_crash_handlers();
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <config_path>" << std::endl;
         return EXIT_FAILURE;

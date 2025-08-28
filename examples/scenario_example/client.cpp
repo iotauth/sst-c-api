@@ -11,6 +11,33 @@ extern "C" {
 
 enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM };
 
+// #include <execinfo.h>  // backtrace, backtrace_symbols_fd
+// #include <signal.h>
+// // --- crash handler (no ucontext, no longjmp) ---
+// static void crash_handler(int sig, siginfo_t *si, void *unused) {
+//     (void)unused;
+//     dprintf(STDERR_FILENO, "\n*** fatal signal %d at %p ***\n", sig,
+//             si ? si->si_addr : NULL);
+
+//     void *bt[64];
+//     int n = backtrace(bt, 64);
+//     backtrace_symbols_fd(bt, n, STDERR_FILENO);
+
+//     _exit(128 + sig);  // 안전 종료
+// }
+
+// static void install_crash_handlers(void) {
+//     struct sigaction sa;
+//     sigemptyset(&sa.sa_mask);
+//     sa.sa_sigaction = crash_handler;
+//     sa.sa_flags = SA_SIGINFO;  // ucontext.h 없이 si_addr 사용 가능
+
+//     sigaction(SIGSEGV, &sa, NULL);
+//     sigaction(SIGBUS, &sa, NULL);
+//     sigaction(SIGILL, &sa, NULL);
+//     sigaction(SIGABRT, &sa, NULL);
+// }
+
 static AttackType parseAttackType(const std::string &s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
@@ -26,7 +53,7 @@ static AttackType parseAttackType(const std::string &s) {
 }
 
 int main(int argc, char *argv[]) {
-    install_crash_handlers();  // << 추가
+    // install_crash_handlers();
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <config_path> <csv_file_path>"
                   << std::endl;
@@ -113,8 +140,8 @@ int main(int argc, char *argv[]) {
 
                 // DOS Attack on get_session_key
                 for (int i = 0; i < repeat; ++i) {
-                    std::cout << "Getting session key: " << (i + 1)
-                              << " of " << repeat << std::endl;
+                    std::cout << "Getting session key: " << (i + 1) << " of "
+                              << repeat << std::endl;
                     session_key_list_t *s_key_list = get_session_key(ctx, NULL);
                     if (s_key_list == NULL) {
                         std::cerr << "Client failed to get session key in DOS "
