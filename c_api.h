@@ -13,6 +13,7 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
+#define MAX_PATH_LEN 512
 
 #define AES_IV_SIZE 16
 #define SEQ_NUM_SIZE 8
@@ -36,8 +37,8 @@ typedef enum {
 
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    unsigned char abs_validity[KEY_EXPIRATION_TIME_SIZE];
-    unsigned char rel_validity[KEY_EXPIRATION_TIME_SIZE];
+    uint64_t abs_validity;
+    uint64_t rel_validity;
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
@@ -51,7 +52,7 @@ typedef struct {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    unsigned char abs_validity[DIST_KEY_EXPIRATION_TIME_SIZE];
+    uint64_t abs_validity;
     AES_encryption_mode_t enc_mode;
 } distribution_key_t;
 
@@ -64,8 +65,8 @@ typedef struct {
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
     int auth_id;
-    char *auth_pubkey_path;
-    char *entity_privkey_path;
+    char auth_pubkey_path[MAX_PATH_LEN];
+    char entity_privkey_path[MAX_PATH_LEN];
     char auth_ip_addr[INET_ADDRSTRLEN];
     int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
@@ -97,7 +98,7 @@ typedef struct {
 // keys.
 typedef struct {
     distribution_key_t dist_key;
-    config_t *config;
+    config_t config;
     void *pub_key;
     void *priv_key;
     pthread_mutex_t mutex;
@@ -299,8 +300,12 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 int generate_random_nonce(int length, unsigned char *buf);
 
 // Frees memory used in session_key_list recursively.
-// @param session_key_list_t session_key_list to free
+// @param session_key_list_t session_key_list to free.
 void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Frees memory used in SST_session_ctx_t.
+// @param SST_session_ctx_t SST_session_ctx_t to free.
+void free_session_ctx(SST_session_ctx_t *session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free

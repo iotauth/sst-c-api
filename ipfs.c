@@ -129,7 +129,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     fclose(fin);
 
     unsigned char iv[AES_128_CBC_IV_SIZE];
-    int provider_len = sizeof(ctx->config->name);
+    int provider_len = sizeof(ctx->config.name);
     unsigned int encrypted_length =
         (((bufsize) / AES_128_CBC_IV_SIZE) + 1) * AES_128_CBC_IV_SIZE;
     unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
@@ -154,7 +154,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     unsigned char *enc_save = (unsigned char *)malloc(
         encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
-    memcpy(enc_save + 1, ctx->config->name, provider_len);
+    memcpy(enc_save + 1, ctx->config.name, provider_len);
     enc_save[provider_len + 1] = AES_128_CBC_IV_SIZE;
     memcpy(enc_save + 1 + provider_len + 1, iv, AES_128_CBC_IV_SIZE);
     memcpy(enc_save + 1 + provider_len + 1 + AES_128_CBC_IV_SIZE, encrypted,
@@ -228,19 +228,19 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
                                   unsigned char *hash_value,
                                   int hash_value_len) {
     int sock;
-    if (connect_as_client(
-            (const char *)ctx->config->file_system_manager_ip_addr,
-            ctx->config->file_system_manager_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.file_system_manager_ip_addr,
+                          ctx->config.file_system_manager_port_num,
+                          &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return -1;
     }
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
-    name_size = sizeof(ctx->config->name);
+    name_size = sizeof(ctx->config.name);
     unsigned char data[MAX_PAYLOAD_LENGTH];
     data[0] = UPLOAD_INDEX;
     data[1] = name_size;
-    memcpy(data + 2, ctx->config->name, name_size);
+    memcpy(data + 2, ctx->config.name, name_size);
     data[2 + name_size] = key_id_size;
     memcpy(data + 3 + name_size, s_key->key_id, key_id_size);
     data[3 + name_size + key_id_size] = hash_value_len;
@@ -260,13 +260,13 @@ int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,
                            char *concat_buffer) {
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
-    name_size = sizeof(ctx->config->name);
+    name_size = sizeof(ctx->config.name);
     int index = 0;
     concat_buffer[index] = UPLOAD_INDEX;
     index += 1;
     concat_buffer[index] = name_size;
     index += 1;
-    memcpy(concat_buffer + index, ctx->config->name, name_size);
+    memcpy(concat_buffer + index, ctx->config.name, name_size);
     index += name_size;
     concat_buffer[index] = key_id_size;
     index += 1;
@@ -281,13 +281,13 @@ int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,
 
 int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
     int name_size;
-    name_size = sizeof(ctx->config->name);
+    name_size = sizeof(ctx->config.name);
     int index = 0;
     concat_buffer[index] = DOWNLOAD_INDEX;
     index += 1;
     concat_buffer[index] = name_size;
     index += 1;
-    memcpy(concat_buffer + index, ctx->config->name, name_size);
+    memcpy(concat_buffer + index, ctx->config.name, name_size);
     index += name_size;
     return index;
 }
@@ -299,18 +299,18 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     int sock;
     struct timeval filemanager_start, filemanager_end;
     gettimeofday(&filemanager_start, NULL);
-    if (connect_as_client(
-            (const char *)ctx->config->file_system_manager_ip_addr,
-            ctx->config->file_system_manager_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.file_system_manager_ip_addr,
+                          ctx->config.file_system_manager_port_num,
+                          &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return -1;
     }
     int name_size;
-    name_size = sizeof(ctx->config->name);
+    name_size = sizeof(ctx->config.name);
     unsigned char data[BUFF_SIZE];
     data[0] = DOWNLOAD_INDEX;
     data[1] = name_size;
-    memcpy(data + 2, ctx->config->name, name_size);
+    memcpy(data + 2, ctx->config.name, name_size);
     int bytes_written = sst_write_to_socket(sock, data, 2 + name_size);
     if (bytes_written < 0) {
         SST_print_error("Failed sst_write_to_socket().");
@@ -372,8 +372,8 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
 
 int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
     int sock;
-    if (connect_as_client((const char *)ctx->config->auth_ip_addr,
-                          ctx->config->auth_port_num, &sock) < 0) {
+    if (connect_as_client((const char *)ctx->config.auth_ip_addr,
+                          ctx->config.auth_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return -1;
     }
@@ -414,7 +414,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config->encryption_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config.encryption_mode, 0,
                     &decrypted_entity_nonce,
                     &decrypted_entity_nonce_length) < 0) {
                 SST_print_error(

@@ -145,8 +145,10 @@ int find_session_key(unsigned int key_id, session_key_list_t *s_key_list);
 // Appends at the destination list's rear_idx.
 // @param s_key Session key to add
 // @param existing_s_key_list Destination session_key_list
-void add_session_key_to_list(session_key_t *s_key,
-                             session_key_list_t *existing_s_key_list);
+// @return index of the new session key added to the existing_s_key_list or -1
+// otherwise
+int add_session_key_to_list(session_key_t *s_key,
+                            session_key_list_t *existing_s_key_list);
 
 // Appends src list to dest list.
 // Appends at the destination list's rear_idx.
