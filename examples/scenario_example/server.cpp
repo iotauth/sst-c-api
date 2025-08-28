@@ -193,8 +193,8 @@ int main(int argc, char *argv[]) {
         pthread_detach(t);
     }
 
-    std::cout << "Finished communication." << std::endl;
-
+    std::cout << "Successfully finished communication." << std::endl;
+    
     if (close(serv_sock) < 0) {
         std::cerr << "close() error" << std::endl;
         return EXIT_FAILURE;
