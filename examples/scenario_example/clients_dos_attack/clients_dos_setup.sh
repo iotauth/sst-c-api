@@ -19,12 +19,39 @@ launch_terminal() {
 }
 
 # Parameters check
-if [ $# -ne 1 ]; then
-  echo "Usage: $0 <number-of-clients>"
+if [ $# -lt 1 ]; then
+  echo "Usage: $0 <number-of-clients> [-p|--password <password>]"
   exit 1
 fi
 
 COUNT="$1"
+shift
+
+PASSWORD=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -p|--password)
+      if [[ $# -lt 2 ]]; then
+        echo "Error: $1 requires a value"
+        exit 1
+      fi
+      PASSWORD="$2"
+      shift 2
+      ;;
+    *)
+      echo "Unknown option: $1"
+      exit 1
+      ;;
+  esac
+done
+
+echo "Number of clients: $COUNT"
+if [[ -n "$PASSWORD" ]]; then
+  echo "Password: $PASSWORD"
+else
+  echo "Password not provided"
+fi
 
 # Directory of this script
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -32,11 +59,19 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Directory and commands for regenerating Auth with the new graph generated
 EXAMPLES_DIR="../../../../../examples"
 CLEANALL='./cleanAll.sh'
-GENERATEALL='./generateAll.sh -g configs/custom_clients.graph'
+if [[ -n "$PASSWORD" ]]; then
+  GENERATEALL="./generateAll.sh -g configs/custom_clients.graph -p $PASSWORD"
+else
+  GENERATEALL="./generateAll.sh -g configs/custom_clients.graph"
+fi
 
 # Auth Server directory and command for starting it
 SERVER_DIR="../../../../../auth/auth-server"
-SERVER_CMD='java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties'
+if [[ -n "$PASSWORD" ]]; then
+  SERVER_CMD="java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password $PASSWORD"
+else
+  SERVER_CMD="java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties"
+fi
 
 # 1) Run the graph file generator
 echo
