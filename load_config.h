@@ -32,12 +32,9 @@ typedef enum {
 config_type_t get_key_value(char *ptr);
 
 // Load config file from path and save the information in config struct.
+// @param config_t struct to use while using SST api.
 // @param path config file path
-// @return config struct to use when connecting to Auth
-config_t *load_config(const char *path);
-
-// Free memory used in config_t.
-// @param config struct config_t to be freed.
-void free_config_t(config_t *config);
+// @return 0 for success, -1 for fail
+int load_config(config_t *c, const char *path);
 
 #endif  // LOAD_CONFIG_H

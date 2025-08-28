@@ -45,7 +45,7 @@ int main(int argc, char* argv[]) {
     add_reader_file.close();
 
     // Set purpose to make session key request for file sharing.
-    ctx->config->purpose_index = 1;
+    ctx->config.purpose_index = 1;
     estimate_time_t estimate_time[5];
     session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
@@ -178,8 +178,9 @@ int main(int argc, char* argv[]) {
     }
 
     free(hash_of_file);
-    free_SST_ctx_t(ctx);
+    free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list_0);
+    free_SST_ctx_t(ctx);
     close(client_socket);
     close(server_socket);
 

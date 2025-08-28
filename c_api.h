@@ -13,6 +13,7 @@
 #define MAX_ENTITY_NAME_LENGTH 32
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
+#define MAX_PATH_LEN 512
 
 #define AES_IV_SIZE 16
 #define SEQ_NUM_SIZE 8
@@ -64,8 +65,8 @@ typedef struct {
     AES_encryption_mode_t encryption_mode;
     hmac_mode_t hmac_mode;
     int auth_id;
-    char *auth_pubkey_path;
-    char *entity_privkey_path;
+    char auth_pubkey_path[MAX_PATH_LEN];
+    char entity_privkey_path[MAX_PATH_LEN];
     char auth_ip_addr[INET_ADDRSTRLEN];
     int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
@@ -97,7 +98,7 @@ typedef struct {
 // keys.
 typedef struct {
     distribution_key_t dist_key;
-    config_t *config;
+    config_t config;
     void *pub_key;
     void *priv_key;
     pthread_mutex_t mutex;
@@ -299,8 +300,12 @@ unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
 int generate_random_nonce(int length, unsigned char *buf);
 
 // Frees memory used in session_key_list recursively.
-// @param session_key_list_t session_key_list to free
+// @param session_key_list_t session_key_list to free.
 void free_session_key_list_t(session_key_list_t *session_key_list);
+
+// Frees memory used in SST_session_ctx_t.
+// @param SST_session_ctx_t SST_session_ctx_t to free.
+void free_session_ctx(SST_session_ctx_t *session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
