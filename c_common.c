@@ -309,7 +309,7 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
             ret = -1;
             break;
         }
-        usleep(500000);
+        usleep(50000);
     }
     if (ret < 0) {
         SST_print_error("Failed to connect to %s:%d after %d attempts.",
