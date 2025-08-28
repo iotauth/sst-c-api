@@ -177,7 +177,8 @@ int main(int argc, char *argv[]) {
             pthread_mutex_lock(&count_mutex);
             active_clients--;
             if (active_clients == 0) {
-                stop_server = 1; // If this was the last client, tell main to stop
+                stop_server =
+                    1;  // If this was the last client, tell main to stop
             }
             pthread_mutex_unlock(&count_mutex);
 
@@ -193,7 +194,7 @@ int main(int argc, char *argv[]) {
     }
 
     std::cout << "Successfully finished communication." << std::endl;
-    
+
     if (close(serv_sock) < 0) {
         std::cerr << "close() error" << std::endl;
         return EXIT_FAILURE;

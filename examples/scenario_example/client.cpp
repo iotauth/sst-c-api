@@ -26,6 +26,7 @@ static AttackType parseAttackType(const std::string &s) {
 }
 
 int main(int argc, char *argv[]) {
+    install_crash_handlers();  // << 추가
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <config_path> <csv_file_path>"
                   << std::endl;
@@ -138,8 +139,8 @@ int main(int argc, char *argv[]) {
                                   << ::std::endl;
                         exit(1);
                     }
-                    std::cout << "Connecting to server: " << (i + 1)
-                              << " of " << repeat << std::endl;
+                    std::cout << "Connecting to server: " << (i + 1) << " of "
+                              << repeat << std::endl;
 
                     session_ctx[i] =
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
@@ -161,10 +162,15 @@ int main(int argc, char *argv[]) {
 
                 // DOS Attack on send_secure_message
                 for (int i = 0; i < repeat; ++i) {
-                    std::cout << "Sending message: " << message << " (" << (i + 1) << " of "
-                              << repeat << ")" << std::endl;
-                    send_secure_message(const_cast<char *>(message.c_str()),
-                                        message.length(), session_ctx);
+                    std::cout << "Sending message: " << message << " ("
+                              << (i + 1) << " of " << repeat << ")"
+                              << std::endl;
+                    int msg =
+                        send_secure_message(const_cast<char *>(message.c_str()),
+                                            message.length(), session_ctx);
+                    if (msg < 0) {
+                        SST_print_error_exit("Failed send_secure_message().");
+                    }
                 }
             } break;
 
