@@ -186,11 +186,11 @@ However, for convenience, DoS attacks with multiple clients have it's own script
     - The format of the input CSV file for this attack example should be:
         - First and second are same as above.
         - Third is "DoSM".
-        - Fourth, is the number of times the message will be sent to the server.
+        - Fourth, is the number of times the client should connect to the server using Auth.
     ```
-    <sleep_time1>,<message1>,DoSM,10000
-    <sleep_time2>,<message2>,DOSM,55555
-    <sleep_time2>,<message2>,dosm,123456
+    <sleep_time1>,<message1>,DoSC,10000
+    <sleep_time2>,<message2>,DOSC,55555
+    <sleep_time2>,<message2>,dosc,123456
     ...
     ```
 
