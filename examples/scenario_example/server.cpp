@@ -1,6 +1,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <csignal>  // sig_atomic_t
+#include <cstring>  // memset
 #include <fstream>
 #include <iostream>
 
@@ -169,7 +171,9 @@ int main(int argc, char *argv[]) {
             std::cerr << "select() error" << std::endl;
             continue;
         }
-        if (stop_server) break;  // all clients are done; exit loop
+        if (stop_server) {
+            break;  // all clients are done; exit loop
+        }
 
         if (ready == 0) {
             // timeout: no incoming connection; loop to re-check stop_server
