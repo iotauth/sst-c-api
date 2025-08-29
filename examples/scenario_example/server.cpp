@@ -17,18 +17,18 @@ pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 // Struct for arguments for each thread
 struct ThreadArgs {
     int client_sock;
-    SST_ctx_t *ctx;
+    SST_ctx_t* ctx;
 };
 
 // For pthread_create()
-void *receive_and_print_messages(void *thread_args) {
-    ThreadArgs *args = static_cast<ThreadArgs *>(thread_args);
+void* receive_and_print_messages(void* thread_args) {
+    ThreadArgs* args = static_cast<ThreadArgs*>(thread_args);
     int clnt_sock = args->client_sock;
-    SST_ctx_t *ctx = args->ctx;
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    SST_ctx_t* ctx = args->ctx;
+    session_key_list_t* s_key_list = init_empty_session_key_list();
     delete args;  // no longer needed
 
-    SST_session_ctx_t *session_ctx =
+    SST_session_ctx_t* session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         std::cerr << "There is no session key.\n" << std::endl;
@@ -58,7 +58,7 @@ void *receive_and_print_messages(void *thread_args) {
         }
         // Process the received_buf message
         std::cout << "Received message from socket: " << clnt_sock << ": ";
-        std::cout.write(reinterpret_cast<const char *>(received_buf), ret);
+        std::cout.write(reinterpret_cast<const char*>(received_buf), ret);
         std::cout << std::endl;
     }
 
@@ -80,7 +80,7 @@ void *receive_and_print_messages(void *thread_args) {
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         std::cerr << "Usage: " << argv[0] << " <config_path>" << std::endl;
         return EXIT_FAILURE;
@@ -108,7 +108,7 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT_NUM);
 
-    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0) {
+    if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
         std::cerr << "bind() error" << std::endl;
         return EXIT_FAILURE;
     }
@@ -118,8 +118,8 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    SST_ctx_t *ctx = init_SST(argv[1]);
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    SST_ctx_t* ctx = init_SST(argv[1]);
+    session_key_list_t* s_key_list = init_empty_session_key_list();
 
     // Accept incoming client connections
     // Run until all clients are done
@@ -156,7 +156,7 @@ int main(int argc, char *argv[]) {
         struct sockaddr_in clnt_addr;
         socklen_t clnt_addr_size = sizeof(clnt_addr);
         int clnt_sock =
-            accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+            accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
         if (clnt_sock < 0) {
             std::cerr << "accept() error" << std::endl;
             continue;
@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
         active_clients++;
         pthread_mutex_unlock(&count_mutex);
 
-        ThreadArgs *args = new ThreadArgs;
+        ThreadArgs* args = new ThreadArgs;
         args->client_sock = clnt_sock;
         args->ctx = ctx;
 

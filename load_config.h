@@ -29,12 +29,12 @@ typedef enum {
 // Get a value by comparing a string of conditional statement with a variable.
 // @param ptr input variable to compare with string
 // @return value
-config_type_t get_key_value(char *ptr);
+config_type_t get_key_value(char* ptr);
 
 // Load config file from path and save the information in config struct.
 // @param config_t struct to use while using SST api.
 // @param path config file path
 // @return 0 for success, -1 for fail
-int load_config(config_t *c, const char *path);
+int load_config(config_t* c, const char* path);
 
 #endif  // LOAD_CONFIG_H

@@ -23,7 +23,7 @@ const char file_system_manager_ip_address[] = "fileSystemManager.ip.address";
 const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
 
-config_type_t get_key_value(char *ptr) {
+config_type_t get_key_value(char* ptr) {
     if (strcmp(ptr, entity_info_name) == 0) {
         return ENTITY_INFO_NAME;
     } else if (strcmp(ptr, entity_info_purpose) == 0) {
@@ -59,7 +59,7 @@ config_type_t get_key_value(char *ptr) {
     }
 }
 
-int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
+int safe_config_value_copy(char* dest, const char* src, size_t dest_size) {
     if ((strlen(src) + 1) > dest_size) {
         SST_print_error("Problem found while copying config value: %s.", src);
         return -1;
@@ -77,8 +77,8 @@ int safe_config_value_copy(char *dest, const char *src, size_t dest_size) {
     }
 }
 
-int load_config(config_t *c, const char *path) {
-    FILE *fp = fopen(path, "r");
+int load_config(config_t* c, const char* path) {
+    FILE* fp = fopen(path, "r");
     if (fp == NULL) {
         // Print an error message based on the error code
         if (errno == ENOENT) {
@@ -96,7 +96,7 @@ int load_config(config_t *c, const char *path) {
     char buffer[MAX_CONFIG_BUF_SIZE] = {
         0,
     };
-    char *pline;
+    char* pline;
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0;  // Option for ipfs.
     c->purpose_index = 0;              // Option for ipfs.
@@ -105,7 +105,7 @@ int load_config(config_t *c, const char *path) {
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
-        char *ptr = strtok(pline, "=");
+        char* ptr = strtok(pline, "=");
         while (ptr != NULL) {
             config_type_t config = get_key_value(ptr);
             if (config == UNKNOWN_CONFIG) {
@@ -152,7 +152,7 @@ int load_config(config_t *c, const char *path) {
                     break;
                 case ENTITY_INFO_NUMKEY:
                     SST_print_debug("Numkey: %s", ptr);
-                    c->numkey = atoi((const char *)ptr);
+                    c->numkey = atoi((const char*)ptr);
                     break;
                 case ENCRYPTION_MODE:
                     SST_print_debug("Encryption mode: %s", ptr);
@@ -181,7 +181,7 @@ int load_config(config_t *c, const char *path) {
                     break;
                 case AUTH_ID:
                     SST_print_debug("Auth ID: %s", ptr);
-                    c->auth_id = atoi((const char *)ptr);
+                    c->auth_id = atoi((const char*)ptr);
                     break;
                 case AUTH_INFO_PUBKEY_PATH:
                     SST_print_debug("Pubkey path of Auth: %s", ptr);

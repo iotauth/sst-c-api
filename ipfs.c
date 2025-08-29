@@ -16,7 +16,7 @@ const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
 const char DOWNLOAD_FILE_NAME[] = "download";
 
-int get_file_content(FILE *fin, unsigned char *file_buf,
+int get_file_content(FILE* fin, unsigned char* file_buf,
                      unsigned long bufsize) {
     if (fseek(fin, 0L, SEEK_SET) != 0) {
         SST_print_error("Start point is not zero.");
@@ -31,7 +31,7 @@ int get_file_content(FILE *fin, unsigned char *file_buf,
     return 0;
 }
 
-int64_t file_size_return(FILE *fin) {
+int64_t file_size_return(FILE* fin) {
     if (fin == NULL) {
         SST_print_error("Cannot read the file.");
         return -1;
@@ -45,8 +45,8 @@ int64_t file_size_return(FILE *fin) {
     return bufsize;
 }
 
-void file_duplication_check(const char *file_name, const char *file_extension,
-                            char *file_name_buf) {
+void file_duplication_check(const char* file_name, const char* file_extension,
+                            char* file_name_buf) {
     int suffix_num = 0;
 
     while (suffix_num < MAX_REPLY_NUM) {
@@ -78,10 +78,10 @@ void file_duplication_check(const char *file_name, const char *file_extension,
         "Cannot save the file as file name's suffix number exceeds max.");
 }
 
-int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
-                                    estimate_time_t *estimate_time) {
+int execute_command_and_save_result(char* file_name, unsigned char* hash_value,
+                                    estimate_time_t* estimate_time) {
     char buff[BUFF_SIZE];
-    FILE *fp;
+    FILE* fp;
     char command[BUFF_SIZE];
     struct timeval upload_start, upload_end;
     gettimeofday(&upload_start, NULL);
@@ -109,17 +109,17 @@ int execute_command_and_save_result(char *file_name, unsigned char *hash_value,
     return cid_len;
 }
 
-int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
-                        char *my_file_path, unsigned char *hash_value,
-                        estimate_time_t *estimate_time) {
+int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
+                        char* my_file_path, unsigned char* hash_value,
+                        estimate_time_t* estimate_time) {
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
-    FILE *fin = fopen(my_file_path, "r");
+    FILE* fin = fopen(my_file_path, "r");
     int64_t bufsize = file_size_return(fin);
     if (bufsize < 0) {
         SST_print_error("Failed file_size_return()");
     }
-    unsigned char *file_buf = NULL;
+    unsigned char* file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     if (get_file_content(fin, file_buf, bufsize) < 0) {
         SST_print_error("Failed get_file_content()");
@@ -132,7 +132,7 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     int provider_len = sizeof(ctx->config.name);
     unsigned int encrypted_length =
         (((bufsize) / AES_128_CBC_IV_SIZE) + 1) * AES_128_CBC_IV_SIZE;
-    unsigned char *encrypted = (unsigned char *)malloc(encrypted_length);
+    unsigned char* encrypted = (unsigned char*)malloc(encrypted_length);
     if (generate_nonce(AES_128_CBC_IV_SIZE, iv) < 0) {
         SST_print_error("Failed generate_nonce().");
         return -1;
@@ -150,8 +150,8 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
                            &file_name_buffer[0]);
 
     // File descriptor for the encrypted file.
-    FILE *fenc = fopen(file_name_buffer, "w");
-    unsigned char *enc_save = (unsigned char *)malloc(
+    FILE* fenc = fopen(file_name_buffer, "w");
+    unsigned char* enc_save = (unsigned char*)malloc(
         encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
     enc_save[0] = provider_len;
     memcpy(enc_save + 1, ctx->config.name, provider_len);
@@ -178,13 +178,13 @@ int file_encrypt_upload(session_key_t *s_key, SST_ctx_t *ctx,
     return ret;
 }
 
-int file_decrypt_save(session_key_t s_key, char *file_name) {
-    FILE *fin = fopen(file_name, "r");
+int file_decrypt_save(session_key_t s_key, char* file_name) {
+    FILE* fin = fopen(file_name, "r");
     int64_t bufsize = file_size_return(fin);
     if (bufsize < 0) {
         SST_print_error("Failed file_size_return()");
     }
-    unsigned char *file_buf = NULL;
+    unsigned char* file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     if (get_file_content(fin, file_buf, bufsize) < 0) {
         SST_print_error("Failed get_file_content()");
@@ -203,7 +203,7 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
         bufsize - (1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len);
     unsigned int ret_length = (enc_length + AES_128_CBC_IV_SIZE) /
                               AES_128_CBC_IV_SIZE * AES_128_CBC_IV_SIZE;
-    unsigned char *ret = (unsigned char *)malloc(ret_length);
+    unsigned char* ret = (unsigned char*)malloc(ret_length);
     if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
                     &ret_length) < 0) {
@@ -215,7 +215,7 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     char result_file_name[20];
     file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION,
                            &result_file_name[0]);
-    FILE *fout = fopen(result_file_name, "w");
+    FILE* fout = fopen(result_file_name, "w");
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);
@@ -224,11 +224,11 @@ int file_decrypt_save(session_key_t s_key, char *file_name) {
     return 0;
 }
 
-int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
-                                  unsigned char *hash_value,
+int upload_to_file_system_manager(session_key_t* s_key, SST_ctx_t* ctx,
+                                  unsigned char* hash_value,
                                   int hash_value_len) {
     int sock;
-    if (connect_as_client((const char *)ctx->config.file_system_manager_ip_addr,
+    if (connect_as_client((const char*)ctx->config.file_system_manager_ip_addr,
                           ctx->config.file_system_manager_port_num,
                           &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
@@ -255,9 +255,9 @@ int upload_to_file_system_manager(session_key_t *s_key, SST_ctx_t *ctx,
     return 0;
 }
 
-int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,
-                           unsigned char *hash_value, int hash_value_len,
-                           char *concat_buffer) {
+int make_upload_req_buffer(session_key_t* s_key, SST_ctx_t* ctx,
+                           unsigned char* hash_value, int hash_value_len,
+                           char* concat_buffer) {
     int key_id_size, name_size;
     key_id_size = sizeof(s_key->key_id);
     name_size = sizeof(ctx->config.name);
@@ -279,7 +279,7 @@ int make_upload_req_buffer(session_key_t *s_key, SST_ctx_t *ctx,
     return index;
 }
 
-int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
+int make_download_req_buffer(SST_ctx_t* ctx, char* concat_buffer) {
     int name_size;
     name_size = sizeof(ctx->config.name);
     int index = 0;
@@ -292,14 +292,14 @@ int make_download_req_buffer(SST_ctx_t *ctx, char *concat_buffer) {
     return index;
 }
 
-int receive_data_and_download_file(unsigned char *skey_id_in_str,
-                                   SST_ctx_t *ctx, char *file_name,
-                                   estimate_time_t *estimate_time) {
-    FILE *fin;
+int receive_data_and_download_file(unsigned char* skey_id_in_str,
+                                   SST_ctx_t* ctx, char* file_name,
+                                   estimate_time_t* estimate_time) {
+    FILE* fin;
     int sock;
     struct timeval filemanager_start, filemanager_end;
     gettimeofday(&filemanager_start, NULL);
-    if (connect_as_client((const char *)ctx->config.file_system_manager_ip_addr,
+    if (connect_as_client((const char*)ctx->config.file_system_manager_ip_addr,
                           ctx->config.file_system_manager_port_num,
                           &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
@@ -353,9 +353,9 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     return 0;
 }
 
-void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
-                   char *file_name) {
-    FILE *fin;
+void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str,
+                   char* file_name) {
+    FILE* fin;
     int command_size;
     command_size = received_buf[2 + KEY_ID_SIZE];
     memcpy(skey_id_in_str, received_buf + 2, KEY_ID_SIZE);
@@ -370,9 +370,9 @@ void download_file(unsigned char *received_buf, unsigned char *skey_id_in_str,
     SST_print_log("Success for downloading %s.", file_name);
 }
 
-int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
+int send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
     int sock;
-    if (connect_as_client((const char *)ctx->config.auth_ip_addr,
+    if (connect_as_client((const char*)ctx->config.auth_ip_addr,
                           ctx->config.auth_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return -1;
@@ -388,7 +388,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         }
         unsigned char message_type;
         unsigned int data_buf_length;
-        unsigned char *data_buf = parse_received_message(
+        unsigned char* data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (message_type == AUTH_HELLO) {
             if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
@@ -408,7 +408,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                 return -1;
             }
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce = NULL;
+            unsigned char* decrypted_entity_nonce = NULL;
             if (symmetric_decrypt_authenticate(
                     encrypted_entity_nonce, encrypted_entity_nonce_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
@@ -421,8 +421,8 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     "ADD_READER_RESP_WITH_DIST_KEY.");
                 return -1;
             }
-            if (strncmp((const char *)decrypted_entity_nonce,
-                        (const char *)entity_nonce,
+            if (strncmp((const char*)decrypted_entity_nonce,
+                        (const char*)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
                 SST_print_error("Auth nonce NOT verified");
@@ -435,7 +435,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
             break;
         } else if (message_type == ADD_READER_RESP) {
             unsigned int decrypted_entity_nonce_length;
-            unsigned char *decrypted_entity_nonce = NULL;
+            unsigned char* decrypted_entity_nonce = NULL;
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
@@ -447,8 +447,8 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
                     "ADD_READER_RESP.");
                 return -1;
             }
-            if (strncmp((const char *)decrypted_entity_nonce,
-                        (const char *)entity_nonce,
+            if (strncmp((const char*)decrypted_entity_nonce,
+                        (const char*)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                                              // & received entity's nonce.
                 SST_print_error("Auth nonce NOT verified");

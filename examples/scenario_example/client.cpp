@@ -10,7 +10,7 @@ extern "C" {
 
 enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM };
 
-static AttackType parseAttackType(const std::string &s) {
+static AttackType parseAttackType(const std::string& s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
@@ -24,7 +24,7 @@ static AttackType parseAttackType(const std::string &s) {
     return NONE;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 3) {
         std::cerr << "Usage: " << argv[0] << " <config_path> <csv_file_path>"
                   << std::endl;
@@ -32,17 +32,17 @@ int main(int argc, char *argv[]) {
     }
 
     // Standard SST initialization
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
 
-    session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         std::cerr << "Client failed to get session key.\n" << ::std::endl;
         exit(1);
     }
 
     // SST Connect to server
-    SST_session_ctx_t *session_ctx =
+    SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
 
     // Read CSV file
@@ -65,7 +65,7 @@ int main(int argc, char *argv[]) {
         std::string message = line.substr(comma1 + 1, comma2 - comma1 - 1);
         std::cout << "Sending message: " << message << std::endl;
 
-        int msg = send_secure_message(const_cast<char *>(message.c_str()),
+        int msg = send_secure_message(const_cast<char*>(message.c_str()),
                                       message.length(), session_ctx);
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
@@ -113,7 +113,7 @@ int main(int argc, char *argv[]) {
                 for (int i = 0; i < repeat; ++i) {
                     std::cout << "Getting session key: " << (i + 1) << " of "
                               << repeat << std::endl;
-                    session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+                    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
                     if (s_key_list == NULL) {
                         std::cerr << "Client failed to get session key in DOS "
                                      "Key attack.\n"
@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
                 // Quantity of secure_connect_to_server requests is the fourth
                 // column in the CSV
                 int repeat = std::stoi(attack_param);
-                SST_session_ctx_t *session_ctx[repeat];
+                SST_session_ctx_t* session_ctx[repeat];
                 // DOS Attack on secure_connect_to_server
                 for (int i = 0; i < repeat; ++i) {
                     s_key_list = get_session_key(ctx, NULL);
@@ -164,7 +164,7 @@ int main(int argc, char *argv[]) {
                               << (i + 1) << " of " << repeat << ")"
                               << std::endl;
                     int msg =
-                        send_secure_message(const_cast<char *>(message.c_str()),
+                        send_secure_message(const_cast<char*>(message.c_str()),
                                             message.length(), session_ctx);
                     if (msg < 0) {
                         SST_print_error_exit("Failed send_secure_message().");

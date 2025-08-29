@@ -7,22 +7,22 @@
 #define MAX_PAYLOAD_LENGTH 1024
 #define SEQ_NUM_SIZE 8
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    session_key_list_t* s_key_list = init_empty_session_key_list();
     ctx->config.purpose_index = 0;
-    session_key_list_t *s_key_list_0 = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
     if (s_key_list_0 == NULL) {
         SST_print_error_exit("Failed get_session_key().");
     }
-    SST_session_ctx_t *session_ctx =
+    SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
     if (session_ctx == NULL) {
         SST_print_error_exit("Failed secure_connect_to_server().");
@@ -49,7 +49,7 @@ int main(int argc, char *argv[]) {
     printf("Command size: %d\n", decrypted[SESSION_KEY_ID_SIZE + 2]);
 
     download_file(&decrypted[0], &received_skey_id[0], &file_name[0]);
-    session_key_t *session_key =
+    session_key_t* session_key =
         get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
     if (session_key == NULL) {
         SST_print_error_exit("Failed to get_session_key_by_ID().");

@@ -73,32 +73,32 @@ typedef struct {
 // Only prints when dcmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_debug(const unsigned char *buf, size_t size);
+void print_buf_debug(const unsigned char* buf, size_t size);
 
 // Utility function for printing unsigned char buffer in hex string.
 // @param buf given buffer of unsigned chars.
 // @param size length of the given buffer.
-void print_buf_log(const unsigned char *buf, size_t size);
+void print_buf_log(const unsigned char* buf, size_t size);
 
 // Generate secure random nonce using OpenSSL.
 // @param length length to generate the nonce.
 // @param buf buffer to save the generated nonce.
 // @return 0 for success, -1 for fail
-int generate_nonce(int length, unsigned char *buf);
+int generate_nonce(int length, unsigned char* buf);
 
 // Write number num in buffer size of n.
 // @param num number to write in buffer
 // @param n buffer size
 // @param buf output buffer
-void write_in_n_bytes(uint64_t num, int n, unsigned char *buf);
+void write_in_n_bytes(uint64_t num, int n, unsigned char* buf);
 
 // Make the total int number in big endian buffer.
 // @param buf input buffer
 // @param byte_length buffer length to make the total number
 // @return total number of input buffer
-unsigned int read_unsigned_int_BE(unsigned char *buf, int byte_length);
+unsigned int read_unsigned_int_BE(unsigned char* buf, int byte_length);
 
-uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length);
+uint64_t read_unsigned_long_int_BE(unsigned char* buf, int byte_length);
 
 // Extracts number value of variable length integer from given buffer.
 // When
@@ -111,16 +111,16 @@ uint64_t read_unsigned_long_int_BE(unsigned char *buf, int byte_length);
 //  @param num number value of the variable length integer.
 //  @param var_len_int_buf_size size of the buffer containing the variable
 //  length integer
-void var_length_int_to_num(unsigned char *buf, unsigned int buf_length,
-                           unsigned int *num, int *var_len_int_buf_size);
+void var_length_int_to_num(unsigned char* buf, unsigned int buf_length,
+                           unsigned int* num, int* var_len_int_buf_size);
 
 // Make the data_length to a variable length.
 // @param num number to be converted into variable length integer.
 // @param var_len_int_buf buffer to contain the variable length integer.
 // @param var_len_int_buf_size size of the buffer containing the variable
 // length integer.
-void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
-                           unsigned int *var_len_int_buf_size);
+void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
+                           unsigned int* var_len_int_buf_size);
 
 // Parses received message into 'message_type',
 // and data after msg_type+payload_buf to 'data_buf'.
@@ -131,10 +131,10 @@ void num_to_var_length_int(unsigned int num, unsigned char *var_len_int_buf,
 // @param message_type message type of received input buffer
 // @param data_buf_length length of return information
 // @return starting address of information from input buffer
-unsigned char *parse_received_message(unsigned char *received_buf,
+unsigned char* parse_received_message(unsigned char* received_buf,
                                       unsigned int received_buf_length,
-                                      unsigned char *message_type,
-                                      unsigned int *data_buf_length);
+                                      unsigned char* message_type,
+                                      unsigned int* data_buf_length);
 
 // Reads the SST header, and returns the message type, start pointer of the
 // SST's payload, and the payload's length.
@@ -142,8 +142,8 @@ unsigned char *parse_received_message(unsigned char *received_buf,
 // @param message_type SST message type
 // @param buf Return buffer
 // @param buf_length Return buffer's length
-int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
-                                        unsigned char *buf,
+int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
+                                        unsigned char* buf,
                                         unsigned int buf_length);
 
 // Make the buffer sending to Auth by using make_buffer_header() and
@@ -153,9 +153,9 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
 // @param MESSAGE_TYPE message type according to purpose
 // @param sender buffer to send to Auth
 // @param sender_length length of sender buffer
-void make_sender_buf(unsigned char *payload, unsigned int payload_length,
-                     unsigned char MESSAGE_TYPE, unsigned char *sender,
-                     unsigned int *sender_length);
+void make_sender_buf(unsigned char* payload, unsigned int payload_length,
+                     unsigned char MESSAGE_TYPE, unsigned char* sender,
+                     unsigned int* sender_length);
 
 // Connect to the server as client by using ip address, port number, and sock.
 // May be the entity_client-Auth, entity_client - entity_server, entity_server -
@@ -163,21 +163,21 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-int connect_as_client(const char *ip_addr, int port_num, int *sock);
+int connect_as_client(const char* ip_addr, int port_num, int* sock);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself
 // @param reply_nonce nonce received from the other entity or Auth
 // @param ret return_buffer:indicator_1byte + nonce_8byte + reply_nonce_8byte
 // @return 0 for success, -1 for fail
-int serialize_handshake(unsigned char *nonce, unsigned char *reply_nonce,
-                        unsigned char *ret);
+int serialize_handshake(unsigned char* nonce, unsigned char* reply_nonce,
+                        unsigned char* ret);
 
 // Parses the received buffer to struct HS_nonce_t
 // See parse_handshake() for details.
 // @param buf input buffer incluing nonce.
 // @param ret return buffer
-void parse_handshake(unsigned char *buf, HS_nonce_t *ret);
+void parse_handshake(unsigned char* buf, HS_nonce_t* ret);
 
 // Computes the positive remainder of a modulo operation.
 // This function ensures that the result is always non-negative, even if the
@@ -196,7 +196,7 @@ int mod(int a, int b);
 // @param buf A pointer to the buffer where the data will be stored.
 // @param buf_length The maximum number of bytes to read into the buffer.
 // @return The number of bytes successfully read, or -1 if an error occurred.
-int sst_read_from_socket(int socket, unsigned char *buf,
+int sst_read_from_socket(int socket, unsigned char* buf,
                          unsigned int buf_length);
 
 // Writes data to a socket from a buffer.
@@ -207,7 +207,7 @@ int sst_read_from_socket(int socket, unsigned char *buf,
 // @param buf A pointer to the buffer containing the data to be written.
 // @param buf_length The number of bytes to write from the buffer.
 // @return The number of bytes successfully written, or -1 if an error occurred.
-int sst_write_to_socket(int socket, const unsigned char *buf,
+int sst_write_to_socket(int socket, const unsigned char* buf,
                         unsigned int buf_length);
 
 // Checks message type if it is SECURE_COMM_MSG. This is needed as a separate

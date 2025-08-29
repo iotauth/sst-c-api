@@ -7,13 +7,13 @@
 
 #include "../../c_api.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
     int serv_sock, clnt_sock, clnt_sock2;
-    const char *PORT_NUM = "21100";
+    const char* PORT_NUM = "21100";
 
     struct sockaddr_in serv_addr, clnt_addr;
     socklen_t clnt_addr_size;
@@ -31,7 +31,7 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(atoi(PORT_NUM));
 
-    if (bind(serv_sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) ==
+    if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) ==
         -1) {
         SST_print_error_exit("bind() error in %s", __FILE__);
         return -1;
@@ -43,26 +43,26 @@ int main(int argc, char *argv[]) {
     }
     clnt_addr_size = sizeof(clnt_addr);
     clnt_sock =
-        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+        accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
         SST_print_error_exit("accept() error for first client in %s", __FILE__);
         return -1;
     }
 
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
-    session_key_list_t *s_key_list = init_empty_session_key_list();
-    SST_session_ctx_t *session_ctx =
+    session_key_list_t* s_key_list = init_empty_session_key_list();
+    SST_session_ctx_t* session_ctx =
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         SST_print_error_exit("Failed server_secure_comm_setup().");
     } else {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
-                       (void *)session_ctx);
+                       (void*)session_ctx);
         sleep(1);
 
         int msg = send_secure_message("Hello client", strlen("Hello client"),
@@ -87,12 +87,12 @@ int main(int argc, char *argv[]) {
     }
     // Second connection. session_key_list caches the session key.
     clnt_sock2 =
-        accept(serv_sock, (struct sockaddr *)&clnt_addr, &clnt_addr_size);
+        accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
     if (clnt_sock2 == -1) {
         SST_print_error_exit("accept() error for second client in %s",
                              __FILE__);
     }
-    SST_session_ctx_t *session_ctx2 =
+    SST_session_ctx_t* session_ctx2 =
         server_secure_comm_setup(ctx, clnt_sock2, s_key_list);
     if (session_ctx2 == NULL) {
         SST_print_error_exit("Failed server_secure_comm_setup().");
@@ -100,7 +100,7 @@ int main(int argc, char *argv[]) {
 
     pthread_t thread2;
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,
-                   (void *)session_ctx2);
+                   (void*)session_ctx2);
     sleep(1);
 
     int msg;
