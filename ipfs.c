@@ -383,8 +383,7 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         int received_buf_length =
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
         if (received_buf_length <= 0) {
-            SST_print_error(
-                "Socket read error in sst_read_from_socket().");
+            SST_print_error("Socket read error in sst_read_from_socket().");
             return -1;
         }
         unsigned char message_type;

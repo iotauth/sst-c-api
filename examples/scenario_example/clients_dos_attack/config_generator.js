@@ -28,7 +28,7 @@ if (isNaN(count) || count < 1) {
   process.exit(1);
 }
 
-// // Read the input .graph file
+// Read the input .graph file
 let lines;
 try {
   lines = fs.readFileSync(original_config, 'utf8').split(/\r?\n/);
@@ -37,7 +37,7 @@ try {
   process.exit(1);
 }
 
-// // Create the output config folder
+// Create the output config folder
 if (!fs.existsSync(out_dir)) {
   fs.mkdirSync(out_dir, { recursive: true });
 }
