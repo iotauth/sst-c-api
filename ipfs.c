@@ -319,7 +319,7 @@ int receive_data_and_download_file(unsigned char *skey_id_in_str,
     unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     int received_buf_length =
         sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-    if (received_buf_length < 0) {
+    if (received_buf_length <= 0) {
         SST_print_error("Socket read error in sst_read_from_socket().");
         return -1;
     }
@@ -382,9 +382,8 @@ int send_add_reader_req_via_TCP(SST_ctx_t *ctx, char *add_reader) {
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
         int received_buf_length =
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-        if (received_buf_length < 0) {
-            SST_print_error(
-                "Socket read error in send_add_reader_req_via_TCP().");
+        if (received_buf_length <= 0) {
+            SST_print_error("Socket read error in sst_read_from_socket().");
             return -1;
         }
         unsigned char message_type;

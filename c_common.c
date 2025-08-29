@@ -176,7 +176,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
     // Read the first byte.
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-    if (received_buf_length < 0) {
+    if (received_buf_length <= 0) {
         SST_print_error(
             "Socket read error in read_header_return_data_buf_pointer().");
         return -1;
@@ -202,7 +202,11 @@ int read_header_return_data_buf_pointer(int socket, unsigned char *message_type,
         SST_print_error("Larger buffer size required.");
         return -1;
     }
-    int bytes_read = sst_read_from_socket(socket, buf, buf_length);
+    int bytes_read = sst_read_from_socket(socket, buf, ret_length);
+    if (bytes_read <= 0) {
+        SST_print_error("Failed to read from socket reading the payload.");
+        return bytes_read;
+    }
     if ((unsigned int)bytes_read != ret_length) {
         SST_print_error("Wrong read... Exiting..");
         return -1;
@@ -264,15 +268,19 @@ void make_sender_buf(unsigned char *payload, unsigned int payload_length,
 
 int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     struct sockaddr_in serv_addr;
-    *sock = socket(PF_INET, SOCK_STREAM, 0);
+    *sock = socket(AF_INET, SOCK_STREAM, 0);
     if (*sock == -1) {
         SST_print_error("socket() error");
         return -1;
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
-    serv_addr.sin_addr.s_addr =
-        inet_addr(ip_addr);  // the ip_address to connect to
+    if (inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) != 1) {
+        SST_print_error("invalid IPv4 address: %s", ip_addr);
+        close(*sock);
+        *sock = -1;
+        return -1;
+    }
     serv_addr.sin_port = htons(port_num);
 
     int count_retries = 0;
@@ -280,20 +288,36 @@ int connect_as_client(const char *ip_addr, int port_num, int *sock) {
     // FIXME(Dongha Kim): Make the maximum number of retries configurable.
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
-        if (ret < 0) {
-            SST_print_error("Connection attempt %d failed. Retrying...",
-                            count_retries);
-            usleep(500);  // Wait 500 microseconds before retrying.
-            continue;
-        } else {
+        if (ret == 0) {
             SST_print_debug("Successfully connected to %s:%d on attempt %d.",
                             ip_addr, port_num, count_retries);
             break;
         }
+
+        if (errno == EINTR) {
+            SST_print_error("connect interrupted (EINTR). Retrying...");
+            continue;
+        }
+
+        SST_print_error("Connection attempt %d failed: %s. Retrying...",
+                        count_retries);
+
+        close(*sock);
+        *sock = socket(AF_INET, SOCK_STREAM, 0);
+        if (*sock == -1) {
+            SST_print_error("socket() error during retry: %s");
+            ret = -1;
+            break;
+        }
+        usleep(50000);
     }
     if (ret < 0) {
         SST_print_error("Failed to connect to %s:%d after %d attempts.",
                         ip_addr, port_num, count_retries - 1);
+        if (*sock != -1) {
+            close(*sock);
+            *sock = -1;
+        }
     }
     return ret;
 }
