@@ -208,11 +208,11 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 1. Go to `$ROOT/entity/c/examples/scenario_example/clients_dos_attack`
 
-2. (optional) `chmod +x clients_dos_setup.sh`
+2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
 3. Run `./client_dos_setup.sh <number-of-clients> -p <password>`
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
-    - (optional) `<password>` is the password of the generated Auth.
+    - *[Optional]* `<password>` is the password of the generated Auth.
     - e.g., `./client_dos_setup.sh 3 -p asdf`
 
 4. Insert a password when prompted.
