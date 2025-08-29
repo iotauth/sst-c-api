@@ -91,7 +91,7 @@ typedef struct {
 typedef struct {
     int num_key;
     int rear_idx;
-    session_key_t *s_key;
+    session_key_t* s_key;
 } session_key_list_t;
 
 // This struct contains distribution_key, loaded config, public and private
@@ -99,8 +99,8 @@ typedef struct {
 typedef struct {
     distribution_key_t dist_key;
     config_t config;
-    void *pub_key;
-    void *priv_key;
+    void* pub_key;
+    void* priv_key;
     pthread_mutex_t mutex;
 } SST_ctx_t;
 
@@ -110,27 +110,27 @@ typedef struct {
 // @param path config file path
 // @return SST_ctx_t struct stores config, public and private keys, and
 // distribution key.
-SST_ctx_t *init_SST(const char *config_path);
+SST_ctx_t* init_SST(const char* config_path);
 
 // Initializes empty session_key_list.
 // Mallocs session_key_list_t and the session_key_t as much as the
 // MAX_SESSION_KEY.
 // @return Empty session key list.
-session_key_list_t *init_empty_session_key_list(void);
+session_key_list_t* init_empty_session_key_list(void);
 
 // Request and get session key from Auth according to secure connection
 // by using OpenSSL which provides the cryptography, MAC, and Block cipher etc..
 // @param config_info config struct obtained from load_config()
 // @return secure session key list.
-session_key_list_t *get_session_key(SST_ctx_t *ctx,
-                                    session_key_list_t *existing_s_key_list);
+session_key_list_t* get_session_key(SST_ctx_t* ctx,
+                                    session_key_list_t* existing_s_key_list);
 
 // Connect to entity_server using the session key. This function can be called
 // after the connect() function, and uses the user's socket.
 // @param s_key session key struct received by Auth
 // @param sock Connected socket number
 // @return Connected session_ctx.
-SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
+SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
                                                         int sock);
 
 // Connect with other entity such as entity servers using the session key. This
@@ -139,8 +139,8 @@ SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key,
 // @param s_key session key struct received by Auth
 // @param ctx config struct obtained from load_config()
 // @return Connected session_ctx.
-SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
-                                            SST_ctx_t *ctx);
+SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
+                                            SST_ctx_t* ctx);
 
 // Try finding a target session key with its ID. If the entity has the target
 // session key, return the session key. Otherwise, request and receive the
@@ -149,9 +149,9 @@ SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key,
 // @param ctx SST context to communicate with Auth.
 // @param existing_s_key_list list of session keys that currently exist.
 // @param return The session key received with the target ID.
-session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
-                                     SST_ctx_t *ctx,
-                                     session_key_list_t *existing_s_key_list);
+session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
+                                     SST_ctx_t* ctx,
+                                     session_key_list_t* existing_s_key_list);
 
 // Wait the entity client to get the session key and
 // make a secure connection using session key.
@@ -160,20 +160,20 @@ session_key_t *get_session_key_by_ID(unsigned char *target_session_key_id,
 // @param config config struct for information
 // @param clnt_sock entity client socket number
 // @return session key struct
-SST_session_ctx_t *server_secure_comm_setup(
-    SST_ctx_t *ctx, int clnt_sock, session_key_list_t *existing_s_key_list);
+SST_session_ctx_t* server_secure_comm_setup(
+    SST_ctx_t* ctx, int clnt_sock, session_key_list_t* existing_s_key_list);
 
 // Read SECURE_COMM_MESSAGE, and return buffer, and bytes read.
 // @param plaintext The decrypted plaintext
 // @param session_ctx session ctx struct
 // @return the total number of bytes read from the socket, or -1 on failure.
-int read_secure_message(unsigned char *plaintext,
-                        SST_session_ctx_t *session_ctx);
+int read_secure_message(unsigned char* plaintext,
+                        SST_session_ctx_t* session_ctx);
 
 // Creates a thread to receive messages, by reading one bytes each at the SST
 // header. Max buffer length is 1000 bytes currently.
 // @param arguments struct including session key and socket number
-void *receive_thread_read_one_each(void *SST_session_ctx);
+void* receive_thread_read_one_each(void* SST_session_ctx);
 
 // Encrypt the message with session key and send the encrypted message to
 // the socket.
@@ -181,8 +181,8 @@ void *receive_thread_read_one_each(void *SST_session_ctx);
 // @param msg_length length of message
 // @param SST_session_ctx_t session ctx struct
 // @return the total number of bytes written to the socket, or -1 on failure.
-int send_secure_message(char *msg, unsigned int msg_length,
-                        SST_session_ctx_t *session_ctx);
+int send_secure_message(char* msg, unsigned int msg_length,
+                        SST_session_ctx_t* session_ctx);
 
 // Encrypt buffer with session key. This mallocs data, so the buffer must be
 // freed after use.
@@ -192,10 +192,10 @@ int send_secure_message(char *msg, unsigned int msg_length,
 // @param encrypted double pointer of returned encrypted buffer
 // @param encrypted_length length of returned encrypted buffer
 // @return 0 for success, -1 for fail
-int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
+int encrypt_buf_with_session_key(session_key_t* s_key, unsigned char* plaintext,
                                  unsigned int plaintext_length,
-                                 unsigned char **encrypted,
-                                 unsigned int *encrypted_length);
+                                 unsigned char** encrypted,
+                                 unsigned int* encrypted_length);
 
 // Decrypt buffer with session key. This mallocs data, so the buffer must be
 // freed after use.
@@ -205,10 +205,10 @@ int encrypt_buf_with_session_key(session_key_t *s_key, unsigned char *plaintext,
 // @param decrypted double pointer of returned decrypted buffer
 // @param decrypted_length length of returned decrypted buffer
 // @return 0 for success, -1 for fail
-int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
+int decrypt_buf_with_session_key(session_key_t* s_key, unsigned char* encrypted,
                                  unsigned int encrypted_length,
-                                 unsigned char **decrypted,
-                                 unsigned int *decrypted_length);
+                                 unsigned char** decrypted,
+                                 unsigned int* decrypted_length);
 
 // Encrypts buffer with session key without mallocing the return buffer. The
 // user must provide the ciphertext buffer.
@@ -219,11 +219,11 @@ int decrypt_buf_with_session_key(session_key_t *s_key, unsigned char *encrypted,
 // filled
 // @param encrypted_length length of returned encrypted buffer
 // @return 0 for success, -1 for fail
-int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
-                                                unsigned char *plaintext,
+int encrypt_buf_with_session_key_without_malloc(session_key_t* s_key,
+                                                unsigned char* plaintext,
                                                 unsigned int plaintext_length,
-                                                unsigned char *encrypted,
-                                                unsigned int *encrypted_length);
+                                                unsigned char* encrypted,
+                                                unsigned int* encrypted_length);
 
 // Decrypt buffer with session key without mallocing the return buffer. The user
 // must provide the plaintext buffer.
@@ -234,25 +234,25 @@ int encrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
 // filled
 // @param decrypted_length length of returned decrypted buffer
 // @return 0 for success, -1 for fail
-int decrypt_buf_with_session_key_without_malloc(session_key_t *s_key,
-                                                unsigned char *encrypted,
+int decrypt_buf_with_session_key_without_malloc(session_key_t* s_key,
+                                                unsigned char* encrypted,
                                                 unsigned int encrypted_length,
-                                                unsigned char *decrypted,
-                                                unsigned int *decrypted_length);
+                                                unsigned char* decrypted,
+                                                unsigned int* decrypted_length);
 
 // Saves session key list recursively.
 // @param session_key_list_t session_key_list to save
 // @param file_path file_path to save
 // @return 0 for success, -1 for fail
-int save_session_key_list(session_key_list_t *session_key_list,
-                          const char *file_path);
+int save_session_key_list(session_key_list_t* session_key_list,
+                          const char* file_path);
 
 // Loads session key list recursively.
 // @param session_key_list_t session_key_list to load
 // @param file_path file_path to load
 // @return 0 for success, -1 for fail
-int load_session_key_list(session_key_list_t *session_key_list,
-                          const char *file_path);
+int load_session_key_list(session_key_list_t* session_key_list,
+                          const char* file_path);
 
 // Saves session key list using a password and salt, additionally encrypting the
 // session_key_list
@@ -263,11 +263,11 @@ int load_session_key_list(session_key_list_t *session_key_list,
 // @param salt salt char to salt the password
 // @param salt_len length of the salt
 // @return 0 for success, -1 for fail
-int save_session_key_list_with_password(session_key_list_t *session_key_list,
-                                        const char *file_path,
-                                        const char *password,
+int save_session_key_list_with_password(session_key_list_t* session_key_list,
+                                        const char* file_path,
+                                        const char* password,
                                         unsigned int password_len,
-                                        const char *salt,
+                                        const char* salt,
                                         unsigned int salt_len);
 
 // Loads session key list using a password and salt, additionally encrypting the
@@ -279,37 +279,37 @@ int save_session_key_list_with_password(session_key_list_t *session_key_list,
 // @param salt salt char to salt the password
 // @param salt_len length of the salt
 // @return 0 for success, -1 for fail
-int load_session_key_list_with_password(session_key_list_t *session_key_list,
-                                        const char *file_path,
-                                        const char *password,
+int load_session_key_list_with_password(session_key_list_t* session_key_list,
+                                        const char* file_path,
+                                        const char* password,
                                         unsigned int password_len,
-                                        const char *salt,
+                                        const char* salt,
                                         unsigned int salt_len);
 
 // Returns the session key id buffer to be saved in unsigned integer.
 // @param buf session key id buffer to convert to int
 // @param byte_length length of session key id buffer
 // @return Session key id converted to integer.
-unsigned int convert_skid_buf_to_int(unsigned char *buf, int byte_length);
+unsigned int convert_skid_buf_to_int(unsigned char* buf, int byte_length);
 
 // Generates a random nonce.
 // This is used not to directly #include OpenSSL libraries.
 // @param length Length of the nonce
 // @param buf Pointer of the buffer with the random nonce.
 // @return 0 for success, -1 for fail
-int generate_random_nonce(int length, unsigned char *buf);
+int generate_random_nonce(int length, unsigned char* buf);
 
 // Frees memory used in session_key_list recursively.
 // @param session_key_list_t session_key_list to free.
-void free_session_key_list_t(session_key_list_t *session_key_list);
+void free_session_key_list_t(session_key_list_t* session_key_list);
 
 // Frees memory used in SST_session_ctx_t.
 // @param SST_session_ctx_t SST_session_ctx_t to free.
-void free_session_ctx(SST_session_ctx_t *session_ctx);
+void free_session_ctx(SST_session_ctx_t* session_ctx);
 
 // Free memory used in SST_ctx recursively.
 // @param SST_ctx_t loaded SST_ctx_t to free
-void free_SST_ctx_t(SST_ctx_t *ctx);
+void free_SST_ctx_t(SST_ctx_t* ctx);
 
 /**
  * @brief Generates a cryptographically secure random integer within a given
@@ -349,24 +349,24 @@ int secure_rand(int min, int max);
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_debug(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_debug(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 // Print out log messages.
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_log(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_log(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 // Print out error messages along with errno if set.
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_error(const char *fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 // Print out error message and exit program.
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char *fmt, ...);
+void SST_print_error_exit(const char* fmt, ...);
 
 #endif  // C_API_H

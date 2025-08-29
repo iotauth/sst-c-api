@@ -1,20 +1,20 @@
 #include "block_common.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
 
     // Open file_metadata structs.
-    char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
-    char *plaintext_metadata_filename = "plaintext_file_metadata.dat";
-    FILE *encrypted_metadata_fp;
-    FILE *plaintext_metadata_fp;
+    char* encrypted_metadata_filename = "encrypted_file_metadata.dat";
+    char* plaintext_metadata_filename = "plaintext_file_metadata.dat";
+    FILE* encrypted_metadata_fp;
+    FILE* plaintext_metadata_fp;
     encrypted_metadata_fp = fopen(encrypted_metadata_filename, "rb");
     plaintext_metadata_fp = fopen(plaintext_metadata_filename, "rb");
 
@@ -27,7 +27,7 @@ int main(int argc, char *argv[]) {
               plaintext_metadata_fp);
     }
 
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    session_key_list_t* s_key_list = init_empty_session_key_list();
     //  ----Decrypt and compare with plaintext----
 
     // Read files.
@@ -45,8 +45,8 @@ int main(int argc, char *argv[]) {
         snprintf(plaintext_filename, sizeof(plaintext_filename),
                  "plaintext%d.txt", i);
 
-        FILE *encrypted_fp;
-        FILE *plaintext_fp;
+        FILE* encrypted_fp;
+        FILE* plaintext_fp;
         encrypted_fp = fopen(encrypted_filename, "rb");
         plaintext_fp = fopen(plaintext_filename, "rb");
 
@@ -74,7 +74,7 @@ int main(int argc, char *argv[]) {
                   plaintext_fp);
 
             unsigned int decrypted_length;
-            unsigned char *decrypted = NULL;
+            unsigned char* decrypted = NULL;
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,

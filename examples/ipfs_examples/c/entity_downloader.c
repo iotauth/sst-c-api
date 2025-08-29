@@ -5,23 +5,23 @@
 
 #include "../../../ipfs.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    session_key_list_t* s_key_list = init_empty_session_key_list();
     ctx->config.purpose_index = 0;
     char file_name[BUFF_SIZE];
     unsigned char received_skey_id[SESSION_KEY_ID_SIZE];
     estimate_time_t estimate_time[5];
 
-    char *filename = "Download_result.csv";
-    FILE *file;
+    char* filename = "Download_result.csv";
+    FILE* file;
     file = fopen(filename, "r");
     if (file) {
         fclose(file);
@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
         }
         struct timeval keygen_start, keygen_end;
         gettimeofday(&keygen_start, NULL);
-        session_key_t *session_key =
+        session_key_t* session_key =
             get_session_key_by_ID(&received_skey_id[0], ctx, s_key_list);
         if (session_key == NULL) {
             SST_print_error_exit("Failed get_session_key_by_ID().");

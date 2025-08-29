@@ -1,18 +1,18 @@
 #include "block_common.h"
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
 
     // This will bring 3 keys. It is changable in the config file's
     // entityInfo.number_key=3
-    session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key().");
     }
@@ -23,10 +23,10 @@ int main(int argc, char *argv[]) {
     file_metadata_t encrypted_file_metadata[TOTAL_FILE_NUM];
     file_metadata_t plaintext_file_metadata[TOTAL_FILE_NUM];
 
-    char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
-    char *plaintext_metadata_filename = "plaintext_file_metadata.dat";
-    FILE *encrypted_metadata_fp;
-    FILE *plaintext_metadata_fp;
+    char* encrypted_metadata_filename = "encrypted_file_metadata.dat";
+    char* plaintext_metadata_filename = "plaintext_file_metadata.dat";
+    FILE* encrypted_metadata_fp;
+    FILE* plaintext_metadata_fp;
     encrypted_metadata_fp = fopen(encrypted_metadata_filename, "wb");
     plaintext_metadata_fp = fopen(plaintext_metadata_filename, "wb");
 
@@ -48,8 +48,8 @@ int main(int argc, char *argv[]) {
         snprintf(plaintext_filename, sizeof(plaintext_filename),
                  "plaintext%d.txt", i);
 
-        FILE *encrypted_fp;
-        FILE *plaintext_fp;
+        FILE* encrypted_fp;
+        FILE* plaintext_fp;
         encrypted_fp = fopen(encrypted_filename, "wb");
         plaintext_fp = fopen(plaintext_filename, "wb");
         // Create blocks.
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
                 total_block_size;
 
             unsigned int encrypted_length;
-            unsigned char *encrypted = NULL;
+            unsigned char* encrypted = NULL;
             if (encrypt_buf_with_session_key(
                     &s_key_list->s_key[i], plaintext_block_buf,
                     total_block_size, &encrypted, &encrypted_length) < 0) {

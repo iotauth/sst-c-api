@@ -2,9 +2,9 @@
 #include "../include/sst_crypto_embedded.h"
 #include "mbedtls/gcm.h"
 
-int sst_encrypt_gcm(const uint8_t *key, const uint8_t *nonce,
-                    const uint8_t *input, size_t input_len, uint8_t *ciphertext,
-                    uint8_t *tag) {
+int sst_encrypt_gcm(const uint8_t* key, const uint8_t* nonce,
+                    const uint8_t* input, size_t input_len, uint8_t* ciphertext,
+                    uint8_t* tag) {
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
 
@@ -22,9 +22,9 @@ int sst_encrypt_gcm(const uint8_t *key, const uint8_t *nonce,
     return ret;
 }
 
-int sst_decrypt_gcm(const uint8_t *key, const uint8_t *nonce,
-                    const uint8_t *ciphertext, size_t ciphertext_len,
-                    const uint8_t *tag, uint8_t *output) {
+int sst_decrypt_gcm(const uint8_t* key, const uint8_t* nonce,
+                    const uint8_t* ciphertext, size_t ciphertext_len,
+                    const uint8_t* tag, uint8_t* output) {
     mbedtls_gcm_context gcm;
     mbedtls_gcm_init(&gcm);
 

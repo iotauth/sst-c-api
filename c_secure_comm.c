@@ -25,15 +25,15 @@ typedef enum {
 // @param purpose_length length of purpose
 // @param ret_length length of return buffer
 // @return concated total buffer
-static unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
-                                                 unsigned char *auth_nonce,
-                                                 int num_key, char *sender,
-                                                 char *purpose,
-                                                 unsigned int *ret_length) {
+static unsigned char* serialize_message_for_auth(unsigned char* entity_nonce,
+                                                 unsigned char* auth_nonce,
+                                                 int num_key, char* sender,
+                                                 char* purpose,
+                                                 unsigned int* ret_length) {
     size_t sender_length = strlen(sender);
     size_t purpose_length = strlen(purpose);
 
-    unsigned char *ret = (unsigned char *)malloc(
+    unsigned char* ret = (unsigned char*)malloc(
         NONCE_SIZE * 2 + NUMKEY_SIZE + sender_length + purpose_length +
         8 /* +8 for two var length ints */);
 
@@ -82,26 +82,26 @@ static unsigned char *serialize_message_for_auth(unsigned char *entity_nonce,
 // @param ctx config struct obtained from load_config()
 // @param message message with encrypted message and signature
 // @param message_length length of message
-static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
-                                       SST_ctx_t *ctx,
-                                       unsigned int *message_length) {
+static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
+                                       SST_ctx_t* ctx,
+                                       unsigned int* message_length) {
     size_t encrypted_length;
-    unsigned char *encrypted =
+    unsigned char* encrypted =
         public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING,
-                       (EVP_PKEY *)ctx->pub_key, &encrypted_length);
+                       (EVP_PKEY*)ctx->pub_key, &encrypted_length);
     if (encrypted == NULL) {
         SST_print_error("Failed public_encrypt().");
         return NULL;
     }
     size_t sigret_length;
-    unsigned char *sigret = SHA256_sign(
-        encrypted, encrypted_length, (EVP_PKEY *)ctx->priv_key, &sigret_length);
+    unsigned char* sigret = SHA256_sign(
+        encrypted, encrypted_length, (EVP_PKEY*)ctx->priv_key, &sigret_length);
     if (sigret == NULL) {
         SST_print_error("Failed SHA256_sign().");
         return NULL;
     }
     *message_length = sigret_length + encrypted_length;
-    unsigned char *message = (unsigned char *)malloc(*message_length);
+    unsigned char* message = (unsigned char*)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
     memcpy(message + encrypted_length, sigret, sigret_length);
     OPENSSL_free(encrypted);
@@ -120,11 +120,11 @@ static unsigned char *encrypt_and_sign(unsigned char *buf, unsigned int buf_len,
 // @param name entity_sender name.
 // @param ret_length
 // @return unsigned char * return buffer
-static unsigned char *serialize_session_key_req_with_distribution_key(
-    unsigned char *serialized, unsigned int serialized_length,
-    distribution_key_t *dist_key, char *name, unsigned int *ret_length) {
+static unsigned char* serialize_session_key_req_with_distribution_key(
+    unsigned char* serialized, unsigned int serialized_length,
+    distribution_key_t* dist_key, char* name, unsigned int* ret_length) {
     unsigned int temp_length;
-    unsigned char *temp = NULL;
+    unsigned char* temp = NULL;
     if (symmetric_encrypt_authenticate(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
@@ -137,7 +137,7 @@ static unsigned char *serialize_session_key_req_with_distribution_key(
     }
     unsigned int name_length = strlen(name);
     unsigned char length_buf[] = {name_length};
-    unsigned char *ret = malloc(1 + name_length + temp_length);
+    unsigned char* ret = malloc(1 + name_length + temp_length);
     unsigned int offset = 0;
     memcpy(ret, length_buf, 1);
     offset += 1;
@@ -162,8 +162,8 @@ static int check_validity(uint64_t abs_validity_ms) {
 // Must free distribution_key.mac_key, distribution_key.cipher_key
 // @param parsed_distribution_key distribution key struct to save information
 // @param buf input buffer with distribution key
-static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
-                                   unsigned char *buf) {
+static void parse_distribution_key(distribution_key_t* parsed_distribution_key,
+                                   unsigned char* buf) {
     parsed_distribution_key->abs_validity =
         read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
     unsigned int cur_index = DIST_KEY_EXPIRATION_TIME_SIZE;
@@ -184,8 +184,8 @@ static void parse_distribution_key(distribution_key_t *parsed_distribution_key,
 // modes.
 // @param ctx The SST_ctx_t to get the config.
 // @param s_key The target session key to set the modes.
-static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
-                                                         session_key_t *s_key) {
+static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t* ctx,
+                                                         session_key_t* s_key) {
     s_key->enc_mode = ctx->config.encryption_mode;
     s_key->hmac_mode = ctx->config.hmac_mode;
 }
@@ -196,9 +196,9 @@ static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t *ctx,
 // @param offset buffer index
 // @param return_to_length length of return buffer
 // @return buffer with crypto spec
-static unsigned char *parse_string_param(unsigned char *buf,
+static unsigned char* parse_string_param(unsigned char* buf,
                                          unsigned int buf_length, int offset,
-                                         unsigned int *return_to_length) {
+                                         unsigned int* return_to_length) {
     unsigned int num;
     int var_len_int_buf_size;
     var_length_int_to_num(buf + offset, buf_length, &num,
@@ -209,7 +209,7 @@ static unsigned char *parse_string_param(unsigned char *buf,
         return NULL;
     }
     *return_to_length = num + var_len_int_buf_size;
-    unsigned char *return_to = (unsigned char *)malloc(*return_to_length);
+    unsigned char* return_to = (unsigned char*)malloc(*return_to_length);
     memcpy(return_to, buf + offset + var_len_int_buf_size, num);
     return return_to;
 }
@@ -219,7 +219,7 @@ static unsigned char *parse_string_param(unsigned char *buf,
 // @param ret session key struct to save key info
 // @param buf input buffer with session key
 // @return index number for another session key
-static unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
+static unsigned int parse_session_key(session_key_t* ret, unsigned char* buf) {
     memcpy(ret->key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
 
@@ -251,14 +251,14 @@ static unsigned int parse_session_key(session_key_t *ret, unsigned char *buf) {
 // @param buf_length length of buf
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
-static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
+static int parse_session_key_response(SST_ctx_t* ctx, unsigned char* buf,
                                       unsigned int buf_length,
-                                      unsigned char *reply_nonce,
-                                      session_key_list_t *session_key_list) {
+                                      unsigned char* reply_nonce,
+                                      session_key_list_t* session_key_list) {
     memcpy(reply_nonce, buf, NONCE_SIZE);
     unsigned int buf_idx = NONCE_SIZE;
     unsigned int ret_length;
-    unsigned char *ret =
+    unsigned char* ret =
         parse_string_param(buf, buf_length, buf_idx, &ret_length);
     if (ret == NULL) {
         SST_print_error("Failed parse_string_param().");
@@ -286,7 +286,7 @@ static int parse_session_key_response(SST_ctx_t *ctx, unsigned char *buf,
 // Check the validity of session key by checking abs_validity
 // @param session_key_t session_key to check validity
 // @return -1 when expired, 0 when valid
-static int check_session_key_validity(session_key_t *session_key) {
+static int check_session_key_validity(session_key_t* session_key) {
     if (check_validity(session_key->abs_validity) < 0) {
         SST_print_error("Failed check_validity().");
         return -1;
@@ -298,7 +298,7 @@ static int check_session_key_validity(session_key_t *session_key) {
 // Check the validity of distribution key by checking abs_validity
 // @param distribution_key_t distribution_key to check validity
 // @return -1 when expired, 0 when valid
-static int check_distribution_key_validity(distribution_key_t *dist_key) {
+static int check_distribution_key_validity(distribution_key_t* dist_key) {
     int ret = check_validity(dist_key->abs_validity);
     SST_print_debug("Distribution key expired!");
     return ret;
@@ -311,9 +311,9 @@ static int check_distribution_key_validity(distribution_key_t *dist_key) {
 // @param sock socket number
 // @param requestIndex request index for purpose
 // @return 0 for success, -1 for fail
-static int send_auth_request_message(unsigned char *serialized,
+static int send_auth_request_message(unsigned char* serialized,
                                      unsigned int serialized_length,
-                                     SST_ctx_t *ctx, int sock,
+                                     SST_ctx_t* ctx, int sock,
                                      int requestIndex) {
     if (check_distribution_key_validity(&ctx->dist_key) <
         0) {  // when dist_key expired
@@ -321,7 +321,7 @@ static int send_auth_request_message(unsigned char *serialized,
             "Current distribution key expired, requesting new "
             "distribution key as well...");
         unsigned int enc_length;
-        unsigned char *enc =
+        unsigned char* enc =
             encrypt_and_sign(serialized, serialized_length, ctx, &enc_length);
         if (enc == NULL) {
             SST_print_error("Failed encrypt_and_sign().");
@@ -345,7 +345,7 @@ static int send_auth_request_message(unsigned char *serialized,
         OPENSSL_free(enc);
     } else {
         unsigned int enc_length;
-        unsigned char *enc = serialize_session_key_req_with_distribution_key(
+        unsigned char* enc = serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, &ctx->dist_key, ctx->config.name,
             &enc_length);
         if (enc == NULL) {
@@ -374,9 +374,9 @@ static int send_auth_request_message(unsigned char *serialized,
     return 0;
 }
 
-int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
-                      unsigned char *entity_nonce, int sock, int num_key,
-                      char *purpose, int requestIndex) {
+int handle_AUTH_HELLO(unsigned char* data_buf, SST_ctx_t* ctx,
+                      unsigned char* entity_nonce, int sock, int num_key,
+                      char* purpose, int requestIndex) {
     unsigned char auth_nonce[NONCE_SIZE];
     unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
     if (auth_id != (unsigned int)ctx->config.auth_id) {
@@ -386,7 +386,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
     memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
     RAND_bytes(entity_nonce, NONCE_SIZE);
     unsigned int serialized_length;
-    unsigned char *serialized = serialize_message_for_auth(
+    unsigned char* serialized = serialize_message_for_auth(
         entity_nonce, auth_nonce, num_key, ctx->config.name, purpose,
         &serialized_length);
     if (send_auth_request_message(serialized, serialized_length, ctx, sock,
@@ -397,7 +397,7 @@ int handle_AUTH_HELLO(unsigned char *data_buf, SST_ctx_t *ctx,
     return 0;
 }
 
-int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
+int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
                           size_t key_size) {
     signed_data_t signed_data;
 
@@ -407,7 +407,7 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 
     // verify
     if (SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
-                      (EVP_PKEY *)ctx->pub_key) < 0) {
+                      (EVP_PKEY*)ctx->pub_key) < 0) {
         SST_print_error("Failed SHA256_verify().");
         return -1;
     }
@@ -415,9 +415,9 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
 
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
-    unsigned char *decrypted_dist_key_buf = private_decrypt(
+    unsigned char* decrypted_dist_key_buf = private_decrypt(
         signed_data.data, key_size, RSA_PKCS1_OAEP_PADDING,
-        (EVP_PKEY *)ctx->priv_key, &decrypted_dist_key_buf_length);
+        (EVP_PKEY*)ctx->priv_key, &decrypted_dist_key_buf_length);
     if (decrypted_dist_key_buf == NULL) {
         SST_print_error("Failed private_decrypt().");
         return -1;
@@ -430,16 +430,16 @@ int save_distribution_key(unsigned char *data_buf, SST_ctx_t *ctx,
     return 0;
 }
 
-unsigned char *parse_handshake_1(session_key_t *s_key,
-                                 unsigned char *entity_nonce,
-                                 unsigned int *ret_length) {
+unsigned char* parse_handshake_1(session_key_t* s_key,
+                                 unsigned char* entity_nonce,
+                                 unsigned int* ret_length) {
     RAND_bytes(entity_nonce, HS_NONCE_SIZE);
     unsigned char indicator_entity_nonce[1 + HS_NONCE_SIZE];
     memcpy(indicator_entity_nonce + 1, entity_nonce, HS_NONCE_SIZE);
     indicator_entity_nonce[0] = 1;
 
     unsigned int encrypted_length;
-    unsigned char *encrypted = NULL;
+    unsigned char* encrypted = NULL;
     if (symmetric_encrypt_authenticate(
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
@@ -450,21 +450,21 @@ unsigned char *parse_handshake_1(session_key_t *s_key,
     }
 
     *ret_length = encrypted_length + KEY_ID_SIZE;
-    unsigned char *ret = (unsigned char *)malloc(*ret_length);
+    unsigned char* ret = (unsigned char*)malloc(*ret_length);
     memcpy(ret, s_key->key_id, KEY_ID_SIZE);
     memcpy(ret + KEY_ID_SIZE, encrypted, encrypted_length);
     free(encrypted);
     return ret;
 }
 
-unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
+unsigned char* check_handshake_2_send_handshake_3(unsigned char* data_buf,
                                                   unsigned int data_buf_length,
-                                                  unsigned char *entity_nonce,
-                                                  session_key_t *s_key,
-                                                  unsigned int *ret_length) {
+                                                  unsigned char* entity_nonce,
+                                                  session_key_t* s_key,
+                                                  unsigned int* ret_length) {
     SST_print_debug("Received session key handshake2!");
     unsigned int decrypted_length;
-    unsigned char *decrypted = NULL;
+    unsigned char* decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -477,7 +477,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     free(decrypted);
 
     // compare my_nonce and received_nonce
-    if (strncmp((const char *)hs.reply_nonce, (const char *)entity_nonce,
+    if (strncmp((const char*)hs.reply_nonce, (const char*)entity_nonce,
                 HS_NONCE_SIZE) != 0) {
         SST_print_error(
             "Comm init failed: server NOT verified, nonce NOT matched, "
@@ -495,7 +495,7 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
         return NULL;
     }
 
-    unsigned char *ret = NULL;
+    unsigned char* ret = NULL;
     if (symmetric_encrypt_authenticate(
             buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -506,8 +506,8 @@ unsigned char *check_handshake_2_send_handshake_3(unsigned char *data_buf,
     return ret;
 }
 
-int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
-                             SST_session_ctx_t *session_ctx) {
+int send_SECURE_COMM_message(char* msg, unsigned int msg_length,
+                             SST_session_ctx_t* session_ctx) {
     if (check_session_key_validity(&session_ctx->s_key) < 0) {
         SST_print_error("Failed at check_session_key_validity().");
         return -1;
@@ -515,7 +515,7 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     unsigned char buf[SEQ_NUM_SIZE + msg_length];
     memset(buf, 0, SEQ_NUM_SIZE + msg_length);
     write_in_n_bytes(session_ctx->sent_seq_num, SEQ_NUM_SIZE, buf);
-    memcpy(buf + SEQ_NUM_SIZE, (unsigned char *)msg, msg_length);
+    memcpy(buf + SEQ_NUM_SIZE, (unsigned char*)msg, msg_length);
 
     unsigned int estimate_encrypted_length =
         get_expected_encrypted_total_length(
@@ -550,11 +550,11 @@ int send_SECURE_COMM_message(char *msg, unsigned int msg_length,
     return bytes_written;
 }
 
-int decrypt_received_message(unsigned char *encrypted_data,
+int decrypt_received_message(unsigned char* encrypted_data,
                              unsigned int encrypted_data_length,
-                             unsigned char *decrypted_data,
-                             unsigned int *decrypted_buf_length,
-                             SST_session_ctx_t *session_ctx) {
+                             unsigned char* decrypted_data,
+                             unsigned int* decrypted_buf_length,
+                             SST_session_ctx_t* session_ctx) {
     if (symmetric_decrypt_authenticate_without_malloc(
             encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
             MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
@@ -580,8 +580,8 @@ int decrypt_received_message(unsigned char *encrypted_data,
     return 0;
 }
 
-session_key_list_t *send_session_key_request_check_protocol(
-    SST_ctx_t *ctx, unsigned char *target_key_id) {
+session_key_list_t* send_session_key_request_check_protocol(
+    SST_ctx_t* ctx, unsigned char* target_key_id) {
     // TODO: check if needed
     // Temporary code. need to load?
     unsigned char target_session_key_cache[10];
@@ -589,9 +589,8 @@ session_key_list_t *send_session_key_request_check_protocol(
     target_session_key_cache_length =
         (unsigned char)sizeof("none") / sizeof(unsigned char) - 1;
     memcpy(target_session_key_cache, "none", target_session_key_cache_length);
-    if (strcmp((const char *)ctx->config.network_protocol, "TCP") ==
-        0) {  // TCP
-        session_key_list_t *s_key_list = send_session_key_req_via_TCP(ctx);
+    if (strcmp((const char*)ctx->config.network_protocol, "TCP") == 0) {  // TCP
+        session_key_list_t* s_key_list = send_session_key_req_via_TCP(ctx);
         if (s_key_list == NULL) {
             SST_print_error("Failed to send_session_key_req_via_TCP().");
             return NULL;
@@ -603,11 +602,10 @@ session_key_list_t *send_session_key_request_check_protocol(
         //  if(){} //TODO: check received_dist_key null;
         //  if(strncmp(callback_params.target_session_key_cache, "Clients",
         //  callback_params.target_session_key_cache_length) == 0){}
-        if (strncmp((const char *)target_session_key_cache, "none",
+        if (strncmp((const char*)target_session_key_cache, "none",
                     target_session_key_cache_length) == 0) {
-            if (strncmp((const char *)s_key_list->s_key[0].key_id,
-                        (const char *)target_key_id,
-                        SESSION_KEY_ID_SIZE) != 0) {
+            if (strncmp((const char*)s_key_list->s_key[0].key_id,
+                        (const char*)target_key_id, SESSION_KEY_ID_SIZE) != 0) {
                 SST_print_error("Session key id is NOT as expected");
                 return NULL;
             } else {
@@ -615,7 +613,7 @@ session_key_list_t *send_session_key_request_check_protocol(
             }
             return s_key_list;
         }
-    } else if (strcmp((const char *)ctx->config.network_protocol, "UDP") == 0) {
+    } else if (strcmp((const char*)ctx->config.network_protocol, "UDP") == 0) {
         // TODO:(Dongha Kim): Implement session key request via UDP.
         // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
         // return s_key_list;
@@ -624,15 +622,15 @@ session_key_list_t *send_session_key_request_check_protocol(
     return NULL;
 }
 
-session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
+session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
     int sock;
-    if (connect_as_client((const char *)ctx->config.auth_ip_addr,
+    if (connect_as_client((const char*)ctx->config.auth_ip_addr,
                           ctx->config.auth_port_num, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
 
-    session_key_list_t *session_key_list = malloc(sizeof(session_key_list_t));
+    session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
 
     session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
 
@@ -650,7 +648,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
         }
         unsigned char message_type;
         unsigned int data_buf_length;
-        unsigned char *data_buf = parse_received_message(
+        unsigned char* data_buf = parse_received_message(
             received_buf, received_buf_length, &message_type, &data_buf_length);
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
@@ -666,7 +664,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
                 "Received session key response encrypted with distribution "
                 "key.");
             unsigned int decrypted_length;
-            unsigned char *decrypted;
+            unsigned char* decrypted;
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
@@ -687,7 +685,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             free(decrypted);
             SST_print_debug("Reply_nonce in sessionKeyResp: ");
             print_buf_debug(reply_nonce, NONCE_SIZE);
-            if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
+            if (strncmp((const char*)reply_nonce, (const char*)entity_nonce,
                         NONCE_SIZE) != 0) {
                 SST_print_error("Auth nonce NOT verified.");
                 return NULL;
@@ -714,7 +712,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 
             // decrypt session_key with decrypted_dist_key_buf
             unsigned int decrypted_session_key_response_length;
-            unsigned char *decrypted_session_key_response;
+            unsigned char* decrypted_session_key_response;
             if (symmetric_decrypt_authenticate(
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
@@ -741,7 +739,7 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
             free(decrypted_session_key_response);
             SST_print_debug("Reply_nonce in sessionKeyResp: ");
             print_buf_debug(reply_nonce, NONCE_SIZE);
-            if (strncmp((const char *)reply_nonce, (const char *)entity_nonce,
+            if (strncmp((const char*)reply_nonce, (const char*)entity_nonce,
                         NONCE_SIZE) != 0) {  // compare generated entity's nonce
                 // & received entity's nonce.
                 SST_print_error("Auth nonce NOT verified.");
@@ -781,12 +779,12 @@ session_key_list_t *send_session_key_req_via_TCP(SST_ctx_t *ctx) {
 //     SST_print_error("This function is not implemented yet.");
 // }
 
-unsigned char *check_handshake1_send_handshake2(
-    unsigned char *received_buf, unsigned int received_buf_length,
-    unsigned char *server_nonce, session_key_t *s_key,
-    unsigned int *ret_length) {
+unsigned char* check_handshake1_send_handshake2(
+    unsigned char* received_buf, unsigned int received_buf_length,
+    unsigned char* server_nonce, session_key_t* s_key,
+    unsigned int* ret_length) {
     unsigned int decrypted_length;
-    unsigned char *decrypted = NULL;
+    unsigned char* decrypted = NULL;
     if (symmetric_decrypt_authenticate(
             received_buf + SESSION_KEY_ID_SIZE,
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
@@ -818,7 +816,7 @@ unsigned char *check_handshake1_send_handshake2(
         return NULL;
     }
 
-    unsigned char *ret = NULL;
+    unsigned char* ret = NULL;
     if (symmetric_encrypt_authenticate(
             buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
@@ -831,7 +829,7 @@ unsigned char *check_handshake1_send_handshake2(
     return ret;
 }
 
-int find_session_key(unsigned int key_id, session_key_list_t *s_key_list) {
+int find_session_key(unsigned int key_id, session_key_list_t* s_key_list) {
     // TODO: Fix integer size 32 or 64
     for (int idx = 0; idx < s_key_list->num_key; idx++) {
         unsigned int list_key_id = read_unsigned_int_BE(
@@ -847,14 +845,14 @@ int find_session_key(unsigned int key_id, session_key_list_t *s_key_list) {
 // Does not free the src's session key. Free must needed.
 // @param dest Session key destination pointer to copy to.
 // @param src Session key src pointer to copy.
-static void copy_session_key(session_key_t *dest, session_key_t *src) {
+static void copy_session_key(session_key_t* dest, session_key_t* src) {
     memcpy(dest, src, sizeof(session_key_t));
     memcpy(dest->mac_key, src->mac_key, src->mac_key_size);
     memcpy(dest->cipher_key, src->cipher_key, src->cipher_key_size);
 }
 
-int add_session_key_to_list(session_key_t *s_key,
-                            session_key_list_t *existing_s_key_list) {
+int add_session_key_to_list(session_key_t* s_key,
+                            session_key_list_t* existing_s_key_list) {
     if (s_key == NULL || existing_s_key_list == NULL) {
         return -1;
     }
@@ -875,8 +873,8 @@ int add_session_key_to_list(session_key_t *s_key,
     return index;
 }
 
-void append_session_key_list(session_key_list_t *dest,
-                             session_key_list_t *src) {
+void append_session_key_list(session_key_list_t* dest,
+                             session_key_list_t* src) {
     if (dest->num_key + src->num_key > MAX_SESSION_KEY) {
         int temp = dest->num_key + src->num_key - MAX_SESSION_KEY;
         SST_print_debug(
@@ -892,13 +890,13 @@ void append_session_key_list(session_key_list_t *dest,
     }
 }
 
-void update_validity(session_key_t *session_key) {
+void update_validity(session_key_t* session_key) {
     session_key->abs_validity =
         ((uint64_t)time(NULL) * 1000) + session_key->rel_validity;
 }
 
 int check_session_key_list_addable(int requested_num_key,
-                                   session_key_list_t *s_key_list) {
+                                   session_key_list_t* s_key_list) {
     if (MAX_SESSION_KEY - s_key_list->num_key < requested_num_key) {
         // Checks (num_key) number from the oldest session_keys.
         int ret = 1;
@@ -920,8 +918,8 @@ int check_session_key_list_addable(int requested_num_key,
 }
 
 int encrypt_or_decrypt_buf_with_session_key(
-    session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char **output, unsigned int *output_length, bool is_encrypt) {
+    session_key_t* s_key, unsigned char* input, unsigned int input_length,
+    unsigned char** output, unsigned int* output_length, bool is_encrypt) {
     if (!check_session_key_validity(s_key)) {
         if (is_encrypt) {
             // Encryption mode.
@@ -957,8 +955,8 @@ int encrypt_or_decrypt_buf_with_session_key(
 }
 
 int encrypt_or_decrypt_buf_with_session_key_without_malloc(
-    session_key_t *s_key, unsigned char *input, unsigned int input_length,
-    unsigned char *output, unsigned int *output_length, bool is_encrypt) {
+    session_key_t* s_key, unsigned char* input, unsigned int input_length,
+    unsigned char* output, unsigned int* output_length, bool is_encrypt) {
     if (!check_session_key_validity(s_key)) {
         if (is_encrypt) {
             if (symmetric_encrypt_authenticate_without_malloc(

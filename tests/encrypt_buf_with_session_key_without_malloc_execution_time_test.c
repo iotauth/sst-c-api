@@ -31,16 +31,16 @@ long get_time_diff_ns(struct timespec start, struct timespec end) {
            (end.tv_nsec - start.tv_nsec);
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     // Just to pass compiler warnings.
     (void)argc;
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
 
-    session_key_list_t *s_key_list = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key().");
     }

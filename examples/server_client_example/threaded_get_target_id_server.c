@@ -15,19 +15,19 @@
 
 // Define a struct to hold the thread arguments
 typedef struct {
-    SST_ctx_t *ctx;
-    char *file_path;
+    SST_ctx_t* ctx;
+    char* file_path;
 } thread_args_t;
 
-void *call_get_session_key_by_ID(void *args) {
-    thread_args_t *data = (thread_args_t *)args;
-    SST_ctx_t *ctx = data->ctx;
-    char *file_path = data->file_path;
+void* call_get_session_key_by_ID(void* args) {
+    thread_args_t* data = (thread_args_t*)args;
+    SST_ctx_t* ctx = data->ctx;
+    char* file_path = data->file_path;
 
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    session_key_list_t* s_key_list = init_empty_session_key_list();
 
     unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    FILE *fp = fopen(file_path, "rb");
+    FILE* fp = fopen(file_path, "rb");
     if (!fp) {
         fprintf(stderr, "Error: Could not open file %s\n", file_path);
         return NULL;
@@ -38,7 +38,7 @@ void *call_get_session_key_by_ID(void *args) {
            convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE));
 
     pthread_mutex_lock(&ctx->mutex);
-    session_key_t *session_key =
+    session_key_t* session_key =
         get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     if (session_key == NULL) {
         SST_print_error_exit("Failed get_session_key_by_ID().");
@@ -57,13 +57,13 @@ void *call_get_session_key_by_ID(void *args) {
     return NULL;
 }
 
-int main(int argc, char *argv[]) {
+int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Too many arguments. Usage: %s <config_path>",
                              argv[0]);
     }
-    char *config_path = argv[1];
-    SST_ctx_t *ctx = init_SST(config_path);
+    char* config_path = argv[1];
+    SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
@@ -75,7 +75,7 @@ int main(int argc, char *argv[]) {
 
     for (int i = 0; i < 3; i++) {
         pthread_create(&threads[i], NULL, call_get_session_key_by_ID,
-                       (void *)&args[i]);
+                       (void*)&args[i]);
     }
 
     for (int i = 0; i < 3; i++) {

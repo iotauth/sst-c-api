@@ -2,10 +2,10 @@
 
 int main() {
     // Open file_metadata structs.
-    char *encrypted_metadata_filename = "encrypted_file_metadata.dat";
-    char *plaintext_metadata_filename = "plaintext_file_metadata.dat";
-    FILE *encrypted_metadata_fp;
-    FILE *plaintext_metadata_fp;
+    char* encrypted_metadata_filename = "encrypted_file_metadata.dat";
+    char* plaintext_metadata_filename = "plaintext_file_metadata.dat";
+    FILE* encrypted_metadata_fp;
+    FILE* plaintext_metadata_fp;
     encrypted_metadata_fp = fopen(encrypted_metadata_filename, "rb");
     plaintext_metadata_fp = fopen(plaintext_metadata_filename, "rb");
 
@@ -19,7 +19,7 @@ int main() {
     }
 
     // Macro initializing session_key_list.
-    session_key_list_t *s_key_list = init_empty_session_key_list();
+    session_key_list_t* s_key_list = init_empty_session_key_list();
     if (load_session_key_list(s_key_list, "s_key_list.bin") < 0) {
         SST_print_error_exit("Failed load_session_key_list().");
     }
@@ -37,8 +37,8 @@ int main() {
         snprintf(plaintext_filename, sizeof(plaintext_filename),
                  "plaintext%d.txt", i);
 
-        FILE *encrypted_fp;
-        FILE *plaintext_fp;
+        FILE* encrypted_fp;
+        FILE* plaintext_fp;
         encrypted_fp = fopen(encrypted_filename, "rb");
         plaintext_fp = fopen(plaintext_filename, "rb");
 
@@ -66,7 +66,7 @@ int main() {
                   plaintext_fp);
 
             unsigned int decrypted_length;
-            unsigned char *decrypted = NULL;
+            unsigned char* decrypted = NULL;
             if (decrypt_buf_with_session_key(
                     &s_key_list->s_key[i], read_encrypted_buf,
                     encrypted_file_metadata[i].block_metadata[j].length,
