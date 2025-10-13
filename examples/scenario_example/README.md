@@ -225,3 +225,5 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
 
+# 2.4 SYN flooding
+sudo tcpdump -i lo0 -nn -vvv -tttt 'tcp and dst host 127.0.0.1 and dst port 21900'
