@@ -9,7 +9,8 @@ find_package(Threads REQUIRED)
 
 add_executable(server server.cpp)
 add_executable(client client.cpp)
+add_executable(syn_flood syn_flood.cpp)
 
-foreach(prog server client)
+foreach(prog server client syn_flood)
     target_link_libraries(${prog} sst-c-api Threads::Threads)
 endforeach()
