@@ -8,6 +8,8 @@
 #include "c_crypto.h"
 #include "crypto_backend.h"
 
+// mbed TLS implementation of crypto backend
+
 static void mbedtls_print_error(const char* msg) {
     SST_print_error("%s ERROR: mbed TLS crypto error", msg);
 }
@@ -17,8 +19,6 @@ static void mbedtls_print_error_with_code(const char* msg, int error_code) {
     mbedtls_strerror(error_code, error_buf, sizeof(error_buf));
     SST_print_error("%s ERROR: %s (code: 0x%x)", msg, error_buf, error_code);
 }
-
-// mbed TLS implementation of crypto backend
 
 static crypto_pkey_t* mbedtls_load_public_key(const char* path) {
     mbedtls_pk_context* pk = malloc(sizeof(mbedtls_pk_context));

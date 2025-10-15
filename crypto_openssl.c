@@ -7,6 +7,18 @@
 
 // OpenSSL implementation of crypto backend
 
+static void openssl_print_error(const char* msg) {
+    unsigned long error_code = ERR_get_error();
+    if (error_code != 0) {
+        char err[MAX_ERROR_MESSAGE_LENGTH];
+        ERR_load_crypto_strings();
+        ERR_error_string(error_code, err);
+        SST_print_error("%s ERROR: %s (code: 0x%lx)", msg, err, error_code);
+    } else {
+        SST_print_error("%s ERROR: Unknown OpenSSL error", msg);
+    }
+}
+
 static crypto_pkey_t* openssl_load_public_key(const char* path) {
     FILE* pemFile = fopen(path, "rb");
     if (pemFile == NULL) {
@@ -48,18 +60,6 @@ static crypto_pkey_t* openssl_load_private_key(const char* path) {
 static void openssl_free_pkey(crypto_pkey_t* pkey) {
     if (pkey) {
         EVP_PKEY_free(pkey);
-    }
-}
-
-static void openssl_print_error(const char* msg) {
-    unsigned long error_code = ERR_get_error();
-    if (error_code != 0) {
-        char err[MAX_ERROR_MESSAGE_LENGTH];
-        ERR_load_crypto_strings();
-        ERR_error_string(error_code, err);
-        SST_print_error("%s ERROR: %s (code: 0x%lx)", msg, err, error_code);
-    } else {
-        SST_print_error("%s ERROR: Unknown OpenSSL error", msg);
     }
 }
 
