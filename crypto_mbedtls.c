@@ -2,11 +2,16 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>  
 
 #include "c_api.h"
 #include "c_common.h"
 #include "c_crypto.h"
 #include "crypto_backend.h"
+
+static mbedtls_entropy_context g_entropy;
+static mbedtls_ctr_drbg_context g_ctr_drbg;
+static int g_rng_ready = 0;
 
 // mbed TLS implementation of crypto backend
 
@@ -23,18 +28,27 @@ static void mbedtls_print_error_with_code(const char* msg, int error_code) {
 static crypto_pkey_t* mbedtls_load_public_key(const char* path) {
     mbedtls_pk_context* pk = malloc(sizeof(mbedtls_pk_context));
     if (!pk) {
+        SST_print_error("malloc(mbedtls_pk_context) failed");
         return NULL;
     }
-
     mbedtls_pk_init(pk);
 
-    int ret = mbedtls_pk_parse_public_keyfile(pk, path);
+    // Parse as X.509 certificate instead of a plain public key
+    mbedtls_x509_crt crt;
+    mbedtls_x509_crt_init(&crt);
+    int ret = mbedtls_x509_crt_parse_file(&crt, path);
     if (ret != 0) {
-        mbedtls_print_error_with_code("Failed to parse public key file", ret);
-        mbedtls_pk_free(pk);
+        mbedtls_print_error_with_code(
+            "Failed to parse certificate (public key)", ret);
+        mbedtls_x509_crt_free(&crt);
         free(pk);
         return NULL;
     }
+
+    // Move the public key from certificate to our pk context
+    *pk = crt.pk;
+    memset(&crt.pk, 0, sizeof(crt.pk));  // Prevent double-free on crt
+    mbedtls_x509_crt_free(&crt);
 
     return pk;
 }
@@ -47,8 +61,7 @@ static crypto_pkey_t* mbedtls_load_private_key(const char* path) {
 
     mbedtls_pk_init(pk);
 
-    int ret =
-        mbedtls_pk_parse_keyfile(pk, path, NULL, mbedtls_ctr_drbg_random, NULL);
+    int ret = mbedtls_pk_parse_keyfile(pk, path, NULL, NULL, NULL);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to parse private key file", ret);
         mbedtls_pk_free(pk);
@@ -66,39 +79,124 @@ static void mbedtls_free_pkey(crypto_pkey_t* pkey) {
     }
 }
 
-static unsigned char* mbedtls_public_encrypt(const unsigned char* data,
-                                             size_t data_len, int padding,
-                                             crypto_pkey_t* pub_key,
-                                             size_t* ret_len) {
-    size_t key_size = (mbedtls_pk_get_bitlen(pub_key) + 7) / 8;
-    unsigned char* out = malloc(key_size);
-    if (!out) {
+static int crypto_mbedtls_rng_init_once(void) {
+    if (g_rng_ready) return 0;
+
+    mbedtls_entropy_init(&g_entropy);
+    mbedtls_ctr_drbg_init(&g_ctr_drbg);
+
+    const char* pers = "crypto_mbedtls_rng";
+    int ret =
+        mbedtls_ctr_drbg_seed(&g_ctr_drbg, mbedtls_entropy_func, &g_entropy,
+                              (const unsigned char*)pers, strlen(pers));
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to seed global CTR-DRBG", ret);
+        mbedtls_ctr_drbg_free(&g_ctr_drbg);
+        mbedtls_entropy_free(&g_entropy);
+        return ret;
+    }
+
+    g_rng_ready = 1;
+    return 0;
+}
+
+static unsigned char* mbedtls_public_encrypt(
+    const unsigned char* data, size_t data_len,
+    int padding,  // always RSA_PKCS1_OAEP_PADDING
+    crypto_pkey_t* pub_key, size_t* ret_len) {
+    if (!data || data_len == 0 || !pub_key || !ret_len) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_public_encrypt invalid arguments");
+        return NULL;
+    }
+    if (!mbedtls_pk_can_do(pub_key, MBEDTLS_PK_RSA)) {
+        SST_print_error("mbedtls_public_encrypt expects an RSA public key");
         return NULL;
     }
 
-    int ret = mbedtls_pk_encrypt(pub_key, data, data_len, out, ret_len,
-                                 key_size, mbedtls_ctr_drbg_random, NULL);
+    // 1) Initialize global RNG once (no per-call seeding)
+    int ret = crypto_mbedtls_rng_init_once();
+    if (ret != 0) {
+        SST_print_error("Global RNG not ready");
+        return NULL;
+    }
+
+    // 2) Force OAEP padding (OpenSSL compatibility)
+    mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*pub_key);
+     // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING default
+    ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to set RSA OAEP padding", ret);
+        return NULL;
+    }
+
+    // 3) Allocate ciphertext buffer of modulus size
+    const size_t key_size = (mbedtls_pk_get_bitlen(pub_key) + 7) / 8;
+    unsigned char* out = (unsigned char*)malloc(key_size);
+    if (!out) {
+        SST_print_error("malloc(ciphertext) failed");
+        return NULL;
+    }
+
+    // 4) Encrypt (OAEP uses RNG internally)
+    size_t out_len = 0;
+    ret = mbedtls_pk_encrypt(pub_key, data, data_len, out, &out_len, key_size,
+                             mbedtls_ctr_drbg_random, &g_ctr_drbg);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to encrypt with public key", ret);
         free(out);
         return NULL;
     }
 
+    *ret_len = out_len;  // equals key_size for RSA
     return out;
 }
 
-static unsigned char* mbedtls_private_decrypt(const unsigned char* enc_data,
-                                              size_t enc_data_len, int padding,
-                                              crypto_pkey_t* priv_key,
-                                              size_t* ret_len) {
-    size_t key_size = (mbedtls_pk_get_bitlen(priv_key) + 7) / 8;
-    unsigned char* out = malloc(key_size);
-    if (!out) {
+static unsigned char* mbedtls_private_decrypt(
+    const unsigned char* enc_data, size_t enc_data_len,
+    int padding,  // always RSA_PKCS1_OAEP_PADDING
+    crypto_pkey_t* priv_key, size_t* ret_len) {
+    // Validate arguments
+    if (!enc_data || enc_data_len == 0 || !priv_key || !ret_len) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_private_decrypt invalid arguments");
         return NULL;
     }
 
-    int ret = mbedtls_pk_decrypt(priv_key, enc_data, enc_data_len, out, ret_len,
-                                 key_size, mbedtls_ctr_drbg_random, NULL);
+    // Ensure RSA private key
+    if (!mbedtls_pk_can_do(priv_key, MBEDTLS_PK_RSA)) {
+        SST_print_error("mbedtls_private_decrypt expects an RSA private key");
+        return NULL;
+    }
+
+    // Initialize global RNG once (used for RSA blinding in private ops)
+    int ret = crypto_mbedtls_rng_init_once();
+    if (ret != 0) {
+        SST_print_error("Global RNG not ready");
+        return NULL;
+    }
+
+    // Force OAEP padding (to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING)
+    mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*priv_key);
+     // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING default
+    ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to set RSA OAEP padding", ret);
+        return NULL;
+    }
+
+    // Allocate output buffer: maximum possible plaintext size is key_size
+    const size_t key_size = (mbedtls_pk_get_bitlen(priv_key) + 7) / 8;
+    unsigned char* out = (unsigned char*)malloc(key_size);
+    if (!out) {
+        SST_print_error("malloc(plaintext) failed");
+        return NULL;
+    }
+
+    // Decrypt (RSA private op may use RNG for blinding → pass DRBG)
+    size_t out_len = 0;
+    ret = mbedtls_pk_decrypt(priv_key, enc_data, enc_data_len, out, &out_len,
+                             key_size, mbedtls_ctr_drbg_random, &g_ctr_drbg);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to decrypt with private key",
                                       ret);
@@ -106,6 +204,11 @@ static unsigned char* mbedtls_private_decrypt(const unsigned char* enc_data,
         return NULL;
     }
 
+    // Optionally shrink to fit:
+    // unsigned char* shrunk = realloc(out, out_len);
+    // if (shrunk) out = shrunk;
+
+    *ret_len = out_len;
     return out;
 }
 
