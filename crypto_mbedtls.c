@@ -1,8 +1,8 @@
 #ifdef USE_MBEDTLS
 
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>  
 
 #include "c_api.h"
 #include "c_common.h"
@@ -123,7 +123,8 @@ static unsigned char* mbedtls_public_encrypt(
 
     // 2) Force OAEP padding (OpenSSL compatibility)
     mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*pub_key);
-     // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING default
+    // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's
+    // RSA_PKCS1_OAEP_PADDING default
     ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to set RSA OAEP padding", ret);
@@ -178,7 +179,8 @@ static unsigned char* mbedtls_private_decrypt(
 
     // Force OAEP padding (to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING)
     mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*priv_key);
-     // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's RSA_PKCS1_OAEP_PADDING default
+    // Set OAEP (PKCS#1 v2.1) with SHA-1 to mirror OpenSSL's
+    // RSA_PKCS1_OAEP_PADDING default
     ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V21, MBEDTLS_MD_SHA1);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to set RSA OAEP padding", ret);
@@ -216,39 +218,85 @@ static unsigned char* mbedtls_sign_sha256(const unsigned char* data,
                                           unsigned int data_length,
                                           crypto_pkey_t* priv_key,
                                           size_t* sig_length) {
-    unsigned char hash[32];
-    size_t hash_len = 32;
+    // Validate inputs
+    if (!data || data_length == 0 || !priv_key || !sig_length) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_sign_sha256 invalid arguments");
+        return NULL;
+    }
 
-    // Calculate SHA256 hash
+    // Ensure RSA private key
+    if (!mbedtls_pk_can_do(priv_key, MBEDTLS_PK_RSA)) {
+        SST_print_error("mbedtls_sign_sha256 expects an RSA private key");
+        return NULL;
+    }
+
+    // Ensure global RNG is ready (used for RSA blinding)
+    if (crypto_mbedtls_rng_init_once() != 0) {
+        SST_print_error("Global RNG not ready");
+        return NULL;
+    }
+
+    // Compute SHA-256 digest of the message
+    unsigned char hash[SHA256_DIGEST_LENGTH];
     int ret = mbedtls_sha256(data, data_length, hash, 0);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to calculate SHA256 hash", ret);
         return NULL;
     }
 
-    size_t key_size = (mbedtls_pk_get_bitlen(priv_key) + 7) / 8;
-    unsigned char* sig = malloc(key_size);
-    if (!sig) {
+    // Force PKCS#1 v1.5 signing (RSA-SHA256), to mirror OpenSSL's
+    // RSA_PKCS1_PADDING + EVP_sha256()
+    mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*priv_key);
+    ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V15, MBEDTLS_MD_NONE);
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to set RSA PKCS#1 v1.5 padding",
+                                      ret);
         return NULL;
     }
 
-    ret = mbedtls_pk_sign(priv_key, MBEDTLS_MD_SHA256, hash, hash_len, sig,
-                          key_size, sig_length, mbedtls_ctr_drbg_random, NULL);
+    // Allocate signature buffer of modulus size
+    size_t key_size = (mbedtls_pk_get_bitlen(priv_key) + 7) / 8;
+    unsigned char* sig = (unsigned char*)malloc(key_size);
+    if (!sig) {
+        SST_print_error("malloc(signature) failed");
+        return NULL;
+    }
+
+    // Sign precomputed hash with RSA PKCS#1 v1.5 + SHA-256
+    size_t out_len = 0;
+    ret = mbedtls_pk_sign(priv_key, MBEDTLS_MD_SHA256, hash,
+                          0,  // hash length ignored for fixed-size hash
+                          sig, key_size, &out_len, mbedtls_ctr_drbg_random,
+                          &g_ctr_drbg);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to sign with private key", ret);
         free(sig);
         return NULL;
     }
 
+    *sig_length = out_len;
     return sig;
 }
 
 static int mbedtls_verify_sha256(const unsigned char* data,
                                  unsigned int data_length, unsigned char* sig,
                                  size_t sig_length, crypto_pkey_t* pub_key) {
-    unsigned char hash[32];
+    // Validate inputs
+    if (!data || data_length == 0 || !sig || sig_length == 0 || !pub_key) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_verify_sha256 invalid arguments");
+        return -1;
+    }
 
-    // Calculate SHA256 hash
+    // Ensure RSA public key
+    if (!mbedtls_pk_can_do(pub_key, MBEDTLS_PK_RSA)) {
+        SST_print_error("mbedtls_verify_sha256 expects an RSA public key");
+        return -1;
+    }
+
+    // Compute SHA-256 digest of the message
+    unsigned char hash[SHA256_DIGEST_LENGTH];
     int ret = mbedtls_sha256(data, data_length, hash, 0);
     if (ret != 0) {
         mbedtls_print_error_with_code(
@@ -256,21 +304,48 @@ static int mbedtls_verify_sha256(const unsigned char* data,
         return -1;
     }
 
-    ret = mbedtls_pk_verify(pub_key, MBEDTLS_MD_SHA256, hash, 32, sig,
-                            sig_length);
+    // Force PKCS#1 v1.5 verify to mirror OpenSSL's RSA_PKCS1_PADDING +
+    // EVP_sha256()
+    mbedtls_rsa_context* rsa = mbedtls_pk_rsa(*pub_key);
+    ret = mbedtls_rsa_set_padding(rsa, MBEDTLS_RSA_PKCS_V15, MBEDTLS_MD_NONE);
+    if (ret != 0) {
+        mbedtls_print_error_with_code(
+            "Failed to set RSA PKCS#1 v1.5 padding for verify", ret);
+        return -1;
+    }
+
+    // Verify signature over SHA-256 hash
+    // Note: when md_alg != MBEDTLS_MD_NONE, mbedTLS expects hash_len == 0
+    ret =
+        mbedtls_pk_verify(pub_key, MBEDTLS_MD_SHA256, hash, 0, sig, sig_length);
     if (ret != 0) {
         mbedtls_print_error_with_code("Failed to verify signature", ret);
+        return -1;
     }
-    return (ret == 0) ? 0 : -1;
+
+    return 0;
 }
 
 static int mbedtls_digest_sha256(const unsigned char* data, size_t data_len,
                                  unsigned char* hash, unsigned int* hash_len) {
-    int ret = mbedtls_sha256(data, data_len, hash, 0);
-    if (ret == 0) {
-        *hash_len = 32;
+    // Validate required output arguments
+    if (!hash || !hash_len) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_digest_sha256 invalid arguments");
+        return -1;
     }
-    return ret;
+
+    // Compute SHA-256 digest over the input buffer (data may be NULL when
+    // data_len==0)
+    int ret = mbedtls_sha256(data, data_len, hash, 0);
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to compute SHA-256 digest", ret);
+        return -1;
+    }
+
+    // Set output length to 32 bytes to match OpenSSL's SHA256_DIGEST_LENGTH
+    *hash_len = SHA256_DIGEST_LENGTH;
+    return 0;
 }
 
 static int mbedtls_encrypt_aes(const unsigned char* plaintext,
@@ -280,6 +355,13 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
                                AES_encryption_mode_t enc_mode,
                                unsigned char* output,
                                unsigned int* ret_length) {
+    // Validate basic arguments
+    if (!key || !iv || !output || !ret_length) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_encrypt_aes invalid arguments");
+        return -1;
+    }
+
     switch (enc_mode) {
         case AES_128_CBC: {
             mbedtls_aes_context aes_ctx;
@@ -288,41 +370,43 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
             int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
             if (result != 0) {
                 mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (CBC)",
+                                              result);
                 return -1;
             }
 
-            // For CBC, we need to pad the input to a multiple of 16 bytes
+            // PKCS#7 padding to a multiple of 16 bytes
             size_t padded_len = ((plaintext_length + 15) / 16) * 16;
-            unsigned char* padded_input = malloc(padded_len);
+            unsigned char* padded_input = (unsigned char*)malloc(padded_len);
             if (!padded_input) {
                 mbedtls_aes_free(&aes_ctx);
+                SST_print_error("malloc(padded_input) failed");
                 return -1;
             }
 
             memcpy(padded_input, plaintext, plaintext_length);
-            // PKCS7 padding
-            unsigned char pad_value = padded_len - plaintext_length;
+            unsigned char pad_value =
+                (unsigned char)(padded_len - plaintext_length);
             for (size_t i = plaintext_length; i < padded_len; i++) {
                 padded_input[i] = pad_value;
             }
 
-            // Copy IV to a mutable buffer
-            unsigned char iv_copy[16];
-            memcpy(iv_copy, iv, 16);
+            // CBC consumes and mutates IV; use a local copy
+            unsigned char iv_copy[AES_128_CBC_IV_SIZE];
+            memcpy(iv_copy, iv, AES_128_CBC_IV_SIZE);
 
             result =
                 mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, padded_len,
                                       iv_copy, padded_input, output);
+            free(padded_input);
             if (result != 0) {
+                mbedtls_aes_free(&aes_ctx);
                 mbedtls_print_error_with_code("Failed to encrypt with AES-CBC",
                                               result);
-                free(padded_input);
-                mbedtls_aes_free(&aes_ctx);
                 return -1;
             }
 
-            *ret_length = padded_len;
-            free(padded_input);
+            *ret_length = (unsigned int)padded_len;
             mbedtls_aes_free(&aes_ctx);
             return 0;
         }
@@ -334,33 +418,25 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
             int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
             if (result != 0) {
                 mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (CTR)",
+                                              result);
                 return -1;
             }
 
-            // For CTR, we need to implement the counter mode manually
-            unsigned char counter[16];
-            memcpy(counter, iv, 16);
+            // Use the official CTR helper (avoids manual ECB-keystream loop)
+            unsigned char nonce_counter[AES_128_CTR_IV_SIZE];
+            unsigned char stream_block[AES_128_CTR_IV_SIZE];
+            size_t nc_off = 0;
+            memcpy(nonce_counter, iv, AES_128_CTR_IV_SIZE);
 
-            size_t blocks = (plaintext_length + 15) / 16;
-            for (size_t i = 0; i < blocks; i++) {
-                unsigned char keystream[16];
-                result = mbedtls_aes_crypt_ecb(&aes_ctx, MBEDTLS_AES_ENCRYPT,
-                                               counter, keystream);
-                if (result != 0) {
-                    mbedtls_aes_free(&aes_ctx);
-                    return -1;
-                }
-
-                size_t block_len =
-                    (i == blocks - 1) ? (plaintext_length - i * 16) : 16;
-                for (size_t j = 0; j < block_len; j++) {
-                    output[i * 16 + j] = plaintext[i * 16 + j] ^ keystream[j];
-                }
-
-                // Increment counter
-                for (int j = 15; j >= 0; j--) {
-                    if (++counter[j] != 0) break;
-                }
+            result = mbedtls_aes_crypt_ctr(&aes_ctx, plaintext_length, &nc_off,
+                                           nonce_counter, stream_block,
+                                           plaintext, output);
+            if (result != 0) {
+                mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to encrypt with AES-CTR",
+                                              result);
+                return -1;
             }
 
             *ret_length = plaintext_length;
@@ -376,27 +452,32 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
                 mbedtls_gcm_setkey(&gcm_ctx, MBEDTLS_CIPHER_ID_AES, key, 128);
             if (result != 0) {
                 mbedtls_gcm_free(&gcm_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (GCM)",
+                                              result);
                 return -1;
             }
 
-            // Use only the first 12 bytes of the IV for GCM
+            // Mirror OpenSSL path: IV length = AES_128_GCM_IV_SIZE, tag
+            // appended of AES_GCM_TAG_SIZE
             result = mbedtls_gcm_crypt_and_tag(
-                &gcm_ctx, MBEDTLS_GCM_ENCRYPT, plaintext_length, iv, 12, NULL,
-                0, plaintext, output, 12, output + plaintext_length);
+                &gcm_ctx, MBEDTLS_GCM_ENCRYPT, plaintext_length, iv,
+                AES_128_GCM_IV_SIZE,
+                /*aad*/ NULL, 0, plaintext, output, AES_GCM_TAG_SIZE,
+                output + plaintext_length);
             if (result != 0) {
+                mbedtls_gcm_free(&gcm_ctx);
                 mbedtls_print_error_with_code("Failed to encrypt with AES-GCM",
                                               result);
-                mbedtls_gcm_free(&gcm_ctx);
                 return -1;
             }
 
-            *ret_length = plaintext_length + 12;  // plaintext + tag
+            *ret_length = (unsigned int)(plaintext_length + AES_GCM_TAG_SIZE);
             mbedtls_gcm_free(&gcm_ctx);
             return 0;
         }
 
         default:
-            SST_print_debug("Invalid encryption mode: %d", enc_mode);
+            SST_print_error("Invalid encryption mode: %d", enc_mode);
             return -1;
     }
 }
@@ -408,34 +489,61 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
                                AES_encryption_mode_t enc_mode,
                                unsigned char* output,
                                unsigned int* ret_length) {
+    // Validate basic arguments
+    if (!key || !iv || !output || !ret_length) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_decrypt_aes invalid arguments");
+        return -1;
+    }
+
     switch (enc_mode) {
         case AES_128_CBC: {
+            // Ciphertext length must be a multiple of block size (16)
+            if (encrypted_length == 0 ||
+                (encrypted_length % AES_128_CBC_IV_SIZE) != 0) {
+                SST_print_error(
+                    "AES-CBC ciphertext length is not a multiple of 16");
+                return -1;
+            }
+
             mbedtls_aes_context aes_ctx;
             mbedtls_aes_init(&aes_ctx);
 
             int result = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
             if (result != 0) {
                 mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (CBC)",
+                                              result);
                 return -1;
             }
 
-            // Copy IV to a mutable buffer
-            unsigned char iv_copy[16];
-            memcpy(iv_copy, iv, 16);
+            // CBC consumes and mutates IV; use a local copy
+            unsigned char iv_copy[AES_128_CBC_IV_SIZE];
+            memcpy(iv_copy, iv, AES_128_CBC_IV_SIZE);
 
             result = mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT,
                                            encrypted_length, iv_copy, encrypted,
                                            output);
             if (result != 0) {
                 mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to decrypt with AES-CBC",
+                                              result);
                 return -1;
             }
 
-            // Remove PKCS7 padding
+            // Validate and remove PKCS#7 padding
             unsigned char pad_value = output[encrypted_length - 1];
-            if (pad_value > 16 || pad_value == 0) {
+            if (pad_value == 0 || pad_value > AES_128_CBC_IV_SIZE) {
                 mbedtls_aes_free(&aes_ctx);
+                SST_print_error("Invalid PKCS#7 padding value");
                 return -1;
+            }
+            for (size_t i = 0; i < pad_value; ++i) {
+                if (output[encrypted_length - 1 - i] != pad_value) {
+                    mbedtls_aes_free(&aes_ctx);
+                    SST_print_error("PKCS#7 padding bytes mismatch");
+                    return -1;
+                }
             }
 
             *ret_length = encrypted_length - pad_value;
@@ -450,33 +558,24 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
             int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
             if (result != 0) {
                 mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (CTR)",
+                                              result);
                 return -1;
             }
 
-            // For CTR, decryption is the same as encryption
-            unsigned char counter[16];
-            memcpy(counter, iv, 16);
+            unsigned char nonce_counter[AES_128_CTR_IV_SIZE];
+            unsigned char stream_block[AES_128_CTR_IV_SIZE];
+            size_t nc_off = 0;
+            memcpy(nonce_counter, iv, AES_128_CTR_IV_SIZE);
 
-            size_t blocks = (encrypted_length + 15) / 16;
-            for (size_t i = 0; i < blocks; i++) {
-                unsigned char keystream[16];
-                result = mbedtls_aes_crypt_ecb(&aes_ctx, MBEDTLS_AES_ENCRYPT,
-                                               counter, keystream);
-                if (result != 0) {
-                    mbedtls_aes_free(&aes_ctx);
-                    return -1;
-                }
-
-                size_t block_len =
-                    (i == blocks - 1) ? (encrypted_length - i * 16) : 16;
-                for (size_t j = 0; j < block_len; j++) {
-                    output[i * 16 + j] = encrypted[i * 16 + j] ^ keystream[j];
-                }
-
-                // Increment counter
-                for (int j = 15; j >= 0; j--) {
-                    if (++counter[j] != 0) break;
-                }
+            result = mbedtls_aes_crypt_ctr(&aes_ctx, encrypted_length, &nc_off,
+                                           nonce_counter, stream_block,
+                                           encrypted, output);
+            if (result != 0) {
+                mbedtls_aes_free(&aes_ctx);
+                mbedtls_print_error_with_code("Failed to decrypt with AES-CTR",
+                                              result);
+                return -1;
             }
 
             *ret_length = encrypted_length;
@@ -492,56 +591,65 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
                 mbedtls_gcm_setkey(&gcm_ctx, MBEDTLS_CIPHER_ID_AES, key, 128);
             if (result != 0) {
                 mbedtls_gcm_free(&gcm_ctx);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (GCM)",
+                                              result);
                 return -1;
             }
 
-            // Extract tag from the end of encrypted data
-            unsigned char* tag =
-                (unsigned char*)encrypted + encrypted_length - 12;
-            unsigned char* ciphertext = (unsigned char*)encrypted;
-            size_t ciphertext_len = encrypted_length - 12;
+            if (encrypted_length < AES_GCM_TAG_SIZE) {
+                mbedtls_gcm_free(&gcm_ctx);
+                SST_print_error("AES-GCM ciphertext too short");
+                return -1;
+            }
 
-            // Use only the first 12 bytes of the IV for GCM
-            result =
-                mbedtls_gcm_auth_decrypt(&gcm_ctx, ciphertext_len, iv, 12, NULL,
-                                         0, tag, 12, ciphertext, output);
+            unsigned char* tag =
+                (unsigned char*)encrypted + encrypted_length - AES_GCM_TAG_SIZE;
+            unsigned char* ciphertext = (unsigned char*)encrypted;
+            size_t ciphertext_len = encrypted_length - AES_GCM_TAG_SIZE;
+
+            result = mbedtls_gcm_auth_decrypt(
+                &gcm_ctx, ciphertext_len, iv, AES_128_GCM_IV_SIZE,
+                /*aad*/ NULL, 0, tag, AES_GCM_TAG_SIZE, ciphertext, output);
             if (result != 0) {
                 mbedtls_gcm_free(&gcm_ctx);
+                mbedtls_print_error_with_code("Failed to decrypt with AES-GCM",
+                                              result);
                 return -1;
             }
 
-            *ret_length = ciphertext_len;
+            *ret_length = (unsigned int)ciphertext_len;
             mbedtls_gcm_free(&gcm_ctx);
             return 0;
         }
 
         default:
-            SST_print_debug("Invalid encryption mode: %d", enc_mode);
+            SST_print_error("Invalid encryption mode: %d", enc_mode);
             return -1;
     }
 }
 
 static int mbedtls_generate_random(unsigned char* buf, int length) {
-    mbedtls_ctr_drbg_context ctr_drbg;
-    mbedtls_entropy_context entropy;
-
-    mbedtls_entropy_init(&entropy);
-    mbedtls_ctr_drbg_init(&ctr_drbg);
-
-    int ret = mbedtls_ctr_drbg_seed(&ctr_drbg, mbedtls_entropy_func, &entropy,
-                                    NULL, 0);
-    if (ret != 0) {
-        mbedtls_ctr_drbg_free(&ctr_drbg);
-        mbedtls_entropy_free(&entropy);
+    // Validate arguments
+    if (!buf || length <= 0) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_generate_random invalid arguments");
         return -1;
     }
 
-    ret = mbedtls_ctr_drbg_random(&ctr_drbg, buf, length);
+    // Ensure global DRBG is initialized once (reuse across calls)
+    if (crypto_mbedtls_rng_init_once() != 0) {
+        SST_print_error("Global RNG not ready");
+        return -1;
+    }
 
-    mbedtls_ctr_drbg_free(&ctr_drbg);
-    mbedtls_entropy_free(&entropy);
+    // Generate cryptographically secure random bytes
+    int ret = mbedtls_ctr_drbg_random(&g_ctr_drbg, buf, (size_t)length);
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to generate random bytes", ret);
+        return -1;
+    }
 
-    return (ret == 0) ? 0 : -1;
+    return 0;
 }
 
 static void mbedtls_free_memory(void* ptr) {
@@ -556,35 +664,54 @@ static int mbedtls_hmac_sha256(const unsigned char* key, size_t key_len,
                                const unsigned char* data, size_t data_len,
                                unsigned char* output,
                                unsigned int* output_len) {
+    // Validate arguments
+    if (!key || key_len == 0 || (!data && data_len != 0) || !output ||
+        !output_len) {
+        errno = EINVAL;
+        SST_print_error("mbedtls_hmac_sha256 invalid arguments");
+        return -1;
+    }
+
     mbedtls_md_context_t ctx;
     mbedtls_md_init(&ctx);
 
-    int ret =
-        mbedtls_md_setup(&ctx, mbedtls_md_info_from_type(MBEDTLS_MD_SHA256), 1);
+    const mbedtls_md_info_t* md_info =
+        mbedtls_md_info_from_type(MBEDTLS_MD_SHA256);
+    if (md_info == NULL) {
+        mbedtls_md_free(&ctx);
+        SST_print_error("mbedtls_hmac_sha256 failed to get md info");
+        return -1;
+    }
+
+    int ret = mbedtls_md_setup(&ctx, md_info, 1 /* HMAC enable */);
     if (ret != 0) {
         mbedtls_md_free(&ctx);
+        mbedtls_print_error_with_code("mbedtls_md_setup failed", ret);
         return -1;
     }
 
     ret = mbedtls_md_hmac_starts(&ctx, key, key_len);
     if (ret != 0) {
         mbedtls_md_free(&ctx);
+        mbedtls_print_error_with_code("mbedtls_md_hmac_starts failed", ret);
         return -1;
     }
 
     ret = mbedtls_md_hmac_update(&ctx, data, data_len);
     if (ret != 0) {
         mbedtls_md_free(&ctx);
+        mbedtls_print_error_with_code("mbedtls_md_hmac_update failed", ret);
         return -1;
     }
 
     ret = mbedtls_md_hmac_finish(&ctx, output);
     if (ret != 0) {
         mbedtls_md_free(&ctx);
+        mbedtls_print_error_with_code("mbedtls_md_hmac_finish failed", ret);
         return -1;
     }
 
-    *output_len = 32;  // SHA256 output length
+    *output_len = SHA256_DIGEST_LENGTH;  // SHA-256 HMAC length in bytes
     mbedtls_md_free(&ctx);
     return 0;
 }
