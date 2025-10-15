@@ -13,6 +13,8 @@
 #include "../c_crypto.h"
 
 #include <assert.h>
+#include <stdlib.h>
+#include <string.h>
 
 #include "../c_api.h"
 #include "../c_common.h"
