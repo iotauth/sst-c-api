@@ -4,7 +4,33 @@
 cmake_minimum_required(VERSION 3.19)
 project(sst-lib VERSION 1.0.0 LANGUAGES C)
 
-find_package(OpenSSL REQUIRED)
+# Crypto backend selection
+option(USE_MBEDTLS "Use mbed TLS instead of OpenSSL" OFF)
+option(USE_OPENSSL "Use OpenSSL (default)" ON)
+
+# Set default to OpenSSL if neither is explicitly set
+if(NOT USE_MBEDTLS AND NOT USE_OPENSSL)
+    set(USE_OPENSSL ON)
+endif()
+
+# If USE_MBEDTLS is ON, turn off USE_OPENSSL
+if(USE_MBEDTLS)
+    set(USE_OPENSSL OFF)
+endif()
+
+# Ensure only one backend is selected
+if(USE_MBEDTLS AND USE_OPENSSL)
+    message(FATAL_ERROR "Cannot use both OpenSSL and mbed TLS. Please choose one.")
+endif()
+
+if(USE_MBEDTLS)
+    message(STATUS "Using mbed TLS crypto backend")
+    add_definitions(-DUSE_MBEDTLS)
+elseif(USE_OPENSSL)
+    message(STATUS "Using OpenSSL crypto backend")
+    add_definitions(-DUSE_OPENSSL)
+endif()
+
 find_package(Threads REQUIRED)
 
 add_library(sst-c-api STATIC
@@ -15,10 +41,36 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/load_config.c
   ${CMAKE_CURRENT_LIST_DIR}/ipfs.c)
 
+# Add crypto backend source files
+if(USE_OPENSSL)
+    target_sources(sst-c-api PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/crypto_openssl.c)
+elseif(USE_MBEDTLS)
+    target_sources(sst-c-api PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/crypto_mbedtls.c)
+endif()
+
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Statically link OpenSSL into sst-c-api
-target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
+# Add embedded mbed TLS if using mbed TLS
+if(USE_MBEDTLS)
+    target_sources(sst-c-api PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/embedded/src/sst_mbedtls.c)
+    target_include_directories(sst-c-api PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/embedded/include
+        ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
+
+    # Build and link upstream mbed TLS as separate libraries (no file lists here)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls
+                     ${CMAKE_CURRENT_BINARY_DIR}/mbedtls-build
+                     EXCLUDE_FROM_ALL)
+
+    # Link only what we use (crypto + x509). TLS layer is not required.
+    target_link_libraries(sst-c-api PRIVATE Threads::Threads mbedcrypto mbedx509)
+elseif(USE_OPENSSL)
+    find_package(OpenSSL REQUIRED)
+    target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
+endif()
 
 target_include_directories(sst-c-api PUBLIC
   $<INSTALL_INTERFACE:include>
@@ -40,42 +92,35 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   target_compile_definitions(sst-c-api PRIVATE DEBUG=1)
 endif()
 
-# Install the library
-# Installs in /usr/local/lib/cmake/sst-lib/sst-libTargets.cmake & sst-libTargets-noconfig.cmake
-# Contains target definitions for sst-c-api
-# Helps CMake know how to link against sst-c-api
+# Install/export only when not vendoring mbed TLS
+if(NOT USE_MBEDTLS)
+  # Install the library and export target
+  install(TARGETS sst-c-api
+    EXPORT sst-libTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+  )
 
-# sst-libTargets-noconfig.cmake Acts as the entry point for find_package(sst-lib)
-# Defines where to look for sst-libTargets.cmake
-install(TARGETS sst-c-api
-  EXPORT sst-libTargets
-  LIBRARY DESTINATION lib
-  ARCHIVE DESTINATION lib
-  RUNTIME DESTINATION bin
-)
+  include(CMakePackageConfigHelpers)
 
-# Export targets for find_package()
-include(CMakePackageConfigHelpers)
+  install(
+    EXPORT sst-libTargets
+    FILE sst-libTargets.cmake
+    NAMESPACE sst-lib::
+    DESTINATION lib/cmake/sst-lib
+  )
 
-install(
-  EXPORT sst-libTargets
-  FILE sst-libTargets.cmake
-  NAMESPACE sst-lib::
-  DESTINATION lib/cmake/sst-lib
-)
-
-# Creates in /usr/local/lib/cmake/sst-lib/sst-libConfig.cmake
-# Acts as the entry point for find_package(sst-lib)
-# Defines where to look for sst-libTargets.cmake
-configure_package_config_file(
-  ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sst-libConfig.cmake.in
-  ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
-  INSTALL_DESTINATION lib/cmake/sst-lib
-)
-install(
-  FILES ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
-  DESTINATION lib/cmake/sst-lib
-)
+  configure_package_config_file(
+    ${CMAKE_CURRENT_SOURCE_DIR}/cmake/sst-libConfig.cmake.in
+    ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
+    INSTALL_DESTINATION lib/cmake/sst-lib
+  )
+  install(
+    FILES ${CMAKE_CURRENT_BINARY_DIR}/sst-libConfig.cmake
+    DESTINATION lib/cmake/sst-lib
+  )
+endif()
 
 # Install headers
 install(FILES c_api.h DESTINATION include/sst-c-api)
@@ -85,4 +130,13 @@ enable_testing()
 
 add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
 target_link_libraries(crypto_test PRIVATE sst-c-api)
+
+# Add mbed TLS include directories to test if using mbed TLS
+if(USE_MBEDTLS)
+    target_include_directories(crypto_test PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/embedded/include
+        ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
+    target_link_libraries(crypto_test PRIVATE mbedcrypto mbedx509)
+endif()
+
 add_test(NAME crypto_test COMMAND crypto_test)

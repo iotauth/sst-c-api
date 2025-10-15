@@ -1,6 +1,10 @@
 #ifndef C_CRYPTO_H
 #define C_CRYPTO_H
 
+#include "c_api.h"
+#include "crypto_backend.h"
+
+#ifdef USE_OPENSSL
 #include <openssl/aes.h>
 #include <openssl/bio.h>
 #include <openssl/crypto.h>
@@ -14,8 +18,19 @@
 #include <openssl/sha.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
-
-#include "c_api.h"
+#elif defined(USE_MBEDTLS)
+#include <mbedtls/aes.h>
+#include <mbedtls/cipher.h>
+#include <mbedtls/ctr_drbg.h>
+#include <mbedtls/entropy.h>
+#include <mbedtls/gcm.h>
+#include <mbedtls/md.h>
+#include <mbedtls/pem.h>
+#include <mbedtls/pk.h>
+#include <mbedtls/rsa.h>
+#include <mbedtls/sha256.h>
+#include <mbedtls/x509_crt.h>
+#endif
 
 #define AES_128_KEY_SIZE_IN_BYTES 16
 #define AES_128_IV_SIZE 16
@@ -45,57 +60,59 @@ typedef struct {
 
 // Loads auth's public key from path
 // @param path path of auth's public key
-EVP_PKEY* load_auth_public_key(const char* path);
+crypto_pkey_t* load_auth_public_key(const char* path);
 
 // Loads entity's private key from path
 // @param path path of entity's private key
-EVP_PKEY* load_entity_private_key(const char* path);
+crypto_pkey_t* load_entity_private_key(const char* path);
 
-// Encrypt the message with public key using public key encryption from OpenSSL.
+// Encrypt the message with public key using public key encryption.
 // @param data message for public key encryption
 // @param data_len length of message
 // @param padding set of padding , 1 if padding is used, 0 if not used.
 // padding prevents an attacker from knowing the exact length of the plaintext
 // message.
-// @param path protected key path
+// @param pub_key public key
 // @param ret_len length of encrypted message
 // @return encrypted message from public key encryption
 unsigned char* public_encrypt(const unsigned char* data, size_t data_len,
-                              int padding, EVP_PKEY* pub_key, size_t* ret_len);
+                              int padding, crypto_pkey_t* pub_key,
+                              size_t* ret_len);
 
-// Decrypt message with private key using private key decryption from OpenSSL.
+// Decrypt message with private key using private key decryption.
 // @param enc_data encrypted message for private key decryption
 // @param enc_data_len length of encrypted message
 // @param padding set of padding , 1 if padding is used, 0 if not used.
 // padding prevents an attacker from knowing the exact length of the plaintext
 // message.
-// @param path private key path
+// @param priv_key private key
 // @param ret_len length of decrypted message
 // @return decrypted message from private key decryption
 unsigned char* private_decrypt(const unsigned char* enc_data,
                                size_t enc_data_len, int padding,
-                               EVP_PKEY* priv_key, size_t* ret_len);
+                               crypto_pkey_t* priv_key, size_t* ret_len);
 
 // After digest the encrypted message, sign digested message
-// with private key using private key signature from OpenSSL.
+// with private key using private key signature.
 // @param encrypted encrypted message to sign
 // @param encrypted_length length of encrypted message
-// @param path private key path for private key signature
+// @param priv_key private key for private key signature
 // @param sig_length length of signed buffer
 // @return sign sign of the encrypted message
 unsigned char* SHA256_sign(const unsigned char* encrypted,
-                           unsigned int encrypted_length, EVP_PKEY* priv_key,
-                           size_t* sig_length);
+                           unsigned int encrypted_length,
+                           crypto_pkey_t* priv_key, size_t* sig_length);
 
 // Verification of encrypted data and signature
-// using the RSA verification from OpenSSL.
+// using the RSA verification.
 // @param data encrypted data
 // @param data_length length of encrypted data
-// @param sign signature buffer
-// @param sign_length length of signiture
-// @param path public key path
+// @param sig signature buffer
+// @param sig_length length of signature
+// @param pub_key public key
 int SHA256_verify(const unsigned char* data, unsigned int data_length,
-                  unsigned char* sig, size_t sig_length, EVP_PKEY* pub_key);
+                  unsigned char* sig, size_t sig_length,
+                  crypto_pkey_t* pub_key);
 
 // Digest the message using the SHA256 digest function.
 // @param data Data to digest

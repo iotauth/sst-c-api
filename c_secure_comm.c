@@ -1,5 +1,7 @@
 #include "c_secure_comm.h"
 
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 
 #include "c_common.h"
@@ -86,16 +88,17 @@ static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
                                        SST_ctx_t* ctx,
                                        unsigned int* message_length) {
     size_t encrypted_length;
+    // TODO: Make sure of this. mbedtls is not using the padding.
     unsigned char* encrypted =
-        public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING,
-                       (EVP_PKEY*)ctx->pub_key, &encrypted_length);
+        public_encrypt(buf, buf_len, 4,  // RSA_PKCS1_OAEP_PADDING equivalent
+                       (void*)ctx->pub_key, &encrypted_length);
     if (encrypted == NULL) {
         SST_print_error("Failed public_encrypt().");
         return NULL;
     }
     size_t sigret_length;
-    unsigned char* sigret = SHA256_sign(
-        encrypted, encrypted_length, (EVP_PKEY*)ctx->priv_key, &sigret_length);
+    unsigned char* sigret = SHA256_sign(encrypted, encrypted_length,
+                                        (void*)ctx->priv_key, &sigret_length);
     if (sigret == NULL) {
         SST_print_error("Failed SHA256_sign().");
         return NULL;
@@ -104,8 +107,8 @@ static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
     unsigned char* message = (unsigned char*)malloc(*message_length);
     memcpy(message, encrypted, encrypted_length);
     memcpy(message + encrypted_length, sigret, sigret_length);
-    OPENSSL_free(encrypted);
-    OPENSSL_free(sigret);
+    free(encrypted);
+    free(sigret);
     return message;
 }
 
@@ -144,7 +147,7 @@ static unsigned char* serialize_session_key_req_with_distribution_key(
     memcpy(ret + offset, name, name_length);
     offset += name_length;
     memcpy(ret + offset, temp, temp_length);
-    OPENSSL_free(temp);
+    free(temp);
     *ret_length = 1 + strlen(name) + temp_length;
     return ret;
 }
@@ -342,7 +345,7 @@ static int send_auth_request_message(unsigned char* serialized,
             SST_print_error("Failed sst_write_to_socket().");
             return -1;
         }
-        OPENSSL_free(enc);
+        free(enc);
     } else {
         unsigned int enc_length;
         unsigned char* enc = serialize_session_key_req_with_distribution_key(
@@ -369,7 +372,7 @@ static int send_auth_request_message(unsigned char* serialized,
             return -1;
         }
 
-        OPENSSL_free(enc);
+        free(enc);
     }
     return 0;
 }
@@ -384,7 +387,7 @@ int handle_AUTH_HELLO(unsigned char* data_buf, SST_ctx_t* ctx,
         return -1;
     }
     memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-    RAND_bytes(entity_nonce, NONCE_SIZE);
+    generate_nonce(NONCE_SIZE, entity_nonce);
     unsigned int serialized_length;
     unsigned char* serialized = serialize_message_for_auth(
         entity_nonce, auth_nonce, num_key, ctx->config.name, purpose,
@@ -407,7 +410,7 @@ int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
 
     // verify
     if (SHA256_verify(signed_data.data, key_size, signed_data.sign, key_size,
-                      (EVP_PKEY*)ctx->pub_key) < 0) {
+                      (void*)ctx->pub_key) < 0) {
         SST_print_error("Failed SHA256_verify().");
         return -1;
     }
@@ -416,8 +419,8 @@ int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
     unsigned char* decrypted_dist_key_buf = private_decrypt(
-        signed_data.data, key_size, RSA_PKCS1_OAEP_PADDING,
-        (EVP_PKEY*)ctx->priv_key, &decrypted_dist_key_buf_length);
+        signed_data.data, key_size, 4,  // RSA_PKCS1_OAEP_PADDING equivalent
+        (void*)ctx->priv_key, &decrypted_dist_key_buf_length);
     if (decrypted_dist_key_buf == NULL) {
         SST_print_error("Failed private_decrypt().");
         return -1;
@@ -433,7 +436,7 @@ int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
 unsigned char* parse_handshake_1(session_key_t* s_key,
                                  unsigned char* entity_nonce,
                                  unsigned int* ret_length) {
-    RAND_bytes(entity_nonce, HS_NONCE_SIZE);
+    generate_nonce(HS_NONCE_SIZE, entity_nonce);
     unsigned char indicator_entity_nonce[1 + HS_NONCE_SIZE];
     memcpy(indicator_entity_nonce + 1, entity_nonce, HS_NONCE_SIZE);
     indicator_entity_nonce[0] = 1;
@@ -804,7 +807,7 @@ unsigned char* check_handshake1_send_handshake2(
     SST_print_debug("Client's nonce: ");
     print_buf_debug(hs.nonce, HS_NONCE_SIZE);
 
-    RAND_bytes(server_nonce, HS_NONCE_SIZE);
+    generate_nonce(HS_NONCE_SIZE, server_nonce);
     SST_print_debug("Server's nonce: ");
     print_buf_debug(server_nonce, HS_NONCE_SIZE);
 

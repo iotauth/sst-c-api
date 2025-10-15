@@ -1,16 +1,18 @@
 #include "c_api.h"
 
-#include <openssl/rand.h>
-
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
 #include "load_config.h"
 
 SST_ctx_t* init_SST(const char* config_path) {
+#ifdef USE_OPENSSL
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
     // By default OpenSSL will attempt to clean itself up when the process exits
     // via an "atexit" handler. Using this option suppresses that behaviour.
+#elif defined(USE_MBEDTLS)
+    // mbed TLS initialization is typically done automatically
+#endif
     // This means that the application will have to clean up OpenSSL explicitly
     // using OPENSSL_cleanup().
     // This is needed because, Lingua Franca uses the "atexit" handler, and
@@ -495,8 +497,8 @@ int save_session_key_list_with_password(session_key_list_t* session_key_list,
                                         const char* salt,
                                         unsigned int salt_len) {
     // Generate IV.
-    unsigned char iv[AES_BLOCK_SIZE];
-    if (generate_nonce(AES_BLOCK_SIZE, iv) < 0) {
+    unsigned char iv[AES_128_IV_SIZE];
+    if (generate_nonce(AES_128_IV_SIZE, iv) < 0) {
         SST_print_error("Failed generate_nonce().");
         return -1;
     }
@@ -544,7 +546,7 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
                                         unsigned int password_len,
                                         const char* salt,
                                         unsigned int salt_len) {
-    unsigned char iv[AES_BLOCK_SIZE];
+    unsigned char iv[AES_128_IV_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
     unsigned char buffer[sizeof(session_key_list_t) +
@@ -624,8 +626,16 @@ void free_session_key_list_t(session_key_list_t* session_key_list) {
 void free_session_ctx(SST_session_ctx_t* session_ctx) { free(session_ctx); }
 
 void free_SST_ctx_t(SST_ctx_t* ctx) {
+#ifdef USE_OPENSSL
     EVP_PKEY_free((EVP_PKEY*)ctx->priv_key);
     EVP_PKEY_free((EVP_PKEY*)ctx->pub_key);
+#elif defined(USE_MBEDTLS)
+//TODO: Fix this.
+    mbedtls_pk_free((mbedtls_pk_context*)ctx->priv_key);
+    mbedtls_pk_free((mbedtls_pk_context*)ctx->pub_key);
+    free(ctx->priv_key);
+    free(ctx->pub_key);
+#endif
     free(ctx);
 }
 
@@ -634,7 +644,7 @@ int secure_rand(int min, int max) {
     unsigned int rand_num;
     unsigned char buffer[4];
 
-    if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
+    if (generate_nonce(sizeof(buffer), buffer) != 0) {
         fprintf(stderr, "RAND_bytes failed");
         return -1;  // handle error
     }

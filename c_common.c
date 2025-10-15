@@ -4,7 +4,6 @@
 #include <errno.h>
 #include <math.h>
 #include <netinet/in.h>
-#include <openssl/rand.h>
 #include <pthread.h>
 #include <stdarg.h>
 #include <stdbool.h>
@@ -15,6 +14,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+
+#include "crypto_backend.h"
 
 void SST_print_debug(const char* fmt, ...) {
     if (SST_DEBUG_ENABLED) {
@@ -80,9 +81,16 @@ void print_buf_log(const unsigned char* buf, size_t size) {
     SST_print_log("Hex:%s", hex);
 }
 
+//TODO: Maybe need to move this to crypto.
 int generate_nonce(int length, unsigned char* buf) {
-    int x = RAND_bytes(buf, length);
-    if (x == -1) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        SST_print_error("Crypto backend not available");
+        return -1;
+    }
+
+    int result = backend->generate_random(buf, length);
+    if (result != 0) {
         SST_print_error("Failed to create Random Nonce");
         return -1;
     }
@@ -299,13 +307,13 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
             continue;
         }
 
-        SST_print_error("Connection attempt %d failed: %s. Retrying...",
+        SST_print_error("Connection attempt %d failed. Retrying...",
                         count_retries);
 
         close(*sock);
         *sock = socket(AF_INET, SOCK_STREAM, 0);
         if (*sock == -1) {
-            SST_print_error("socket() error during retry: %s");
+            SST_print_error("socket() error during retry.");
             ret = -1;
             break;
         }
