@@ -66,7 +66,7 @@ if(USE_MBEDTLS)
                      EXCLUDE_FROM_ALL)
 
     # Link only what we use (crypto + x509). TLS layer is not required.
-    target_link_libraries(sst-c-api PRIVATE Threads::Threads mbedcrypto mbedx509)
+    target_link_libraries(sst-c-api PUBLIC Threads::Threads mbedcrypto mbedx509)
 elseif(USE_OPENSSL)
     find_package(OpenSSL REQUIRED)
     target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
@@ -136,7 +136,6 @@ if(USE_MBEDTLS)
     target_include_directories(crypto_test PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/embedded/include
         ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
-    target_link_libraries(crypto_test PRIVATE mbedcrypto mbedx509)
 endif()
 
 add_test(NAME crypto_test COMMAND crypto_test)
