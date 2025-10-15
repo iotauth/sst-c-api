@@ -39,6 +39,7 @@ typedef const EVP_MD crypto_md_t;
 #include <mbedtls/rsa.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
+#include <mbedtls/error.h>
 
 #include "sst_mbedtls.h"
 
