@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include "c_api.h"
 
 // Forward declarations for crypto backend types
 #ifdef USE_OPENSSL
