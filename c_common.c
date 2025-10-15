@@ -81,7 +81,7 @@ void print_buf_log(const unsigned char* buf, size_t size) {
     SST_print_log("Hex:%s", hex);
 }
 
-//TODO: Maybe need to move this to crypto.
+// TODO: Maybe need to move this to crypto.
 int generate_nonce(int length, unsigned char* buf) {
     const crypto_backend_t* backend = get_crypto_backend();
     if (!backend) {

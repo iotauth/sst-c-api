@@ -630,7 +630,7 @@ void free_SST_ctx_t(SST_ctx_t* ctx) {
     EVP_PKEY_free((EVP_PKEY*)ctx->priv_key);
     EVP_PKEY_free((EVP_PKEY*)ctx->pub_key);
 #elif defined(USE_MBEDTLS)
-//TODO: Fix this.
+    // TODO: Fix this.
     mbedtls_pk_free((mbedtls_pk_context*)ctx->priv_key);
     mbedtls_pk_free((mbedtls_pk_context*)ctx->pub_key);
     free(ctx->priv_key);

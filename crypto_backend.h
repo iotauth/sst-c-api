@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+
 #include "c_api.h"
 
 // Forward declarations for crypto backend types
@@ -32,6 +33,7 @@ typedef const EVP_MD crypto_md_t;
 #include <mbedtls/cipher.h>
 #include <mbedtls/ctr_drbg.h>
 #include <mbedtls/entropy.h>
+#include <mbedtls/error.h>
 #include <mbedtls/gcm.h>
 #include <mbedtls/md.h>
 #include <mbedtls/pem.h>
@@ -39,7 +41,6 @@ typedef const EVP_MD crypto_md_t;
 #include <mbedtls/rsa.h>
 #include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
-#include <mbedtls/error.h>
 
 #include "sst_mbedtls.h"
 
