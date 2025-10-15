@@ -4,8 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "c_api.h"
-
 // Forward declarations for crypto backend types
 #ifdef USE_OPENSSL
 #include <openssl/aes.h>
@@ -98,9 +96,9 @@ typedef struct {
 // Get the appropriate crypto backend
 const crypto_backend_t* get_crypto_backend(void);
 
-//TODO: Clean up.
-// // Initialize crypto backend
-// int init_crypto_backend(void);
+// TODO: Clean up.
+//  // Initialize crypto backend
+//  int init_crypto_backend(void);
 
 // // Cleanup crypto backend
 // void cleanup_crypto_backend(void);

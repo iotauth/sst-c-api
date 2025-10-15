@@ -1,15 +1,17 @@
+#ifdef USE_OPENSSL
+
+#include "c_api.h"
 #include "c_common.h"
 #include "c_crypto.h"
 #include "crypto_backend.h"
-
-#ifdef USE_OPENSSL
 
 // OpenSSL implementation of crypto backend
 
 static crypto_pkey_t* openssl_load_public_key(const char* path) {
     FILE* pemFile = fopen(path, "rb");
     if (pemFile == NULL) {
-        printf("Error %d \n", errno);
+        SST_print_error("Failed to open public key file: %s (errno: %d)", path,
+                        errno);
         return NULL;
     }
     X509* cert = PEM_read_X509(pemFile, NULL, NULL, NULL);
@@ -34,7 +36,8 @@ static crypto_pkey_t* openssl_load_public_key(const char* path) {
 static crypto_pkey_t* openssl_load_private_key(const char* path) {
     FILE* keyfile = fopen(path, "rb");
     if (keyfile == NULL) {
-        printf("Error %d \n", errno);
+        SST_print_error("Failed to open private key file: %s (errno: %d)", path,
+                        errno);
         return NULL;
     }
     EVP_PKEY* priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
@@ -49,10 +52,15 @@ static void openssl_free_pkey(crypto_pkey_t* pkey) {
 }
 
 static void openssl_print_error(const char* msg) {
-    char err[MAX_ERROR_MESSAGE_LENGTH];
-    ERR_load_crypto_strings();
-    ERR_error_string(ERR_get_error(), err);
-    printf("%s ERROR: %s\n", msg, err);
+    unsigned long error_code = ERR_get_error();
+    if (error_code != 0) {
+        char err[MAX_ERROR_MESSAGE_LENGTH];
+        ERR_load_crypto_strings();
+        ERR_error_string(error_code, err);
+        SST_print_error("%s ERROR: %s (code: 0x%lx)", msg, err, error_code);
+    } else {
+        SST_print_error("%s ERROR: Unknown OpenSSL error", msg);
+    }
 }
 
 static unsigned char* openssl_public_encrypt(const unsigned char* data,
@@ -383,12 +391,11 @@ static const crypto_backend_t openssl_backend = {
 
 const crypto_backend_t* get_crypto_backend(void) { return &openssl_backend; }
 
-
-//TODO: Clean up.
-// int init_crypto_backend(void) {
-//     // OpenSSL initialization is typically done automatically
-//     return 0;
-// }
+// TODO: Clean up.
+//  int init_crypto_backend(void) {
+//      // OpenSSL initialization is typically done automatically
+//      return 0;
+//  }
 
 // void cleanup_crypto_backend(void) {
 //     // OpenSSL cleanup is typically done automatically
