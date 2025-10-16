@@ -32,7 +32,7 @@ void AES_test_common(AES_encryption_mode_t mode) {
     // Generate buffer
     const char plaintext[] = "Hello World!";
     SST_print_log("Plaintext Length: %ld, Plaintext: %s", strlen(plaintext),
-           plaintext);
+                  plaintext);
 
     // Encrypt Cipher
     unsigned char cipher[100];
@@ -55,7 +55,7 @@ void AES_test_common(AES_encryption_mode_t mode) {
         SST_print_error_exit("Failed decrypt_AES().");
     }
     SST_print_log("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-           decrypted);
+                  decrypted);
     assert(decrypted_length == strlen(plaintext));
     assert(strncmp((const char*)decrypted, (const char*)plaintext,
                    decrypted_length) == 0);
@@ -96,7 +96,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
     // Generate buffer
     const char plaintext[] = "Hello World!";
     SST_print_log("Plaintext Length: %ld, Plaintext: %s", strlen(plaintext),
-           plaintext);
+                  plaintext);
     int s;
     _unused(s);
     unsigned int encrypted_length;
@@ -117,7 +117,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             cipher_key, AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE,
             enc_mode, hmac_mode, &decrypted, &decrypted_length);
         SST_print_log("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-               decrypted);
+                      decrypted);
         assert(s == 0);
         assert(decrypted_length == strlen(plaintext));
         assert(strncmp((const char*)decrypted, (const char*)plaintext,
@@ -150,7 +150,7 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             hmac_mode, &decrypted_stack[0], &decrypted_length);
         decrypted = &decrypted_stack[0];
         SST_print_log("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-               decrypted);
+                      decrypted);
         assert(s == 0);
         assert(decrypted_length == strlen(plaintext));
         assert(strncmp((const char*)decrypted, (const char*)plaintext,
@@ -163,17 +163,20 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
 // allocation (malloc).
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_CBC_test(void) {
-    SST_print_log("**** STARTING symmetric_encrypt_authenticate_AES_128_CBC_test.");
+    SST_print_log(
+        "**** STARTING symmetric_encrypt_authenticate_AES_128_CBC_test.");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CBC, 0, 0);
 }
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_CTR_test(void) {
-    SST_print_log("**** STARTING symmetric_encrypt_authenticate_AES_128_CTR_test.");
+    SST_print_log(
+        "**** STARTING symmetric_encrypt_authenticate_AES_128_CTR_test.");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_CTR, 0, 0);
 }
 
 void symmetric_encrypt_decrypt_authenticate_AES_128_GCM_test(void) {
-    SST_print_log("**** STARTING symmetric_encrypt_authenticate_AES_128_GCM_test.");
+    SST_print_log(
+        "**** STARTING symmetric_encrypt_authenticate_AES_128_GCM_test.");
     symmetric_encrypt_decrypt_authenticate_common(AES_128_GCM, 0, 0);
 }
 
