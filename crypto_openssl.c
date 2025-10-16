@@ -64,7 +64,7 @@ static void openssl_free_pkey(crypto_pkey_t* pkey) {
 }
 
 static unsigned char* openssl_public_encrypt(const unsigned char* data,
-                                             size_t data_len, int padding,
+                                             size_t data_len,
                                              crypto_pkey_t* pub_key,
                                              size_t* ret_len) {
     EVP_PKEY_CTX* ctx;
@@ -78,7 +78,7 @@ static unsigned char* openssl_public_encrypt(const unsigned char* data,
         EVP_PKEY_CTX_free(ctx);
         return NULL;
     }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, padding) <= 0) {
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
         EVP_PKEY_CTX_free(ctx);
         return NULL;
     }
@@ -102,7 +102,7 @@ static unsigned char* openssl_public_encrypt(const unsigned char* data,
 }
 
 static unsigned char* openssl_private_decrypt(const unsigned char* enc_data,
-                                              size_t enc_data_len, int padding,
+                                              size_t enc_data_len,
                                               crypto_pkey_t* priv_key,
                                               size_t* ret_len) {
     EVP_PKEY_CTX* ctx;
@@ -115,7 +115,7 @@ static unsigned char* openssl_private_decrypt(const unsigned char* enc_data,
         EVP_PKEY_CTX_free(ctx);
         return NULL;
     }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, padding) <= 0) {
+    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
         EVP_PKEY_CTX_free(ctx);
         return NULL;
     }

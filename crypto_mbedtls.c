@@ -100,10 +100,10 @@ static int crypto_mbedtls_rng_init_once(void) {
     return 0;
 }
 
-static unsigned char* mbedtls_public_encrypt(
-    const unsigned char* data, size_t data_len,
-    int padding,  // always RSA_PKCS1_OAEP_PADDING
-    crypto_pkey_t* pub_key, size_t* ret_len) {
+static unsigned char* mbedtls_public_encrypt(const unsigned char* data,
+                                             size_t data_len,
+                                             crypto_pkey_t* pub_key,
+                                             size_t* ret_len) {
     if (!data || data_len == 0 || !pub_key || !ret_len) {
         errno = EINVAL;
         SST_print_error("mbedtls_public_encrypt invalid arguments");
@@ -153,10 +153,10 @@ static unsigned char* mbedtls_public_encrypt(
     return out;
 }
 
-static unsigned char* mbedtls_private_decrypt(
-    const unsigned char* enc_data, size_t enc_data_len,
-    int padding,  // always RSA_PKCS1_OAEP_PADDING
-    crypto_pkey_t* priv_key, size_t* ret_len) {
+static unsigned char* mbedtls_private_decrypt(const unsigned char* enc_data,
+                                              size_t enc_data_len,
+                                              crypto_pkey_t* priv_key,
+                                              size_t* ret_len) {
     // Validate arguments
     if (!enc_data || enc_data_len == 0 || !priv_key || !ret_len) {
         errno = EINVAL;

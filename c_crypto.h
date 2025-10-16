@@ -69,28 +69,21 @@ crypto_pkey_t* load_entity_private_key(const char* path);
 // Encrypt the message with public key using public key encryption.
 // @param data message for public key encryption
 // @param data_len length of message
-// @param padding set of padding , 1 if padding is used, 0 if not used.
-// padding prevents an attacker from knowing the exact length of the plaintext
-// message.
 // @param pub_key public key
 // @param ret_len length of encrypted message
 // @return encrypted message from public key encryption
 unsigned char* public_encrypt(const unsigned char* data, size_t data_len,
-                              int padding, crypto_pkey_t* pub_key,
-                              size_t* ret_len);
+                              crypto_pkey_t* pub_key, size_t* ret_len);
 
 // Decrypt message with private key using private key decryption.
 // @param enc_data encrypted message for private key decryption
 // @param enc_data_len length of encrypted message
-// @param padding set of padding , 1 if padding is used, 0 if not used.
-// padding prevents an attacker from knowing the exact length of the plaintext
-// message.
 // @param priv_key private key
 // @param ret_len length of decrypted message
 // @return decrypted message from private key decryption
 unsigned char* private_decrypt(const unsigned char* enc_data,
-                               size_t enc_data_len, int padding,
-                               crypto_pkey_t* priv_key, size_t* ret_len);
+                               size_t enc_data_len, crypto_pkey_t* priv_key,
+                               size_t* ret_len);
 
 // After digest the encrypted message, sign digested message
 // with private key using private key signature.

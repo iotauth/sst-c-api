@@ -55,15 +55,14 @@ crypto_pkey_t* load_entity_private_key(const char* path) {
 }
 
 unsigned char* public_encrypt(const unsigned char* data, size_t data_len,
-                              int padding, crypto_pkey_t* pub_key,
-                              size_t* ret_len) {
+                              crypto_pkey_t* pub_key, size_t* ret_len) {
     const crypto_backend_t* backend = get_crypto_backend();
     if (!backend) {
         return print_crypto_error_return_NULL("Crypto backend not available");
     }
 
     unsigned char* result = backend->public_encrypt(
-        data, data_len, padding, (crypto_pkey_t*)pub_key, ret_len);
+        data, data_len, (crypto_pkey_t*)pub_key, ret_len);
     if (!result) {
         return print_crypto_error_return_NULL("Public encryption failed");
     }
@@ -72,15 +71,15 @@ unsigned char* public_encrypt(const unsigned char* data, size_t data_len,
 }
 
 unsigned char* private_decrypt(const unsigned char* enc_data,
-                               size_t enc_data_len, int padding,
-                               crypto_pkey_t* priv_key, size_t* ret_len) {
+                               size_t enc_data_len, crypto_pkey_t* priv_key,
+                               size_t* ret_len) {
     const crypto_backend_t* backend = get_crypto_backend();
     if (!backend) {
         return print_crypto_error_return_NULL("Crypto backend not available");
     }
 
     unsigned char* result = backend->private_decrypt(
-        enc_data, enc_data_len, padding, (crypto_pkey_t*)priv_key, ret_len);
+        enc_data, enc_data_len, (crypto_pkey_t*)priv_key, ret_len);
     if (!result) {
         return print_crypto_error_return_NULL("Private decryption failed");
     }

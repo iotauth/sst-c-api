@@ -61,10 +61,9 @@ typedef struct {
     void (*print_error)(const char* msg);
 
     unsigned char* (*public_encrypt)(const unsigned char* data, size_t data_len,
-                                     int padding, crypto_pkey_t* pub_key,
-                                     size_t* ret_len);
+                                     crypto_pkey_t* pub_key, size_t* ret_len);
     unsigned char* (*private_decrypt)(const unsigned char* enc_data,
-                                      size_t enc_data_len, int padding,
+                                      size_t enc_data_len,
                                       crypto_pkey_t* priv_key, size_t* ret_len);
 
     unsigned char* (*sign_sha256)(const unsigned char* data,
