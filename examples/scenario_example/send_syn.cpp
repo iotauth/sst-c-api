@@ -13,6 +13,15 @@ extern "C" {
 #include <sys/socket.h>
 #include <unistd.h>
 
+// Pseudo header for TCP checksum
+struct pseudo_header {
+    uint32_t saddr;
+    uint32_t daddr;
+    uint8_t  zero;
+    uint8_t  protocol;
+    uint16_t tcp_len;
+} __attribute__((packed));
+
 // RFC 1071 16-bit one's complement checksum
 static uint16_t csum16(const void *data, size_t len) {
     uint32_t sum = 0;
@@ -23,21 +32,12 @@ static uint16_t csum16(const void *data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-// Pseudo header for TCP checksum
-struct pseudo {
-    uint32_t saddr;
-    uint32_t daddr;
-    uint8_t  zero;
-    uint8_t  protocol;
-    uint16_t tcp_len;
-} __attribute__((packed));
-
-int main(int argc, char **argv) {
-
+int send_one_syn(const char* dst_ip, unsigned short dst_port) {
     const char *src_ip_str = "127.0.0.1";
     const char *dst_ip_str = "127.0.0.1";
     uint16_t dst_port = 21900;
 
+    // ... build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
     unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr)];
     memset(packet, 0, sizeof(packet));
@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
     tcph->th_urp   = 0;
 
     // TCP checksum (pseudo header + TCP header [+ payload])
-    struct pseudo ph;
+    struct pseudo_header ph;
     ph.saddr    = *(uint32_t *)&iph->ip_src;
     ph.daddr    = *(uint32_t *)&iph->ip_dst;
     ph.zero     = 0;
@@ -83,6 +83,9 @@ int main(int argc, char **argv) {
 
     // IP checksum (required when you provide your own IP header)
     iph->ip_sum = csum16(iph, sizeof(struct ip));
+
+
+
 
     // Raw IP socket on macOS/BSD: use IPPROTO_RAW and set ip->ip_p to TCP
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
@@ -106,6 +109,7 @@ int main(int argc, char **argv) {
            src_ip_str, ntohs(tcph->th_sport), dst_ip_str, dst_port, n);
 
     close(s);
+
     return 0;
 }
 
