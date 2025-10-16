@@ -141,20 +141,6 @@ int digest_message_SHA_256(const unsigned char* data, size_t data_len,
     return 0;
 }
 
-// Get crypto cipher structure corresponding to the given encryption mode.
-// @param enc_mode AES encryption mode enum (e.g., AES_128_CBC)
-// @return crypto cipher type, or NULL if unsupported
-static crypto_cipher_t* get_crypto_cipher(AES_encryption_mode_t enc_mode) {
-    const crypto_backend_t* backend = get_crypto_backend();
-    if (!backend) {
-        SST_print_error("Crypto backend not available.");
-        return NULL;
-    }
-
-    // This function is now handled by the backend
-    return NULL;
-}
-
 int encrypt_AES(const unsigned char* plaintext, unsigned int plaintext_length,
                 const unsigned char* key, const unsigned char* iv,
                 AES_encryption_mode_t enc_mode, unsigned char* ret,
