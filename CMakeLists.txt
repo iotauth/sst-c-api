@@ -31,7 +31,10 @@ elseif(USE_OPENSSL)
     add_definitions(-DUSE_OPENSSL)
 endif()
 
-find_package(Threads REQUIRED)
+# Only use host Threads on non-Pico builds
+if(NOT DEFINED PICO_PLATFORM)
+    find_package(Threads REQUIRED)
+endif()
 
 add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/c_api.c
@@ -66,10 +69,17 @@ if(USE_MBEDTLS)
                      EXCLUDE_FROM_ALL)
 
     # Link only what we use (crypto + x509). TLS layer is not required.
-    target_link_libraries(sst-c-api PUBLIC Threads::Threads mbedcrypto mbedx509)
+    target_link_libraries(sst-c-api PUBLIC mbedcrypto mbedx509)
+    # Link host Threads only when not building for Pico SDK
+    if(NOT DEFINED PICO_PLATFORM)
+        target_link_libraries(sst-c-api PUBLIC Threads::Threads)
+    endif()
 elseif(USE_OPENSSL)
     find_package(OpenSSL REQUIRED)
-    target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
+    target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL)
+    if(NOT DEFINED PICO_PLATFORM)
+        target_link_libraries(sst-c-api PUBLIC Threads::Threads)
+    endif()
 endif()
 
 target_include_directories(sst-c-api PUBLIC
@@ -125,17 +135,16 @@ endif()
 # Install headers
 install(FILES c_api.h DESTINATION include/sst-c-api)
 
-# Build unit tests
-enable_testing()
-
-add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
-target_link_libraries(crypto_test PRIVATE sst-c-api)
-
-# Add mbed TLS include directories to test if using mbed TLS
-if(USE_MBEDTLS)
-    target_include_directories(crypto_test PRIVATE
-        ${CMAKE_CURRENT_LIST_DIR}/embedded/include
-        ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
+# Build unit tests only for host builds (not Pico SDK)
+if(NOT DEFINED PICO_PLATFORM)
+  enable_testing()
+  add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
+  target_link_libraries(crypto_test PRIVATE sst-c-api)
+  # Add mbed TLS include directories to test if using mbed TLS
+  if(USE_MBEDTLS)
+      target_include_directories(crypto_test PRIVATE
+          ${CMAKE_CURRENT_LIST_DIR}/embedded/include
+          ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
+  endif()
+  add_test(NAME crypto_test COMMAND crypto_test)
 endif()
-
-add_test(NAME crypto_test COMMAND crypto_test)
