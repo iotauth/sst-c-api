@@ -568,7 +568,7 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
                     "mbedtls_cipher_write_tag failed (GCM)", ret);
                 return -1;
             }
-            
+
             memcpy(output + out_len + finish_len, tag, AES_GCM_TAG_SIZE);
             *ret_length =
                 (unsigned int)(out_len + finish_len + AES_GCM_TAG_SIZE);
@@ -818,9 +818,7 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
                 return -1;
             }
 
-            *ret_length =
-                (unsigned int)(out_len +
-                               finish_len);
+            *ret_length = (unsigned int)(out_len + finish_len);
             mbedtls_cipher_free(&c);
             return 0;
         }
