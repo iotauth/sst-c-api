@@ -66,7 +66,7 @@ jobs:
         ref: ${{ github.ref }}
       if: ${{ github.ref}}
 
-    - name: Init and update submodules for sst-c-api (mbedtls)
+    - name: Init and update submodules for sst-c-api (pico-sdk, mbedtls)
       working-directory: entity/c
       run: |
         git submodule sync --recursive
