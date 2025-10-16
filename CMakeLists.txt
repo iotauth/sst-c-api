@@ -5,7 +5,7 @@ cmake_minimum_required(VERSION 3.19)
 project(sst-lib VERSION 1.0.0 LANGUAGES C)
 
 # Crypto backend selection
-option(USE_MBEDTLS "Use mbed TLS instead of OpenSSL" OFF)
+option(USE_MBEDTLS "Use mbedTLS instead of OpenSSL" OFF)
 option(USE_OPENSSL "Use OpenSSL (default)" ON)
 
 # Set default to OpenSSL if neither is explicitly set
@@ -20,11 +20,11 @@ endif()
 
 # Ensure only one backend is selected
 if(USE_MBEDTLS AND USE_OPENSSL)
-    message(FATAL_ERROR "Cannot use both OpenSSL and mbed TLS. Please choose one.")
+    message(FATAL_ERROR "Cannot use both OpenSSL and mbedTLS. Please choose one.")
 endif()
 
 if(USE_MBEDTLS)
-    message(STATUS "Using mbed TLS crypto backend")
+    message(STATUS "Using mbedTLS crypto backend")
     add_definitions(-DUSE_MBEDTLS)
 elseif(USE_OPENSSL)
     message(STATUS "Using OpenSSL crypto backend")
@@ -55,7 +55,7 @@ endif()
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Add embedded mbed TLS if using mbed TLS
+# Add embedded mbedTLS if using mbedTLS
 if(USE_MBEDTLS)
     target_sources(sst-c-api PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/embedded/src/sst_mbedtls.c)
@@ -63,7 +63,7 @@ if(USE_MBEDTLS)
         ${CMAKE_CURRENT_LIST_DIR}/embedded/include
         ${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls/include)
 
-    # Build and link upstream mbed TLS as separate libraries (no file lists here)
+    # Build and link upstream mbedTLS as separate libraries (no file lists here)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/embedded/lib/mbedtls
                      ${CMAKE_CURRENT_BINARY_DIR}/mbedtls-build
                      EXCLUDE_FROM_ALL)
@@ -102,7 +102,7 @@ if(CMAKE_BUILD_TYPE STREQUAL "Debug" OR CMAKE_BUILD_TYPE STREQUAL "DEBUG")
   target_compile_definitions(sst-c-api PRIVATE DEBUG=1)
 endif()
 
-# Install/export only when not vendoring mbed TLS
+# Install/export only when not vendoring mbedTLS
 if(NOT USE_MBEDTLS)
   # Install the library and export target
   install(TARGETS sst-c-api
@@ -140,7 +140,7 @@ if(NOT DEFINED PICO_PLATFORM)
   enable_testing()
   add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
   target_link_libraries(crypto_test PRIVATE sst-c-api)
-  # Add mbed TLS include directories to test if using mbed TLS
+  # Add mbedTLS include directories to test if using mbedTLS
   if(USE_MBEDTLS)
       target_include_directories(crypto_test PRIVATE
           ${CMAKE_CURRENT_LIST_DIR}/embedded/include
