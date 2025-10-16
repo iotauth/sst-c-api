@@ -25,10 +25,8 @@ endif()
 
 if(USE_MBEDTLS)
     message(STATUS "Using mbed TLS crypto backend")
-    add_definitions(-DUSE_MBEDTLS)
 elseif(USE_OPENSSL)
     message(STATUS "Using OpenSSL crypto backend")
-    add_definitions(-DUSE_OPENSSL)
 endif()
 
 # Only use host Threads on non-Pico builds
@@ -52,6 +50,13 @@ elseif(USE_MBEDTLS)
     target_sources(sst-c-api PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/crypto_mbedtls.c)
 endif()
+
+if(USE_MBEDTLS)
+    target_compile_definitions(sst-c-api PUBLIC USE_MBEDTLS)
+elseif(USE_OPENSSL)
+    target_compile_definitions(sst-c-api PUBLIC USE_OPENSSL)
+endif()
+
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
