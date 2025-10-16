@@ -90,7 +90,7 @@ static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
     size_t encrypted_length;
     // TODO: Make sure of this. mbedtls is not using the padding.
     unsigned char* encrypted =
-        public_encrypt(buf, buf_len, 4,  // RSA_PKCS1_OAEP_PADDING equivalent
+        public_encrypt(buf, buf_len,
                        (void*)ctx->pub_key, &encrypted_length);
     if (encrypted == NULL) {
         SST_print_error("Failed public_encrypt().");
@@ -419,7 +419,7 @@ int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
     // decrypt encrypted_distribution_key
     size_t decrypted_dist_key_buf_length;
     unsigned char* decrypted_dist_key_buf = private_decrypt(
-        signed_data.data, key_size, 4,  // RSA_PKCS1_OAEP_PADDING equivalent
+        signed_data.data, key_size,
         (void*)ctx->priv_key, &decrypted_dist_key_buf_length);
     if (decrypted_dist_key_buf == NULL) {
         SST_print_error("Failed private_decrypt().");
