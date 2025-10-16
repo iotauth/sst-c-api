@@ -362,117 +362,218 @@ static int mbedtls_encrypt_aes(const unsigned char* plaintext,
         return -1;
     }
 
+    int ret = 0;
+
     switch (enc_mode) {
         case AES_128_CBC: {
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_CBC);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-CBC)");
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_ENCRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
                 mbedtls_print_error_with_code("Failed to set AES-128 key (CBC)",
-                                              result);
+                                              ret);
                 return -1;
             }
 
-            // PKCS#7 padding to a multiple of 16 bytes
-            size_t padded_len = ((plaintext_length + 15) / 16) * 16;
-            unsigned char* padded_input = (unsigned char*)malloc(padded_len);
-            if (!padded_input) {
-                mbedtls_aes_free(&aes_ctx);
-                SST_print_error("malloc(padded_input) failed");
+            // Match OpenSSL default: PKCS#7 padding
+            if ((ret = mbedtls_cipher_set_padding_mode(
+                     &c, MBEDTLS_PADDING_PKCS7)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set PKCS#7 padding",
+                                              ret);
                 return -1;
             }
 
-            memcpy(padded_input, plaintext, plaintext_length);
-            unsigned char pad_value =
-                (unsigned char)(padded_len - plaintext_length);
-            for (size_t i = plaintext_length; i < padded_len; i++) {
-                padded_input[i] = pad_value;
-            }
-
-            // CBC consumes and mutates IV; use a local copy
-            unsigned char iv_copy[AES_128_CBC_IV_SIZE];
-            memcpy(iv_copy, iv, AES_128_CBC_IV_SIZE);
-
-            result =
-                mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_ENCRYPT, padded_len,
-                                      iv_copy, padded_input, output);
-            free(padded_input);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
-                mbedtls_print_error_with_code("Failed to encrypt with AES-CBC",
-                                              result);
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_CBC_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (CBC)", ret);
                 return -1;
             }
 
-            *ret_length = (unsigned int)padded_len;
-            mbedtls_aes_free(&aes_ctx);
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
+            }
+
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, plaintext, plaintext_length,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (CBC)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (CBC)", ret);
+                return -1;
+            }
+
+            *ret_length = (unsigned int)(out_len + finish_len);
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
         case AES_128_CTR: {
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_CTR);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-CTR)");
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_ENCRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
                 mbedtls_print_error_with_code("Failed to set AES-128 key (CTR)",
-                                              result);
+                                              ret);
                 return -1;
             }
 
-            // Use the official CTR helper (avoids manual ECB-keystream loop)
-            unsigned char nonce_counter[AES_128_CTR_IV_SIZE];
-            unsigned char stream_block[AES_128_CTR_IV_SIZE];
-            size_t nc_off = 0;
-            memcpy(nonce_counter, iv, AES_128_CTR_IV_SIZE);
-
-            result = mbedtls_aes_crypt_ctr(&aes_ctx, plaintext_length, &nc_off,
-                                           nonce_counter, stream_block,
-                                           plaintext, output);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
-                mbedtls_print_error_with_code("Failed to encrypt with AES-CTR",
-                                              result);
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_CTR_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (CTR)", ret);
                 return -1;
             }
 
-            *ret_length = plaintext_length;
-            mbedtls_aes_free(&aes_ctx);
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
+            }
+
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, plaintext, plaintext_length,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (CTR)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (CTR)", ret);
+                return -1;
+            }
+
+            *ret_length =
+                (unsigned int)(out_len +
+                               finish_len);  // finish_len is expected 0 for CTR
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
         case AES_128_GCM: {
-            mbedtls_gcm_context gcm_ctx;
-            mbedtls_gcm_init(&gcm_ctx);
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            int result =
-                mbedtls_gcm_setkey(&gcm_ctx, MBEDTLS_CIPHER_ID_AES, key, 128);
-            if (result != 0) {
-                mbedtls_gcm_free(&gcm_ctx);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_GCM);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-GCM)");
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_ENCRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
                 mbedtls_print_error_with_code("Failed to set AES-128 key (GCM)",
-                                              result);
+                                              ret);
                 return -1;
             }
 
-            // Mirror OpenSSL path: IV length = AES_128_GCM_IV_SIZE, tag
-            // appended of AES_GCM_TAG_SIZE
-            result = mbedtls_gcm_crypt_and_tag(
-                &gcm_ctx, MBEDTLS_GCM_ENCRYPT, plaintext_length, iv,
-                AES_128_GCM_IV_SIZE,
-                /*aad*/ NULL, 0, plaintext, output, AES_GCM_TAG_SIZE,
-                output + plaintext_length);
-            if (result != 0) {
-                mbedtls_gcm_free(&gcm_ctx);
-                mbedtls_print_error_with_code("Failed to encrypt with AES-GCM",
-                                              result);
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_GCM_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (GCM)", ret);
                 return -1;
             }
 
-            *ret_length = (unsigned int)(plaintext_length + AES_GCM_TAG_SIZE);
-            mbedtls_gcm_free(&gcm_ctx);
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
+            }
+
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, plaintext, plaintext_length,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (GCM)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (GCM)", ret);
+                return -1;
+            }
+
+            unsigned char tag[AES_GCM_TAG_SIZE];
+            if ((ret = mbedtls_cipher_write_tag(&c, tag, AES_GCM_TAG_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_write_tag failed (GCM)", ret);
+                return -1;
+            }
+            
+            memcpy(output + out_len + finish_len, tag, AES_GCM_TAG_SIZE);
+            *ret_length =
+                (unsigned int)(out_len + finish_len + AES_GCM_TAG_SIZE);
+
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
@@ -496,9 +597,10 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
         return -1;
     }
 
+    int ret = 0;
+
     switch (enc_mode) {
         case AES_128_CBC: {
-            // Ciphertext length must be a multiple of block size (16)
             if (encrypted_length == 0 ||
                 (encrypted_length % AES_128_CBC_IV_SIZE) != 0) {
                 SST_print_error(
@@ -506,119 +608,220 @@ static int mbedtls_decrypt_aes(const unsigned char* encrypted,
                 return -1;
             }
 
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            int result = mbedtls_aes_setkey_dec(&aes_ctx, key, 128);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_CBC);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-CBC)");
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_DECRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
                 mbedtls_print_error_with_code("Failed to set AES-128 key (CBC)",
-                                              result);
+                                              ret);
                 return -1;
             }
 
-            // CBC consumes and mutates IV; use a local copy
-            unsigned char iv_copy[AES_128_CBC_IV_SIZE];
-            memcpy(iv_copy, iv, AES_128_CBC_IV_SIZE);
-
-            result = mbedtls_aes_crypt_cbc(&aes_ctx, MBEDTLS_AES_DECRYPT,
-                                           encrypted_length, iv_copy, encrypted,
-                                           output);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
-                mbedtls_print_error_with_code("Failed to decrypt with AES-CBC",
-                                              result);
+            if ((ret = mbedtls_cipher_set_padding_mode(
+                     &c, MBEDTLS_PADDING_PKCS7)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set PKCS#7 padding",
+                                              ret);
                 return -1;
             }
 
-            // Validate and remove PKCS#7 padding
-            unsigned char pad_value = output[encrypted_length - 1];
-            if (pad_value == 0 || pad_value > AES_128_CBC_IV_SIZE) {
-                mbedtls_aes_free(&aes_ctx);
-                SST_print_error("Invalid PKCS#7 padding value");
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_CBC_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (CBC)", ret);
                 return -1;
             }
-            for (size_t i = 0; i < pad_value; ++i) {
-                if (output[encrypted_length - 1 - i] != pad_value) {
-                    mbedtls_aes_free(&aes_ctx);
-                    SST_print_error("PKCS#7 padding bytes mismatch");
-                    return -1;
-                }
+
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
             }
 
-            *ret_length = encrypted_length - pad_value;
-            mbedtls_aes_free(&aes_ctx);
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, encrypted, encrypted_length,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (CBC)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (CBC)", ret);
+                return -1;
+            }
+
+            *ret_length = (unsigned int)(out_len + finish_len);
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
         case AES_128_CTR: {
-            mbedtls_aes_context aes_ctx;
-            mbedtls_aes_init(&aes_ctx);
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            int result = mbedtls_aes_setkey_enc(&aes_ctx, key, 128);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_CTR);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-CTR)");
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_DECRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
                 mbedtls_print_error_with_code("Failed to set AES-128 key (CTR)",
-                                              result);
+                                              ret);
                 return -1;
             }
 
-            unsigned char nonce_counter[AES_128_CTR_IV_SIZE];
-            unsigned char stream_block[AES_128_CTR_IV_SIZE];
-            size_t nc_off = 0;
-            memcpy(nonce_counter, iv, AES_128_CTR_IV_SIZE);
-
-            result = mbedtls_aes_crypt_ctr(&aes_ctx, encrypted_length, &nc_off,
-                                           nonce_counter, stream_block,
-                                           encrypted, output);
-            if (result != 0) {
-                mbedtls_aes_free(&aes_ctx);
-                mbedtls_print_error_with_code("Failed to decrypt with AES-CTR",
-                                              result);
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_CTR_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (CTR)", ret);
                 return -1;
             }
 
-            *ret_length = encrypted_length;
-            mbedtls_aes_free(&aes_ctx);
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
+            }
+
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, encrypted, encrypted_length,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (CTR)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (CTR)", ret);
+                return -1;
+            }
+
+            *ret_length =
+                (unsigned int)(out_len + finish_len);  // finish_len expected 0
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
         case AES_128_GCM: {
-            mbedtls_gcm_context gcm_ctx;
-            mbedtls_gcm_init(&gcm_ctx);
-
-            int result =
-                mbedtls_gcm_setkey(&gcm_ctx, MBEDTLS_CIPHER_ID_AES, key, 128);
-            if (result != 0) {
-                mbedtls_gcm_free(&gcm_ctx);
-                mbedtls_print_error_with_code("Failed to set AES-128 key (GCM)",
-                                              result);
-                return -1;
-            }
-
             if (encrypted_length < AES_GCM_TAG_SIZE) {
-                mbedtls_gcm_free(&gcm_ctx);
                 SST_print_error("AES-GCM ciphertext too short");
                 return -1;
             }
 
-            unsigned char* tag =
-                (unsigned char*)encrypted + encrypted_length - AES_GCM_TAG_SIZE;
-            unsigned char* ciphertext = (unsigned char*)encrypted;
-            size_t ciphertext_len = encrypted_length - AES_GCM_TAG_SIZE;
+            mbedtls_cipher_context_t c;
+            mbedtls_cipher_init(&c);
 
-            result = mbedtls_gcm_auth_decrypt(
-                &gcm_ctx, ciphertext_len, iv, AES_128_GCM_IV_SIZE,
-                /*aad*/ NULL, 0, tag, AES_GCM_TAG_SIZE, ciphertext, output);
-            if (result != 0) {
-                mbedtls_gcm_free(&gcm_ctx);
-                mbedtls_print_error_with_code("Failed to decrypt with AES-GCM",
-                                              result);
+            const mbedtls_cipher_info_t* info =
+                mbedtls_cipher_info_from_type(MBEDTLS_CIPHER_AES_128_GCM);
+            if (!info) {
+                mbedtls_cipher_free(&c);
+                SST_print_error("Failed to get cipher info (AES-128-GCM)");
                 return -1;
             }
 
-            *ret_length = (unsigned int)ciphertext_len;
-            mbedtls_gcm_free(&gcm_ctx);
+            if ((ret = mbedtls_cipher_setup(&c, info)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_setup failed",
+                                              ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_setkey(&c, key, 128, MBEDTLS_DECRYPT)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set AES-128 key (GCM)",
+                                              ret);
+                return -1;
+            }
+
+            const unsigned char* tag =
+                encrypted + encrypted_length - AES_GCM_TAG_SIZE;
+            const unsigned char* ciphertext = encrypted;
+            size_t ciphertext_len = encrypted_length - AES_GCM_TAG_SIZE;
+
+            if ((ret = mbedtls_cipher_set_iv(&c, iv, AES_128_GCM_IV_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("Failed to set IV (GCM)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_reset(&c)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code("mbedtls_cipher_reset failed",
+                                              ret);
+                return -1;
+            }
+
+            size_t out_len = 0, finish_len = 0;
+            if ((ret = mbedtls_cipher_update(&c, ciphertext, ciphertext_len,
+                                             output, &out_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_update failed (GCM)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_finish(&c, output + out_len,
+                                             &finish_len)) != 0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_finish failed (GCM)", ret);
+                return -1;
+            }
+
+            if ((ret = mbedtls_cipher_check_tag(&c, tag, AES_GCM_TAG_SIZE)) !=
+                0) {
+                mbedtls_cipher_free(&c);
+                mbedtls_print_error_with_code(
+                    "mbedtls_cipher_check_tag failed (GCM)", ret);
+                return -1;
+            }
+
+            *ret_length =
+                (unsigned int)(out_len +
+                               finish_len);
+            mbedtls_cipher_free(&c);
             return 0;
         }
 
