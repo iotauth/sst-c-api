@@ -1,6 +1,7 @@
-// sst_crypto_embedded.c
-#include "../include/sst_crypto_embedded.h"
-#include "mbedtls/gcm.h"
+// sst_mbedtls.c
+#include "../include/sst_mbedtls.h"
+
+#include "../lib/mbedtls/include/mbedtls/gcm.h"
 
 int sst_encrypt_gcm(const uint8_t* key, const uint8_t* nonce,
                     const uint8_t* input, size_t input_len, uint8_t* ciphertext,
