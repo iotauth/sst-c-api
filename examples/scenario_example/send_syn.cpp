@@ -34,8 +34,6 @@ static uint16_t csum16(const void *data, size_t len) {
 
 int send_one_syn(const char* dst_ip, unsigned short dst_port) {
     const char *src_ip_str = "127.0.0.1";
-    const char *dst_ip_str = "127.0.0.1";
-    uint16_t dst_port = 21900;
 
     // ... build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
@@ -55,7 +53,7 @@ int send_one_syn(const char* dst_ip, unsigned short dst_port) {
     iph->ip_ttl = 64;
     iph->ip_p   = IPPROTO_TCP;
     if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) { perror("src ip"); return 1; }
-    if (inet_pton(AF_INET, dst_ip_str, &iph->ip_dst) != 1) { perror("dst ip"); return 1; }
+    if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1) { perror("dst ip"); return 1; }
 
     // Fill TCP header (BSD layout uses th_* and th_offx2)
     tcph->th_sport = htons(40000 + (rand() % 20000));
@@ -99,14 +97,14 @@ int send_one_syn(const char* dst_ip, unsigned short dst_port) {
     struct sockaddr_in dst = {0};
     dst.sin_len    = sizeof(dst);
     dst.sin_family = AF_INET;
-    if (inet_pton(AF_INET, dst_ip_str, &dst.sin_addr) != 1) { perror("dst addr"); close(s); return 1; }
+    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) { perror("dst addr"); close(s); return 1; }
 
     ssize_t n = sendto(s, packet, sizeof(packet), 0,
                        (struct sockaddr *)&dst, sizeof(dst));
     if (n < 0) { perror("sendto"); close(s); return 1; }
 
     printf("Sent TCP SYN from %s:%u to %s:%u (%zd bytes)\n",
-           src_ip_str, ntohs(tcph->th_sport), dst_ip_str, dst_port, n);
+           src_ip_str, ntohs(tcph->th_sport), dst_ip, dst_port, n);
 
     close(s);
 

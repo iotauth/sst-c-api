@@ -7,8 +7,16 @@ extern "C" {
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include "send_syn.hpp"
 
-enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM };
+enum AttackType {
+    NONE,
+    REPLAY,
+    DOSK,
+    DOSC,
+    DOSM,
+    DOSSYN
+};
 
 static AttackType parseAttackType(const std::string& s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
@@ -21,6 +29,9 @@ static AttackType parseAttackType(const std::string& s) {
     if (s == "DOSM" || s == "DoSM" || s == "DosM" || s == "Dosc" ||
         s == "dosM" || s == "dosm")
         return DOSM;
+    if (s == "DOSSYN" || s == "DoSSYN" || s == "DosSYN" || s == "Dossyn" ||
+        s == "dossyn")
+        return DOSSYN;
     return NONE;
 }
 
@@ -172,6 +183,33 @@ int main(int argc, char* argv[]) {
                 }
             } break;
 
+            case DOSSYN: {
+                // SYN Flood Attack
+                const char *src_ip_str = ctx->config.auth_ip_addr;
+                const char *dst_ip_str = ctx->config.auth_ip_addr;
+                uint16_t dst_port = 21900;
+
+                int repeat = std::stoi(attack_param);
+                for (int i = 0; i < repeat; ++i) {
+                    send_one_syn(src_ip_str, dst_port);
+                }
+            } break;
+
+            // possible other case:
+            // for (int i = 0; i < repeat; ++i) {
+            //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
+            //     if (temp_sock < 0) {
+            //         SST_print_error_exit("Failed to create socket.");
+            //     }
+
+            //     struct sockaddr_in server_addr;
+            //     server_addr.sin_family = AF_INET;
+            //     server_addr.sin_port = htons(ctx->config.server_port);
+            //     server_addr.sin_addr.s_addr = inet_addr(ctx->config.server_ip);
+
+            //     connect(temp_sock, (struct sockaddr*)&server_addr,
+            //             sizeof(server_addr));
+            //     // Not closing the socket to keep it in SYN-RECEIVED state
             case NONE:
             default:
                 break;
