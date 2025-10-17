@@ -42,8 +42,6 @@ typedef const EVP_MD crypto_md_t;
 #include <mbedtls/sha256.h>
 #include <mbedtls/x509_crt.h>
 
-#include "sst_mbedtls.h"
-
 typedef mbedtls_pk_context crypto_pkey_t;
 typedef mbedtls_md_context_t crypto_md_ctx_t;
 typedef mbedtls_cipher_context_t crypto_cipher_ctx_t;
