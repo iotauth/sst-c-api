@@ -1,5 +1,6 @@
 extern "C" {
 #include "../../c_api.h"
+#include "send_syn.hpp"
 }
 
 #include <unistd.h>
@@ -7,7 +8,6 @@ extern "C" {
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include "send_syn.hpp"
 
 enum AttackType {
     NONE,
@@ -191,7 +191,14 @@ int main(int argc, char* argv[]) {
 
                 int repeat = std::stoi(attack_param);
                 for (int i = 0; i < repeat; ++i) {
-                    send_one_syn(src_ip_str, dst_port);
+                    
+                    bool success = send_one_syn(src_ip_str, dst_port);
+                    if (!success) {
+                        std::cerr << "Failed to send SYN packet." << std::endl;
+                        exit(1);
+                    }
+                    std::cout << "Sent SYN packet " << (i + 1) << " of " << repeat
+                              << std::endl;
                 }
             } break;
 
