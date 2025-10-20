@@ -2,10 +2,10 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "c_common.h"
 #include "c_crypto.h"
+#include "platform_compat.h"
 
 typedef enum {
     INIT,
@@ -88,7 +88,6 @@ static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
                                        SST_ctx_t* ctx,
                                        unsigned int* message_length) {
     size_t encrypted_length;
-    // TODO: Make sure of this. mbedtls is not using the padding.
     unsigned char* encrypted =
         public_encrypt(buf, buf_len, (void*)ctx->pub_key, &encrypted_length);
     if (encrypted == NULL) {
@@ -155,7 +154,7 @@ static unsigned char* serialize_session_key_req_with_distribution_key(
 // @param abs_validity_ms  Expiration time in ms (uint64_t).
 // @return -1 when expired, 0 when still valid.
 static int check_validity(uint64_t abs_validity_ms) {
-    uint64_t current_ms = (uint64_t)time(NULL) * 1000ULL;  // seconds → ms
+    uint64_t current_ms = sst_platform_now_ms();
     return (current_ms >= abs_validity_ms) ? -1 : 0;
 }
 
@@ -302,7 +301,9 @@ static int check_session_key_validity(session_key_t* session_key) {
 // @return -1 when expired, 0 when valid
 static int check_distribution_key_validity(distribution_key_t* dist_key) {
     int ret = check_validity(dist_key->abs_validity);
-    SST_print_debug("Distribution key expired!");
+    if (ret < 0) {
+        SST_print_debug("Distribution key expired!");
+    }
     return ret;
 }
 
@@ -894,7 +895,7 @@ void append_session_key_list(session_key_list_t* dest,
 
 void update_validity(session_key_t* session_key) {
     session_key->abs_validity =
-        ((uint64_t)time(NULL) * 1000) + session_key->rel_validity;
+        sst_platform_now_ms() + session_key->rel_validity;
 }
 
 int check_session_key_list_addable(int requested_num_key,

@@ -1,21 +1,13 @@
 #include "c_common.h"
 
-#include <arpa/inet.h>
 #include <errno.h>
-#include <math.h>
-#include <netinet/in.h>
-#include <pthread.h>
 #include <stdarg.h>
-#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
-#include <sys/types.h>
-#include <time.h>
-#include <unistd.h>
 
 #include "crypto_backend.h"
+#include "platform_compat.h"
 
 void SST_print_debug(const char* fmt, ...) {
     if (SST_DEBUG_ENABLED) {
@@ -283,7 +275,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;  // IPv4
-    if (inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) != 1) {
+    if (sst_inet_pton(AF_INET, ip_addr, &serv_addr.sin_addr) != 1) {
         SST_print_error("invalid IPv4 address: %s", ip_addr);
         close(*sock);
         *sock = -1;
@@ -317,7 +309,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
             ret = -1;
             break;
         }
-        usleep(50000);
+        sst_platform_sleep_us(50000);
     }
     if (ret < 0) {
         SST_print_error("Failed to connect to %s:%d after %d attempts.",

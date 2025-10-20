@@ -41,7 +41,6 @@ SST_ctx_t* init_SST(const char* config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
-    bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
 
@@ -626,16 +625,18 @@ void free_session_key_list_t(session_key_list_t* session_key_list) {
 void free_session_ctx(SST_session_ctx_t* session_ctx) { free(session_ctx); }
 
 void free_SST_ctx_t(SST_ctx_t* ctx) {
-#ifdef USE_OPENSSL
-    EVP_PKEY_free((EVP_PKEY*)ctx->priv_key);
-    EVP_PKEY_free((EVP_PKEY*)ctx->pub_key);
-#elif defined(USE_MBEDTLS)
-    // TODO: Fix this.
-    mbedtls_pk_free((mbedtls_pk_context*)ctx->priv_key);
-    mbedtls_pk_free((mbedtls_pk_context*)ctx->pub_key);
-    free(ctx->priv_key);
-    free(ctx->pub_key);
-#endif
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (backend && backend->free_pkey) {
+        if (ctx->priv_key) {
+            backend->free_pkey((crypto_pkey_t*)ctx->priv_key);
+            ctx->priv_key = NULL;
+        }
+        if (ctx->pub_key) {
+            backend->free_pkey((crypto_pkey_t*)ctx->pub_key);
+            ctx->pub_key = NULL;
+        }
+    }
+
     free(ctx);
 }
 

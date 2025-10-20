@@ -4,7 +4,6 @@
 #include <string.h>
 
 #include "c_common.h"
-#include "crypto_backend.h"
 
 // Print crypto error message to stderr with message.
 // @param msg Message to print with.

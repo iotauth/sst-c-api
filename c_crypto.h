@@ -4,34 +4,6 @@
 #include "c_api.h"
 #include "crypto_backend.h"
 
-#ifdef USE_OPENSSL
-#include <openssl/aes.h>
-#include <openssl/bio.h>
-#include <openssl/crypto.h>
-#include <openssl/err.h>
-#include <openssl/evp.h>
-#include <openssl/hmac.h>
-#include <openssl/md5.h>
-#include <openssl/pem.h>
-#include <openssl/rand.h>
-#include <openssl/rsa.h>
-#include <openssl/sha.h>
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#elif defined(USE_MBEDTLS)
-#include <mbedtls/aes.h>
-#include <mbedtls/cipher.h>
-#include <mbedtls/ctr_drbg.h>
-#include <mbedtls/entropy.h>
-#include <mbedtls/gcm.h>
-#include <mbedtls/md.h>
-#include <mbedtls/pem.h>
-#include <mbedtls/pk.h>
-#include <mbedtls/rsa.h>
-#include <mbedtls/sha256.h>
-#include <mbedtls/x509_crt.h>
-#endif
-
 #define AES_128_KEY_SIZE_IN_BYTES 16
 #define AES_128_IV_SIZE 16
 #define AES_128_CBC_IV_SIZE 16
@@ -46,11 +18,6 @@
 #define RSA_KEY_SIZE 256
 #define RSA_ENCRYPT_SIGN_SIZE RSA_KEY_SIZE * 2
 #define SHA256_DIGEST_LENGTH 32
-
-// Encryption Mode //
-// #define AES_128_CBC 101
-// #define AES_128_CTR 102
-// #define AES_128_GCM 103
 
 // Struct for digital signature
 typedef struct {

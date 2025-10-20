@@ -23,10 +23,6 @@
 #include <openssl/x509.h>
 
 typedef EVP_PKEY crypto_pkey_t;
-typedef EVP_MD_CTX crypto_md_ctx_t;
-typedef EVP_CIPHER_CTX crypto_cipher_ctx_t;
-typedef const EVP_CIPHER crypto_cipher_t;
-typedef const EVP_MD crypto_md_t;
 
 #elif defined(USE_MBEDTLS)
 #include <mbedtls/aes.h>
@@ -43,10 +39,6 @@ typedef const EVP_MD crypto_md_t;
 #include <mbedtls/x509_crt.h>
 
 typedef mbedtls_pk_context crypto_pkey_t;
-typedef mbedtls_md_context_t crypto_md_ctx_t;
-typedef mbedtls_cipher_context_t crypto_cipher_ctx_t;
-typedef mbedtls_cipher_type_t crypto_cipher_t;
-typedef mbedtls_md_type_t crypto_md_t;
 
 #endif
 
@@ -84,8 +76,6 @@ typedef struct {
                        unsigned char* ret, unsigned int* ret_length);
 
     int (*generate_random)(unsigned char* buf, int length);
-    void (*free_memory)(void* ptr);
-    void* (*malloc_memory)(size_t size);
 
     // HMAC functions
     int (*hmac_sha256)(const unsigned char* key, size_t key_len,
@@ -95,12 +85,5 @@ typedef struct {
 
 // Get the appropriate crypto backend
 const crypto_backend_t* get_crypto_backend(void);
-
-// TODO: Clean up.
-//  // Initialize crypto backend
-//  int init_crypto_backend(void);
-
-// // Cleanup crypto backend
-// void cleanup_crypto_backend(void);
 
 #endif  // CRYPTO_BACKEND_H

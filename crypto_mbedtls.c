@@ -853,14 +853,6 @@ static int mbedtls_generate_random(unsigned char* buf, int length) {
     return 0;
 }
 
-static void mbedtls_free_memory(void* ptr) {
-    if (ptr) {
-        free(ptr);
-    }
-}
-
-static void* mbedtls_malloc_memory(size_t size) { return malloc(size); }
-
 static int mbedtls_hmac_sha256(const unsigned char* key, size_t key_len,
                                const unsigned char* data, size_t data_len,
                                unsigned char* output,
@@ -931,19 +923,8 @@ static const crypto_backend_t mbedtls_backend = {
     .encrypt_aes = mbedtls_encrypt_aes,
     .decrypt_aes = mbedtls_decrypt_aes,
     .generate_random = mbedtls_generate_random,
-    .free_memory = mbedtls_free_memory,
-    .malloc_memory = mbedtls_malloc_memory,
     .hmac_sha256 = mbedtls_hmac_sha256};
 
 const crypto_backend_t* get_crypto_backend(void) { return &mbedtls_backend; }
-
-// int init_crypto_backend(void) {
-//     // mbed TLS initialization is typically done automatically
-//     return 0;
-// }
-
-// void cleanup_crypto_backend(void) {
-//     // mbed TLS cleanup is typically done automatically
-// }
 
 #endif  // USE_MBEDTLS
