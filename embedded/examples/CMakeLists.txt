@@ -32,6 +32,7 @@ endif()
 # --- Always use mbedTLS backend for embedded builds ---
 set(USE_MBEDTLS ON CACHE BOOL "Force use of mbedTLS backend" FORCE)
 set(USE_OPENSSL OFF CACHE BOOL "Disable OpenSSL backend" FORCE)
+set(SST_PLATFORM_PICO ON CACHE BOOL "Build SST library for Raspberry Pi Pico targets" FORCE)
 
 # Include the main SST library (assuming the root directory is two levels up)
 add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
@@ -39,7 +40,9 @@ add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 add_executable(embedded_client embedded_client.c)
 
 # Include headers with #include "c_api.h"
-target_include_directories(embedded_client PRIVATE ${CMAKE_CURRENT_LIST_DIR}/../..)
+target_include_directories(embedded_client PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}
+    ${CMAKE_CURRENT_LIST_DIR}/../..)
 
 # Link against the freshly built SST library and Pico Wi-Fi (lwIP+cyw43)
 target_link_libraries(embedded_client 
