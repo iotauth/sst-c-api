@@ -32,11 +32,14 @@ if(USE_OPENSSL)
   target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL)
   # list(APPEND SST_CORE_SOURCES ${CMAKE_CURRENT_LIST_DIR}/ipfs.c)
 elseif(SST_PLATFORM_PICO)
+  set(FREERTOS_KERNEL_PATH "${CMAKE_CURRENT_LIST_DIR}/embedded/lib/FreeRTOS-Kernel" CACHE PATH "Path to FreeRTOS Kernel" FORCE)
+  include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
   pico_sdk_init()
   target_link_libraries(sst-c-api PRIVATE 
-    pico_cyw43_arch_lwip_poll
+    pico_cyw43_arch_lwip_sys_freertos
     pico_stdlib
     pico_mbedtls
+    FreeRTOS-Kernel-Heap4
   )
   target_sources(sst-c-api PRIVATE ${CMAKE_CURRENT_LIST_DIR}/crypto_mbedtls.c)
   target_compile_definitions(sst-c-api PUBLIC USE_MBEDTLS)
