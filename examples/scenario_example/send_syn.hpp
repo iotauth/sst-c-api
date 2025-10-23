@@ -7,7 +7,7 @@ extern "C" {
 
 // Send exactly one TCP SYN to (dst_ip, dst_port).
 // Returns 0 on success, nonzero on error.
-int send_one_syn(const char* dst_ip, unsigned short dst_port);
+bool send_one_syn(const char* dst_ip, unsigned short dst_port, int repeat);
 
 #ifdef __cplusplus
 }

@@ -58,7 +58,7 @@ $ git submodule update --init
 
 2. Run `mkdir build && cd build`
 
-3. Run `cmake ..`.
+3. Run `cmake ..`
     - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.
 
 4. Run `make`
@@ -200,6 +200,10 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_connect.csv`
 
+## 2.2.4 DoS attack to Auth via SYN Flooding
+
+
+
 ## 2.3 DoS attack with Multiple Clients (DDoS)
 This attack involves using many clients to connect to the server to create the denial of service. To do that though, the Auth databases and configurations need to be modified to support this.
 So, also make sure that the ***Auth*** executed before is terminated.
@@ -210,7 +214,7 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
-3. Run `./client_dos_setup.sh <number-of-clients> -p <password>`
+3. Run `./clients_dos_setup.sh <number-of-clients> -p <password>`
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
     - *[Optional]* `<password>` is the password of the generated Auth.
     - e.g., `./client_dos_setup.sh 3 -p asdf`
@@ -224,6 +228,3 @@ So, also make sure that the ***Auth*** executed before is terminated.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
 
 Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
-
-# 2.4 SYN flooding
-sudo tcpdump -i lo0 -nn -vvv -tttt 'tcp and dst host 127.0.0.1 and dst port 21900'

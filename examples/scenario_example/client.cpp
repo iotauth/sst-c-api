@@ -1,8 +1,9 @@
 extern "C" {
 #include "../../c_api.h"
-#include "send_syn.hpp"
 }
 
+#include "send_syn.hpp"
+#include "metrics.hpp"
 #include <unistd.h>
 
 #include <fstream>
@@ -19,7 +20,8 @@ enum AttackType {
 };
 
 static AttackType parseAttackType(const std::string& s) {
-    if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
+    if (s == "REPLAY" || s == "Replay" || s == "replay")
+        return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
         return DOSK;
@@ -36,10 +38,25 @@ static AttackType parseAttackType(const std::string& s) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        std::cerr << "Usage: " << argv[0] << " <config_path> <csv_file_path>"
-                  << std::endl;
-        exit(1);
+    // allow: ./client <config_path> <csv_file_path> [-metrics]
+    if (argc != 3 && argc != 4) {
+        std::cerr << "Usage: " << argv[0]
+                  << " <config_path> <csv_file_path> [-metrics]\n";
+        return EXIT_FAILURE;
+    }
+
+    bool metrics = false;
+    if (argc == 4) {
+        if (std::strcmp(argv[3], "-metrics") == 0) {
+            metrics = true;
+        } else {
+            std::cerr << "Unknown option: " << argv[3]
+                      << "\nUsage: " << argv[0]
+                      << " <config_path> <csv_file_path> [-metrics]\n";
+            return EXIT_FAILURE;
+        }
+
+        std::cout << "Metrics logging enabled.\n";
     }
 
     // Standard SST initialization
@@ -119,18 +136,45 @@ int main(int argc, char* argv[]) {
                 // Quantity of get_session_key requests is the fourth column in
                 // the CSV
                 int repeat = std::stoi(attack_param);
+                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+
+                // from metrics.hpp
+                // If the user used the -metrics flag, set up metrics logging
+                MetricsRow row;
+                if (metrics) {
+                    metrics_open_new_file();
+                    metrics_write_header_if_empty();
+                    row = metrics_begin_row(exp_id);
+                }
 
                 // DOS Attack on get_session_key
                 for (int i = 0; i < repeat; ++i) {
                     std::cout << "Getting session key: " << (i + 1) << " of "
                               << repeat << std::endl;
+
+                    // Track how long it takes to get the session key
+                    auto t0 = std::chrono::steady_clock::now();
+                    
                     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
+
+                    auto t1 = std::chrono::steady_clock::now();
+
+                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+                    if (metrics) {
+                        metrics_add_sample(row, dur_us, s_key_list != NULL);
+                    }
+
                     if (s_key_list == NULL) {
                         std::cerr << "Client failed to get session key in DOS "
                                      "Key attack.\n"
                                   << ::std::endl;
-                        exit(1);
+                        break;
                     }
+                }
+
+                if (metrics) {
+                metrics_end_row_and_write(row);                                                                                                             
                 }
             } break;
 
@@ -185,21 +229,13 @@ int main(int argc, char* argv[]) {
 
             case DOSSYN: {
                 // SYN Flood Attack
-                const char *src_ip_str = ctx->config.auth_ip_addr;
+                // const char *src_ip_str = ctx->config.auth_ip_addr;
                 const char *dst_ip_str = ctx->config.auth_ip_addr;
                 uint16_t dst_port = 21900;
 
                 int repeat = std::stoi(attack_param);
-                for (int i = 0; i < repeat; ++i) {
-                    
-                    bool success = send_one_syn(src_ip_str, dst_port);
-                    if (!success) {
-                        std::cerr << "Failed to send SYN packet." << std::endl;
-                        exit(1);
-                    }
-                    std::cout << "Sent SYN packet " << (i + 1) << " of " << repeat
-                              << std::endl;
-                }
+                send_one_syn(dst_ip_str, dst_port, repeat);
+
             } break;
 
             // possible other case:

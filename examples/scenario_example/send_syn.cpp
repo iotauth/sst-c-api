@@ -12,6 +12,7 @@ extern "C" {
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <iostream>
 
 // Pseudo header for TCP checksum
 struct pseudo_header {
@@ -32,7 +33,7 @@ static uint16_t csum16(const void *data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-int send_one_syn(const char* dst_ip, unsigned short dst_port) {
+extern "C" bool send_one_syn(const char* dst_ip, unsigned short dst_port, int repeat) {
     const char *src_ip_str = "127.0.0.1";
 
     // ... build IPv4 + TCP SYN
@@ -52,8 +53,14 @@ int send_one_syn(const char* dst_ip, unsigned short dst_port) {
     iph->ip_off = 0;
     iph->ip_ttl = 64;
     iph->ip_p   = IPPROTO_TCP;
-    if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) { perror("src ip"); return 1; }
-    if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1) { perror("dst ip"); return 1; }
+    if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) {
+        std::cout << "src ip error" << std::endl;
+        return EXIT_FAILURE;
+    }
+    if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1) {
+        std::cout << "dst ip error" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     // Fill TCP header (BSD layout uses th_* and th_offx2)
     tcph->th_sport = htons(40000 + (rand() % 20000));
@@ -87,28 +94,47 @@ int send_one_syn(const char* dst_ip, unsigned short dst_port) {
 
     // Raw IP socket on macOS/BSD: use IPPROTO_RAW and set ip->ip_p to TCP
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
-    if (s < 0) { perror("socket"); return 1; }
+    if (s < 0) {
+        std::cout << "socket() error" << std::endl;
+        return EXIT_FAILURE;
+    }
 
     int one = 1;
     if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
-        perror("setsockopt(IP_HDRINCL)"); return 1;
+        std::cout << "setsockopt(IP_HDRINCL) error" << std::endl;
+        return EXIT_FAILURE;
     }
 
     struct sockaddr_in dst = {0};
     dst.sin_len    = sizeof(dst);
     dst.sin_family = AF_INET;
-    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) { perror("dst addr"); close(s); return 1; }
+    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
+        std::cout << "dst addr error" << std::endl;
+        close(s);
+        return EXIT_FAILURE;
+    }
 
-    ssize_t n = sendto(s, packet, sizeof(packet), 0,
-                       (struct sockaddr *)&dst, sizeof(dst));
-    if (n < 0) { perror("sendto"); close(s); return 1; }
+    for (int i = 0; i < repeat; ++i) {
 
-    printf("Sent TCP SYN from %s:%u to %s:%u (%zd bytes)\n",
-           src_ip_str, ntohs(tcph->th_sport), dst_ip, dst_port, n);
+        ssize_t n = sendto(s, packet, sizeof(packet), 0,
+                        (struct sockaddr *)&dst, sizeof(dst));
+        if (n < 0) {
+            std::cout << "sendto() error" << std::endl;
+            close(s);
+            return EXIT_FAILURE;
+        }
+
+        std::cout << "Sent TCP SYN from " << src_ip_str << ":" << ntohs(tcph->th_sport)
+                << " to " << dst_ip << ":" << dst_port << " (" << n << " bytes)"
+                << std::endl;
+
+        std::cout << "Sent SYN packet " << (i + 1) << " of " << repeat
+                  << std::endl;
+    }
 
     close(s);
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 
 
