@@ -7,10 +7,13 @@
 #include <unistd.h>
 
 #ifdef SST_PLATFORM_PICO
+#include "lwip/api.h"
 #include "lwip/inet.h"
 #include "lwip/ip_addr.h"
-#include "lwip/netdb.h"
+// #include "lwip/netdb.h"
+#include "lwip/netif.h"
 #include "lwip/sockets.h"
+#include "lwip/ip4_addr.h"
 #include "pico/time.h"
 
 static inline void sst_platform_sleep_us(uint32_t micros) { sleep_us(micros); }
