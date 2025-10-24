@@ -154,9 +154,7 @@ int main(int argc, char* argv[]) {
 
                     // Track how long it takes to get the session key
                     auto t0 = std::chrono::steady_clock::now();
-                    
                     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
-
                     auto t1 = std::chrono::steady_clock::now();
 
                     long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
@@ -176,13 +174,23 @@ int main(int argc, char* argv[]) {
                 if (metrics) {
                 metrics_end_row_and_write(row);                                                                                                             
                 }
+
             } break;
 
             case DOSC: {
                 // Quantity of secure_connect_to_server requests is the fourth
                 // column in the CSV
                 int repeat = std::stoi(attack_param);
+                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
                 SST_session_ctx_t* session_ctx[repeat];
+
+                MetricsRow row;
+                if (metrics) {
+                    metrics_open_new_file();
+                    metrics_write_header_if_empty();
+                    row = metrics_begin_row(exp_id);
+                }
+
                 // DOS Attack on secure_connect_to_server
                 for (int i = 0; i < repeat; ++i) {
                     s_key_list = get_session_key(ctx, NULL);
@@ -195,8 +203,18 @@ int main(int argc, char* argv[]) {
                     std::cout << "Connecting to server: " << (i + 1) << " of "
                               << repeat << std::endl;
 
+                    // Track how long it takes to connect
+                    auto t0 = std::chrono::steady_clock::now();
                     session_ctx[i] =
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+                    auto t1 = std::chrono::steady_clock::now();
+
+                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+                    if (metrics) {
+                        metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
+                    }
+
                     if (session_ctx[i] == NULL) {
                         std::cerr
                             << "Client failed to connect to server in DOS "
@@ -206,25 +224,54 @@ int main(int argc, char* argv[]) {
                     }
                     free_session_key_list_t(s_key_list);
                 }
+
+                if (metrics) {
+                metrics_end_row_and_write(row);                                                                                                             
+                }
+
             } break;
 
             case DOSM: {
                 // Quantity of send_secure_message requests is the fourth column
                 // in the CSV
                 int repeat = std::stoi(attack_param);
+                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+
+                MetricsRow row;
+                if (metrics) {
+                    metrics_open_new_file();
+                    metrics_write_header_if_empty();
+                    row = metrics_begin_row(exp_id);
+                }
 
                 // DOS Attack on send_secure_message
                 for (int i = 0; i < repeat; ++i) {
                     std::cout << "Sending message: " << message << " ("
                               << (i + 1) << " of " << repeat << ")"
                               << std::endl;
+
+                    // Track how long it takes to get the send the message
+                    auto t0 = std::chrono::steady_clock::now();
                     int msg =
                         send_secure_message(const_cast<char*>(message.c_str()),
                                             message.length(), session_ctx);
+                    auto t1 = std::chrono::steady_clock::now();
+
+                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+                    if (metrics) {
+                        metrics_add_sample(row, dur_us, msg >= 0);
+                    }
+
                     if (msg < 0) {
                         SST_print_error_exit("Failed send_secure_message().");
                     }
                 }
+
+                if (metrics) {
+                metrics_end_row_and_write(row);                                                                                                             
+                }
+
             } break;
 
             case DOSSYN: {
