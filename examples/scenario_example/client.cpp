@@ -40,14 +40,22 @@ static AttackType parseAttackType(const std::string& s) {
 
 int main(int argc, char* argv[]) {
     // allow: ./client <config_path> <csv_file_path> [-metrics]
-    if (argc != 3 && argc != 4) {
+    if (argc != 3 && argc != 4 && argc!= 5) {
         std::cerr << "Usage: " << argv[0]
                   << " <config_path> <csv_file_path> [-metrics]\n";
         return EXIT_FAILURE;
     }
 
     bool metrics = false;
+    const char* src_ip = 0;
     if (argc == 4) {
+        if (std::strcmp(argv[3], "-metrics") == 0) {
+            metrics = true;
+        } else {
+            src_ip = argv[3];
+        }
+    }
+    if (argc == 5) {
         if (std::strcmp(argv[3], "-metrics") == 0) {
             metrics = true;
         } else {
@@ -56,8 +64,10 @@ int main(int argc, char* argv[]) {
                       << " <config_path> <csv_file_path> [-metrics]\n";
             return EXIT_FAILURE;
         }
+        src_ip = argv[4];
 
         std::cout << "Metrics logging enabled.\n";
+        std::cout << "IP enabled.\n";
     }
 
     // Standard SST initialization
@@ -283,7 +293,7 @@ int main(int argc, char* argv[]) {
                 uint16_t dst_port = 21900;
 
                 int repeat = std::stoi(attack_param);
-                send_one_syn(dst_ip_str, dst_port, repeat);
+                send_one_syn(src_ip, dst_ip_str, dst_port, repeat);
 
             } break;
 

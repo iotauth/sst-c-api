@@ -33,8 +33,7 @@ static uint16_t csum16(const void *data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-extern "C" bool send_one_syn(const char* dst_ip, unsigned short dst_port, int repeat) {
-    const char *src_ip_str = "127.0.0.1";
+extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigned short dst_port, int repeat) {
 
     // ... build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
@@ -92,10 +91,10 @@ extern "C" bool send_one_syn(const char* dst_ip, unsigned short dst_port, int re
 
 
 
-    // Raw IP socket on macOS/BSD: use IPPROTO_RAW and set ip->ip_p to TCP
+    // Raw IP socket on macOS/BSD: use IPPROTO_RAW and set iph->ip_p to TCP
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
     if (s < 0) {
-        std::cout << "socket() error" << std::endl;
+        std::cout << "socket() error " << strerror(errno) << std::endl;
         return EXIT_FAILURE;
     }
 
@@ -122,9 +121,10 @@ extern "C" bool send_one_syn(const char* dst_ip, unsigned short dst_port, int re
         ssize_t n = sendto(s, packet, sizeof(packet), 0,
                         (struct sockaddr *)&dst, sizeof(dst));
         if (n < 0) {
-            std::cout << "sendto() error" << std::endl;
-            close(s);
-            return EXIT_FAILURE;
+            std::cout << "sendto() error " << strerror(errno) << std::endl;
+            // close(s);
+            // return EXIT_FAILURE;
+            continue;
         }
 
         std::cout << "Sent TCP SYN from " << src_ip_str << ":" << ntohs(tcph->th_sport)

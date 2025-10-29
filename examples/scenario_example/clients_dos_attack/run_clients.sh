@@ -36,9 +36,9 @@ done
 
 OS=$(uname)
 
-CFG="../../server_client_example/c_server.config"
-SHCMD="cd '$(pwd)' && $SERVER_BIN '$CFG'"
-launch_terminal "$SHCMD"
+# CFG="../../server_client_example/c_server.config"
+# SHCMD="cd '$(pwd)' && $SERVER_BIN '$CFG'"
+# launch_terminal "$SHCMD"
 
 for (( i=0; i<COUNT; i++ )); do
   CFG="../config/client${i}.config"
