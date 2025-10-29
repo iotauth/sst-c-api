@@ -105,9 +105,12 @@ extern "C" bool send_one_syn(const char* dst_ip, unsigned short dst_port, int re
         return EXIT_FAILURE;
     }
 
-    struct sockaddr_in dst = {0};
-    dst.sin_len    = sizeof(dst);
+    struct sockaddr_in dst{};
+    #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+        dst.sin_len = sizeof(dst);   // macOS only
+    #endif
     dst.sin_family = AF_INET;
+    dst.sin_port = htons(dst_port);
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
         std::cout << "dst addr error" << std::endl;
         close(s);

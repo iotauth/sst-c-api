@@ -19,7 +19,7 @@ struct MetricsRow {
   std::chrono::steady_clock::time_point t0;
 };
 
-void metrics_open_new_file(const std::string& base = "../metric_logs/client/client_metrics_log.csv");
+void metrics_open_new_file(const std::string& base = "../metric_logs/client_metrics_log.csv");
 void metrics_write_header_if_empty();
 
 MetricsRow metrics_begin_row(const std::string& exp_id);

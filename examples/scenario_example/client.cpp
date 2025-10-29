@@ -9,6 +9,7 @@ extern "C" {
 #include <fstream>
 #include <iostream>
 #include <thread>
+#include <cstring>
 
 enum AttackType {
     NONE,
@@ -181,7 +182,7 @@ int main(int argc, char* argv[]) {
                 // Quantity of secure_connect_to_server requests is the fourth
                 // column in the CSV
                 int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+                std::string exp_id = "DOSC:repeat=" + std::to_string(repeat);
                 SST_session_ctx_t* session_ctx[repeat];
 
                 MetricsRow row;
@@ -220,9 +221,8 @@ int main(int argc, char* argv[]) {
                             << "Client failed to connect to server in DOS "
                                "Connect attack.\n"
                             << ::std::endl;
-                        exit(1);
+                        continue;
                     }
-                    free_session_key_list_t(s_key_list);
                 }
 
                 if (metrics) {
@@ -235,7 +235,7 @@ int main(int argc, char* argv[]) {
                 // Quantity of send_secure_message requests is the fourth column
                 // in the CSV
                 int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+                std::string exp_id = "DOSM:repeat=" + std::to_string(repeat);
 
                 MetricsRow row;
                 if (metrics) {
@@ -258,6 +258,8 @@ int main(int argc, char* argv[]) {
                     auto t1 = std::chrono::steady_clock::now();
 
                     long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+                    usleep(10000);
 
                     if (metrics) {
                         metrics_add_sample(row, dur_us, msg >= 0);
