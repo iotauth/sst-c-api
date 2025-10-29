@@ -269,8 +269,6 @@ int main(int argc, char* argv[]) {
 
                     long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
-                    usleep(10000);
-
                     if (metrics) {
                         metrics_add_sample(row, dur_us, msg >= 0);
                     }
