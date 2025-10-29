@@ -62,6 +62,10 @@ void* receive_and_print_messages(void* thread_args) {
         std::cout.write(reinterpret_cast<const char*>(received_buf), ret);
         std::cout << std::endl;
         count++;
+        int msg = send_secure_message("Hello", strlen("Hello"), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";

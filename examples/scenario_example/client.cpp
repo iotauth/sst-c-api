@@ -255,6 +255,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 // DOS Attack on send_secure_message
+                unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
                 for (int i = 0; i < repeat; ++i) {
                     std::cout << "Sending message: " << message << " ("
                               << (i + 1) << " of " << repeat << ")"
@@ -265,16 +266,26 @@ int main(int argc, char* argv[]) {
                     int msg =
                         send_secure_message(const_cast<char*>(message.c_str()),
                                             message.length(), session_ctx);
+                    if (msg < 0) {
+                        SST_print_error_exit("Failed send_secure_message().");
+                    }
+                    if(metrics) {
+                        int ret = read_secure_message(received_buf, session_ctx);
+                    
+                        if (ret < 0) {
+                            std::cerr << "Failed to read secure message." << std::endl;
+                            continue;
+                        } else if (ret == 0) {
+                            std::cerr << "Connection closed" << std::endl;
+                            continue;
+                        }
+                    }
                     auto t1 = std::chrono::steady_clock::now();
 
                     long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
                     if (metrics) {
                         metrics_add_sample(row, dur_us, msg >= 0);
-                    }
-
-                    if (msg < 0) {
-                        SST_print_error_exit("Failed send_secure_message().");
                     }
                 }
 
