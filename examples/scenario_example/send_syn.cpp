@@ -104,7 +104,7 @@ extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigne
         return EXIT_FAILURE;
     }
 
-    struct sockaddr_in dst{};
+    struct sockaddr_in dst;
     #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
         dst.sin_len = sizeof(dst);   // macOS only
     #endif

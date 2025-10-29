@@ -70,7 +70,7 @@ void metrics_end_row_and_write(MetricsRow& r) {
 
   r.ts_end_us = epoch_us_now();
   auto t1 = steady_clock::now();
-  double duration_s = duration_cast<duration<double>>(t1 - r.t0).count();
+  double duration_s = duration_cast<duration<double> >(t1 - r.t0).count();
   long long duration_us_ll = static_cast<long long>(std::llround(duration_s * 1e6));
 
   long attempts = static_cast<long>(r.successes + r.failures);
