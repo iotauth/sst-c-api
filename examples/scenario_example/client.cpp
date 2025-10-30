@@ -213,7 +213,8 @@ int main(int argc, char* argv[]) {
                         std::cerr << "Client failed to get session key in DOS "
                                      "Connect attack.\n"
                                   << ::std::endl;
-                        exit(1);
+                        i--;
+                        continue;
                     }
                     std::cout << "Connecting to server: " << (i + 1) << " of "
                               << repeat << std::endl;
