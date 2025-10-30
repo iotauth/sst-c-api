@@ -1,0 +1,2 @@
+exp_id,ts_start_us,ts_end_us,successes,failures,avg_us,min_us,max_us,duration_us,attempt_rate_per_s,success_rate_per_s
+DOSM:repeat=100,1761835381246340,1761835400678185,100,0,194199,397,1807955,19431841,5.146,5.146
