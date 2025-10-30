@@ -17,13 +17,14 @@ launch_terminal() {
   fi
 }
 
-if [ $# -ne 2 ]; then
-  echo "Usage: $0 <number-of-instances> <csv-file>"
-  exit 1
-fi
+# if [ $# -ne 2 ]; then
+#   echo "Usage: $0 <number-of-instances> <csv-file>"
+#   exit 1
+# fi
 
 COUNT=$1
 CSV="$2"
+SRC_IP="$3"
 SERVER_BIN="../build/server"
 CLIENT_BIN="../build/client"
 
@@ -42,7 +43,7 @@ OS=$(uname)
 
 for (( i=0; i<COUNT; i++ )); do
   CFG="../config/client${i}.config"
-  SHCMD="cd '$(pwd)' && $CLIENT_BIN '$CFG' '$CSV'"
+  SHCMD="cd '$(pwd)' && sudo $CLIENT_BIN '$CFG' '$CSV' '$SRC_IP'"
   launch_terminal "$SHCMD"
 done
 
