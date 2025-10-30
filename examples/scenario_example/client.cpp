@@ -127,6 +127,10 @@ int main(int argc, char* argv[]) {
         std::string attack_param =
             (comma3 != std::string::npos) ? line.substr(comma3 + 1) : "";
 
+        if(metrics) {
+            sleep(3);
+        }
+
         switch (attack_type) {
             case REPLAY: {
                 // Replay Attack
