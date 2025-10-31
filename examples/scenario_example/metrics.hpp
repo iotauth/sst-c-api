@@ -24,7 +24,7 @@ void metrics_write_header_if_empty();
 
 MetricsRow metrics_begin_row(const std::string& exp_id);
 
-inline void metrics_add_sample(MetricsRow& r, long dur_us, bool ok) {
+inline void metrics_add_sample(MetricsRow& r, long long dur_us, bool ok) {
   r.sum_us += static_cast<long double>(dur_us);
   if (dur_us < r.min_us) r.min_us = dur_us;
   if (dur_us > r.max_us) r.max_us = dur_us;

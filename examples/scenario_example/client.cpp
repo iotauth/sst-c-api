@@ -225,7 +225,7 @@ int main(int argc, char* argv[]) {
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
                     auto t1 = std::chrono::steady_clock::now();
 
-                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                    long long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
                     if (metrics) {
                         metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
