@@ -35,7 +35,7 @@ For compilation and step-by-step run instructions, see:
 - C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
 - C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
 - Higher-level description in the main SST repo:  
-  `$SST_ROOT/examples/file_sharing/README.md`
+  [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/master/examples/file_sharing)
 
 ---
 
