@@ -58,7 +58,7 @@ For compilation and step-by-step run instructions, see:
 
 ---
 
-## 4. Scenario Example (SST Testbed)
+## 4. SST Testbed
 
 A testbed to experiment attacks on SST.
 
@@ -74,7 +74,7 @@ A testbed to experiment attacks on SST.
 
 For compilation steps, and detailed instructions for each scenario, see:
 
-- [`scenario_example/README.md`](./scenario_example/README.md)
+- [`SST_Testbed/README.md`](./SST_Testbed/README.md)
 
 ---
 
