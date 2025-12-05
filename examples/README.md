@@ -32,10 +32,10 @@ Examples that integrate SST with [IPFS](https://ipfs.tech/) to realize a secure 
 
 For compilation and step-by-step run instructions, see:
 
-- C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
-- C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
 - Higher-level description in the main SST repo:  
   [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/master/examples/file_sharing)
+- C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
+- C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
 
 ---
 
@@ -72,12 +72,11 @@ A testbed to experiment attacks on SST.
      - To server (and indirectly Auth) via repeated connection requests (DoSC).
   4. **Distributed DoS (DDoS)-style scenarios** with multiple clients.
 
-This example shows how SST behaves under benign and adversarial conditions and how policies and session keys are used in each case.
-
 For compilation steps, and detailed instructions for each scenario, see:
 
 - [`scenario_example/README.md`](./scenario_example/README.md)
 
 ---
 
-Each of these examples is designed to be run end-to-end together with the Java Auth server in `$SST_ROOT/auth/auth-server/`. For deeper background on the architecture and example setups, refer to the corresponding `README.md` files in the main SST (`iotauth`) repository as well.
+Each of these examples is designed to be run together with the Java Auth server in `$SST_ROOT/auth/auth-server/`. 
+For deeper background on the architecture and example setups, refer to the corresponding `README.md` files in the main SST (`iotauth`) repository as well.
