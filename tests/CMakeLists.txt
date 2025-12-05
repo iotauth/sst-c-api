@@ -4,9 +4,6 @@ project(SST_TEST LANGUAGES C)
 # Add the root directory, which contains the sst-c-api library
 add_subdirectory(.. sst-build)
 
-find_package(OpenSSL REQUIRED)
-find_package(Threads REQUIRED)
-
 # Create test executables
 add_executable(c_crypto_test c_crypto_test.c)
 add_executable(multi_thread_get_session_key_test multi_thread_get_session_key_test.c)

@@ -1,5 +1,7 @@
 #include "block_common.h"
 
+#include "time.h"
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);

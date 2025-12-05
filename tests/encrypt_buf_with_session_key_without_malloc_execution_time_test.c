@@ -16,12 +16,12 @@
  * encryption and decryption times per block and per file for performance
  * evaluation.
  */
-#include <openssl/rand.h>
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
 #include "../c_api.h"
+#include "../c_common.h"
 #define FILE_ITERATION 100
 #define BLOCK_ITERATION 16384
 #define BLOCK_SIZE 4096
@@ -48,7 +48,7 @@ int main(int argc, char* argv[]) {
     unsigned char plaintext_buf[BLOCK_SIZE];
 
     // Insert random bytes inside buffer.
-    RAND_bytes(plaintext_buf, BLOCK_SIZE);
+    generate_nonce(BLOCK_SIZE, plaintext_buf);
 
     unsigned char encrypted_data[BLOCK_SIZE + 16];
     unsigned char decrypted_data[BLOCK_SIZE];

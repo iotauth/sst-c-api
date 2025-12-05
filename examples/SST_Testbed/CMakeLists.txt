@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(scenario_example)
+project(SST_Testbed)
 
 # Add the main SST library
 add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)

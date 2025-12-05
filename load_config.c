@@ -65,7 +65,7 @@ int safe_config_value_copy(char* dest, const char* src, size_t dest_size) {
         return -1;
     } else {
         dest[dest_size - 1] = 0;
-        strncpy(dest, src, dest_size);
+        snprintf(dest, dest_size, "%s", src);
         if (dest[dest_size - 1] != 0) {
             SST_print_error(
                 "Problem found while copying config value, dest string is not "
