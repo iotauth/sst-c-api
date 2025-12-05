@@ -136,23 +136,7 @@ $sudo make install
 
 # Example
 
--   Turn on two different terminals at `$SST_ROOT/entity/c/examples/server_client_example/build`, and turn on Auth on the third terminal.
-
-Execute
-
-`$./entity_client ../c_client.config`
-
-`$./entity_server ../c_server.config`
-
-on each terminal
-
-To test AES_128_CTR mode, with noHMAC when exchanging messages, execute
-
-`$./entity_client ../c_computenode_CTR_noHMAC.config`
-
-`$./entity_server ../c_compactionnode_CTR_noHMAC.config`
-
-This will get all keys encrypted in AES_128_CTR mode, and send all messages in CTR mode, with no HMAC.
+To run examples, please checkout the [`examples/`](./examples/README.md) directory.
 
 # For Developers
 
@@ -168,4 +152,4 @@ This will get all keys encrypted in AES_128_CTR mode, and send all messages in C
 
 -   Implement an additional API function for extracting session key from cached session keys.
 
-*Last updated on February 2, 2024*
+*Last updated on December 5, 2025*
