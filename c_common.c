@@ -202,16 +202,24 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         SST_print_error("Larger buffer size required.");
         return -1;
     }
-    int bytes_read = sst_read_from_socket(socket, buf, ret_length);
-    if (bytes_read <= 0) {
-        SST_print_error("Failed to read from socket reading the payload.");
-        return bytes_read;
+    unsigned int total_read = 0;
+    while (total_read < ret_length) {
+        int bytes_read = sst_read_from_socket(socket, buf + total_read,
+                                              ret_length - total_read);
+        if (bytes_read <= 0) {
+            SST_print_error(
+                "Failed to read from socket while reading the payload.");
+            return bytes_read;
+        }
+        total_read += bytes_read;
     }
-    if ((unsigned int)bytes_read != ret_length) {
-        SST_print_error("Wrong read... Exiting..");
+
+    if (total_read != ret_length) {
+        SST_print_error("Incomplete read... Exiting..");
         return -1;
     }
-    return bytes_read;
+
+    return total_read;
 }
 
 // ----------------Header Parsing functions----------------
