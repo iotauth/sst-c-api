@@ -60,9 +60,7 @@ For compilation and step-by-step run instructions, see:
 
 ## 4. Scenario Example (SST Testbed)
 
-**Directory:** [`scenario_example/`](./scenario_example)
-
-A larger “testbed” style example that shows SST in more realistic scenarios:
+A testbed to experiment attacks on SST.
 
 - Uses Auth, example entities, and CSV-driven traffic patterns.
 - Includes:
