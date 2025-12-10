@@ -6,11 +6,11 @@
 launch_terminal() {
   local cmd="$1"
   if [[ "$OS" == "Darwin" ]]; then
-    osascript -e "tell application \"Terminal\" to do script \"$cmd\""
+    sudo osascript -e "tell application \"Terminal\" to do script \"$cmd\""
   elif command -v gnome-terminal &> /dev/null; then
-    gnome-terminal -- bash -c "$cmd; exec bash" &
+    sudo gnome-terminal -- bash -c "$cmd; exec bash" &
   elif command -v xterm &> /dev/null; then
-    xterm -hold -e "$cmd" &
+    sudo xterm -hold -e "$cmd" &
   else
     echo "No GUI terminal found; running headless: $cmd"
     eval "$cmd &"
@@ -41,7 +41,7 @@ OS=$(uname)
 # SHCMD="cd '$(pwd)' && $SERVER_BIN '$CFG'"
 # launch_terminal "$SHCMD"
 
-for (( i=0; i<COUNT; i++ )); do
+for (( i=0; i<0+COUNT; i++ )); do
   CFG="../config/client${i}.config"
   SHCMD="cd '$(pwd)' && sudo $CLIENT_BIN '$CFG' '$CSV' '$SRC_IP'"
   launch_terminal "$SHCMD"

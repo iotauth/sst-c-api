@@ -6,7 +6,7 @@ extern "C" {
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>    // struct ip (BSD)
-#include <netinet/tcp.h>   // struct tcphdr (BSD), TH_* flags
+#include <netinet/tcp.h>   // struct tcphdr (BSD)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,7 +35,7 @@ static uint16_t csum16(const void *data, size_t len) {
 
 extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigned short dst_port, int repeat) {
 
-    // ... build IPv4 + TCP SYN
+    // Build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
     unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr)];
     memset(packet, 0, sizeof(packet));
@@ -45,7 +45,7 @@ extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigne
 
     // Fill IPv4 header (BSD layout)
     iph->ip_v   = 4;
-    iph->ip_hl  = 5; // 5 * 4 = 20 bytes
+    iph->ip_hl  = 5;
     iph->ip_tos = 0;
     iph->ip_len = sizeof(packet);
     iph->ip_id  = htons(0x1234);
@@ -61,14 +61,14 @@ extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigne
         return EXIT_FAILURE;
     }
 
-    // Fill TCP header (BSD layout uses th_* and th_offx2)
+    // Fill TCP header (BSD layout uses th_offx2)
     tcph->th_sport = htons(40000 + (rand() % 20000));
     tcph->th_dport = htons(dst_port);
     tcph->th_seq   = htonl(0xABCDEFFF);
     tcph->th_ack   = htonl(0);
-    tcph->th_off   = 5;                         // <-- correct on macOS
+    tcph->th_off   = 5; // <-- correct on macOS
     tcph->th_x2    = 0;
-    tcph->th_flags = TH_SYN;        // set SYN
+    tcph->th_flags = TH_SYN;
     tcph->th_win   = htons(65535);
     tcph->th_urp   = 0;
 
