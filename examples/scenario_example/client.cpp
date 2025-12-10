@@ -40,34 +40,35 @@ static AttackType parseAttackType(const std::string& s) {
 
 int main(int argc, char* argv[]) {
     // allow: ./client <config_path> <csv_file_path> [-metrics]
-    if (argc != 3 && argc != 4 && argc!= 5) {
+    if (argc < 3 || argc > 5) {
         std::cerr << "Usage: " << argv[0]
-                  << " <config_path> <csv_file_path> [-metrics]\n";
+                  << " <config_path> <csv_file_path> [-metrics] [src_ip]\n";
         return EXIT_FAILURE;
     }
 
     bool metrics = false;
-    const char* src_ip = 0;
-    if (argc == 4) {
-        if (std::strcmp(argv[3], "-metrics") == 0) {
+    const char* src_ip = nullptr;
+
+    // parse optional args starting at argv[3]
+    for (int i = 3; i < argc; ++i) {
+        if (std::strcmp(argv[i], "-metrics") == 0) {
             metrics = true;
+        } else if (!src_ip) {
+            // first flag that isn't metrics is src_ip
+            src_ip = argv[i];
         } else {
-            src_ip = argv[3];
-        }
-    }
-    if (argc == 5) {
-        if (std::strcmp(argv[3], "-metrics") == 0) {
-            metrics = true;
-        } else {
-            std::cerr << "Unknown option: " << argv[3]
-                      << "\nUsage: " << argv[0]
-                      << " <config_path> <csv_file_path> [-metrics]\n";
+            std::cerr << "Unknown or extra option: " << argv[i] << '\n';
+            std::cerr << "Usage: " << argv[0]
+                  << " <config_path> <csv_file_path> [-metrics] [src_ip]\n";
             return EXIT_FAILURE;
         }
-        src_ip = argv[4];
+    }
 
+    if (metrics) {
         std::cout << "Metrics logging enabled.\n";
-        std::cout << "IP enabled.\n";
+    }
+    if (src_ip) {
+        std::cout << "IP enabled: " << src_ip << '\n';
     }
 
     // Standard SST initialization
@@ -241,7 +242,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (metrics) {
-                metrics_end_row_and_write(row);                                                                                                             
+                    metrics_end_row_and_write(row);                                                                                                             
                 }
 
             } break;
@@ -266,8 +267,8 @@ int main(int argc, char* argv[]) {
                               << (i + 1) << " of " << repeat << ")"
                               << std::endl;
 
-                    // Track how long it takes to get the send the message
-                    auto t0 = std::chrono::steady_clock::now();
+                    // Track how long it takes to send the message
+                    // auto t0 = std::chrono::steady_clock::now();
                     int msg =
                         send_secure_message(const_cast<char*>(message.c_str()),
                                             message.length(), session_ctx);
@@ -284,13 +285,13 @@ int main(int argc, char* argv[]) {
                             std::cerr << "Connection closed" << std::endl;
                             continue;
                         }
-                    }
-                    auto t1 = std::chrono::steady_clock::now();
+                    
+                        // auto t1 = std::chrono::steady_clock::now();
 
-                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                        // long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
 
-                    if (metrics) {
-                        metrics_add_sample(row, dur_us, msg >= 0);
+                    
+                        // metrics_add_sample(row, dur_us, msg >= 0);
                     }
                 }
 
