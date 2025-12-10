@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
     }
 
     bool metrics = false;
-    const char* src_ip = nullptr;
+    const char* src_ip = NULL;
 
     // parse optional args starting at argv[3]
     for (int i = 3; i < argc; ++i) {
@@ -111,16 +111,23 @@ int main(int argc, char* argv[]) {
             SST_print_error_exit("Failed send_secure_message().");
         }
 
-        // Parse the attack type
-        std::string attack_type_str =
-            (comma2 != std::string::npos)
-                ? line.substr(
-                      comma2 + 1,
-                      (comma3 == std::string::npos
-                           ? std::string::npos
-                           : comma3 - comma2 -
-                                 1))  // if there is a 3rd column, grab it
-                : "";                 // else, use the empty string
+        std::string attack_type_str;
+
+        if (comma2 != std::string::npos) {
+            std::size_t start = comma2 + 1;
+
+            if (comma3 == std::string::npos) {
+                // No 3rd comma: go to the end of the line
+                attack_type_str = line.substr(start);
+            } else {
+                // 3rd comma: grab text between 2nd and 3rd comma
+                std::size_t len = comma3 - start;
+                attack_type_str = line.substr(start, len);
+            }
+        } else {
+            // No 2nd comma: use empty string
+            attack_type_str = "";
+        }
 
         AttackType attack_type = parseAttackType(attack_type_str);
 
@@ -128,9 +135,9 @@ int main(int argc, char* argv[]) {
         std::string attack_param =
             (comma3 != std::string::npos) ? line.substr(comma3 + 1) : "";
 
-        // if(metrics) {
+        if(metrics) {
             sleep(10);
-        // }
+        }
 
         switch (attack_type) {
             case REPLAY: {
@@ -296,14 +303,13 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (metrics) {
-                metrics_end_row_and_write(row);                                                                                                             
+                    metrics_end_row_and_write(row);                                                                                                             
                 }
 
             } break;
 
             case DOSSYN: {
                 // SYN Flood Attack
-                // const char *src_ip_str = ctx->config.auth_ip_addr;
                 const char *dst_ip_str = ctx->config.auth_ip_addr;
                 uint16_t dst_port = 21900;
 
