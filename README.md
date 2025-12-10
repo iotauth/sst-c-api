@@ -134,7 +134,7 @@ $make
 $sudo make install
 ```
 
-# Example
+# Examples
 
 To run examples, please checkout the [`examples/`](./examples/README.md) directory.
 
