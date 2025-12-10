@@ -204,19 +204,19 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
     }
     unsigned int total_read = 0;
     while (total_read < ret_length) {
-        int bytes_read = sst_read_from_socket(socket, buf + total_read, ret_length - total_read);
+        int bytes_read = sst_read_from_socket(socket, buf + total_read,
+                                              ret_length - total_read);
         if (bytes_read <= 0) {
-            SST_print_error("Failed to read from socket while reading the payload.");
+            SST_print_error(
+                "Failed to read from socket while reading the payload.");
             return bytes_read;
         }
         total_read += bytes_read;
     }
-    
     if (total_read != ret_length) {
         SST_print_error("Incomplete read... Exiting..");
         return -1;
     }
-    
     return total_read;
 }
 

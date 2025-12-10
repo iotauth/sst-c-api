@@ -52,9 +52,9 @@ $ git submodule update --init
 
 1. Go to directory `iotauth/examples`
 
-### Compile the scenario code
+### Compile the SST_Testbed code
 
-1. Go to `iotauth/entity/c/examples/scenario_example/`
+1. Go to `iotauth/entity/c/examples/SST_Testbed/`
 
 2. Run `mkdir build && cd build`
 
@@ -89,7 +89,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 ## 1. Basic Messaging
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/basic_messages.csv` to have the client send custom messages to the server.
     - The format of the input CSV file for this example should be:
@@ -112,7 +112,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 ## 2. Attack Scenarios
 ## 2.1 Replay Attack
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/replay_attack.csv` to have the client send custom messages and replay attacks to the server,
     - The format of the input CSV file for this attack example should be:
@@ -136,7 +136,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 ## 2.2 Denial of Service (DoS) attack
 ## 2.2.1 DoS attack to Auth via session key requests (DoSK)
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_key.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -158,7 +158,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 ## 2.2.2 DoS attack to Server via session key requests (DoSM)
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -180,7 +180,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 ## 2.2.3 DoS attack to Server and Auth via connection requests (DoSC)
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -210,7 +210,7 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 ### Create New Graph for Auth Databases and Configuration Files for the Clients
 
-1. Go to `$ROOT/entity/c/examples/scenario_example/clients_dos_attack`
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/clients_dos_attack`
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 

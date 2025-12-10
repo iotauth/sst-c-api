@@ -71,4 +71,4 @@ for (let i = 0; i < count; i++) {
   fs.writeFileSync(out_path, out_lines.join('\n'), 'utf8');
 }
 
-console.log(`Generated ${count} configs in scenario_example/config/`);
+console.log(`Generated ${count} configs in SST_Testbed/config/`);
