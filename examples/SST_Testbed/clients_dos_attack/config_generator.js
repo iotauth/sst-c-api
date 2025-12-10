@@ -4,7 +4,7 @@
 
 // Examples: ./configGenerator.js 100
 
-import fs   from 'fs';
+import fs from 'fs';
 import path from 'path';
 
 // Parses the command line arguments
@@ -71,4 +71,4 @@ for (let i = 0; i < count; i++) {
   fs.writeFileSync(out_path, out_lines.join('\n'), 'utf8');
 }
 
-console.log(`Generated ${count} configs in scenario_example/config/`);
+console.log(`Generated ${count} configs in SST_Testbed/config/`);
