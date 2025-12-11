@@ -38,6 +38,156 @@ static AttackType parseAttackType(const std::string& s) {
     return NONE;
 }
 
+void dosk_attack(SST_ctx_t* ctx, std::string& param, bool cond) {
+    // Quantity of get_session_key requests is the fourth column in
+    // the CSV
+    int repeat = std::stoi(param);
+    std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+
+    // from metrics.hpp
+    // If the user used the -metrics flag, set up metrics logging
+    MetricsRow row;
+    if (cond) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on get_session_key
+    for (int i = 0; i < repeat; ++i) {
+        std::cout << "Getting session key: " << (i + 1) << " of "
+                    << repeat << std::endl;
+
+        // Track how long it takes to get the session key
+        auto t0 = std::chrono::steady_clock::now();
+        session_key_list_t* s_key_list = get_session_key(ctx, NULL);
+        auto t1 = std::chrono::steady_clock::now();
+
+        long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+        if (cond) {
+            metrics_add_sample(row, dur_us, s_key_list != NULL);
+        }
+
+        if (s_key_list == NULL) {
+            std::cerr << "Client failed to get session key in DOS "
+                            "Key attack.\n"
+                        << ::std::endl;
+            break;
+        }
+    }
+
+    if (cond) {
+    metrics_end_row_and_write(row);                                                                                                             
+    }
+}
+
+void dosc_attack(SST_ctx_t* ctx, std::string& param, session_key_list_t* skey_list, bool cond) {
+    // Quantity of secure_connect_to_server requests is the fourth
+    // column in the CSV
+    int repeat = std::stoi(param);
+    std::string exp_id = "DOSC:repeat=" + std::to_string(repeat);
+    SST_session_ctx_t* session_ctx[repeat];
+
+    MetricsRow row;
+    if (cond) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on secure_connect_to_server
+    for (int i = 0; i < repeat; ++i) {
+        skey_list = get_session_key(ctx, NULL);
+        if (skey_list == NULL) {
+            std::cerr << "Client failed to get session key in DOS "
+                            "Connect attack.\n"
+                        << ::std::endl;
+            i--;
+            continue;
+        }
+        std::cout << "Connecting to server: " << (i + 1) << " of "
+                    << repeat << std::endl;
+
+        // Track how long it takes to connect
+        auto t0 = std::chrono::steady_clock::now();
+        session_ctx[i] =
+            secure_connect_to_server(&skey_list->s_key[0], ctx);
+        auto t1 = std::chrono::steady_clock::now();
+
+        long long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+        if (cond) {
+            metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
+        }
+
+        if (session_ctx[i] == NULL) {
+            std::cerr
+                << "Client failed to connect to server in DOS "
+                    "Connect attack.\n"
+                << ::std::endl;
+            continue;
+        }
+    }
+
+    if (cond) {
+        metrics_end_row_and_write(row);                                                                                                             
+    }
+}
+
+void dosm_attack(SST_session_ctx_t* session_ctx, std::string& param, std::string message, bool cond) {
+    // Quantity of send_secure_message requests is the fourth column
+    // in the CSV
+    int repeat = std::stoi(param);
+    std::string exp_id = "DOSM:repeat=" + std::to_string(repeat);
+
+    MetricsRow row;
+    if (cond) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on send_secure_message
+    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
+    for (int i = 0; i < repeat; ++i) {
+        std::cout << "Sending message: " << message << " ("
+                    << (i + 1) << " of " << repeat << ")"
+                    << std::endl;
+
+        // Track how long it takes to send the message
+        // auto t0 = std::chrono::steady_clock::now();
+        int msg =
+            send_secure_message(const_cast<char*>(message.c_str()),
+                                message.length(), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
+        if(cond) {
+            int ret = read_secure_message(received_buf, session_ctx);
+        
+            if (ret < 0) {
+                std::cerr << "Failed to read secure message." << std::endl;
+                continue;
+            } else if (ret == 0) {
+                std::cerr << "Connection closed" << std::endl;
+                continue;
+            }
+        
+            // auto t1 = std::chrono::steady_clock::now();
+
+            // long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+
+        
+            // metrics_add_sample(row, dur_us, msg >= 0);
+        }
+    }
+
+    if (cond) {
+        metrics_end_row_and_write(row);                                                                                                             
+    }
+}
+
 int main(int argc, char* argv[]) {
     // allow: ./client <config_path> <csv_file_path> [-metrics]
     if (argc < 3 || argc > 5) {
@@ -156,155 +306,17 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSK: {
-                // Quantity of get_session_key requests is the fourth column in
-                // the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
-
-                // from metrics.hpp
-                // If the user used the -metrics flag, set up metrics logging
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
-
-                // DOS Attack on get_session_key
-                for (int i = 0; i < repeat; ++i) {
-                    std::cout << "Getting session key: " << (i + 1) << " of "
-                              << repeat << std::endl;
-
-                    // Track how long it takes to get the session key
-                    auto t0 = std::chrono::steady_clock::now();
-                    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
-                    auto t1 = std::chrono::steady_clock::now();
-
-                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-
-                    if (metrics) {
-                        metrics_add_sample(row, dur_us, s_key_list != NULL);
-                    }
-
-                    if (s_key_list == NULL) {
-                        std::cerr << "Client failed to get session key in DOS "
-                                     "Key attack.\n"
-                                  << ::std::endl;
-                        break;
-                    }
-                }
-
-                if (metrics) {
-                metrics_end_row_and_write(row);                                                                                                             
-                }
+                dosk_attack(ctx, attack_param, metrics);
 
             } break;
 
             case DOSC: {
-                // Quantity of secure_connect_to_server requests is the fourth
-                // column in the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSC:repeat=" + std::to_string(repeat);
-                SST_session_ctx_t* session_ctx[repeat];
-
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
-
-                // DOS Attack on secure_connect_to_server
-                for (int i = 0; i < repeat; ++i) {
-                    s_key_list = get_session_key(ctx, NULL);
-                    if (s_key_list == NULL) {
-                        std::cerr << "Client failed to get session key in DOS "
-                                     "Connect attack.\n"
-                                  << ::std::endl;
-                        i--;
-                        continue;
-                    }
-                    std::cout << "Connecting to server: " << (i + 1) << " of "
-                              << repeat << std::endl;
-
-                    // Track how long it takes to connect
-                    auto t0 = std::chrono::steady_clock::now();
-                    session_ctx[i] =
-                        secure_connect_to_server(&s_key_list->s_key[0], ctx);
-                    auto t1 = std::chrono::steady_clock::now();
-
-                    long long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-
-                    if (metrics) {
-                        metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
-                    }
-
-                    if (session_ctx[i] == NULL) {
-                        std::cerr
-                            << "Client failed to connect to server in DOS "
-                               "Connect attack.\n"
-                            << ::std::endl;
-                        continue;
-                    }
-                }
-
-                if (metrics) {
-                    metrics_end_row_and_write(row);                                                                                                             
-                }
+                dosc_attack(ctx, attack_param, s_key_list, metrics);
 
             } break;
 
             case DOSM: {
-                // Quantity of send_secure_message requests is the fourth column
-                // in the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSM:repeat=" + std::to_string(repeat);
-
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
-
-                // DOS Attack on send_secure_message
-                unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-                for (int i = 0; i < repeat; ++i) {
-                    std::cout << "Sending message: " << message << " ("
-                              << (i + 1) << " of " << repeat << ")"
-                              << std::endl;
-
-                    // Track how long it takes to send the message
-                    // auto t0 = std::chrono::steady_clock::now();
-                    int msg =
-                        send_secure_message(const_cast<char*>(message.c_str()),
-                                            message.length(), session_ctx);
-                    if (msg < 0) {
-                        SST_print_error_exit("Failed send_secure_message().");
-                    }
-                    if(metrics) {
-                        int ret = read_secure_message(received_buf, session_ctx);
-                    
-                        if (ret < 0) {
-                            std::cerr << "Failed to read secure message." << std::endl;
-                            continue;
-                        } else if (ret == 0) {
-                            std::cerr << "Connection closed" << std::endl;
-                            continue;
-                        }
-                    
-                        // auto t1 = std::chrono::steady_clock::now();
-
-                        // long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
-
-                    
-                        // metrics_add_sample(row, dur_us, msg >= 0);
-                    }
-                }
-
-                if (metrics) {
-                    metrics_end_row_and_write(row);                                                                                                             
-                }
+                dosm_attack(session_ctx, attack_param, message, metrics);
 
             } break;
 
@@ -318,21 +330,21 @@ int main(int argc, char* argv[]) {
 
             } break;
 
-            // possible other case:
-            // for (int i = 0; i < repeat; ++i) {
-            //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
-            //     if (temp_sock < 0) {
-            //         SST_print_error_exit("Failed to create socket.");
-            //     }
+                // possible other case:
+                // for (int i = 0; i < repeat; ++i) {
+                //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
+                //     if (temp_sock < 0) {
+                //         SST_print_error_exit("Failed to create socket.");
+                //     }
 
-            //     struct sockaddr_in server_addr;
-            //     server_addr.sin_family = AF_INET;
-            //     server_addr.sin_port = htons(ctx->config.server_port);
-            //     server_addr.sin_addr.s_addr = inet_addr(ctx->config.server_ip);
+                //     struct sockaddr_in server_addr;
+                //     server_addr.sin_family = AF_INET;
+                //     server_addr.sin_port = htons(ctx->config.server_port);
+                //     server_addr.sin_addr.s_addr = inet_addr(ctx->config.server_ip);
 
-            //     connect(temp_sock, (struct sockaddr*)&server_addr,
-            //             sizeof(server_addr));
-            //     // Not closing the socket to keep it in SYN-RECEIVED state
+                //     connect(temp_sock, (struct sockaddr*)&server_addr,
+                //             sizeof(server_addr));
+                //     // Not closing the socket to keep it in SYN-RECEIVED state
             case NONE:
             default:
                 break;
