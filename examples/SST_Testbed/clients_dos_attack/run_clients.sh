@@ -66,7 +66,6 @@ fi
 # Launch server
 CFG="../../server_client_example/c_server.config"
 SHCMD="cd '$(pwd)' && $SERVER_BIN '$CFG'"
-# If server never needs sudo even when SRC_IP is set, change "$USE_SUDO" to "no" here.
 launch_terminal "$SHCMD" "$no"
 
 # Launch clients
