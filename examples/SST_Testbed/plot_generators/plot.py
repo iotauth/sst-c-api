@@ -1,24 +1,58 @@
 #!/usr/bin/env python3
 """
-plot.py (unified)
-Plot either Throughput or Latency vs Number of Malicious Clients.
+plot.py — Plot throughput or latency vs. number of malicious clients from CSV files.
 
-Usage examples:
-  # Throughput mode
-  ./throughput_plot.py --throughput --glob 'results/*.csv' --out throughput.pdf
+Usage:
+    # Throughput mode (uses attempt_rate_per_s)
+    python3 plot.py --throughput <CSV_OR_DIR> [<CSV_OR_DIR> ...]
+    python3 plot.py --throughput --glob "results/*.csv"
+    python3 plot.py --throughput --recursive path/to/dir
 
-  # Latency mode
-  ./throughput_plot.py --latency --glob 'results/*.csv' --out latency.pdf
+    # Latency mode (avg_us is converted to milliseconds)
+    python3 plot.py --latency <CSV_OR_DIR> [<CSV_OR_DIR> ...]
+    python3 plot.py --latency --glob "logs/*lat.csv"
 
-Notes
-- Each CSV contributes up to three points, corresponding to Config#2, Config#3, Config#1 in that row order.
-- In latency mode, avg_us is converted to milliseconds on the y-axis.
-- Outputs a PDF by default; won't overwrite existing files (auto-increments).
-- Always renders in a compact form (20% smaller). Use --figsize W H to control base size.
-- Integer-only ticks on both axes.
-- Optional --xlim/--ylim to clamp axis ranges (latency mode expects ms for --ylim).
-- CSVs are expected to have up to three rows in order: Config#2 (row 0), Config#3 (row 1), Config#1 (row 2).
-- Use --glob to specify glob patterns for input CSVs.
+    # Example
+    python3 plot.py --throughput ../metric_logs/metric_logs_set2/syn
+    python3 plot.py --latency --glob "../metric_logs/metric_logs_set2/*.csv" --logy --inset
+
+Input format:
+    - Inputs may be CSV files or directories containing CSVs.
+    - You may also provide a glob pattern via --glob, and enable directory recursion via --recursive.
+    - Each CSV may contain up to three rows, strictly in this order:
+          row 0 -> Config#2
+          row 1 -> Config#3
+          row 2 -> Config#1
+    - Required columns depend on mode:
+          * Throughput mode: malicious_number, attempt_rate_per_s
+          * Latency mode: malicious_number, avg_us
+    - In latency mode, avg_us is converted to milliseconds on the y-axis.
+
+Plot behavior:
+    - The script aggregates points from all CSVs into three series: Config#2, Config#3, Config#1.
+    - It plots “Number of Malicious Clients” on the x-axis against throughput (ops/s) or latency (ms).
+    - Each CSV contributes up to three points—one per config, if present.
+    - Both axes use integer-only ticks.
+    - Y-axis uses linear scale by default; use --logy for logarithmic scale.
+    - Use --inset to draw a zoomed inset focusing on lower-y regions.
+
+Output:
+    - Output is a PDF by default. You can specify a filename via --out; if no extension is given, .pdf is appended.
+    - The script never overwrites existing files—names auto-increment (e.g., latency.pdf, latency1.pdf, latency2.pdf).
+    - All figures are rendered in a compact form: the actual drawn area is 80% of the specified --figsize.
+      You can control base size with --figsize W H.
+
+Axis options:
+    - --xlim XMIN XMAX : Clamp x-axis range.
+    - --ylim YMIN YMAX : Clamp y-axis range (latency mode expects milliseconds).
+    - --logy           : Enable logarithmic scaling for the y-axis.
+    - --inset          : Draw a zoomed inset; useful when Config#1 dominates the scale.
+    - --inset-max VAL  : Manually specify the inset’s upper y-limit (default is auto-calculated).
+
+Summary:
+    This script reads multiple CSVs and generates a compact PDF figure showing how throughput or latency
+    changes as the number of malicious clients increases. CSV structure (row order and required columns)
+    must match the expected format, and either --throughput or --latency must be specified.
 """
 import argparse
 import glob
