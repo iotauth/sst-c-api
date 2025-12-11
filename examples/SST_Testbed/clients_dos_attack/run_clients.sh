@@ -7,7 +7,7 @@ OS=$(uname)
 
 launch_terminal() {
   local cmd="$1"
-  local use_sudo="$2"  # "yes" or "no"
+  local use_sudo="$2" # "yes" or "no"
 
   if [[ "$OS" == "Darwin" ]]; then
     if [[ "$use_sudo" == "yes" ]]; then
@@ -45,7 +45,7 @@ fi
 
 COUNT="$1"
 CSV="$2"
-SRC_IP="${3:-}"   # empty if not provided
+SRC_IP="${3:-}" # empty if not provided
 
 SERVER_BIN="../build/server"
 CLIENT_BIN="../build/client"
@@ -67,7 +67,7 @@ fi
 CFG="../../server_client_example/c_server.config"
 SHCMD="cd '$(pwd)' && $SERVER_BIN '$CFG'"
 # If server never needs sudo even when SRC_IP is set, change "$USE_SUDO" to "no" here.
-launch_terminal "$SHCMD" "$USE_SUDO"
+launch_terminal "$SHCMD" "$no"
 
 # Launch clients
 for (( i=0; i<COUNT; i++ )); do
