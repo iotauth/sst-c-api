@@ -218,7 +218,7 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         SST_print_error("Incomplete read... Exiting..");
         return -1;
     }
-    
+
     return total_read;
 }
 
