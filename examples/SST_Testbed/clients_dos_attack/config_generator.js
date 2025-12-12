@@ -20,7 +20,7 @@ if (isNaN(count) || count < 1) {
   process.exit(1);
 }
 
-const original_config = '../../server_client_example/c_client.config';
+const client_template = 'client_template.config';
 const out_dir = '../config';
 
 if (isNaN(count) || count < 1) {
@@ -31,9 +31,9 @@ if (isNaN(count) || count < 1) {
 // Read the input .graph file
 let lines;
 try {
-  lines = fs.readFileSync(original_config, 'utf8').split(/\r?\n/);
+  lines = fs.readFileSync(client_template, 'utf8').split(/\r?\n/);
 } catch (err) {
-  console.error(`Failed to read the original config \"${original_config}\": ${err.message}`);
+  console.error(`Failed to read the template client config \"${client_template}\": ${err.message}`);
   process.exit(1);
 }
 

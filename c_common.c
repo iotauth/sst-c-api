@@ -213,10 +213,12 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         }
         total_read += bytes_read;
     }
+
     if (total_read != ret_length) {
         SST_print_error("Incomplete read... Exiting..");
         return -1;
     }
+    
     return total_read;
 }
 
