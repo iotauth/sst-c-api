@@ -8,7 +8,7 @@ add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 find_package(Threads REQUIRED)
 
 add_executable(server server.cpp)
-add_executable(client client.cpp)
+add_executable(client client.cpp send_syn.cpp metrics.cpp)
 
 foreach(prog server client)
     target_link_libraries(${prog} sst-c-api Threads::Threads)
