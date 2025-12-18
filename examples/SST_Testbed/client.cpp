@@ -314,7 +314,7 @@ int main(int argc, char* argv[]) {
                 uint16_t dst_port = 21900;
 
                 int repeat = std::stoi(attack_param);
-                send_one_syn(src_ip, dst_ip_str, dst_port, repeat);
+                send_syn_packets(src_ip, dst_ip_str, dst_port, repeat);
 
             } break;
 

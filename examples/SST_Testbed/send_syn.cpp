@@ -33,7 +33,7 @@ static uint16_t csum16(const void *data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigned short dst_port, int repeat) {
+extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip, unsigned short dst_port, int repeat) {
 
     // Build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
@@ -108,6 +108,7 @@ extern "C" bool send_one_syn(const char* src_ip_str, const char* dst_ip, unsigne
     #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
         dst.sin_len = sizeof(dst);   // macOS only
     #endif
+
     dst.sin_family = AF_INET;
     dst.sin_port = htons(dst_port);
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
