@@ -6,13 +6,13 @@
 #include "load_config.h"
 
 SST_ctx_t* init_SST(const char* config_path) {
-#ifdef USE_OPENSSL
+    #ifdef USE_OPENSSL
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
+    #endif
     // By default OpenSSL will attempt to clean itself up when the process exits
     // via an "atexit" handler. Using this option suppresses that behaviour.
-#elif defined(USE_MBEDTLS)
     // mbed TLS initialization is typically done automatically
-#endif
+
     // This means that the application will have to clean up OpenSSL explicitly
     // using OPENSSL_cleanup().
     // This is needed because, Lingua Franca uses the "atexit" handler, and
@@ -43,7 +43,6 @@ SST_ctx_t* init_SST(const char* config_path) {
     }
     return ctx;
 }
-
 session_key_list_t* init_empty_session_key_list(void) {
     session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
     session_key_list->num_key = 0;
@@ -441,6 +440,7 @@ int decrypt_buf_with_session_key_without_malloc(
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
 
+#ifdef USE_OPENSSL
 int save_session_key_list(session_key_list_t* session_key_list,
                           const char* file_path) {
     FILE* saved_file_fp = fopen(file_path, "wb");
@@ -604,6 +604,8 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
 
     return 0;
 }
+
+#endif
 
 unsigned int convert_skid_buf_to_int(unsigned char* buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
