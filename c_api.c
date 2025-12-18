@@ -6,9 +6,9 @@
 #include "load_config.h"
 
 SST_ctx_t* init_SST(const char* config_path) {
-    #ifdef USE_OPENSSL
+#ifdef USE_OPENSSL
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
-    #endif
+#endif
     // By default OpenSSL will attempt to clean itself up when the process exits
     // via an "atexit" handler. Using this option suppresses that behaviour.
     // mbed TLS initialization is typically done automatically
@@ -22,15 +22,45 @@ SST_ctx_t* init_SST(const char* config_path) {
         SST_print_error("Failed to load_config()");
         return NULL;
     }
-    int numkey = ctx->config.numkey;
+    SST_print_debug("load_config() success.");
+    SST_print_debug("=== Config after load_config() ===");
+    SST_print_debug("  name: %s", ctx->config.name);
+    SST_print_debug("  purpose_index: %u", ctx->config.purpose_index);
+    SST_print_debug("  purpose[0]: %s", ctx->config.purpose[0]);
+    SST_print_debug("  purpose[1]: %s", ctx->config.purpose[1]);
+    SST_print_debug("  numkey: %d", ctx->config.numkey);
+    SST_print_debug("  encryption_mode: %d", ctx->config.encryption_mode);
+    SST_print_debug("  hmac_mode: %d", ctx->config.hmac_mode);
+    SST_print_debug("  auth_id: %d", ctx->config.auth_id);
+    SST_print_debug("  auth_pubkey_path: %s", ctx->config.auth_pubkey_path);
+    SST_print_debug("  entity_privkey_path: %s",
+                    ctx->config.entity_privkey_path);
+    SST_print_debug("  auth_ip_addr: %s", ctx->config.auth_ip_addr);
+    SST_print_debug("  auth_port_num: %d", ctx->config.auth_port_num);
+    SST_print_debug("  entity_server_ip_addr: %s",
+                    ctx->config.entity_server_ip_addr);
+    SST_print_debug("  entity_server_port_num: %d",
+                    ctx->config.entity_server_port_num);
+    SST_print_debug("  file_system_manager_ip_addr: %s",
+                    ctx->config.file_system_manager_ip_addr);
+    SST_print_debug("  file_system_manager_port_num: %d",
+                    ctx->config.file_system_manager_port_num);
+    SST_print_debug("  network_protocol: %s", ctx->config.network_protocol);
+    SST_print_debug("=== End of config dump ===");
 
+    int numkey = ctx->config.numkey;
+#ifdef SST_PLATFORM_PICO
+    ctx->pub_key = (void*)load_auth_public_key(config_path);
+    ctx->priv_key = (void*)load_entity_private_key(config_path);
+#else
     ctx->pub_key = (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
+    ctx->priv_key =
+        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
+#endif
     if (ctx->pub_key == NULL) {
         SST_print_error("Failed load_auth_public_key().");
         return NULL;
     }
-    ctx->priv_key =
-        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
     if (ctx->priv_key == NULL) {
         SST_print_error("Failed load_entity_private_key().");
         return NULL;
