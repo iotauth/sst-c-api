@@ -6,7 +6,6 @@ cmake_minimum_required(VERSION 3.19)
 project(sst-lib VERSION 1.0.0 LANGUAGES C CXX ASM)
 
 # Crypto backend selection
-# option(USE_MBEDTLS "Use mbedTLS instead of OpenSSL" OFF)
 option(USE_OPENSSL "Use OpenSSL (default)" ON)
 
 # Pico build off as default
@@ -44,8 +43,9 @@ elseif(SST_PLATFORM_PICO)
   target_sources(sst-c-api PRIVATE ${CMAKE_CURRENT_LIST_DIR}/crypto_mbedtls.c)
   target_compile_definitions(sst-c-api PUBLIC USE_MBEDTLS)
   target_compile_definitions(sst-c-api PUBLIC SST_PLATFORM_PICO)
-  # Include lwipopts.h & mbedtls_sst_config.h
+  # Include lwipopts.h & mbedtls_sst_config.h & FreeRTOSConfig.h
   target_include_directories(sst-c-api PRIVATE
+    # ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/embedded/include
   )
 endif()

@@ -8,7 +8,7 @@ if(SST_PLATFORM_PICO)
   if(NOT DEFINED PICO_SDK_PATH OR PICO_SDK_PATH STREQUAL "")
     set(PICO_SDK_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/pico-sdk" CACHE PATH "Path to pico-sdk")
   endif()
-  set(PICO_BOARD pico_w CACHE STRING "Target board" FORCE)
+  set(PICO_BOARD pico2_w CACHE STRING "Target board" FORCE)
   include(${PICO_SDK_PATH}/pico_sdk_init.cmake)
 endif()
 
@@ -29,15 +29,28 @@ target_include_directories(embedded_client PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}
     ${CMAKE_CURRENT_LIST_DIR}/../..)
 
+set(FREERTOS_KERNEL_PATH "${CMAKE_CURRENT_LIST_DIR}/../lib/FreeRTOS-Kernel" CACHE PATH "Path to FreeRTOS Kernel" FORCE)
+include(${FREERTOS_KERNEL_PATH}/portable/ThirdParty/GCC/RP2040/FreeRTOS_Kernel_import.cmake)
+pico_sdk_init()
 # Link against the freshly built SST library and Pico Wi-Fi (lwIP+cyw43)
 target_link_libraries(embedded_client 
     sst-c-api
+    pico_cyw43_arch_lwip_sys_freertos
+    pico_stdlib
+    pico_mbedtls
+    FreeRTOS-Kernel-Heap4
 )
+
+  # Include lwipopts.h & mbedtls_sst_config.h & FreeRTOSConfig.h
+  target_include_directories(embedded_client PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../include
+  )
 
 # Enable USB serial output (printf over USB)
 pico_enable_stdio_usb(embedded_client 1)
 # Disable UART serial output (no logs via TX/RX pins)
 pico_enable_stdio_uart(embedded_client 0)
+
 
 # Produce UF2, bin, map, etc.
 pico_add_extra_outputs(embedded_client)
