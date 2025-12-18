@@ -146,17 +146,20 @@ void main_task(__unused void* params) {
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
+    printf("init_SST done.");
 
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key().");
     }
-    SST_session_ctx_t* session_ctx =
-        secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    if (session_ctx == NULL) {
-        SST_print_error_exit("Failed secure_connect_to_server().");
-    }
-    free_session_ctx(session_ctx);
+    printf("get_session_key done.");
+    // SST_session_ctx_t* session_ctx =
+    //     secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    // if (session_ctx == NULL) {
+    //     SST_print_error_exit("Failed secure_connect_to_server().");
+    // }
+    // print("secure_connect_to_server done.");
+    // free_session_ctx(session_ctx);
 
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
