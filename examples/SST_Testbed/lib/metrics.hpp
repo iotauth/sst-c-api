@@ -32,5 +32,5 @@ inline void metrics_add_sample(MetricsRow& r, long long dur_us, bool ok) {
 }
 
 // Writes a CSV row with:
-// exp_id,ts_start,ts_end,successes,failures,avg_ms,min_ms,max_ms,attempt_qps,success_qps
+// exp_id,ts_start,ts_end,successes,failures,avg_us,min_us,max_us,attempt_qps,success_qps
 void metrics_end_row_and_write(MetricsRow& r);

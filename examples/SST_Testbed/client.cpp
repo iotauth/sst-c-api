@@ -309,7 +309,7 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSSYN: {
-                // SYN Flood Attack
+                // SYN Flood Attack to Auth
                 const char *dst_ip_str = ctx->config.auth_ip_addr;
                 uint16_t dst_port = 21900;
 
@@ -319,6 +319,8 @@ int main(int argc, char* argv[]) {
             } break;
 
             // possible other case:
+            // This code could be useful for making a SYN flood attack to the server instead of Auth
+            //
             // for (int i = 0; i < repeat; ++i) {
             //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
             //     if (temp_sock < 0) {
