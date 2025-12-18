@@ -1,3 +1,6 @@
+#include <stddef.h>
+#include <stdio.h>
+
 #ifdef USE_MBEDTLS
 
 #include <errno.h>
@@ -25,7 +28,100 @@ static void mbedtls_print_error_with_code(const char* msg, int error_code) {
     SST_print_error("%s ERROR: %s (code: 0x%x)", msg, error_buf, error_code);
 }
 
-static crypto_pkey_t* mbedtls_load_public_key(const char* path) {
+// Extract a PEM block between given BEGIN/END markers from an in-memory text
+// blob. On success, returns 0 and sets *pem_start/*pem_len to point inside
+// `text`.
+static int find_pem_block(const char* text, const char* begin_marker,
+                          const char* end_marker,
+                          const unsigned char** pem_start, size_t* pem_len) {
+    if (!text || !begin_marker || !end_marker || !pem_start || !pem_len)
+        return -1;
+    const char* begin = strstr(text, begin_marker);
+    if (!begin) return -1;
+    const char* end = strstr(begin, end_marker);
+    if (!end) return -1;
+    end += strlen(end_marker);  // include END line
+    *pem_start = (const unsigned char*)begin;
+    *pem_len = (size_t)(end - begin);
+
+    SST_print_debug("[find_pem_block] begin offset: %ld", (long)(begin - text));
+    SST_print_debug("[find_pem_block] end offset:   %ld", (long)(end - text));
+    SST_print_debug("[find_pem_block] pem_len:      %zu", *pem_len);
+
+
+    SST_print_debug("[find_pem_block] PEM full:\n%.*s", (int)*pem_len,
+                    (const char*)*pem_start);
+
+    return 0;
+}
+
+static crypto_pkey_t* mbedtls_load_public_key(const char* config_blob) {
+    // Treat the input string as an in-memory configuration blob that contains a
+    // PEM certificate
+    const unsigned char* pem = NULL;
+    size_t pem_len = 0;
+    if (find_pem_block(config_blob, "-----BEGIN CERTIFICATE-----",
+                       "-----END CERTIFICATE-----", &pem, &pem_len) != 0) {
+        SST_print_error("Public cert PEM not found in provided config text");
+        return NULL;
+    }
+
+    unsigned char* pem_buf = malloc(pem_len + 1);
+    if (!pem_buf) {
+        SST_print_error("malloc(pem_buf) failed");
+        return NULL;
+    }
+    memcpy(pem_buf, pem, pem_len);
+    pem_buf[pem_len] = '\0';
+
+    mbedtls_x509_crt crt;
+    mbedtls_x509_crt_init(&crt);
+
+    int ret = mbedtls_x509_crt_parse(&crt, pem_buf, pem_len + 1);
+    free(pem_buf);
+
+    if (ret != 0) {
+        mbedtls_print_error_with_code("Failed to parse in-memory certificate",
+                                      ret);
+        mbedtls_x509_crt_free(&crt);
+        return NULL;
+    }
+
+    mbedtls_pk_context* pk = malloc(sizeof(mbedtls_pk_context));
+    if (!pk) {
+        mbedtls_x509_crt_free(&crt);
+        SST_print_error("malloc(mbedtls_pk_context) failed");
+        return NULL;
+    }
+    mbedtls_pk_init(pk);
+
+    // Move (copy) the public key from the certificate into our own context
+    *pk = crt.pk;                        // struct copy
+    memset(&crt.pk, 0, sizeof(crt.pk));  // avoid double-free
+    mbedtls_x509_crt_free(&crt);
+
+    return pk;
+}
+
+static crypto_pkey_t* mbedtls_load_private_key(const char* config_blob) {
+    // Treat the input string as an in-memory configuration blob that contains a
+    // PEM private key
+    const unsigned char* pem = NULL;
+    size_t pem_len = 0;
+    if (find_pem_block(config_blob, "-----BEGIN PRIVATE KEY-----",
+                       "-----END PRIVATE KEY-----", &pem, &pem_len) != 0) {
+        SST_print_error("Private key PEM not found in provided config text");
+        return NULL;
+    }
+
+    unsigned char* pem_buf = malloc(pem_len + 1);
+    if (!pem_buf) {
+        SST_print_error("malloc(pem_buf) failed");
+        return NULL;
+    }
+    memcpy(pem_buf, pem, pem_len);
+    pem_buf[pem_len] = '\0';
+
     mbedtls_pk_context* pk = malloc(sizeof(mbedtls_pk_context));
     if (!pk) {
         SST_print_error("malloc(mbedtls_pk_context) failed");
@@ -33,37 +129,15 @@ static crypto_pkey_t* mbedtls_load_public_key(const char* path) {
     }
     mbedtls_pk_init(pk);
 
-    // Parse as X.509 certificate instead of a plain public key
-    mbedtls_x509_crt crt;
-    mbedtls_x509_crt_init(&crt);
-    int ret = mbedtls_x509_crt_parse_file(&crt, path);
+    // If your key is password-protected, pass the password bytes and length
+    // below instead of NULLs.
+    int ret =
+        mbedtls_pk_parse_key(pk, pem_buf, pem_len + 1, NULL, 0,  // no password
+                             mbedtls_ctr_drbg_random, &g_ctr_drbg);
+    free(pem_buf);
     if (ret != 0) {
-        mbedtls_print_error_with_code(
-            "Failed to parse certificate (public key)", ret);
-        mbedtls_x509_crt_free(&crt);
-        free(pk);
-        return NULL;
-    }
-
-    // Move the public key from certificate to our pk context
-    *pk = crt.pk;
-    memset(&crt.pk, 0, sizeof(crt.pk));  // Prevent double-free on crt
-    mbedtls_x509_crt_free(&crt);
-
-    return pk;
-}
-
-static crypto_pkey_t* mbedtls_load_private_key(const char* path) {
-    mbedtls_pk_context* pk = malloc(sizeof(mbedtls_pk_context));
-    if (!pk) {
-        return NULL;
-    }
-
-    mbedtls_pk_init(pk);
-
-    int ret = mbedtls_pk_parse_keyfile(pk, path, NULL, NULL, NULL);
-    if (ret != 0) {
-        mbedtls_print_error_with_code("Failed to parse private key file", ret);
+        mbedtls_print_error_with_code("Failed to parse in-memory private key",
+                                      ret);
         mbedtls_pk_free(pk);
         free(pk);
         return NULL;
