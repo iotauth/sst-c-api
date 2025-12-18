@@ -1,8 +1,8 @@
 #ifndef C_API_H
 #define C_API_H
 
-#include <arpa/inet.h>
-#include <pthread.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
@@ -14,6 +14,7 @@
 #define MAX_PURPOSE_LENGTH 64
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
 #define MAX_PATH_LEN 512
+#define IPV4_ADDRSTRLEN 16
 
 #define AES_IV_SIZE 16
 #define SEQ_NUM_SIZE 8
@@ -67,12 +68,12 @@ typedef struct {
     int auth_id;
     char auth_pubkey_path[MAX_PATH_LEN];
     char entity_privkey_path[MAX_PATH_LEN];
-    char auth_ip_addr[INET_ADDRSTRLEN];
+    char auth_ip_addr[IPV4_ADDRSTRLEN];
     int auth_port_num;
-    char entity_server_ip_addr[INET_ADDRSTRLEN];
+    char entity_server_ip_addr[IPV4_ADDRSTRLEN];
     int entity_server_port_num;
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
-    char file_system_manager_ip_addr[INET_ADDRSTRLEN];
+    char file_system_manager_ip_addr[IPV4_ADDRSTRLEN];
     int file_system_manager_port_num;
 } config_t;
 
@@ -101,7 +102,6 @@ typedef struct {
     config_t config;
     void* pub_key;
     void* priv_key;
-    pthread_mutex_t mutex;
 } SST_ctx_t;
 
 // Load config file from path and save the information in ctx struct.

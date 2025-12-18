@@ -1,3 +1,6 @@
-[submodule "embedded/lib/mbedtls"]
-	path = embedded/lib/mbedtls
-	url = https://github.com/Mbed-TLS/mbedtls.git
+[submodule "embedded/lib/pico-sdk"]
+	path = embedded/lib/pico-sdk
+	url = https://github.com/raspberrypi/pico-sdk.git
+[submodule "embedded/lib/FreeRTOS-Kernel"]
+	path = embedded/lib/FreeRTOS-Kernel
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git

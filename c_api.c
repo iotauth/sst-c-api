@@ -1,16 +1,18 @@
 #include "c_api.h"
 
-#include <openssl/rand.h>
-
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
 #include "load_config.h"
 
 SST_ctx_t* init_SST(const char* config_path) {
+#ifdef USE_OPENSSL
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, NULL);
+#endif
     // By default OpenSSL will attempt to clean itself up when the process exits
     // via an "atexit" handler. Using this option suppresses that behaviour.
+    // mbed TLS initialization is typically done automatically
+
     // This means that the application will have to clean up OpenSSL explicitly
     // using OPENSSL_cleanup().
     // This is needed because, Lingua Franca uses the "atexit" handler, and
@@ -20,15 +22,45 @@ SST_ctx_t* init_SST(const char* config_path) {
         SST_print_error("Failed to load_config()");
         return NULL;
     }
-    int numkey = ctx->config.numkey;
+    SST_print_debug("load_config() success.");
+    SST_print_debug("=== Config after load_config() ===");
+    SST_print_debug("  name: %s", ctx->config.name);
+    SST_print_debug("  purpose_index: %u", ctx->config.purpose_index);
+    SST_print_debug("  purpose[0]: %s", ctx->config.purpose[0]);
+    SST_print_debug("  purpose[1]: %s", ctx->config.purpose[1]);
+    SST_print_debug("  numkey: %d", ctx->config.numkey);
+    SST_print_debug("  encryption_mode: %d", ctx->config.encryption_mode);
+    SST_print_debug("  hmac_mode: %d", ctx->config.hmac_mode);
+    SST_print_debug("  auth_id: %d", ctx->config.auth_id);
+    SST_print_debug("  auth_pubkey_path: %s", ctx->config.auth_pubkey_path);
+    SST_print_debug("  entity_privkey_path: %s",
+                    ctx->config.entity_privkey_path);
+    SST_print_debug("  auth_ip_addr: %s", ctx->config.auth_ip_addr);
+    SST_print_debug("  auth_port_num: %d", ctx->config.auth_port_num);
+    SST_print_debug("  entity_server_ip_addr: %s",
+                    ctx->config.entity_server_ip_addr);
+    SST_print_debug("  entity_server_port_num: %d",
+                    ctx->config.entity_server_port_num);
+    SST_print_debug("  file_system_manager_ip_addr: %s",
+                    ctx->config.file_system_manager_ip_addr);
+    SST_print_debug("  file_system_manager_port_num: %d",
+                    ctx->config.file_system_manager_port_num);
+    SST_print_debug("  network_protocol: %s", ctx->config.network_protocol);
+    SST_print_debug("=== End of config dump ===");
 
+    int numkey = ctx->config.numkey;
+#ifdef SST_PLATFORM_PICO
+    ctx->pub_key = (void*)load_auth_public_key(config_path);
+    ctx->priv_key = (void*)load_entity_private_key(config_path);
+#else
     ctx->pub_key = (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
+    ctx->priv_key =
+        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
+#endif
     if (ctx->pub_key == NULL) {
         SST_print_error("Failed load_auth_public_key().");
         return NULL;
     }
-    ctx->priv_key =
-        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
     if (ctx->priv_key == NULL) {
         SST_print_error("Failed load_entity_private_key().");
         return NULL;
@@ -39,10 +71,8 @@ SST_ctx_t* init_SST(const char* config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
-    bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
-
 session_key_list_t* init_empty_session_key_list(void) {
     session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
     session_key_list->num_key = 0;
@@ -440,6 +470,7 @@ int decrypt_buf_with_session_key_without_malloc(
         s_key, encrypted, encrypted_length, decrypted, decrypted_length, 0);
 }
 
+#ifdef USE_OPENSSL
 int save_session_key_list(session_key_list_t* session_key_list,
                           const char* file_path) {
     FILE* saved_file_fp = fopen(file_path, "wb");
@@ -495,8 +526,8 @@ int save_session_key_list_with_password(session_key_list_t* session_key_list,
                                         const char* salt,
                                         unsigned int salt_len) {
     // Generate IV.
-    unsigned char iv[AES_BLOCK_SIZE];
-    if (generate_nonce(AES_BLOCK_SIZE, iv) < 0) {
+    unsigned char iv[AES_128_IV_SIZE];
+    if (generate_nonce(AES_128_IV_SIZE, iv) < 0) {
         SST_print_error("Failed generate_nonce().");
         return -1;
     }
@@ -544,7 +575,7 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
                                         unsigned int password_len,
                                         const char* salt,
                                         unsigned int salt_len) {
-    unsigned char iv[AES_BLOCK_SIZE];
+    unsigned char iv[AES_128_IV_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
     unsigned char buffer[sizeof(session_key_list_t) +
@@ -604,6 +635,8 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
     return 0;
 }
 
+#endif
+
 unsigned int convert_skid_buf_to_int(unsigned char* buf, int byte_length) {
     return read_unsigned_int_BE(buf, byte_length);
 }
@@ -624,8 +657,18 @@ void free_session_key_list_t(session_key_list_t* session_key_list) {
 void free_session_ctx(SST_session_ctx_t* session_ctx) { free(session_ctx); }
 
 void free_SST_ctx_t(SST_ctx_t* ctx) {
-    EVP_PKEY_free((EVP_PKEY*)ctx->priv_key);
-    EVP_PKEY_free((EVP_PKEY*)ctx->pub_key);
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (backend && backend->free_pkey) {
+        if (ctx->priv_key) {
+            backend->free_pkey((crypto_pkey_t*)ctx->priv_key);
+            ctx->priv_key = NULL;
+        }
+        if (ctx->pub_key) {
+            backend->free_pkey((crypto_pkey_t*)ctx->pub_key);
+            ctx->pub_key = NULL;
+        }
+    }
+
     free(ctx);
 }
 
@@ -634,7 +677,7 @@ int secure_rand(int min, int max) {
     unsigned int rand_num;
     unsigned char buffer[4];
 
-    if (RAND_bytes(buffer, sizeof(buffer)) != 1) {
+    if (generate_nonce(sizeof(buffer), buffer) != 0) {
         fprintf(stderr, "RAND_bytes failed");
         return -1;  // handle error
     }

@@ -37,13 +37,11 @@ void* call_get_session_key_by_ID(void* args) {
     printf("Session Key ID from file %s: %u\n", file_path,
            convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE));
 
-    pthread_mutex_lock(&ctx->mutex);
     session_key_t* session_key =
         get_session_key_by_ID(target_session_key_id, ctx, s_key_list);
     if (session_key == NULL) {
         SST_print_error_exit("Failed get_session_key_by_ID().");
     }
-    pthread_mutex_unlock(&ctx->mutex);
 
     if (session_key) {
         printf(
@@ -67,7 +65,8 @@ int main(int argc, char* argv[]) {
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
-    pthread_mutex_init(&ctx->mutex, NULL);
+    // Make sure to update distribution key.
+    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
 
     pthread_t threads[3];
     thread_args_t args[3] = {
@@ -81,7 +80,5 @@ int main(int argc, char* argv[]) {
     for (int i = 0; i < 3; i++) {
         pthread_join(threads[i], NULL);
     }
-
-    pthread_mutex_destroy(&ctx->mutex);
     return 0;
 }

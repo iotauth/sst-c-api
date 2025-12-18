@@ -65,7 +65,7 @@ int safe_config_value_copy(char* dest, const char* src, size_t dest_size) {
         return -1;
     } else {
         dest[dest_size - 1] = 0;
-        strncpy(dest, src, dest_size);
+        snprintf(dest, dest_size, "%s", src);
         if (dest[dest_size - 1] != 0) {
             SST_print_error(
                 "Problem found while copying config value, dest string is not "
@@ -76,7 +76,7 @@ int safe_config_value_copy(char* dest, const char* src, size_t dest_size) {
         return 1;
     }
 }
-
+#ifdef USE_OPENSSL
 int load_config(config_t* c, const char* path) {
     FILE* fp = fopen(path, "r");
     if (fp == NULL) {
@@ -281,3 +281,233 @@ int load_config(config_t* c, const char* path) {
     fclose(fp);
     return 0;
 }
+#elif defined(SST_PLATFORM_PICO)
+int load_config(config_t* c, const char* path) {
+    // In PICO builds, `path` actually holds the entire config text.
+    // Parse line-by-line and populate `c`, skipping multi-line PEM blocks.
+    if (!c || !path) {
+        SST_print_error("load_config(): NULL input.");
+        return -1;
+    }
+    // Defaults (match desktop loader)
+    unsigned short purpose_count = 0;  // Option for ipfs.
+    c->purpose_index = 0;              // Option for ipfs.
+    c->hmac_mode = USE_HMAC;           // Default with HMAC.
+    c->encryption_mode = AES_128_CBC;  // Default encryption mode.
+
+    enum ParserState {
+        NORMAL = 0,
+        SKIP_CERT,    // inside -----BEGIN CERTIFICATE----- ... -----END
+                      // CERTIFICATE-----
+        SKIP_PRIVKEY  // inside -----BEGIN PRIVATE KEY----- ... -----END PRIVATE
+                      // KEY-----
+    } state = NORMAL;
+
+    const char* p = path;
+    char linebuf[MAX_CONFIG_BUF_SIZE];
+
+    while (*p) {
+        // Extract one line
+        size_t len = 0;
+        const char* start = p;
+        while (p[len] && p[len] != '\n' && len + 1 < sizeof(linebuf)) {
+            len++;
+        }
+        // Copy to buffer (truncate safely if too long)
+        size_t copy_len =
+            (len < sizeof(linebuf) - 1) ? len : (sizeof(linebuf) - 1);
+        memcpy(linebuf, start, copy_len);
+        linebuf[copy_len] = '\0';
+
+        // Advance p past this line (and the newline if present)
+        p += len;
+        if (*p == '\n') p++;
+
+        // Skip empty lines
+        if (linebuf[0] == '\0') continue;
+
+        // Handle skipping PEM blocks
+        if (state == SKIP_CERT) {
+            if (strstr(linebuf, "-----END CERTIFICATE-----") != NULL) {
+                state = NORMAL;
+            }
+            continue;
+        } else if (state == SKIP_PRIVKEY) {
+            if (strstr(linebuf, "-----END PRIVATE KEY-----") != NULL) {
+                state = NORMAL;
+            }
+            continue;
+        }
+
+        // If the line doesn't contain '=', it could be part of PEM
+        // (unexpected), ignore.
+        char* eq = strchr(linebuf, '=');
+        if (!eq) {
+            continue;
+        }
+
+        *eq = '\0';
+        char* key = linebuf;
+        char* val = eq + 1;
+
+        // Trim simple whitespace on both sides of value
+        while (*val == ' ' || *val == '\t') val++;
+        // rtrim key
+        for (int i = (int)strlen(key) - 1;
+             i >= 0 && (key[i] == ' ' || key[i] == '\t'); --i) {
+            key[i] = '\0';
+        }
+
+        // Determine config key
+        config_type_t cfg = get_key_value(key);
+
+        // If this is a PEM-carrying key, enter skip state and ignore multi-line
+        // payload.
+        if (cfg == AUTH_INFO_PUBKEY_PATH) {
+            // In embedded builds we ignore on-disk paths and embedded PEM
+            // payloads.
+            state = SKIP_CERT;  // subsequent lines until END CERTIFICATE
+            continue;
+        } else if (cfg == ENTITY_INFO_PRIVKEY_PATH) {
+            state = SKIP_PRIVKEY;  // subsequent lines until END PRIVATE KEY
+            continue;
+        }
+
+        // Populate fields for the remaining keys (single-line values)
+        switch (cfg) {
+            case ENTITY_INFO_NAME:
+                if (safe_config_value_copy(c->name, val, sizeof(c->name)) < 0) {
+                    SST_print_error(
+                        "Failed safe_config_value_copy() ENTITY_INFO_NAME");
+                    return -1;
+                }
+                break;
+
+            case ENTITY_INFO_PURPOSE:
+                if (purpose_count <= 1) {
+                    if (safe_config_value_copy(
+                            c->purpose[purpose_count], val,
+                            sizeof(c->purpose[purpose_count])) < 0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "ENTITY_INFO_PURPOSE");
+                        return -1;
+                    }
+                    purpose_count += 1;
+                } else {
+                    SST_print_debug("Error for wrong number of purpose.");
+                }
+                c->purpose_index = purpose_count - 1;
+                break;
+
+            case ENTITY_INFO_NUMKEY:
+                c->numkey = atoi(val);
+                break;
+
+            case ENCRYPTION_MODE:
+                if (strcmp(val, "AES_128_CBC") == 0) {
+                    c->encryption_mode = AES_128_CBC;
+                } else if (strcmp(val, "AES_128_CTR") == 0) {
+                    c->encryption_mode = AES_128_CTR;
+                } else if (strcmp(val, "AES_128_GCM") == 0) {
+                    c->encryption_mode = AES_128_GCM;
+                }
+                break;
+
+            case HMAC_MODE:
+                if (strcmp(val, "off") == 0 || strcmp(val, "0") == 0) {
+                    c->hmac_mode = NO_HMAC;
+                } else if (strcmp(val, "on") == 0 || strcmp(val, "1") == 0) {
+                    c->hmac_mode = USE_HMAC;
+                } else {
+                    SST_print_error("Wrong input for hmac_mode.");
+                    return -1;
+                }
+                break;
+
+            case AUTH_ID:
+                c->auth_id = atoi(val);
+                break;
+
+            case AUTH_INFO_IP_ADDRESS:
+                if (safe_config_value_copy(c->auth_ip_addr, val,
+                                           sizeof(c->auth_ip_addr)) < 0) {
+                    SST_print_error(
+                        "Failed safe_config_value_copy() AUTH_INFO_IP_ADDRESS");
+                    return -1;
+                }
+                break;
+
+            case AUTH_INFO_PORT: {
+                int port = atoi(val);
+                if (port < 0 || port > 65535) {
+                    SST_print_error("Error: Invalid Auth port number.");
+                    return -1;
+                }
+                c->auth_port_num = port;
+                break;
+            }
+
+            case ENTITY_SERVER_INFO_IP_ADDRESS:
+                if (safe_config_value_copy(c->entity_server_ip_addr, val,
+                                           sizeof(c->entity_server_ip_addr)) <
+                    0) {
+                    SST_print_error(
+                        "Failed safe_config_value_copy() "
+                        "ENTITY_SERVER_INFO_IP_ADDRESS");
+                    return -1;
+                }
+                break;
+
+            case ENTITY_SERVER_INFO_PORT_NUMBER: {
+                int port = atoi(val);
+                if (port < 0 || port > 65535) {
+                    SST_print_error("Error: Invalid server port number.");
+                    return -1;
+                }
+                c->entity_server_port_num = port;
+                break;
+            }
+
+            case NETWORK_PROTOCOL:
+                if (safe_config_value_copy(c->network_protocol, val,
+                                           sizeof(c->network_protocol)) < 0) {
+                    SST_print_error(
+                        "Failed safe_config_value_copy() NETWORK_PROTOCOL");
+                    return -1;
+                }
+                break;
+
+            case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
+                if (safe_config_value_copy(
+                        c->file_system_manager_ip_addr, val,
+                        sizeof(c->file_system_manager_ip_addr)) < 0) {
+                    SST_print_error(
+                        "Failed safe_config_value_copy() "
+                        "FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS");
+                    return -1;
+                }
+                break;
+
+            case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER: {
+                int port = atoi(val);
+                if (port < 0 || port > 65535) {
+                    SST_print_error(
+                        "Error: Invalid file system manager port number.");
+                    return -1;
+                }
+                c->file_system_manager_port_num = port;
+                break;
+            }
+
+            case UNKNOWN_CONFIG:
+            default:
+                // Ignore unknown lines in embedded mode.
+                break;
+        }
+    }
+
+    return 0;
+}
+
+#endif

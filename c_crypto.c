@@ -1,15 +1,19 @@
 #include "c_crypto.h"
 
+#include <stdlib.h>
+#include <string.h>
+
 #include "c_common.h"
 
-// Print OpenSSL crypto error message to stderr with message.
+// Print crypto error message to stderr with message.
 // @param msg Message to print with.
 static void print_crypto_error(const char* msg) {
-    char err[MAX_ERROR_MESSAGE_LENGTH];
-
-    ERR_load_crypto_strings();
-    ERR_error_string(ERR_get_error(), err);
-    printf("%s ERROR: %s\n", msg, err);
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (backend && backend->print_error) {
+        backend->print_error(msg);
+        return;
+    }
+    SST_print_error("%s", msg);
 }
 
 // Print OpenSSL crypto error message, and return NULL.
@@ -19,267 +23,138 @@ static void* print_crypto_error_return_NULL(const char* msg) {
     return NULL;
 }
 
-EVP_PKEY* load_auth_public_key(const char* path) {
-    FILE* pemFile = fopen(path, "rb");
-    if (pemFile == NULL) {
-        printf("Error %d \n", errno);
+crypto_pkey_t* load_auth_public_key(const char* path) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        return print_crypto_error_return_NULL("Crypto backend not available");
+    }
+
+    crypto_pkey_t* pkey = backend->load_public_key(path);
+    if (!pkey) {
         return print_crypto_error_return_NULL(
             "Loading auth_pub_key_path failed");
     }
-    X509* cert = PEM_read_X509(pemFile, NULL, NULL, NULL);
-    EVP_PKEY* pub_key = X509_get_pubkey(cert);
-    if (pub_key == NULL) {
-        return print_crypto_error_return_NULL("public key getting fail");
-    }
-    int id = EVP_PKEY_id(pub_key);
-    if (id != EVP_PKEY_RSA) {
-        return print_crypto_error_return_NULL("is not RSA Encryption file");
-    }
-    fclose(pemFile);
-    X509_free(cert);
-    return pub_key;
+
+    return (crypto_pkey_t*)pkey;
 }
 
-EVP_PKEY* load_entity_private_key(const char* path) {
-    FILE* keyfile = fopen(path, "rb");
-    if (keyfile == NULL) {
-        printf("Error %d \n", errno);
+crypto_pkey_t* load_entity_private_key(const char* path) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        return print_crypto_error_return_NULL("Crypto backend not available");
+    }
+
+    crypto_pkey_t* pkey = backend->load_private_key(path);
+    if (!pkey) {
         return print_crypto_error_return_NULL(
             "Loading entity_priv_key_path failed");
     }
-    EVP_PKEY* priv_key = PEM_read_PrivateKey(keyfile, NULL, NULL, NULL);
-    fclose(keyfile);
-    return priv_key;
+
+    return (crypto_pkey_t*)pkey;
 }
 
 unsigned char* public_encrypt(const unsigned char* data, size_t data_len,
-                              int padding, EVP_PKEY* pub_key, size_t* ret_len) {
-    EVP_PKEY_CTX* ctx;
-    unsigned char* out = NULL;
-
-    ctx = EVP_PKEY_CTX_new(pub_key, NULL);
-    if (!ctx) {
-        return print_crypto_error_return_NULL("EVP_PKEY_CTX_new failed");
-    }
-    if (EVP_PKEY_encrypt_init(ctx) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_encrypt_init failed");
-    }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, padding) <= 0) {
-        return print_crypto_error_return_NULL(
-            "EVP_PKEY_CTX_set_rsa_padding failed");
-    }
-    if (EVP_PKEY_encrypt(ctx, NULL, ret_len, data, data_len) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_encrypt failed");
-    }
-    out = (unsigned char*)OPENSSL_malloc(*ret_len);
-    if (!out) {
-        return print_crypto_error_return_NULL("OPENSSL_malloc failed");
+                              crypto_pkey_t* pub_key, size_t* ret_len) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        return print_crypto_error_return_NULL("Crypto backend not available");
     }
 
-    if (EVP_PKEY_encrypt(ctx, out, ret_len, data, data_len) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_encrypt failed");
+    unsigned char* result = backend->public_encrypt(
+        data, data_len, (crypto_pkey_t*)pub_key, ret_len);
+    if (!result) {
+        return print_crypto_error_return_NULL("Public encryption failed");
     }
-    EVP_PKEY_CTX_free(ctx);
-    return out;
+
+    return result;
 }
 
 unsigned char* private_decrypt(const unsigned char* enc_data,
-                               size_t enc_data_len, int padding,
-                               EVP_PKEY* priv_key, size_t* ret_len) {
-    EVP_PKEY_CTX* ctx;
-    unsigned char* out = NULL;
-    ctx = EVP_PKEY_CTX_new(priv_key, NULL);
-    if (!ctx) {
-        return print_crypto_error_return_NULL("EVP_PKEY_CTX_new failed");
+                               size_t enc_data_len, crypto_pkey_t* priv_key,
+                               size_t* ret_len) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        return print_crypto_error_return_NULL("Crypto backend not available");
     }
-    if (EVP_PKEY_decrypt_init(ctx) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_decrypt_init failed");
+
+    unsigned char* result = backend->private_decrypt(
+        enc_data, enc_data_len, (crypto_pkey_t*)priv_key, ret_len);
+    if (!result) {
+        return print_crypto_error_return_NULL("Private decryption failed");
     }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, padding) <= 0) {
-        return print_crypto_error_return_NULL(
-            "EVP_PKEY_CTX_set_rsa_padding failed");
-    }
-    if (EVP_PKEY_decrypt(ctx, NULL, ret_len, enc_data, enc_data_len) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_decrypt failed");
-    }
-    out = (unsigned char*)OPENSSL_malloc(*ret_len);
-    if (!out) {
-        return print_crypto_error_return_NULL("OPENSSL_malloc failed");
-    }
-    if (EVP_PKEY_decrypt(ctx, out, ret_len, enc_data, enc_data_len) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_decrypt failed");
-    }
-    EVP_PKEY_CTX_free(ctx);
-    return out;
+
+    return result;
 }
 
 unsigned char* SHA256_sign(const unsigned char* encrypted,
-                           unsigned int encrypted_length, EVP_PKEY* priv_key,
-                           size_t* sig_length) {
-    unsigned char md[SHA256_DIGEST_LENGTH];
-    unsigned int md_length;
-    if (digest_message_SHA_256(encrypted, encrypted_length, md, &md_length) <
-        0) {
-        return print_crypto_error_return_NULL(
-            "Failed digest_message_SHA_256().");
+                           unsigned int encrypted_length,
+                           crypto_pkey_t* priv_key, size_t* sig_length) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        return print_crypto_error_return_NULL("Crypto backend not available");
     }
-    EVP_PKEY_CTX* ctx;
-    unsigned char* sig = NULL;
-    ctx = EVP_PKEY_CTX_new(priv_key, NULL);
-    if (!ctx) {
-        return print_crypto_error_return_NULL("EVP_PKEY_CTX_new failed");
-    }
-    if (EVP_PKEY_sign_init(ctx) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_sign_init failed");
-    }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0) {
-        return print_crypto_error_return_NULL(
-            "EVP_PKEY_CTX_set_rsa_padding failed");
-    }
-    if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
-        return print_crypto_error_return_NULL(
-            "EVP_PKEY_CTX_set_signature_md failed");
-    }
-    if (EVP_PKEY_sign(ctx, NULL, sig_length, md, md_length) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_sign failed");
-    }
-    sig = (unsigned char*)OPENSSL_malloc(*sig_length);
 
-    if (!sig) {
-        return print_crypto_error_return_NULL("OPENSSL_malloc failed");
+    unsigned char* result = backend->sign_sha256(
+        encrypted, encrypted_length, (crypto_pkey_t*)priv_key, sig_length);
+    if (!result) {
+        return print_crypto_error_return_NULL("SHA256 signing failed");
     }
-    if (EVP_PKEY_sign(ctx, sig, sig_length, md, md_length) <= 0) {
-        return print_crypto_error_return_NULL("EVP_PKEY_sign failed");
-    }
-    EVP_PKEY_CTX_free(ctx);
 
-    return sig;
+    return result;
 }
 
 int SHA256_verify(const unsigned char* data, unsigned int data_length,
-                  unsigned char* sig, size_t sig_length, EVP_PKEY* pub_key) {
-    EVP_PKEY_CTX* ctx;
-    unsigned char md[SHA256_DIGEST_LENGTH];
-    unsigned int md_len;
-    if (digest_message_SHA_256(data, data_length, md, &md_len) < 0) {
-        print_crypto_error("Failed digest_message_SHA_256().");
+                  unsigned char* sig, size_t sig_length,
+                  crypto_pkey_t* pub_key) {
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        print_crypto_error("Crypto backend not available");
         return -1;
     }
 
-    ctx = EVP_PKEY_CTX_new(pub_key, NULL);
-    if (!ctx) {
-        print_crypto_error("EVP_PKEY_CTX_new failed");
+    int result = backend->verify_sha256(data, data_length, sig, sig_length,
+                                        (crypto_pkey_t*)pub_key);
+    if (result != 0) {
+        print_crypto_error("SHA256 verification failed");
         return -1;
     }
-    if (EVP_PKEY_verify_init(ctx) <= 0) {
-        print_crypto_error("EVP_PKEY_verify_init failed");
-        return -1;
-    }
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_PADDING) <= 0) {
-        print_crypto_error("EVP_PKEY_CTX_set_rsa_padding failed");
-        return -1;
-    }
-    if (EVP_PKEY_CTX_set_signature_md(ctx, EVP_sha256()) <= 0) {
-        print_crypto_error("EVP_PKEY_CTX_set_signature_md failed");
-        return -1;
-    }
-    if (EVP_PKEY_verify(ctx, sig, sig_length, md, md_len) != 1) {
-        print_crypto_error("EVP_PKEY_verify failed");
-        return -1;
-    }
-    EVP_PKEY_CTX_free(ctx);
+
     return 0;
 }
 
 int digest_message_SHA_256(const unsigned char* data, size_t data_len,
                            unsigned char* md5_hash, unsigned int* md_len) {
-    EVP_MD_CTX* mdctx;
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        print_crypto_error("Crypto backend not available");
+        return -1;
+    }
 
-    if ((mdctx = EVP_MD_CTX_create()) == NULL) {
-        print_crypto_error("EVP_MD_CTX_create() failed");
+    int result = backend->digest_sha256(data, data_len, md5_hash, md_len);
+    if (result != 0) {
+        print_crypto_error("SHA256 digest failed");
         return -1;
     }
-    if (EVP_DigestInit_ex(mdctx, EVP_sha256(), NULL) != 1) {
-        print_crypto_error("EVP_DigestInit_ex failed");
-        return -1;
-    }
-    if (EVP_DigestUpdate(mdctx, data, data_len) != 1) {
-        print_crypto_error("EVP_DigestUpdate failed");
-        return -1;
-    }
-    if (EVP_DigestFinal_ex(mdctx, md5_hash, md_len) != 1) {
-        print_crypto_error("failed");
-        return -1;
-    }
-    EVP_MD_CTX_destroy(mdctx);
+
     return 0;
-}
-
-// Get OpenSSL EVP_CIPHER structure corresponding to the given encryption mode.
-// @param enc_mode AES encryption mode enum (e.g., AES_128_CBC)
-// @return OpenSSL EVP_CIPHER*, or NULL if unsupported
-static const EVP_CIPHER* get_EVP_CIPHER(AES_encryption_mode_t enc_mode) {
-    if (enc_mode == AES_128_CBC) {
-        return EVP_aes_128_cbc();
-    } else if (enc_mode == AES_128_CTR) {
-        return EVP_aes_128_ctr();
-    } else if (enc_mode == AES_128_GCM) {
-        return EVP_aes_128_gcm();
-    } else {
-        SST_print_error("Encryption type not supported.");
-    }
-    return NULL;
 }
 
 int encrypt_AES(const unsigned char* plaintext, unsigned int plaintext_length,
                 const unsigned char* key, const unsigned char* iv,
                 AES_encryption_mode_t enc_mode, unsigned char* ret,
                 unsigned int* ret_length) {
-    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-    if (!EVP_EncryptInit_ex(ctx, get_EVP_CIPHER(enc_mode), NULL, key, iv)) {
-        // Error
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_EncryptInit_ex failed");
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        print_crypto_error("Crypto backend not available");
         return -1;
     }
 
-    if (enc_mode == AES_128_GCM) {
-        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
-                                 AES_128_GCM_IV_SIZE,
-                                 NULL)) {  // Set IV length to 12 bytes
-            EVP_CIPHER_CTX_free(ctx);
-            print_crypto_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
-            return -1;
-        }
-    }
-
-    if (!EVP_EncryptUpdate(ctx, ret, (int*)ret_length, plaintext,
-                           plaintext_length)) {
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_EncryptUpdate failed");
+    int result = backend->encrypt_aes(plaintext, plaintext_length, key, iv,
+                                      enc_mode, ret, ret_length);
+    if (result != 0) {
+        print_crypto_error("AES encryption failed");
         return -1;
     }
-
-    unsigned int temp_len;
-    if (!EVP_EncryptFinal_ex(ctx, ret + *ret_length, (int*)&temp_len)) {
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_EncryptFinal_ex failed");
-        return -1;
-    }
-    *ret_length += temp_len;
-
-    if (enc_mode == AES_128_GCM) {
-        // Append the GCM authentication tag to the end of the ciphertext
-        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, AES_GCM_TAG_SIZE,
-                                 ret + *ret_length)) {  // 16 bytes tag
-            EVP_CIPHER_CTX_free(ctx);
-            print_crypto_error("EVP_CIPHER_CTX_ctrl (GET_TAG) failed");
-            return -1;
-        }
-        *ret_length += AES_GCM_TAG_SIZE;  // Increase the length by the tag size
-    }
-
-    EVP_CIPHER_CTX_free(ctx);
     return 0;
 }
 
@@ -287,54 +162,19 @@ int decrypt_AES(const unsigned char* encrypted, unsigned int encrypted_length,
                 const unsigned char* key, const unsigned char* iv,
                 AES_encryption_mode_t enc_mode, unsigned char* ret,
                 unsigned int* ret_length) {
-    EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
-    if (!EVP_DecryptInit_ex(ctx, get_EVP_CIPHER(enc_mode), NULL, key, iv)) {
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_DecryptInit_ex failed");
+    const crypto_backend_t* backend = get_crypto_backend();
+    if (!backend) {
+        print_crypto_error("Crypto backend not available");
         return -1;
     }
 
-    if (enc_mode == AES_128_GCM) {
-        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_IVLEN,
-                                 AES_128_GCM_IV_SIZE,
-                                 NULL)) {  // Set IV length to 12 bytes
-            EVP_CIPHER_CTX_free(ctx);
-            print_crypto_error("EVP_CIPHER_CTX_ctrl (SET_IVLEN) failed");
-            return -1;
-        }
-
-        // Set the expected tag value by extracting it from the end of the
-        // ciphertext
-        unsigned char* tag =
-            (unsigned char*)encrypted + encrypted_length -
-            AES_GCM_TAG_SIZE;  // Get the last 16 bytes as the tag
-        if (!EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, AES_GCM_TAG_SIZE,
-                                 tag)) {
-            EVP_CIPHER_CTX_free(ctx);
-            print_crypto_error("EVP_CIPHER_CTX_ctrl (SET_TAG) failed");
-            return -1;
-        }
-
-        encrypted_length -=
-            AES_GCM_TAG_SIZE;  // Adjust the encrypted length to exclude the tag
-    }
-
-    if (!EVP_DecryptUpdate(ctx, ret, (int*)ret_length, encrypted,
-                           encrypted_length)) {
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_DecryptUpdate failed");
+    int result = backend->decrypt_aes(encrypted, encrypted_length, key, iv,
+                                      enc_mode, ret, ret_length);
+    if (result != 0) {
+        print_crypto_error("AES decryption failed");
         return -1;
     }
 
-    unsigned int temp_len;
-    if (!EVP_DecryptFinal_ex(ctx, ret + *ret_length, (int*)&temp_len)) {
-        EVP_CIPHER_CTX_free(ctx);
-        print_crypto_error("EVP_DecryptFinal_ex failed");
-        return -1;
-    }
-    *ret_length += temp_len;
-
-    EVP_CIPHER_CTX_free(ctx);
     return 0;
 }
 
@@ -397,9 +237,19 @@ static int get_symmetric_encrypt_authenticate_buffer(
     if (hmac_mode == USE_HMAC) {
         // Attach HMAC tag
         if (mac_key_size == MAC_KEY_SHA256_SIZE) {
-            HMAC(EVP_sha256(), mac_key, mac_key_size, ret, total_length,
-                 ret + total_length, &mac_key_size);
-            total_length += mac_key_size;
+            const crypto_backend_t* backend = get_crypto_backend();
+            if (!backend) {
+                SST_print_error("Crypto backend not available.");
+                return -1;
+            }
+
+            unsigned int hmac_len = 0;
+            if (backend->hmac_sha256(mac_key, mac_key_size, ret, total_length,
+                                     ret + total_length, &hmac_len) != 0) {
+                SST_print_error("HMAC generation failed.");
+                return -1;
+            }
+            total_length += hmac_len;
         }
         // Add other MAC key sizes in future.
         else {
@@ -450,8 +300,19 @@ static int get_symmetric_decrypt_authenticate_buffer(
         unsigned char reproduced_tag[mac_key_size];
         encrypted_length -= mac_key_size;
         if (mac_key_size == MAC_KEY_SHA256_SIZE) {
-            HMAC(EVP_sha256(), mac_key, mac_key_size, buf,
-                 iv_size + encrypted_length, reproduced_tag, &mac_key_size);
+            const crypto_backend_t* backend = get_crypto_backend();
+            if (!backend) {
+                SST_print_error("Crypto backend not available.");
+                return -1;
+            }
+
+            unsigned int hmac_len = 0;
+            if (backend->hmac_sha256(mac_key, mac_key_size, buf,
+                                     iv_size + encrypted_length, reproduced_tag,
+                                     &hmac_len) != 0) {
+                SST_print_error("HMAC verification failed.");
+                return -1;
+            }
         } else {
             SST_print_error("HMAC_key_size is not supported.");
             return -1;
