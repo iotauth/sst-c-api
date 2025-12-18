@@ -1,5 +1,5 @@
-#ifndef _LWIPOPTS_EXAMPLE_COMMONH_H
-#define _LWIPOPTS_EXAMPLE_COMMONH_H
+#ifndef _LWIPOPTS_H
+#define _LWIPOPTS_H
 
 
 // Common settings used in most of the pico_w examples
@@ -9,8 +9,6 @@
 #ifndef NO_SYS
 #define NO_SYS                      0
 #endif
-
-
 // allow override in some examples
 #ifndef LWIP_SOCKET
 #define LWIP_SOCKET                 1
@@ -56,8 +54,6 @@
 #define DHCP_DOES_ARP_CHECK         0
 #define LWIP_DHCP_DOES_ACD_CHECK    0
 
-#define LWIP_TIMEVAL_PRIVATE        0
-
 #ifndef NDEBUG
 #define LWIP_DEBUG                  1
 #define LWIP_STATS                  1
@@ -92,5 +88,17 @@
 #define PPP_DEBUG                   LWIP_DBG_OFF
 #define SLIP_DEBUG                  LWIP_DBG_OFF
 #define DHCP_DEBUG                  LWIP_DBG_OFF
+
+#if !NO_SYS
+#define TCPIP_THREAD_STACKSIZE 1024
+#define DEFAULT_THREAD_STACKSIZE 1024
+#define DEFAULT_RAW_RECVMBOX_SIZE 8
+#define TCPIP_MBOX_SIZE 8
+#define LWIP_TIMEVAL_PRIVATE 0
+#endif
+
+#define LWIP_TIMEVAL_PRIVATE        0
+#define LWIP_SOCKET_POLL            0
+
 
 #endif /* __LWIPOPTS_H__ */

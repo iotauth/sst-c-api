@@ -14,7 +14,7 @@
 #define MBEDTLS_CTR_DRBG_C
 #define MBEDTLS_ENTROPY_C
 #define MBEDTLS_ERROR_C
-#define MBEDTLS_FS_IO
+#undef MBEDTLS_FS_IO
 #define MBEDTLS_GCM_C
 #define MBEDTLS_MD_C
 #define MBEDTLS_OID_C
@@ -61,10 +61,10 @@
 #undef MBEDTLS_HAVE_TIME
 #undef MBEDTLS_HAVE_TIME_DATE
 
-#if defined(SST_PLATFORM_PICO)
+// #if defined(SST_PLATFORM_PICO)
 #define MBEDTLS_NO_PLATFORM_ENTROPY
 #define MBEDTLS_ENTROPY_HARDWARE_ALT
-#endif
+// #endif
 
 // #include "mbedtls/check_config.h"
 
