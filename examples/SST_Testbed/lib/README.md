@@ -4,6 +4,8 @@ To create a CSV log file of the metrics of the current attack, simply add the `-
 
 The command should look like: `./client <config_file> <csv_file> -metrics`
 
+# Metric Log Values
+
 For the DoS and DDoS attacks, enabling metric logging will create a CSV file in the `SST_Testbed/metric_logs/` directory that contains information regarding the current execution of `client`. The values stored in the metrics log file are:
 
 1. `exp_id`
