@@ -58,7 +58,8 @@ void* receive_and_print_messages(void* thread_args) {
             break;
         }
         // Process the received_buf message
-        std::cout << "Received message " << count << " from socket: " << clnt_sock << ": ";
+        std::cout << "Received message " << count
+                  << " from socket: " << clnt_sock << ": ";
         std::cout.write(reinterpret_cast<const char*>(received_buf), ret);
         std::cout << std::endl;
         count++;

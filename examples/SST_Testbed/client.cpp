@@ -2,27 +2,20 @@ extern "C" {
 #include "../../c_api.h"
 }
 
-#include "send_syn.hpp"
-#include "metrics.hpp"
 #include <unistd.h>
 
+#include <cstring>
 #include <fstream>
 #include <iostream>
 #include <thread>
-#include <cstring>
 
-enum AttackType {
-    NONE,
-    REPLAY,
-    DOSK,
-    DOSC,
-    DOSM,
-    DOSSYN
-};
+#include "metrics.hpp"
+#include "send_syn.hpp"
+
+enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSSYN };
 
 static AttackType parseAttackType(const std::string& s) {
-    if (s == "REPLAY" || s == "Replay" || s == "replay")
-        return REPLAY;
+    if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
         return DOSK;
@@ -59,7 +52,7 @@ int main(int argc, char* argv[]) {
         } else {
             std::cerr << "Unknown or extra option: " << argv[i] << '\n';
             std::cerr << "Usage: " << argv[0]
-                  << " <config_path> <csv_file_path> [-metrics] [src_ip]\n";
+                      << " <config_path> <csv_file_path> [-metrics] [src_ip]\n";
             return EXIT_FAILURE;
         }
     }
@@ -135,7 +128,7 @@ int main(int argc, char* argv[]) {
         std::string attack_param =
             (comma3 != std::string::npos) ? line.substr(comma3 + 1) : "";
 
-        if(metrics) {
+        if (metrics) {
             sleep(10);
         }
 
@@ -180,7 +173,10 @@ int main(int argc, char* argv[]) {
                     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
                     auto t1 = std::chrono::steady_clock::now();
 
-                    long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                    long dur_us =
+                        std::chrono::duration_cast<std::chrono::microseconds>(
+                            t1 - t0)
+                            .count();
 
                     if (metrics) {
                         metrics_add_sample(row, dur_us, s_key_list != NULL);
@@ -195,7 +191,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (metrics) {
-                metrics_end_row_and_write(row);                                                                                                             
+                    metrics_end_row_and_write(row);
                 }
 
             } break;
@@ -233,7 +229,10 @@ int main(int argc, char* argv[]) {
                         secure_connect_to_server(&s_key_list->s_key[0], ctx);
                     auto t1 = std::chrono::steady_clock::now();
 
-                    long long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                    long long dur_us =
+                        std::chrono::duration_cast<std::chrono::microseconds>(
+                            t1 - t0)
+                            .count();
 
                     if (metrics) {
                         metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
@@ -249,7 +248,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 if (metrics) {
-                    metrics_end_row_and_write(row);                                                                                                             
+                    metrics_end_row_and_write(row);
                 }
 
             } break;
@@ -282,35 +281,38 @@ int main(int argc, char* argv[]) {
                     if (msg < 0) {
                         SST_print_error_exit("Failed send_secure_message().");
                     }
-                    if(metrics) {
-                        int ret = read_secure_message(received_buf, session_ctx);
-                    
+                    if (metrics) {
+                        int ret =
+                            read_secure_message(received_buf, session_ctx);
+
                         if (ret < 0) {
-                            std::cerr << "Failed to read secure message." << std::endl;
+                            std::cerr << "Failed to read secure message."
+                                      << std::endl;
                             continue;
                         } else if (ret == 0) {
                             std::cerr << "Connection closed" << std::endl;
                             continue;
                         }
-                    
+
                         // auto t1 = std::chrono::steady_clock::now();
 
-                        // long dur_us = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count();
+                        // long dur_us =
+                        // std::chrono::duration_cast<std::chrono::microseconds>(t1
+                        // - t0).count();
 
-                    
                         // metrics_add_sample(row, dur_us, msg >= 0);
                     }
                 }
 
                 if (metrics) {
-                    metrics_end_row_and_write(row);                                                                                                             
+                    metrics_end_row_and_write(row);
                 }
 
             } break;
 
             case DOSSYN: {
                 // SYN Flood Attack to Auth
-                const char *dst_ip_str = ctx->config.auth_ip_addr;
+                const char* dst_ip_str = ctx->config.auth_ip_addr;
                 uint16_t dst_port = 21900;
 
                 int repeat = std::stoi(attack_param);
@@ -319,7 +321,8 @@ int main(int argc, char* argv[]) {
             } break;
 
             // possible other case:
-            // This code could be useful for making a SYN flood attack to the server instead of Auth
+            // This code could be useful for making a SYN flood attack to the
+            // server instead of Auth
             //
             // for (int i = 0; i < repeat; ++i) {
             //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
@@ -330,7 +333,8 @@ int main(int argc, char* argv[]) {
             //     struct sockaddr_in server_addr;
             //     server_addr.sin_family = AF_INET;
             //     server_addr.sin_port = htons(ctx->config.server_port);
-            //     server_addr.sin_addr.s_addr = inet_addr(ctx->config.server_ip);
+            //     server_addr.sin_addr.s_addr =
+            //     inet_addr(ctx->config.server_ip);
 
             //     connect(temp_sock, (struct sockaddr*)&server_addr,
             //             sizeof(server_addr));
