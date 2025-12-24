@@ -7,7 +7,6 @@ extern "C" {
 #include <netinet/in.h>
 #include <netinet/ip.h>   // struct ip (BSD)
 #include <netinet/tcp.h>  // struct tcphdr (BSD)
-#include <netinet/udp.h>   // struct udphdr
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -143,116 +142,58 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
     return EXIT_SUCCESS;
 }
 
-extern "C" int send_one_udp_raw(const char* src_ip,
-                                const char* dst_ip, unsigned short dst_port,
-                                const void* payload, size_t payload_len,
-                                int repeat)
+extern "C" int send_one_udp_normal(const char* bind_src_ip,
+                                   const char* dst_ip, unsigned short dst_port,
+                                   const void* payload, size_t payload_len,
+                                   int repeat)
 {
-    const size_t ip_len = sizeof(struct ip), udp_len = sizeof(struct udphdr);
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) { std::cerr << "UDP socket() " << strerror(errno) << "\n"; return EXIT_FAILURE; }
 
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
-    const size_t pkt_len = ip_len + udp_len + payload_len;
-#else
-    const size_t pkt_len = ip_len + udp_len + payload_len;
-#endif
-
-    unsigned char* packet = (unsigned char*)malloc(pkt_len);
-    if (!packet) return EXIT_FAILURE;
-    memset(packet, 0, pkt_len);
-
-    struct ip* iph = (struct ip*)packet;
-    struct udphdr* udph = (struct udphdr*)(packet + ip_len);
-    if (payload && payload_len)
-    {
-        memcpy(packet + ip_len + udp_len, payload, payload_len);
-    }
-
-    iph->ip_v = 4;
-    iph->ip_hl = 5;
-    iph->ip_tos = 0;
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
-    iph->ip_len = (uint16_t)pkt_len;
-#else
-    iph->ip_len = htons((uint16_t)pkt_len);
-#endif
-
-    iph->ip_id = htons(0x7777);
-    iph->ip_off = 0;
-    iph->ip_ttl = 64;
-    iph->ip_p = IPPROTO_UDP;
-    if (inet_pton(AF_INET, src_ip, &iph->ip_src) != 1)
-    {
-        std::cerr << "src ip invalid\n"; free(packet);
-        return EXIT_FAILURE;
-    }
-    if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1)
-    {
-        std::cerr << "dst ip invalid\n"; free(packet);
-        return EXIT_FAILURE;
-    }
-
-    udph->uh_sport = htons(40000 + (rand() % 20000));
-    udph->uh_dport = htons(dst_port);
-    udph->uh_ulen  = htons((uint16_t)(udp_len + payload_len));
-    udph->uh_sum   = 0; // IPv4: checksum 0 allowed
-
-    extern uint16_t csum16(const void*, size_t);
-    iph->ip_sum = csum16(iph, sizeof(struct ip));
-
-    int s = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
-    if (s < 0)
-    {
-        std::cerr << "raw UDP socket(): " << strerror(errno) << "\n";
-        free(packet);
-        return EXIT_FAILURE;
-    }
-    int one = 1;
-    if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0)
-    {
-        std::cerr << "IP_HDRINCL error\n";
-        close(s);
-        free(packet);
-        return EXIT_FAILURE;
-    }
     int snd = 4*1024*1024;
     (void)setsockopt(s, SOL_SOCKET, SO_SNDBUF, &snd, sizeof(snd));
 
-    sockaddr_in dst{};
-    dst.sin_family = AF_INET;
-    dst.sin_port = htons(dst_port);
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
-    dst.sin_len = sizeof(dst);
-#endif
-
-    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1)
-    {
-        std::cerr << "dst addr invalid\n";
-        close(s);
-        free(packet);
-        return EXIT_FAILURE;
-    }
-
-    const int max_retries = 3;  // set to 0 for no retries
-    for (int i = 0; i < repeat; ++i) {
-        // if you want to change uh_sport (UDP Src Port) per packet, do it here
-        int tries = 0;
-        for (;;) {
-            ssize_t n = sendto(s, packet, pkt_len, 0, (sockaddr*)&dst, sizeof(dst));
-
-            if (n >= 0)
-            {
-                break;
-            }
-            if (tries++ >= max_retries)
-            {
-                std::cerr << "sendto() error: " << strerror(errno) << "\n";
-                break;
-            }
-            // retry
+    if (bind_src_ip && bind_src_ip[0]) {
+        sockaddr_in src{}; src.sin_family = AF_INET; src.sin_port = htons(0);
+    #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+        src.sin_len = sizeof(src);
+    #endif
+        if (inet_pton(AF_INET, bind_src_ip, &src.sin_addr) != 1) {
+            std::cerr << "bind src ip invalid\n"; close(s); return EXIT_FAILURE;
+        }
+        if (bind(s, (sockaddr*)&src, sizeof(src)) < 0) {
+            std::cerr << "bind() " << strerror(errno) << "\n"; close(s); return EXIT_FAILURE;
         }
     }
 
+    sockaddr_in dst{}; dst.sin_family = AF_INET; dst.sin_port = htons(dst_port);
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    dst.sin_len = sizeof(dst);
+#endif
+    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
+        std::cerr << "dst ip invalid\n"; close(s); return EXIT_FAILURE;
+    }
+
+    const char* buf = (const char*)payload;
+    size_t len = payload_len;
+    char dummy = 0;
+    if (!buf) { buf = &dummy; len = 0; }
+
+    const int  max_retries = 6;
+    const long base_backoff_ns = 50*1000;  // 50 µs
+    const long pace_ns = 10*1000;          // 10 µs
+
+    for (int i = 0; i < repeat; ++i) {
+        int tries = 0;
+        for (;;) {
+            ssize_t n = sendto(s, buf, len, 0, (sockaddr*)&dst, sizeof(dst));
+            if (n >= 0) break;
+            int e = errno;
+            if ((e == ENOBUFS || e == EAGAIN
+#ifdef EWOULDBLOCK
+                 || e == EWOULDBLOCK
+#endif
+            }
     close(s);
-    free(packet);
     return EXIT_SUCCESS;
 }
