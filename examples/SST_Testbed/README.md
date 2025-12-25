@@ -1,5 +1,28 @@
 # SST Testbed
----
+
+Award-winning testing tool! [1st Place Winner in ESSC at ESWEEK 2025](https://2025.esweek.org/awards-2025/)
+
+# Directory Structure
+
+- `clients_dos_attack/`
+
+    Contains the scripts for creating the environment for launching the attacks with multiple clients.
+
+- `csv_files/`
+
+    Contains the CSV files passed when executing the testbed that are used to specify the attack type.
+
+- `lib/`
+
+    Contains the files used for tracking the metrics of the DDoS attacks.
+
+- `metric_logs/`
+
+    Folder for storing the metric logs that are created.
+
+- `plot_generators/`
+
+    Contains `plot.py` which generates plots for the attack metrics when given metric logs.
 
 # Prerequisites
 ### ***Auth***

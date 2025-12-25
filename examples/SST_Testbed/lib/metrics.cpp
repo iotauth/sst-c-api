@@ -6,19 +6,15 @@
 #include <iomanip>
 #include <mutex>
 
-using namespace std;
-
-static mutex g_mu;
-static ofstream g_f;
+static std::mutex g_mu;
+static std::ofstream g_f;
 static bool g_open = false, g_header = false;
 
 #include <chrono>
 #include <cstdint>
 
 static inline long long epoch_us_now() {
-    using namespace std::chrono;
-    return duration_cast<microseconds>(system_clock::now().time_since_epoch())
-        .count();
+    return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 // helper function for metrics_open_new_file()
@@ -72,11 +68,9 @@ MetricsRow metrics_begin_row(const std::string& exp_id) {
 }
 
 void metrics_end_row_and_write(MetricsRow& r) {
-    using namespace std::chrono;
-
     r.ts_end_us = epoch_us_now();
-    auto t1 = steady_clock::now();
-    double duration_s = duration_cast<duration<double> >(t1 - r.t0).count();
+    auto t1 = std::chrono::steady_clock::now();
+    double duration_s = std::chrono::duration_cast<std::chrono::duration<double> >(t1 - r.t0).count();
     long long duration_us_ll =
         static_cast<long long>(std::llround(duration_s * 1e6));
 
@@ -84,7 +78,10 @@ void metrics_end_row_and_write(MetricsRow& r) {
     long long avg_us_ll =
         attempts ? static_cast<long long>(std::llround(r.sum_us / attempts))
                  : 0;
-    if (r.min_us == LONG_MAX) r.min_us = 0;  // handle empty
+    if (r.min_us == LONG_MAX)
+    {
+        r.min_us = 0;  // handle empty
+    }
 
     double attempt_rate =
         duration_s > 0 ? static_cast<double>(attempts) / duration_s : 0.0;
