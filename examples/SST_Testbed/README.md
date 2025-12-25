@@ -1,5 +1,28 @@
 # SST Testbed
----
+
+Award-winning testing tool! [1st Place Winner in ESSC at ESWEEK 2025](https://2025.esweek.org/awards-2025/)
+
+# Directory Structure
+
+- `clients_dos_attack/`
+
+    Contains the scripts for creating the environment for launching the attacks with multiple clients.
+
+- `csv_files/`
+
+    Contains the CSV files passed when executing the testbed that are used to specify the attack type.
+
+- `lib/`
+
+    Contains the files used for tracking the metrics of the DDoS attacks.
+
+- `metric_logs/`
+
+    Folder for storing the metric logs that are created.
+
+- `plot_generators/`
+
+    Contains `plot.py` which generates plots for the attack metrics when given metric logs.
 
 # Prerequisites
 ### ***Auth***
@@ -58,7 +81,7 @@ $ git submodule update --init
 
 2. Run `mkdir build && cd build`
 
-3. Run `cmake ..`.
+3. Run `cmake ..`
     - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.
 
 4. Run `make`
@@ -93,9 +116,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 2. *[Optional]* Customize `csv_files/basic_messages.csv` to have the client send custom messages to the server.
     - The format of the input CSV file for this example should be:
-        - Each entry should be on its own line.
-        - First, is amount of time spent sleeping (in milliseconds).
-        - Second, is the message.
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
         - The sleep time and message are always seperated by only a single comma.
     ```
     <sleep_time1>,<message1>
@@ -116,14 +139,16 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 2. *[Optional]* Customize `csv_files/replay_attack.csv` to have the client send custom messages and replay attacks to the server,
     - The format of the input CSV file for this attack example should be:
-        - First and second are same as above.
-        - Third, is the attack type word, "Replay" (case insensitive).
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "Replay" in this example (case insensitive).
         - Fourth, is the sequence number change because this attack revolves around modifying the sequence number.
             - The formatting for changing the sequence number is "seq++", "seq--", or "seq=#" where # can be any integer.
     ```
     <sleep_time1>,<message1>,Replay,seq--
     <sleep_time2>,<message2>,REPLAY,seq++
-    <sleep_time2>,<message2>,replay,seq=12
+    <sleep_time3>,<message3>,replay,seq=12
     ...
     ```
 
@@ -138,15 +163,17 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_key.csv` to have the client send custom messages and DoS attacks to the server.
+2. *[Optional]* Customize `csv_files/dos_attack_key.csv` to have the client send custom messages and a custom number of session key requests to Auth.
     - The format of the input CSV file for this attack example should be:
-        - First and second are same as above.
-        - Third is "DoSK".
-        - Fourth, is the number of session key requests the client will make to Auth.
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "DoSK" in this example (case insensitive).
+        - The fourth value is the number of session key requests the client will send to Auth.
     ```
     <sleep_time1>,<message1>,DoSK,10000
     <sleep_time2>,<message2>,DOSK,55555
-    <sleep_time2>,<message2>,dosk,123456
+    <sleep_time3>,<message3>,dosk,123456
     ...
     ```
 
@@ -156,19 +183,21 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_key.csv`
 
-## 2.2.2 DoS attack to Server via session key requests (DoSM)
+## 2.2.2 DoS attack to Server via Messages (DoSM)
 
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
+2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and a custom number of messages to the server.
     - The format of the input CSV file for this attack example should be:
-        - First and second are same as above.
-        - Third is "DoSM".
-        - Fourth, is the number of times the message will be sent to the server.
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "DoSM" in this example (case insensitive).
+        - The fourth value is the number of times the message will be sent to the server.
     ```
     <sleep_time1>,<message1>,DoSM,10000
     <sleep_time2>,<message2>,DOSM,55555
-    <sleep_time2>,<message2>,dosm,123456
+    <sleep_time3>,<message3>,dosm,123456
     ...
     ```
 
@@ -182,15 +211,17 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
+2. *[Optional]* Customize `csv_files/dos_attack_connect.csv` to have the client send custom messages and a custom number of connection attempts to the server.
     - The format of the input CSV file for this attack example should be:
-        - First and second are same as above.
-        - Third is "DoSM".
-        - Fourth, is the number of times the client should connect to the server using Auth.
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "DoSC" in this example (case insensitive).
+        - The fourth value is the number of connection attempts.
     ```
     <sleep_time1>,<message1>,DoSC,10000
     <sleep_time2>,<message2>,DOSC,55555
-    <sleep_time2>,<message2>,dosc,123456
+    <sleep_time3>,<message3>,dosc,123456
     ...
     ```
 
@@ -199,6 +230,30 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 4. Run the server with `./server ../../server_client_example/c_server.config`
 
 5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_connect.csv`
+
+## 2.2.4 DoS attack to Auth via SYN Flooding
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+
+2. *[Optional]* Customize `csv_files/dos_attack_syn.csv` to have the client send custom messages and a custom number of SYN packets to Auth.
+    - The format of the input CSV file for this attack example should be:
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "DoSSYN" in this example (case insensitive).
+        - The fourth value is the number SYN packets that will be sent to Auth.
+    ```
+    <sleep_time1>,<message1>,DoSSYN,10000
+    <sleep_time2>,<message2>,DOSSYN,55555
+    <sleep_time3>,<message3>,dossyn,123456
+    ...
+    ```
+
+3. Run `cd build`
+
+4. Run the server with `./server ../../server_client_example/c_server.config`
+
+5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_syn.csv`
+
 
 ## 2.3 DoS attack with Multiple Clients (DDoS)
 This attack involves using many clients to connect to the server to create the denial of service. To do that though, the Auth databases and configurations need to be modified to support this.
@@ -210,7 +265,7 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
-3. Run `./client_dos_setup.sh <number-of-clients> -p <password>`
+3. Run `./clients_dos_setup.sh <number-of-clients> -p <password>`
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
     - *[Optional]* `<password>` is the password of the generated Auth.
     - e.g., `./client_dos_setup.sh 3 -p asdf`
@@ -224,4 +279,3 @@ So, also make sure that the ***Auth*** executed before is terminated.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
 
 Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
-
