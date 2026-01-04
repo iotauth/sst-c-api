@@ -20,7 +20,7 @@ if (isNaN(count) || count < 1) {
   process.exit(1);
 }
 
-const client_template = 'client_template.config';
+const client_template = '../client.config';
 const out_dir = '../config';
 
 if (isNaN(count) || count < 1) {
