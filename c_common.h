@@ -163,7 +163,7 @@ void make_sender_buf(unsigned char* payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-int connect_as_client(const char* ip_addr, int port_num, int* sock);
+int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself
@@ -197,7 +197,7 @@ int mod(int a, int b);
 // @param buf_length The maximum number of bytes to read into the buffer.
 // @return The number of bytes successfully read, or -1 if an error occurred.
 int sst_read_from_socket(int socket, unsigned char* buf,
-                         unsigned int buf_length);
+                         unsigned int buf_length, bool use_tcp);
 
 // Writes data to a socket from a buffer.
 // This function writes up to `buf_length` bytes from the provided buffer
