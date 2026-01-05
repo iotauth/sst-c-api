@@ -141,3 +141,59 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
 
     return EXIT_SUCCESS;
 }
+
+extern "C" int send_one_udp_normal(const char* bind_src_ip,
+                                   const char* dst_ip, unsigned short dst_port,
+                                   const void* payload, size_t payload_len,
+                                   int repeat)
+{
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    if (s < 0) { std::cerr << "UDP socket() " << strerror(errno) << "\n"; return EXIT_FAILURE; }
+
+    int snd = 4*1024*1024;
+    (void)setsockopt(s, SOL_SOCKET, SO_SNDBUF, &snd, sizeof(snd));
+
+    if (bind_src_ip && bind_src_ip[0]) {
+        sockaddr_in src{}; src.sin_family = AF_INET; src.sin_port = htons(0);
+    #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+        src.sin_len = sizeof(src);
+    #endif
+        if (inet_pton(AF_INET, bind_src_ip, &src.sin_addr) != 1) {
+            std::cerr << "bind src ip invalid\n"; close(s); return EXIT_FAILURE;
+        }
+        if (bind(s, (sockaddr*)&src, sizeof(src)) < 0) {
+            std::cerr << "bind() " << strerror(errno) << "\n"; close(s); return EXIT_FAILURE;
+        }
+    }
+
+    sockaddr_in dst{}; dst.sin_family = AF_INET; dst.sin_port = htons(dst_port);
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    dst.sin_len = sizeof(dst);
+#endif
+    if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
+        std::cerr << "dst ip invalid\n"; close(s); return EXIT_FAILURE;
+    }
+
+    const char* buf = (const char*)payload;
+    size_t len = payload_len;
+    char dummy = 0;
+    if (!buf) { buf = &dummy; len = 0; }
+
+    const int  max_retries = 6;
+    const long base_backoff_ns = 50*1000;  // 50 µs
+    const long pace_ns = 10*1000;          // 10 µs
+
+    for (int i = 0; i < repeat; ++i) {
+        int tries = 0;
+        for (;;) {
+            ssize_t n = sendto(s, buf, len, 0, (sockaddr*)&dst, sizeof(dst));
+            if (n >= 0) break;
+            int e = errno;
+            if ((e == ENOBUFS || e == EAGAIN
+#ifdef EWOULDBLOCK
+                 || e == EWOULDBLOCK
+#endif
+            }
+    close(s);
+    return EXIT_SUCCESS;
+}

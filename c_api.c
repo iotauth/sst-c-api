@@ -51,6 +51,22 @@ session_key_list_t* init_empty_session_key_list(void) {
     return session_key_list;
 }
 
+typedef enum {
+    NET_PRO_UNKNOWN = 0,
+    NET_PRO_TCP,
+    NET_PRO_UDP
+} net_pro_type_t;
+
+get_network_protocol_type(const char* network_protocol_str) {
+    if (strcmp(network_protocol_str, "TCP") == 0) {
+        return NET_PRO_TCP;
+    } else if (strcmp(network_protocol_str, "UDP") == 0) {
+        return NET_PRO_UDP;
+    } else {
+        return NET_PRO_UNKNOWN;
+    }
+}
+
 session_key_list_t* get_session_key(SST_ctx_t* ctx,
                                     session_key_list_t* existing_s_key_list) {
     if (existing_s_key_list != NULL) {
@@ -61,18 +77,37 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
         }
     }
     session_key_list_t* earned_s_key_list = NULL;
-    if (strcmp((const char*)ctx->config.network_protocol, "TCP") == 0) {
-        earned_s_key_list = send_session_key_req_via_TCP(ctx);
-        if (earned_s_key_list == NULL) {
-            SST_print_error("Failed to send_session_key_req_via_TCP().");
-            return NULL;
-        }
-    } else if (strcmp((const char*)ctx->config.network_protocol, "UDP") == 0) {
-        // TODO:(Dongha Kim): Implement session key request via UDP.
-        // earned_s_key_list = send_session_key_req_via_UDP(ctx);
+    bool use_tcp = true; // ------------------------------------ SHOUOLD I USE BOOL OR ENUM?
+    net_pro_type_t net_pro = get_network_protocol_type(ctx->config.network_protocol);
+    switch (net_pro) {
+        case NET_PRO_TCP:
+            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
+            if (earned_s_key_list == NULL) {
+                SST_print_error("Failed to send_session_key_req_via_TCP().");
+                return NULL;
+            }
+            break;
+        case NET_PRO_UDP:
+            use_tcp = false;
+            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
+            if (earned_s_key_list == NULL) {
+                SST_print_error("Failed to send_session_key_req_via_TCP().");
+                return NULL;
+            }
+            break;
+        case NET_PRO_UNKNOWN:
+        default:
+            SST_print_error("Unknown network protocol %s. Default to TCP.", ctx->config.network_protocol); // ------------------------------------ SHOULD IT DEFAULT TO TCP OR RETURN NULL?
+            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
+            if (earned_s_key_list == NULL) {
+                SST_print_error("Failed to send_session_key_req_via_TCP().");
+                return NULL;
+            }
+            break;
     }
+        // TODO:(Dongha Kim): Implement session key request via UDP.
 
-    if (existing_s_key_list == NULL) {
+    if (existing_s_key_list == NULL) { // ------------------------------------ PREVIOUSLY RETURNS NULL BUT HERE IT RETURNS EARNED_S_KEY_LIST?
         return earned_s_key_list;
     } else {
         append_session_key_list(existing_s_key_list, earned_s_key_list);

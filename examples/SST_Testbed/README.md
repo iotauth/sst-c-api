@@ -128,9 +128,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/basic_messages.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/basic_messages.csv`
 
 ## 2. Attack Scenarios
 ## 2.1 Replay Attack
@@ -154,9 +154,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`.
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/replay_attack.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/replay_attack.csv`
 
 ## 2.2 Denial of Service (DoS) attack
 ## 2.2.1 DoS attack to Auth via session key requests (DoSK)
@@ -179,9 +179,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_key.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_key.csv`
 
 ## 2.2.2 DoS attack to Server via Messages (DoSM)
 
@@ -203,9 +203,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_message.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_message.csv`
 
 ## 2.2.3 DoS attack to Server and Auth via connection requests (DoSC)
 
@@ -227,9 +227,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_connect.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_connect.csv`
 
 ## 2.2.4 DoS attack to Auth via SYN Flooding
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
@@ -250,9 +250,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server ../../server_client_example/c_server.config`
+4. Run the server with `./server server.config`
 
-5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_syn.csv`
+5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_syn.csv`
 
 
 ## 2.3 DoS attack with Multiple Clients (DDoS)
