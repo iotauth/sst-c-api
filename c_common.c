@@ -274,9 +274,19 @@ void make_sender_buf(unsigned char* payload, unsigned int payload_length,
 
 // ------------------------------------------------
 
-int connect_as_client(const char* ip_addr, int port_num, int* sock) {
+int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp) {
     struct sockaddr_in serv_addr;
-    *sock = socket(AF_INET, SOCK_STREAM, 0);
+    const int sock_type = use_tcp ? SOCK_STREAM : SOCK_DGRAM;
+    const char* proto_str = NULL;
+
+    // For debug prints
+    if (use_tcp) {
+        proto_str = "TCP";
+    } else {
+        proto_str = "UDP";
+    }
+
+    *sock = socket(AF_INET, sock_type, 0);
     if (*sock == -1) {
         SST_print_error("socket() error");
         return -1;
@@ -297,8 +307,8 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
     while (count_retries++ < 10) {
         ret = connect(*sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr));
         if (ret == 0) {
-            SST_print_debug("Successfully connected to %s:%d on attempt %d.",
-                            ip_addr, port_num, count_retries);
+            SST_print_debug("%s Successfully connected to %s:%d on attempt %d.",
+                            proto_str, ip_addr, port_num, count_retries);
             break;
         }
 
@@ -310,12 +320,16 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
         SST_print_error("Connection attempt %d failed: %s. Retrying...",
                         count_retries);
 
-        close(*sock);
-        *sock = socket(AF_INET, SOCK_STREAM, 0);
-        if (*sock == -1) {
-            SST_print_error("socket() error during retry: %s");
-            ret = -1;
-            break;
+        // rebuild the socket each retry for TCP.
+        // This is unnecessary for UDP since it is connectionless.
+        if (use_tcp) {
+            close(*sock);
+            *sock = socket(AF_INET, sock_type, 0);
+            if (*sock == -1) {
+                SST_print_error("socket() error during retry: %s");
+                ret = -1;
+                break;
+            }
         }
         usleep(50000);
     }
@@ -327,6 +341,22 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock) {
             *sock = -1;
         }
     }
+
+    // Send ENTITY_HELLO kickoff for UDP
+    if (!use_tcp) {
+        unsigned char message[1024];
+        unsigned int message_length = 0;
+
+        // Assuming ENTITY_HELLO has no payload
+        make_sender_buf(NULL, 0, ENTITY_HELLO, message, &message_length);
+
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
+        if (bytes_written < 0) {
+            SST_print_error("Failed to send ENTITY_HELLO kickoff.");
+            ret = -1;
+        }
+    }
+
     return ret;
 }
 
@@ -368,17 +398,26 @@ int mod(int a, int b) {
 }
 
 int sst_read_from_socket(int socket, unsigned char* buf,
-                         unsigned int buf_length) {
+                         unsigned int buf_length, bool use_tcp) {
     if (socket < 0) {
         // Socket is not open.
         errno = EBADF;
         return -1;
     }
-    int length_read = read(socket, buf, buf_length);
+
+    int length_read = 0;
+    if (use_tcp) {
+        length_read = read(socket, buf, buf_length);
+    } else { // use udp
+        length_read = recv(socket, buf, buf_length, 0);
+    }
+
     if (length_read < 0) {
         SST_print_error("Reading from socket %d failed.", socket);
-    } else if (length_read == 0) {
-        SST_print_error("Connection closed from socket %d.", socket);
+    } else if (use_tcp && length_read == 0) {
+        SST_print_error("TCP Connection closed from socket %d.", socket);
+    } else if (!use_tcp && length_read == 0) { // In UDP, 0 bytes does not mean a closed connection
+        SST_print_error("No UDP data received from socket %d.", socket);
     }
     return length_read;
 }
