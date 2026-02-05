@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 // Message Type //
 #define AUTH_HELLO 0
@@ -188,6 +189,12 @@ void parse_handshake(unsigned char* buf, HS_nonce_t* ret);
 // @return The positive remainder when a is divided by b.
 int mod(int a, int b);
 
+// Gets the socket type (SOCK_STREAM or SOCK_DGRAM) of the given socket.
+// @param sock socket to check
+// @param type_out output socket type
+// @return 0 for success, -1 for fail
+int get_socket_type(int sock, int *type_out);
+
 // Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into
 // the provided buffer. It handles error cases, including invalid sockets, read
@@ -197,7 +204,7 @@ int mod(int a, int b);
 // @param buf_length The maximum number of bytes to read into the buffer.
 // @return The number of bytes successfully read, or -1 if an error occurred.
 int sst_read_from_socket(int socket, unsigned char* buf,
-                         unsigned int buf_length, bool use_tcp);
+                         unsigned int buf_length);
 
 // Writes data to a socket from a buffer.
 // This function writes up to `buf_length` bytes from the provided buffer

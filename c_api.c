@@ -51,22 +51,6 @@ session_key_list_t* init_empty_session_key_list(void) {
     return session_key_list;
 }
 
-typedef enum {
-    NET_PRO_UNKNOWN = 0,
-    NET_PRO_TCP,
-    NET_PRO_UDP
-} net_pro_type_t;
-
-get_network_protocol_type(const char* network_protocol_str) {
-    if (strcmp(network_protocol_str, "TCP") == 0) {
-        return NET_PRO_TCP;
-    } else if (strcmp(network_protocol_str, "UDP") == 0) {
-        return NET_PRO_UDP;
-    } else {
-        return NET_PRO_UNKNOWN;
-    }
-}
-
 session_key_list_t* get_session_key(SST_ctx_t* ctx,
                                     session_key_list_t* existing_s_key_list) {
     if (existing_s_key_list != NULL) {
@@ -77,37 +61,13 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
         }
     }
     session_key_list_t* earned_s_key_list = NULL;
-    bool use_tcp = true; // ------------------------------------ SHOUOLD I USE BOOL OR ENUM?
-    net_pro_type_t net_pro = get_network_protocol_type(ctx->config.network_protocol);
-    switch (net_pro) {
-        case NET_PRO_TCP:
-            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
-            if (earned_s_key_list == NULL) {
-                SST_print_error("Failed to send_session_key_req_via_TCP().");
-                return NULL;
-            }
-            break;
-        case NET_PRO_UDP:
-            use_tcp = false;
-            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
-            if (earned_s_key_list == NULL) {
-                SST_print_error("Failed to send_session_key_req_via_TCP().");
-                return NULL;
-            }
-            break;
-        case NET_PRO_UNKNOWN:
-        default:
-            SST_print_error("Unknown network protocol %s. Default to TCP.", ctx->config.network_protocol); // ------------------------------------ SHOULD IT DEFAULT TO TCP OR RETURN NULL?
-            earned_s_key_list = send_session_key_req_via_TCP(ctx, use_tcp);
-            if (earned_s_key_list == NULL) {
-                SST_print_error("Failed to send_session_key_req_via_TCP().");
-                return NULL;
-            }
-            break;
+    earned_s_key_list = send_session_key_req(ctx);
+    if (earned_s_key_list == NULL) {
+        SST_print_error("Failed to send_session_key_req().");
+        return NULL;
     }
-        // TODO:(Dongha Kim): Implement session key request via UDP.
 
-    if (existing_s_key_list == NULL) { // ------------------------------------ PREVIOUSLY RETURNS NULL BUT HERE IT RETURNS EARNED_S_KEY_LIST?
+    if (existing_s_key_list == NULL) {
         return earned_s_key_list;
     } else {
         append_session_key_list(existing_s_key_list, earned_s_key_list);
@@ -119,8 +79,10 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
 SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
                                             SST_ctx_t* ctx) {
     int sock;
+    bool use_tcp = get_network_protocol_type((const char*)ctx->config.network_protocol);
+
     if (connect_as_client((const char*)ctx->config.entity_server_ip_addr,
-                          ctx->config.entity_server_port_num, &sock) < 0) {
+                          ctx->config.entity_server_port_num, &sock, use_tcp) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
