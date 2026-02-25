@@ -195,8 +195,8 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx < 0) {
         // Save the original purpose before overwriting it with the key ID.
-        strncpy(temp_purpose, ctx->config.purpose[ctx->config.purpose_index],
-                sizeof(ctx->config.purpose[ctx->config.purpose_index]));
+        snprintf(temp_purpose, sizeof(temp_purpose), "%s",
+                ctx->config.purpose[ctx->config.purpose_index]);
 
         // WARNING: The following line overwrites the purpose.
         snprintf(ctx->config.purpose[ctx->config.purpose_index],
@@ -208,8 +208,10 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         
         // Restore the original purpose after the key has been fetched.
-        strncpy(ctx->config.purpose[ctx->config.purpose_index], temp_purpose,
-                sizeof(ctx->config.purpose[ctx->config.purpose_index]));
+        snprintf(ctx->config.purpose[ctx->config.purpose_index],
+                sizeof(ctx->config.purpose[ctx->config.purpose_index]), "%s",
+                temp_purpose);
+
         if (s_key_list == NULL) {
             SST_print_error(
                 "Failed to send_session_key_request_check_protocol().");
