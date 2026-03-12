@@ -105,9 +105,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/basic_messages.csv`
+5. Run the client in another terminal with `./client ../client.config ../csv_files/basic_messages.csv`
 
 ## 2. Attack Scenarios
 ## 2.1 Replay Attack
@@ -131,9 +131,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`.
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/replay_attack.csv`
+5. Run the client in another terminal with `./client ../client.config ../csv_files/replay_attack.csv`
 
 ## 2.2 Denial of Service (DoS) attack
 ## 2.2.1 DoS attack to Auth via session key requests (DoSK)
@@ -156,9 +156,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_key.csv`
+5. Run the client in another terminal with `./client ../client.config ../csv_files/dos_attack_key.csv`
 
 ## 2.2.2 DoS attack to Server via Messages (DoSM)
 
@@ -180,9 +180,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_message.csv`
+5. Run the client in another terminal with `./client ../client.config ../csv_files/dos_attack_message.csv`
 
 ## 2.2.3 DoS attack to Server and Auth via connection requests (DoSC)
 
@@ -204,11 +204,11 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 3. Run `cd build`
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_connect.csv`
+5. Run the client in another terminal with `./client ../client.config ../csv_files/dos_attack_connect.csv`
 
-## 2.2.4 DoS attack to Auth via SYN Flooding
+## 2.2.4 DoS attack to Auth via SYN Flooding (DoSS)
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_syn.csv` to have the client send custom messages and a custom number of SYN packets to Auth.
@@ -216,20 +216,43 @@ However, for convenience, DoS attacks with multiple clients have it's own script
         - Each entry is on its own line.
         - The first value is the amount of time spent sleeping (in milliseconds).
         - The second value is the message.
-        - The third value is the attack type, "DoSSYN" in this example (case insensitive).
+        - The third value is the attack type, "DoSS" in this example (case insensitive).
         - The fourth value is the number SYN packets that will be sent to Auth.
     ```
-    <sleep_time1>,<message1>,DoSSYN,10000
-    <sleep_time2>,<message2>,DOSSYN,55555
-    <sleep_time3>,<message3>,dossyn,123456
+    <sleep_time1>,<message1>,DoSS,10000
+    <sleep_time2>,<message2>,DOSS,55555
+    <sleep_time3>,<message3>,doss,123456
     ...
     ```
 
 3. Run `cd build`
 
-4. Run the server with `./server server.config`
+4. Run the server with `./server ../server.config`
 
-5. Run the client in another terminal with `./client client.config ../csv_files/dos_attack_syn.csv`
+5. Run the client in another terminal with `sudo ./client ../client.config ../csv_files/dos_attack_syn.csv`
+
+## 2.2.5 DoS attack to Auth via UDP Flooding (DoSU)
+1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+
+2. *[Optional]* Customize `csv_files/dos_attack_udp.csv` to have the client send custom messages and a custom number of UDP packets to Auth.
+    - The format of the input CSV file for this attack example should be:
+        - Each entry is on its own line.
+        - The first value is the amount of time spent sleeping (in milliseconds).
+        - The second value is the message.
+        - The third value is the attack type, "DoSU" in this example (case insensitive).
+        - The fourth value is the number UDP packets that will be sent to Auth.
+    ```
+    <sleep_time1>,<message1>,DoSU,10000
+    <sleep_time2>,<message2>,DOSU,55555
+    <sleep_time3>,<message3>,dosu,123456
+    ...
+    ```
+
+3. Run `cd build`
+
+4. Run the server with `./server ../config/server_udp.config`
+
+5. Run the client in another terminal with `sudo ./client ../config/client_udp.config ../csv_files/dos_attack_udp.csv`
 
 
 ## 2.3 DoS attack with Multiple Clients (DDoS)
@@ -242,12 +265,12 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
-3. Run `./clients_dos_setup.sh <number-of-clients> -p <password>`
+3. Run `./clients_dos_setup.sh <number-of-clients> [password]`
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
-    - *[Optional]* `<password>` is the password of the generated Auth.
-    - e.g., `./client_dos_setup.sh 3 -p asdf`
+    - `[password]` is optional. If provided, it is used as the password of the generated Auth.
+    - e.g., `./clients_dos_setup.sh 3 asdf` or `./clients_dos_setup.sh 3`
 
-4. Insert a password when prompted.
+4. If password is not provided, insert a password when prompted.
 
 5. Run `./run_clients.sh <number-of-clients> <input-file>`
     - `<number-of-clients>` is the number of clients that should be created during this execution.

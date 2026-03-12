@@ -36,10 +36,7 @@ void SST_print_log(const char* fmt, ...) {
     va_end(args);
 }
 
-// Print out error messages along with errno if set.
-void SST_print_error(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
+static void SST_vprint_error(const char* fmt, va_list args) {
     // Print the "ERROR:" prefix to stderr
     fprintf(stderr, "ERROR: ");
     // Print the formatted error message to stderr (without adding a newline)
@@ -50,14 +47,20 @@ void SST_print_error(const char* fmt, ...) {
     }
     // End the line after the error message and errno
     fprintf(stderr, "\n");
+}
 
+// Print out error messages along with errno if set.
+void SST_print_error(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_vprint_error(fmt, args);
     va_end(args);
 }
 
 void SST_print_error_exit(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    SST_print_error(fmt, args);
+    SST_vprint_error(fmt, args);
     va_end(args);
     exit(1);
 }
@@ -364,7 +367,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp
 
     *sock = socket(AF_INET, sock_type, 0);
     if (*sock == -1) {
-        SST_print_error("socket() error");
+        SST_print_error("socket() error: %s", strerror(errno));
         return -1;
     }
     memset(&serv_addr, 0, sizeof(serv_addr));
@@ -394,7 +397,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp
         }
 
         SST_print_error("Connection attempt %d failed: %s. Retrying...",
-                        count_retries);
+                        count_retries, strerror(errno));
 
         // rebuild the socket each retry for TCP.
         // This is unnecessary for UDP since it is connectionless.
@@ -402,7 +405,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp
             close(*sock);
             *sock = socket(AF_INET, sock_type, 0);
             if (*sock == -1) {
-                SST_print_error("socket() error during retry: %s");
+                SST_print_error("socket() error during retry: %s", strerror(errno));
                 ret = -1;
                 break;
             }
