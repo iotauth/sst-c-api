@@ -107,7 +107,10 @@ int main(int argc, char* argv[]) {
     std::string line;
 
     while (std::getline(file, line)) {
-        //  split the line into 4 tokens
+        // CSV:
+        // - basic message: sleep_ms,message
+        // - most attacks:  sleep_ms,message,attack_type,attack_param
+        // - DOSS/DOSU:     sleep_ms,message,doss|dosu,repeat,target
         size_t comma1 = line.find(',');
         size_t comma2 = line.find(',', comma1 + 1);
         size_t comma3 = line.find(',', comma2 + 1);
@@ -384,9 +387,28 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSU: {
-                // UDP to Auth
-                const char* dst_ip_str = ctx->config.auth_ip_addr;
-                uint16_t dst_port = 21900;
+                if (attack_target.empty()) {
+                    SST_print_error(
+                        "DOSU requires a 5th CSV column target.");
+                    break;
+                }
+
+                AttackTarget target = parseAttackTarget(attack_target);
+                const char* dst_ip_str = NULL;
+                uint16_t dst_port = 0;
+                if (target == TARGET_AUTH) {
+                    dst_ip_str = ctx->config.auth_ip_addr;
+                    dst_port = static_cast<uint16_t>(ctx->config.auth_port_num);
+                } else if (target == TARGET_SERVER) {
+                    dst_ip_str = ctx->config.entity_server_ip_addr;
+                    dst_port =
+                        static_cast<uint16_t>(ctx->config.entity_server_port_num);
+                } else {
+                    SST_print_error(
+                        "Invalid DOSU target '%s'.", attack_target.c_str());
+                    break;
+                }
+
                 char default_src_ip[INET_ADDRSTRLEN];
                 const char* src_ip_to_use = NULL;
                 if (!resolve_src_ip_or_default(src_ip, dst_ip_str, dst_port,

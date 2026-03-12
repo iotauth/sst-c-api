@@ -232,20 +232,20 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 5. Run the client in another terminal with `sudo ./client ../client.config ../csv_files/dos_attack_syn.csv`
 
-## 2.2.5 DoS attack to Auth via UDP Flooding (DoSU)
+## 2.2.5 DoS attack to Auth or Server via UDP Flooding (DoSU)
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_udp.csv` to have the client send custom messages and a custom number of UDP packets to Auth.
+2. *[Optional]* Customize `csv_files/dos_attack_udp.csv` to have the client send custom messages and a custom number of UDP packets to Auth or Server.
     - The format of the input CSV file for this attack example should be:
         - Each entry is on its own line.
         - The first value is the amount of time spent sleeping (in milliseconds).
         - The second value is the message.
         - The third value is the attack type, "DoSU" in this example (case insensitive).
-        - The fourth value is the number UDP packets that will be sent to Auth.
+        - The fourth value is the number UDP packets that will be sent to Auth or Server.
     ```
-    <sleep_time1>,<message1>,DoSU,<number_of_udp_packets>
-    <sleep_time2>,<message2>,DOSU,<number_of_udp_packets>
-    <sleep_time3>,<message3>,dosu,<number_of_udp_packets>
+    <sleep_time1>,<message1>,DoSU,<number_of_udp_packets>,Server
+    <sleep_time2>,<message2>,DOSU,<number_of_udp_packets>,S
+    <sleep_time3>,<message3>,dosu,<number_of_udp_packets>,auth
     ...
     ```
 

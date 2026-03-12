@@ -14,8 +14,6 @@ extern "C" {
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <iostream>
-
 // Pseudo header for TCP checksum
 struct pseudo_header {
     uint32_t saddr;
@@ -129,8 +127,9 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
             // return EXIT_FAILURE;
             continue;
         }
-        std::cout << "Sent SYN packet " << (i + 1) << " of " << repeat
-                  << std::endl;
+        SST_print_debug("Sent raw SYN from %s:%u to %s:%u (%zd bytes)",
+                        src_ip_str, ntohs(tcph->th_sport), dst_ip, dst_port, n);
+        SST_print_log("Sent SYN packet %d of %d", i + 1, repeat);
     }
 
     close(s);
@@ -258,12 +257,9 @@ extern "C" bool send_udp_packets(const char* src_ip_str,
             continue;
         }
 
-        std::cout << "Sent RAW UDP from " << src_ip_str << ":" << src_port
-                  << " to " << dst_ip << ":" << dst_port
-                  << " (" << n << " bytes)"
-                  << std::endl;
-
-        std::cout << "Sent UDP packet " << (i + 1) << " of " << repeat << std::endl;
+        SST_print_debug("Sent raw UDP from %s:%u to %s:%u (%zd bytes)",
+                        src_ip_str, src_port, dst_ip, dst_port, n);
+        SST_print_log("Sent UDP packet %d of %d", i + 1, repeat);
     }
 
     close(s);
