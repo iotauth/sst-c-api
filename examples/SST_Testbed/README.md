@@ -148,9 +148,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
         - The third value is the attack type, "DoSK" in this example (case insensitive).
         - The fourth value is the number of session key requests the client will send to Auth.
     ```
-    <sleep_time1>,<message1>,DoSK,10000
-    <sleep_time2>,<message2>,DOSK,55555
-    <sleep_time3>,<message3>,dosk,123456
+    <sleep_time1>,<message1>,DoSK,<number_of_key_requests>
+    <sleep_time2>,<message2>,DOSK,<number_of_key_requests>
+    <sleep_time3>,<message3>,dosk,<number_of_key_requests>
     ...
     ```
 
@@ -172,9 +172,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
         - The third value is the attack type, "DoSM" in this example (case insensitive).
         - The fourth value is the number of times the message will be sent to the server.
     ```
-    <sleep_time1>,<message1>,DoSM,10000
-    <sleep_time2>,<message2>,DOSM,55555
-    <sleep_time3>,<message3>,dosm,123456
+    <sleep_time1>,<message1>,DoSM,<number_of_messages>
+    <sleep_time2>,<message2>,DOSM,<number_of_messages>
+    <sleep_time3>,<message3>,dosm,<number_of_messages>
     ...
     ```
 
@@ -196,9 +196,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
         - The third value is the attack type, "DoSC" in this example (case insensitive).
         - The fourth value is the number of connection attempts.
     ```
-    <sleep_time1>,<message1>,DoSC,10000
-    <sleep_time2>,<message2>,DOSC,55555
-    <sleep_time3>,<message3>,dosc,123456
+    <sleep_time1>,<message1>,DoSC,<number_of_connection_attemps>
+    <sleep_time2>,<message2>,DOSC,<number_of_connection_attemps>
+    <sleep_time3>,<message3>,dosc,<number_of_connection_attemps>
     ...
     ```
 
@@ -208,20 +208,21 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 5. Run the client in another terminal with `./client ../client.config ../csv_files/dos_attack_connect.csv`
 
-## 2.2.4 DoS attack to Auth via SYN Flooding (DoSS)
+## 2.2.4 DoS attack to Auth or Server via SYN Flooding (DoSS)
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_syn.csv` to have the client send custom messages and a custom number of SYN packets to Auth.
+2. *[Optional]* Customize `csv_files/dos_attack_syn.csv` to have the client send custom messages and a custom number of SYN packets to Auth or Server.
     - The format of the input CSV file for this attack example should be:
         - Each entry is on its own line.
         - The first value is the amount of time spent sleeping (in milliseconds).
         - The second value is the message.
         - The third value is the attack type, "DoSS" in this example (case insensitive).
-        - The fourth value is the number SYN packets that will be sent to Auth.
+        - The fourth value is the number SYN packets that will be sent.
+        - The fifth value is the target (Auth or Server).
     ```
-    <sleep_time1>,<message1>,DoSS,10000
-    <sleep_time2>,<message2>,DOSS,55555
-    <sleep_time3>,<message3>,doss,123456
+    <sleep_time1>,<message1>,DoSS,<number_of_syn_packets>,Auth
+    <sleep_time2>,<message2>,DOSS,<number_of_syn_packets>,a
+    <sleep_time3>,<message3>,doss,<number_of_syn_packets>,server
     ...
     ```
 
@@ -242,9 +243,9 @@ However, for convenience, DoS attacks with multiple clients have it's own script
         - The third value is the attack type, "DoSU" in this example (case insensitive).
         - The fourth value is the number UDP packets that will be sent to Auth.
     ```
-    <sleep_time1>,<message1>,DoSU,10000
-    <sleep_time2>,<message2>,DOSU,55555
-    <sleep_time3>,<message3>,dosu,123456
+    <sleep_time1>,<message1>,DoSU,<number_of_udp_packets>
+    <sleep_time2>,<message2>,DOSU,<number_of_udp_packets>
+    <sleep_time3>,<message3>,dosu,<number_of_udp_packets>
     ...
     ```
 

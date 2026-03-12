@@ -12,6 +12,7 @@ extern "C" {
 #include "lib/send_syn.hpp"
 
 enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSS, DOSU };
+enum AttackTarget { TARGET_NONE, TARGET_AUTH, TARGET_SERVER };
 
 static AttackType parseAttackType(const std::string& s) {
     if (s == "REPLAY" || s == "Replay" || s == "replay")
@@ -32,6 +33,14 @@ static AttackType parseAttackType(const std::string& s) {
         s == "dosU" || s == "dosu")
         return DOSU;
     return NONE;
+}
+
+static AttackTarget parseAttackTarget(const std::string& s) {
+    if (s == "auth" || s == "Auth" || s == "a" || s == "A")
+        return TARGET_AUTH;
+    if (s == "server" || s == "Server" || s == "s" || s == "S")
+        return TARGET_SERVER;
+    return TARGET_NONE;
 }
 
 int main(int argc, char* argv[]) {
@@ -102,6 +111,9 @@ int main(int argc, char* argv[]) {
         size_t comma1 = line.find(',');
         size_t comma2 = line.find(',', comma1 + 1);
         size_t comma3 = line.find(',', comma2 + 1);
+        size_t comma4 =
+            (comma3 != std::string::npos) ? line.find(',', comma3 + 1)
+                                          : std::string::npos;
 
         // Sleep for the specified time
         std::string sleep_time_str = line.substr(0, comma1);
@@ -138,9 +150,18 @@ int main(int argc, char* argv[]) {
 
         AttackType attack_type = parseAttackType(attack_type_str);
 
-        // Optional: parameter for the attack type if applicable
-        std::string attack_param =
-            (comma3 != std::string::npos) ? line.substr(comma3 + 1) : "";
+        // 4th CSV column is attack_param
+        // 5th CSV column is attack_target if DOSS or DOSU.
+        std::string attack_param;
+        std::string attack_target;
+        if (comma3 != std::string::npos) {
+            if (comma4 == std::string::npos) {
+                attack_param = line.substr(comma3 + 1);
+            } else {
+                attack_param = line.substr(comma3 + 1, comma4 - comma3 - 1);
+                attack_target = line.substr(comma4 + 1);
+            }
+        }
 
         if (metrics) {
             sleep(10);
@@ -320,8 +341,30 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSS: {
-                const char* dst_ip_str = ctx->config.auth_ip_addr;
-                unsigned short dst_port = 21900;
+                if (attack_target.empty()) {
+                    SST_print_error(
+                        "DOSS requires a 5th CSV column target.");
+                    break;
+                }
+
+                // Target from CSV file
+                // Either Auth or Server
+                AttackTarget target = parseAttackTarget(attack_target);
+                const char* dst_ip_str = NULL;
+                unsigned short dst_port = 0;
+
+                if (target == TARGET_AUTH) {
+                    dst_ip_str = ctx->config.auth_ip_addr;
+                    dst_port = static_cast<unsigned short>(ctx->config.auth_port_num);
+                } else if (target == TARGET_SERVER) {
+                    dst_ip_str = ctx->config.entity_server_ip_addr;
+                    dst_port = static_cast<unsigned short>(ctx->config.entity_server_port_num);
+                } else {
+                    SST_print_error(
+                        "Invalid DOSS target '%s'.", attack_target.c_str());
+                    break;
+                }
+
                 char default_src_ip[INET_ADDRSTRLEN];
                 const char* src_ip_to_use = NULL;
                 if (!resolve_src_ip_or_default(src_ip, dst_ip_str, dst_port,
@@ -339,28 +382,6 @@ int main(int argc, char* argv[]) {
                     repeat // number of packets
                 );
             } break;
-
-
-
-            // possible other case:
-            // This code could be useful for making a SYN flood attack to the
-            // server instead of Auth
-            //
-            // for (int i = 0; i < repeat; ++i) {
-            //     int temp_sock = socket(AF_INET, SOCK_STREAM, 0);
-            //     if (temp_sock < 0) {
-            //         SST_print_error_exit("Failed to create socket.");
-            //     }
-
-            //     struct sockaddr_in server_addr;
-            //     server_addr.sin_family = AF_INET;
-            //     server_addr.sin_port = htons(ctx->config.server_port);
-            //     server_addr.sin_addr.s_addr =
-            //     inet_addr(ctx->config.server_ip);
-
-            //     connect(temp_sock, (struct sockaddr*)&server_addr,
-            //             sizeof(server_addr));
-            //     // Not closing the socket to keep it in SYN-RECEIVED state
 
             case DOSU: {
                 // UDP to Auth
