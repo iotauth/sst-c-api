@@ -5,6 +5,7 @@
 #include <csignal>  // sig_atomic_t
 #include <cstdlib>  // free, EXIT_FAILURE
 #include <cstring>  // memset
+#include <vector>
 extern "C" {
 #include "../../c_api.h"
 }
@@ -13,12 +14,39 @@ volatile int active_clients = 0;
 volatile sig_atomic_t stop_server = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 const int UDP_IDLE_TIMEOUT_SEC = 10;
+const int UDP_WORKER_COUNT = 512;
+
+// Returns the number of UDP worker threads to start
+// based on the SST_UDP_WORKERS environment variable (default: UDP_WORKER_COUNT).
+// This is because UDP does not have an accept() loop to handle multiple clients
+// so we need a pool of worker threads each with their own socket to handle concurrent clients.
+static int get_udp_worker_count() {
+    const char* env = std::getenv("SST_UDP_WORKERS");
+    if (env == NULL || env[0] == '\0') {
+        return UDP_WORKER_COUNT;
+    }
+
+    char* endptr = NULL;
+    long parsed = std::strtol(env, &endptr, 10);
+    if (endptr == env || *endptr != '\0' || parsed < 1) {
+        errno = 0;
+        SST_print_error("Invalid SST_UDP_WORKERS='%s'. Using default %d.", env,
+                        UDP_WORKER_COUNT);
+        return UDP_WORKER_COUNT;
+    }
+
+    if (parsed > UDP_WORKER_COUNT) {
+        return UDP_WORKER_COUNT;
+    }
+    return static_cast<int>(parsed);
+}
 
 // Struct for arguments for each thread
 struct ThreadArgs {
     int client_sock;
     SST_ctx_t* ctx;
-    bool udp_close_socket;
+    bool use_udp;
+    bool close_socket;
 };
 
 // For pthread_create()
@@ -26,35 +54,14 @@ void* receive_and_print_messages(void* thread_args) {
     ThreadArgs* args = static_cast<ThreadArgs*>(thread_args);
     int clnt_sock = args->client_sock;
     SST_ctx_t* ctx = args->ctx;
-    bool udp_close_socket = args->udp_close_socket;
-    session_key_list_t* s_key_list = init_empty_session_key_list();
+    bool use_udp = args->use_udp;
+    bool close_socket = args->close_socket;
     delete args;  // no longer needed
 
-    SST_session_ctx_t* session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
-    if (session_ctx == NULL) {
-        SST_print_error("There is no session key.");
-        if (udp_close_socket && close(clnt_sock) < 0) {
-            SST_print_error("close() error");
-        }
-        free_session_key_list_t(s_key_list);
+    bool udp_idle_timeout = false;
 
-        // Decrement active client count on failure path
-        pthread_mutex_lock(&count_mutex);
-        active_clients--;
-        // If this was the last (or only) client, tell main to stop
-        if (active_clients == 0) stop_server = 1;
-        pthread_mutex_unlock(&count_mutex);
-
-        return NULL;
-    }
-
-    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    // Receive messages from client
-    char hello[] = "Hello";
-    int count = 0;
-    for (;;) {
-        if (!udp_close_socket) { // TCP sets this bool to true, so this block is only for UDP
+    while (true) {
+        if (use_udp) {
             fd_set rfds;
             FD_ZERO(&rfds);
             FD_SET(clnt_sock, &rfds);
@@ -64,51 +71,80 @@ void* receive_and_print_messages(void* thread_args) {
             tv.tv_usec = 0;
 
             int ready = select(clnt_sock + 1, &rfds, NULL, NULL, &tv);
-            if (ready < 0) { // Error occurred
+            if (ready < 0) {
                 if (errno == EINTR) {
                     continue;
                 }
                 SST_print_error("select() error in UDP thread");
                 break;
             }
-            if (ready == 0) { // Timeout occurred, meaning no messages received for UDP_IDLE_TIMEOUT_SEC seconds
-                SST_print_log("UDP idle timeout reached (%d seconds). Stopping server.",
-                              UDP_IDLE_TIMEOUT_SEC);
+            if (ready == 0) {
+                udp_idle_timeout = true;
                 break;
-            } // else ready > 0 means there is a message to read, so continue to read_secure_message below
+            }
         }
 
-        int ret = read_secure_message(received_buf, session_ctx);
-        if (ret < 0) {
-            SST_print_error("Failed to read secure message.");
-            break;
-        } else if (ret == 0) {
-            SST_print_error("Connection closed");
-            break;
-        }
-        // Process the received_buf message
-        SST_print_log("Received message %d from socket: %d: %.*s", count,
-                      clnt_sock, ret,
-                      reinterpret_cast<const char*>(received_buf));
-        count++;
-        int msg = send_secure_message(hello, strlen(hello), session_ctx);
-        if (msg < 0) {
-            if (errno == EPIPE) {
-                SST_print_error(
-                    "Failed send_secure_message(): client disconnected "
-                    "(EPIPE).");
-            } else {
-                SST_print_error("Failed send_secure_message().");
+        session_key_list_t* s_key_list = init_empty_session_key_list();
+        SST_session_ctx_t* session_ctx =
+            server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+        if (session_ctx == NULL) {
+            errno = 0;
+            SST_print_error("There is no session key.");
+            free_session_key_list_t(s_key_list);
+            if (use_udp) {
+                // Keep serving other UDP clients on this worker.
+                continue;
             }
             break;
         }
+
+        unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
+        char hello[] = "Hello";
+        int count = 0;
+        for (;;) {
+            int ret = read_secure_message(received_buf, session_ctx);
+            if (ret < 0) {
+                SST_print_error("Failed to read secure message.");
+                break;
+            } else if (ret == 0) {
+                SST_print_error("Connection closed");
+                break;
+            }
+
+            SST_print_log("Received message %d from socket: %d: %.*s", count,
+                          clnt_sock, ret,
+                          reinterpret_cast<const char*>(received_buf));
+            count++;
+            int msg = send_secure_message(hello, strlen(hello), session_ctx);
+            if (msg < 0) {
+                if (errno == EPIPE) {
+                    SST_print_error(
+                        "Failed send_secure_message(): client disconnected "
+                        "(EPIPE).");
+                } else {
+                    SST_print_error("Failed send_secure_message().");
+                }
+                break;
+            }
+        }
+
+        SST_print_log("Client %d disconnected.", clnt_sock);
+        free(session_ctx);
+        free_session_key_list_t(s_key_list);
+
+        if (!use_udp) {
+            break;
+        }
     }
 
-    SST_print_log("Client %d disconnected.", clnt_sock);
-    if (udp_close_socket && close(clnt_sock) < 0) {
+    if (udp_idle_timeout) {
+        SST_print_log("UDP worker on socket %d idle for %d seconds, exiting.",
+                      clnt_sock, UDP_IDLE_TIMEOUT_SEC);
+    }
+
+    if (close_socket && close(clnt_sock) < 0) {
         SST_print_error("close() error");
     }
-    free(session_ctx);
 
     // Once the thread has finished, decrement the number of active clients
     // Use a mutex to protect the counter
@@ -235,7 +271,8 @@ int main(int argc, char* argv[]) {
             ThreadArgs* args = new ThreadArgs;
             args->client_sock = clnt_sock;
             args->ctx = ctx;
-            args->udp_close_socket = true;
+            args->use_udp = false;
+            args->close_socket = true;
 
             pthread_t t;
             int err = pthread_create(&t, NULL, receive_and_print_messages, args);
@@ -265,38 +302,106 @@ int main(int argc, char* argv[]) {
             pthread_detach(t);
         }
     } else {
-        // UDP server: use the datagram socket directly.
-        pthread_mutex_lock(&count_mutex);
-        active_clients = 1;
-        pthread_mutex_unlock(&count_mutex);
-
-        ThreadArgs* args = new ThreadArgs;
-        args->client_sock = serv_sock;
-        args->ctx = ctx;
-        args->udp_close_socket = false;
-
-        pthread_t t;
-        int err = pthread_create(&t, NULL, receive_and_print_messages, args);
-        if (err != 0) {
-            SST_print_error("pthread_create() error");
-            if (close(serv_sock) < 0) {
-                SST_print_error("close() error");
-            }
-            delete args;
+        // UDP server: create a worker pool.
+        // Each worker has its own UDP socket bound to the same port with
+        // SO_REUSEPORT, allowing concurrent sessions without changing session_ctx.
+        int worker_count = get_udp_worker_count();
+        if (close(serv_sock) < 0) {
+            SST_print_error("close() error");
             free_SST_ctx_t(ctx);
             return EXIT_FAILURE;
         }
-        pthread_detach(t);
+        serv_sock = -1;
 
-        // Wait until the UDP connection exits and signals stop_server.
-        while (!stop_server) {
-            usleep(100000);
+        std::vector<pthread_t> workers;
+        workers.reserve(worker_count);
+
+        pthread_mutex_lock(&count_mutex);
+        active_clients = 0;
+        stop_server = 0;
+        pthread_mutex_unlock(&count_mutex);
+
+        for (int i = 0; i < worker_count; ++i) {
+            int udp_sock = socket(PF_INET, SOCK_DGRAM, 0);
+            if (udp_sock < 0) {
+                SST_print_error("UDP worker socket() error");
+                continue;
+            }
+
+            int worker_on = 1;
+            if (setsockopt(udp_sock, SOL_SOCKET, SO_REUSEADDR, &worker_on,
+                           sizeof(worker_on)) < 0) {
+                SST_print_error("UDP worker SO_REUSEADDR error");
+                close(udp_sock);
+                continue;
+            }
+#ifdef SO_REUSEPORT
+            if (setsockopt(udp_sock, SOL_SOCKET, SO_REUSEPORT, &worker_on,
+                           sizeof(worker_on)) < 0) {
+                SST_print_error("UDP worker SO_REUSEPORT error");
+                close(udp_sock);
+                continue;
+            }
+#else
+            SST_print_error("SO_REUSEPORT not available; cannot run concurrent UDP workers.");
+            close(udp_sock);
+            break;
+#endif
+
+            if (bind(udp_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) <
+                0) {
+                SST_print_error("UDP worker bind() error");
+                close(udp_sock);
+                continue;
+            }
+
+            // Prevent workers from blocking forever inside UDP handshake reads.
+            struct timeval rcv_to;
+            rcv_to.tv_sec = UDP_IDLE_TIMEOUT_SEC;
+            rcv_to.tv_usec = 0;
+            if (setsockopt(udp_sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_to,
+                           sizeof(rcv_to)) < 0) {
+                SST_print_error("UDP worker SO_RCVTIMEO error");
+                close(udp_sock);
+                continue;
+            }
+
+            ThreadArgs* args = new ThreadArgs;
+            args->client_sock = udp_sock;
+            args->ctx = ctx;
+            args->use_udp = true;
+            args->close_socket = true;
+
+            pthread_t t;
+            int err = pthread_create(&t, NULL, receive_and_print_messages, args);
+            if (err != 0) {
+                SST_print_error("pthread_create() error");
+                close(udp_sock);
+                delete args;
+                continue;
+            }
+
+            pthread_mutex_lock(&count_mutex);
+            active_clients++;
+            pthread_mutex_unlock(&count_mutex);
+
+            workers.push_back(t);
+        }
+
+        if (workers.empty()) {
+            SST_print_error("No UDP workers started.");
+            free_SST_ctx_t(ctx);
+            return EXIT_FAILURE;
+        }
+
+        for (size_t i = 0; i < workers.size(); ++i) {
+            pthread_join(workers[i], NULL);
         }
     }
 
     SST_print_log("Successfully finished communication.");
 
-    if (close(serv_sock) < 0) {
+    if (serv_sock >= 0 && close(serv_sock) < 0) {
         SST_print_error("close() error");
         return EXIT_FAILURE;
     }

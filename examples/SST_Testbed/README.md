@@ -266,17 +266,17 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
-3. Run `./clients_dos_setup.sh <number-of-clients> [password]`
-    - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
+3. Run `./clients_dos_setup.sh <number_of_clients> [password]`
+    - `<number_of_clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
     - `[password]` is optional. If provided, it is used as the password of the generated Auth.
-    - e.g., `./clients_dos_setup.sh 3 asdf` or `./clients_dos_setup.sh 3`
+    - e.g., `./clients_dos_setup.sh 3` or `./clients_dos_setup.sh 3 asdf`
 
 4. If password is not provided, insert a password when prompted.
 
-5. Run `./run_clients.sh <number-of-clients> <input-file>`
-    - `<number-of-clients>` is the number of clients that should be created during this execution.
-    - `<input-file>` is the input CSV file that the program should read for this execution.
+5. Run `./run_clients.sh <number_of_clients> <input_file>`
+    - `<number_of_clients>` is the number of clients that should be created during this execution.
+    - `<input_file>` is the input CSV file that the program should read for this execution.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
-        - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
+    - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
 
-Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
+Each client will be launched in a unique terminal window, along with a terminal window for the server, and will simultaneously perform the attack specified in the input CSV file.

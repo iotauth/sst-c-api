@@ -36,7 +36,10 @@ void SST_print_log(const char* fmt, ...) {
     va_end(args);
 }
 
-static void SST_vprint_error(const char* fmt, va_list args) {
+// Print out error messages along with errno if set.
+void SST_print_error(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
     // Print the "ERROR:" prefix to stderr
     fprintf(stderr, "ERROR: ");
     // Print the formatted error message to stderr (without adding a newline)
@@ -47,20 +50,22 @@ static void SST_vprint_error(const char* fmt, va_list args) {
     }
     // End the line after the error message and errno
     fprintf(stderr, "\n");
-}
-
-// Print out error messages along with errno if set.
-void SST_print_error(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
-    SST_vprint_error(fmt, args);
     va_end(args);
 }
 
 void SST_print_error_exit(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    SST_vprint_error(fmt, args);
+    // Print the "ERROR:" prefix to stderr
+    fprintf(stderr, "ERROR: ");
+    // Print the formatted error message to stderr (without adding a newline)
+    vfprintf(stderr, fmt, args);
+    // Print errno if it is set
+    if (errno != 0) {
+        fprintf(stderr, " (errno: %d, %s)", errno, strerror(errno));
+    }
+    // End the line after the error message and errno
+    fprintf(stderr, "\n");
     va_end(args);
     exit(1);
 }

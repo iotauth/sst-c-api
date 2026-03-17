@@ -36,8 +36,9 @@ static uint16_t csum16(const void* data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
-                                 unsigned short dst_port, int repeat) {
+extern "C" bool send_raw_syn_packets(const char* src_ip_str,
+                                     const char* dst_ip,
+                                     unsigned short dst_port, int repeat) {
     // Build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
     unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr)];
@@ -57,11 +58,11 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
     iph->ip_p = IPPROTO_TCP;
     if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) {
         SST_print_error("src ip error");
-        return EXIT_FAILURE;
+        return false;
     }
     if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1) {
         SST_print_error("dst ip error");
-        return EXIT_FAILURE;
+        return false;
     }
 
     // Fill TCP header (BSD layout uses th_offx2)
@@ -95,13 +96,14 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
     if (s < 0) {
         SST_print_error("socket() error");
-        return EXIT_FAILURE;
+        return false;
     }
 
     int one = 1;
     if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         SST_print_error("setsockopt(IP_HDRINCL) error");
-        return EXIT_FAILURE;
+        close(s);
+        return false;
     }
 
     struct sockaddr_in dst;
@@ -115,7 +117,7 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
         SST_print_error("dst addr error");
         close(s);
-        return EXIT_FAILURE;
+        return false;
     }
 
     for (int i = 0; i < repeat; ++i) {
@@ -134,7 +136,7 @@ extern "C" bool send_syn_packets(const char* src_ip_str, const char* dst_ip,
 
     close(s);
 
-    return EXIT_SUCCESS;
+    return true;
 }
 
 // UDP pseudo header
@@ -146,10 +148,9 @@ struct udp_pseudo_header {
     uint16_t udp_len;
 } __attribute__((packed));
 
-extern "C" bool send_udp_packets(const char* src_ip_str,
+extern "C" bool send_raw_udp_packets(const char* src_ip_str,
                                      const char* dst_ip,
-                                     unsigned short dst_port,
-                                     int repeat) {
+                                     unsigned short dst_port, int repeat) {
     const size_t payload_len = 0;
     const size_t ip_len  = sizeof(struct ip);
     const size_t udp_len = sizeof(struct udphdr);
@@ -176,11 +177,11 @@ extern "C" bool send_udp_packets(const char* src_ip_str,
 
     if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) {
         SST_print_error("src ip error");
-        return EXIT_FAILURE;
+        return false;
     }
     if (inet_pton(AF_INET, dst_ip, &iph->ip_dst) != 1) {
         SST_print_error("dst ip error");
-        return EXIT_FAILURE;
+        return false;
     }
 
     // Fill UDP header
@@ -227,14 +228,14 @@ extern "C" bool send_udp_packets(const char* src_ip_str,
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
     if (s < 0) {
         SST_print_error("socket() error");
-        return EXIT_FAILURE;
+        return false;
     }
 
     int one = 1;
     if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         SST_print_error("setsockopt(IP_HDRINCL) error");
         close(s);
-        return EXIT_FAILURE;
+        return false;
     }
 
     struct sockaddr_in dst;
@@ -247,7 +248,7 @@ extern "C" bool send_udp_packets(const char* src_ip_str,
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
         SST_print_error("dst addr error");
         close(s);
-        return EXIT_FAILURE;
+        return false;
     }
 
     for (int i = 0; i < repeat; ++i) {
@@ -263,13 +264,13 @@ extern "C" bool send_udp_packets(const char* src_ip_str,
     }
 
     close(s);
-    return EXIT_SUCCESS;
+    return true;
 }
 
-extern "C" int get_src_ip(const char* dst_ip, unsigned short dst_port,
-                          char* out_ip, size_t out_ip_len) {
+extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
+                           char* out_ip, size_t out_ip_len) {
     int s = socket(AF_INET, SOCK_DGRAM, 0);
-    if (s < 0) return -1;
+    if (s < 0) return false;
 
     struct sockaddr_in dst;
     memset(&dst, 0, sizeof(dst));
@@ -277,29 +278,29 @@ extern "C" int get_src_ip(const char* dst_ip, unsigned short dst_port,
     dst.sin_port = htons(dst_port);
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
         close(s);
-        return -1;
+        return false;
     }
 
     // UDP connect: doesn't actually connect; just sets the default route/peer.
     if (connect(s, (struct sockaddr*)&dst, sizeof(dst)) < 0) {
         close(s);
-        return -1;
+        return false;
     }
 
     struct sockaddr_in local;
     socklen_t len = sizeof(local);
     if (getsockname(s, (struct sockaddr*)&local, &len) < 0) {
         close(s);
-        return -1;
+        return false;
     }
 
     close(s);
 
     if (!inet_ntop(AF_INET, &local.sin_addr, out_ip, (socklen_t)out_ip_len)) {
-        return -1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
 extern "C" bool resolve_src_ip_or_default(
@@ -315,7 +316,7 @@ extern "C" bool resolve_src_ip_or_default(
         return true;
     }
 
-    if (get_src_ip(dst_ip, dst_port, src_ip_buf, ip_buf_len) == 0) {
+    if (get_src_ip(dst_ip, dst_port, src_ip_buf, ip_buf_len)) {
         *out_src_ip = src_ip_buf;
         SST_print_debug("No src_ip provided; using default local IP %s",
                         *out_src_ip);

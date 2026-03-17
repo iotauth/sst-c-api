@@ -4,8 +4,11 @@ extern "C" {
 
 #include <unistd.h>
 
+#include <chrono>
+#include <cerrno>
 #include <cstring>
 #include <fstream>
+#include <sys/socket.h>
 #include <thread>
 
 #include "lib/metrics.hpp"
@@ -100,6 +103,12 @@ int main(int argc, char* argv[]) {
     // SST Connect to server
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
+    if (session_ctx == NULL) {
+        SST_print_error("Client failed to establish secure session with server.");
+        free_session_key_list_t(s_key_list);
+        free_SST_ctx_t(ctx);
+        return EXIT_FAILURE;
+    }
 
     // Read CSV file
     std::string my_file_path = argv[2];
@@ -344,7 +353,20 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSS: {
+                // DOSS requires TCP config.
+                bool use_tcp =
+                    std::strcmp((const char*)ctx->config.network_protocol,
+                                "TCP") == 0;
+                if (!use_tcp) {
+                    errno = 0;
+                    SST_print_error(
+                        "DOSS denied: the network protocol is UDP. "
+                        "Set the network protocol to TCP to run DOSS.");
+                    break;
+                }
+
                 if (attack_target.empty()) {
+                    errno = 0;
                     SST_print_error(
                         "DOSS requires a 5th CSV column target.");
                     break;
@@ -363,6 +385,7 @@ int main(int argc, char* argv[]) {
                     dst_ip_str = ctx->config.entity_server_ip_addr;
                     dst_port = static_cast<unsigned short>(ctx->config.entity_server_port_num);
                 } else {
+                    errno = 0;
                     SST_print_error(
                         "Invalid DOSS target '%s'.", attack_target.c_str());
                     break;
@@ -378,7 +401,7 @@ int main(int argc, char* argv[]) {
                 }
 
                 int repeat = std::stoi(attack_param);
-                send_syn_packets(
+                send_raw_syn_packets(
                     src_ip_to_use, // spoofed source IP
                     dst_ip_str, // destination IP
                     dst_port, // destination port
@@ -387,7 +410,20 @@ int main(int argc, char* argv[]) {
             } break;
 
             case DOSU: {
+                // DOSU requires UDP config.
+                bool use_tcp =
+                    std::strcmp((const char*)ctx->config.network_protocol,
+                                "TCP") == 0;
+                if (use_tcp) {
+                    errno = 0;
+                    SST_print_error(
+                        "DOSU denied: the network protocol is TCP. "
+                        "Set the network protocol to UDP to run DOSU.");
+                    break;
+                }
+
                 if (attack_target.empty()) {
+                    errno = 0;
                     SST_print_error(
                         "DOSU requires a 5th CSV column target.");
                     break;
@@ -404,10 +440,13 @@ int main(int argc, char* argv[]) {
                     dst_port =
                         static_cast<uint16_t>(ctx->config.entity_server_port_num);
                 } else {
+                    errno = 0;
                     SST_print_error(
                         "Invalid DOSU target '%s'.", attack_target.c_str());
                     break;
                 }
+
+                int repeat = std::stoi(attack_param);
 
                 char default_src_ip[INET_ADDRSTRLEN];
                 const char* src_ip_to_use = NULL;
@@ -418,10 +457,7 @@ int main(int argc, char* argv[]) {
                     break;
                 }
 
-                int repeat = std::stoi(attack_param);
-
-                // No payload, just raw UDP packets
-                send_udp_packets(
+                send_raw_udp_packets(
                     src_ip_to_use, // spoofed source IP
                     dst_ip_str, // destination IP
                     dst_port, // destination port
