@@ -21,17 +21,23 @@ SST_ctx_t* init_SST(const char* config_path) {
         return NULL;
     }
     int numkey = ctx->config.numkey;
-
-    ctx->pub_key = (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
-    if (ctx->pub_key == NULL) {
-        SST_print_error("Failed load_auth_public_key().");
-        return NULL;
-    }
-    ctx->priv_key =
-        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
-    if (ctx->priv_key == NULL) {
-        SST_print_error("Failed load_entity_private_key().");
-        return NULL;
+    if (ctx->config.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
+        ctx->pub_key =
+            (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
+        if (ctx->pub_key == NULL) {
+            SST_print_error("Failed load_auth_public_key().");
+            return NULL;
+        }
+        ctx->priv_key =
+            (void*)load_entity_private_key(ctx->config.entity_privkey_path);
+        if (ctx->priv_key == NULL) {
+            SST_print_error("Failed load_entity_private_key().");
+            return NULL;
+        }
+        bzero(&ctx->dist_key, sizeof(distribution_key_t)); // This also sets the abs_validiy to 0, which will always make the key not valid.
+    } else {
+        // Load distribution key.
+        ctx->dist_key.abs_validity = UINT64_MAX;
     }
     if (numkey > MAX_SESSION_KEY) {
         SST_print_error(
@@ -39,7 +45,6 @@ SST_ctx_t* init_SST(const char* config_path) {
             "session keys are %d",
             MAX_SESSION_KEY);
     }
-    bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
 
