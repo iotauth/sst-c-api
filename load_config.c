@@ -12,6 +12,7 @@ const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
 const char encryption_mode[] = "encryptionMode";
 const char hmac_mode[] = "HmacMode";
+const char permanent_dist_key_mode[] = "PermanentDistKeyMode";
 const char auth_id[] = "authInfo.id";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
@@ -34,6 +35,8 @@ config_type_t get_key_value(char* ptr) {
         return ENCRYPTION_MODE;
     } else if (strcmp(ptr, hmac_mode) == 0) {
         return HMAC_MODE;
+    } else if (strcmp(ptr, permanent_dist_key_mode) == 0) {
+        return PERMANENT_DIST_KEY_MODE;
     } else if (strcmp(ptr, auth_id) == 0) {
         return AUTH_ID;
     } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
@@ -101,6 +104,9 @@ int load_config(config_t* c, const char* path) {
     unsigned short purpose_count = 0;  // Option for ipfs.
     c->purpose_index = 0;              // Option for ipfs.
     c->hmac_mode = USE_HMAC;           // Default with HMAC.
+    c->perm_dist_key_mode =
+        NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
+                                // key.
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
@@ -176,6 +182,24 @@ int load_config(config_t* c, const char* path) {
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
+                        return -1;
+                    }
+                    break;
+                case PERMANENT_DIST_KEY_MODE:
+                    if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
+                        c->perm_dist_key_mode = NO_PERMANENT_DIST_KEY;
+                    } else if (strcmp(ptr, "on") == 0 ||
+                               strcmp(ptr, "1") == 0) {
+                        c->perm_dist_key_mode = USE_PERMANENT_DIST_KEY;
+                    } else {
+                        SST_print_error(
+                            "Wrong input for use_permanent_dist_key.\n Please "
+                            "type "
+                            "\"off\" or \"0\" to not use permanent "
+                            "distribution key.\n Please "
+                            "type "
+                            "\"on\" or \"1\" to use permanent distribution "
+                            "key.");
                         return -1;
                     }
                     break;
