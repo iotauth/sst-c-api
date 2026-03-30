@@ -23,6 +23,8 @@ const char entity_serverInfo_port_number[] = "entity.server.port.number";
 const char file_system_manager_ip_address[] = "fileSystemManager.ip.address";
 const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
+const char dist_cipher_key_path_label[] = "distKey.cipherkey.path";
+const char dist_mac_key_path_label[] = "distkey.mackey.path";
 
 config_type_t get_key_value(char* ptr) {
     if (strcmp(ptr, entity_info_name) == 0) {
@@ -57,6 +59,10 @@ config_type_t get_key_value(char* ptr) {
         return FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS;
     } else if (strcmp(ptr, file_system_manager_port_number) == 0) {
         return FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER;
+    } else if (strcmp(ptr, dist_cipher_key_path_label) == 0) {
+        return DIST_CIPHER_KEY_PATH;
+    } else if (strcmp(ptr, dist_mac_key_path_label) == 0) {
+        return DIST_MAC_KEY_PATH;
     } else {
         return UNKNOWN_CONFIG;
     }
@@ -107,6 +113,8 @@ int load_config(config_t* c, const char* path) {
     c->perm_dist_key_mode =
         NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
                                 // key.
+    c->dist_cipher_key_path[0] = '\0';
+    c->dist_mac_key_path[0] = '\0';
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
@@ -298,10 +306,43 @@ int load_config(config_t* c, const char* path) {
                         return -1;
                     }
                     break;
+                case DIST_CIPHER_KEY_PATH:
+                    SST_print_debug("Dist Cipher Key Path: %s", ptr);
+                    if (safe_config_value_copy(
+                            c->dist_cipher_key_path, ptr,
+                            sizeof(c->dist_cipher_key_path)) < 0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "DIST_CIPHER_KEY_PATH");
+                        return -1;
+                    }
+                    break;
+                case DIST_MAC_KEY_PATH:
+                    SST_print_debug("Dist MAC Key Path: %s", ptr);
+                    if (safe_config_value_copy(c->dist_mac_key_path, ptr,
+                                               sizeof(c->dist_mac_key_path)) <
+                        0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "DIST_MAC_KEY_PATH");
+                        return -1;
+                    }
+                    break;
             }
             break;
         }
     }
     fclose(fp);
+
+    if (c->perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
+        if (strlen(c->dist_cipher_key_path) > 0 ||
+            strlen(c->dist_mac_key_path) > 0) {
+            SST_print_error(
+                "PermanentDistKeyMode is turned off, but dist_key path(s) are "
+                "provided.");
+            return -1;
+        }
+    }
+
     return 0;
 }

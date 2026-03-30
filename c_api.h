@@ -81,6 +81,8 @@ typedef struct {
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
     char file_system_manager_ip_addr[INET_ADDRSTRLEN];
     int file_system_manager_port_num;
+    char dist_cipher_key_path[MAX_PATH_LEN];
+    char dist_mac_key_path[MAX_PATH_LEN];
 } config_t;
 
 // This struct is used in receive_thread_read_one_each()
