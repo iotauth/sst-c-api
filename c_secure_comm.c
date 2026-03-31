@@ -300,7 +300,9 @@ static int check_session_key_validity(session_key_t* session_key) {
 // @return -1 when expired, 0 when valid
 static int check_distribution_key_validity(distribution_key_t* dist_key) {
     int ret = check_validity(dist_key->abs_validity);
-    SST_print_debug("Distribution key expired!");
+    if (ret < 0) {
+        SST_print_debug("Distribution key expired!");
+    }
     return ret;
 }
 
