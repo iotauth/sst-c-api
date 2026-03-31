@@ -35,6 +35,11 @@ typedef enum {
     NO_HMAC,
 } hmac_mode_t;
 
+typedef enum {
+    USE_PERMANENT_DIST_KEY,
+    NO_PERMANENT_DIST_KEY,
+} perm_dist_key_mode_t;
+
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     uint64_t abs_validity;
@@ -45,6 +50,7 @@ typedef struct {
     unsigned int cipher_key_size;
     AES_encryption_mode_t enc_mode;
     hmac_mode_t hmac_mode;
+    perm_dist_key_mode_t perm_dist_key_mode;
 } session_key_t;
 
 typedef struct {
@@ -62,8 +68,10 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
-    AES_encryption_mode_t encryption_mode;
+    AES_encryption_mode_t session_key_enc_mode;
+    AES_encryption_mode_t dist_key_enc_mode;
     hmac_mode_t hmac_mode;
+    perm_dist_key_mode_t perm_dist_key_mode;
     int auth_id;
     char auth_pubkey_path[MAX_PATH_LEN];
     char entity_privkey_path[MAX_PATH_LEN];
@@ -74,6 +82,8 @@ typedef struct {
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
     char file_system_manager_ip_addr[INET_ADDRSTRLEN];
     int file_system_manager_port_num;
+    char dist_cipher_key_path[MAX_PATH_LEN];
+    char dist_mac_key_path[MAX_PATH_LEN];
 } config_t;
 
 // This struct is used in receive_thread_read_one_each()
