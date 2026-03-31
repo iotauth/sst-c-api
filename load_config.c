@@ -25,6 +25,7 @@ const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
 const char dist_cipher_key_path_label[] = "distKey.cipherkey.path";
 const char dist_mac_key_path_label[] = "distkey.mackey.path";
+const char dist_encryption_mode_label[] = "distKey.encryptionMode";
 
 config_type_t get_key_value(char* ptr) {
     if (strcmp(ptr, entity_info_name) == 0) {
@@ -63,6 +64,8 @@ config_type_t get_key_value(char* ptr) {
         return DIST_CIPHER_KEY_PATH;
     } else if (strcmp(ptr, dist_mac_key_path_label) == 0) {
         return DIST_MAC_KEY_PATH;
+    } else if (strcmp(ptr, dist_encryption_mode_label) == 0) {
+        return DIST_ENCRYPTION_MODE;
     } else {
         return UNKNOWN_CONFIG;
     }
@@ -116,6 +119,7 @@ int load_config(config_t* c, const char* path) {
     c->dist_cipher_key_path[0] = '\0';
     c->dist_mac_key_path[0] = '\0';
     c->encryption_mode = AES_128_CBC;  // Default encryption mode.
+    c->dist_enc_mode = AES_128_CBC;    // Default dist encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
@@ -327,6 +331,21 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "DIST_MAC_KEY_PATH");
+                        return -1;
+                    }
+                    break;
+                case DIST_ENCRYPTION_MODE:
+                    SST_print_debug("Distribution key encryption mode: %s", ptr);
+                    if (strcmp(ptr, "AES_128_CBC") == 0) {
+                        c->dist_enc_mode = AES_128_CBC;
+                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
+                        c->dist_enc_mode = AES_128_CTR;
+                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
+                        c->dist_enc_mode = AES_128_GCM;
+                    } else {
+                        SST_print_error(
+                            "Wrong input for distKey.encryptionMode.\n Please type "
+                            "\"AES_128_CBC\" or \"AES_128_CTR\" or \"AES_128_GCM\".");
                         return -1;
                     }
                     break;

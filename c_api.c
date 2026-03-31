@@ -41,7 +41,7 @@ SST_ctx_t* init_SST(const char* config_path) {
     } else {
         // Load distribution key.
         ctx->dist_key.abs_validity = UINT64_MAX;
-        ctx->dist_key.enc_mode = ctx->config.encryption_mode;
+        ctx->dist_key.enc_mode = ctx->config.dist_enc_mode;
 
         if (load_permanent_distribution_key(ctx) < 0) {
             return NULL;

@@ -26,6 +26,7 @@ typedef enum {
     NETWORK_PROTOCOL,
     DIST_CIPHER_KEY_PATH,
     DIST_MAC_KEY_PATH,
+    DIST_ENCRYPTION_MODE,
     UNKNOWN_CONFIG
 } config_type_t;
 

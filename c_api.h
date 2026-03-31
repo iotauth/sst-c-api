@@ -69,6 +69,7 @@ typedef struct {
     char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
     AES_encryption_mode_t encryption_mode;
+    AES_encryption_mode_t dist_enc_mode;
     hmac_mode_t hmac_mode;
     perm_dist_key_mode_t perm_dist_key_mode;
     int auth_id;
