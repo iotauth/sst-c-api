@@ -34,10 +34,10 @@ SST_ctx_t* init_SST(const char* config_path) {
             SST_print_error("Failed load_entity_private_key().");
             return NULL;
         }
-        bzero(&ctx->dist_key,
-              sizeof(distribution_key_t));  // This also sets the abs_validiy to
-                                            // 0, which will always make the key
-                                            // not valid.
+        memset(&ctx->dist_key, 0,
+               sizeof(distribution_key_t));  // This also sets the abs_validiy
+                                             // to 0, which will always make the
+                                             // key invalid.
     } else {
         // Load distribution key.
         ctx->dist_key.abs_validity = UINT64_MAX;
