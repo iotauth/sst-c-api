@@ -307,7 +307,8 @@ int load_config(config_t* c, const char* path) {
                     }
                     break;
                 case DIST_CIPHER_KEY_PATH:
-                    SST_print_debug("Permanent Distribution Key Cipher Key Path: %s", ptr);
+                    SST_print_debug(
+                        "Permanent Distribution Key Cipher Key Path: %s", ptr);
                     if (safe_config_value_copy(
                             c->dist_cipher_key_path, ptr,
                             sizeof(c->dist_cipher_key_path)) < 0) {
@@ -318,7 +319,8 @@ int load_config(config_t* c, const char* path) {
                     }
                     break;
                 case DIST_MAC_KEY_PATH:
-                    SST_print_debug("Permanent Distribution Key MAC Key Path: %s", ptr);
+                    SST_print_debug(
+                        "Permanent Distribution Key MAC Key Path: %s", ptr);
                     if (safe_config_value_copy(c->dist_mac_key_path, ptr,
                                                sizeof(c->dist_mac_key_path)) <
                         0) {
