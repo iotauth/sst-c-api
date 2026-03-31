@@ -100,7 +100,7 @@ void* receive_and_print_messages(void* thread_args) {
 
         unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
         char hello[] = "Hello";
-        int count = 0;
+        int count = 1;
         for (;;) {
             int ret = read_secure_message(received_buf, session_ctx);
             if (ret < 0) {

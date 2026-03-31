@@ -120,13 +120,13 @@ extern "C" bool send_raw_syn_packets(const char* src_ip_str,
         return false;
     }
 
+    bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
         ssize_t n = sendto(s, packet, sizeof(packet), 0, (struct sockaddr*)&dst,
                            sizeof(dst));
         if (n < 0) {
             SST_print_error("sendto() error");
-            // close(s);
-            // return EXIT_FAILURE;
+            all_sent = false;
             continue;
         }
         SST_print_debug("Sent raw SYN from %s:%u to %s:%u (%zd bytes)",
@@ -136,7 +136,7 @@ extern "C" bool send_raw_syn_packets(const char* src_ip_str,
 
     close(s);
 
-    return true;
+    return all_sent;
 }
 
 // UDP pseudo header
@@ -251,10 +251,12 @@ extern "C" bool send_raw_udp_packets(const char* src_ip_str,
         return false;
     }
 
+    bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
         ssize_t n = sendto(s, packet, total_len, 0, (struct sockaddr*)&dst, sizeof(dst));
         if (n < 0) {
             SST_print_error("sendto() error");
+            all_sent = false;
             continue;
         }
 
@@ -264,7 +266,7 @@ extern "C" bool send_raw_udp_packets(const char* src_ip_str,
     }
 
     close(s);
-    return true;
+    return all_sent;
 }
 
 extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
