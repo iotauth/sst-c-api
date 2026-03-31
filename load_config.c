@@ -10,7 +10,7 @@
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
-const char encryption_mode[] = "encryptionMode";
+const char session_key_encryption_mode[] = "sessionKey.encryptionMode";
 const char hmac_mode[] = "HmacMode";
 const char permanent_dist_key_mode[] = "PermanentDistKeyMode";
 const char auth_id[] = "authInfo.id";
@@ -34,8 +34,8 @@ config_type_t get_key_value(char* ptr) {
         return ENTITY_INFO_PURPOSE;
     } else if (strcmp(ptr, entity_info_numkey) == 0) {
         return ENTITY_INFO_NUMKEY;
-    } else if (strcmp(ptr, encryption_mode) == 0) {
-        return ENCRYPTION_MODE;
+    } else if (strcmp(ptr, session_key_encryption_mode) == 0) {
+        return SESSION_KEY_ENCRYPTION_MODE;
     } else if (strcmp(ptr, hmac_mode) == 0) {
         return HMAC_MODE;
     } else if (strcmp(ptr, permanent_dist_key_mode) == 0) {
@@ -118,8 +118,9 @@ int load_config(config_t* c, const char* path) {
                                 // key.
     c->dist_cipher_key_path[0] = '\0';
     c->dist_mac_key_path[0] = '\0';
-    c->encryption_mode = AES_128_CBC;  // Default encryption mode.
-    c->dist_enc_mode = AES_128_CBC;    // Default dist encryption mode.
+    c->session_key_enc_mode =
+        AES_128_CBC;                     // Default session key encryption mode.
+    c->dist_key_enc_mode = AES_128_CBC;  // Default dist encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
@@ -172,14 +173,14 @@ int load_config(config_t* c, const char* path) {
                     SST_print_debug("Numkey: %s", ptr);
                     c->numkey = atoi((const char*)ptr);
                     break;
-                case ENCRYPTION_MODE:
-                    SST_print_debug("Encryption mode: %s", ptr);
+                case SESSION_KEY_ENCRYPTION_MODE:
+                    SST_print_debug("Session key encryption mode: %s", ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->encryption_mode = AES_128_CBC;
+                        c->session_key_enc_mode = AES_128_CBC;
                     } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->encryption_mode = AES_128_CTR;
+                        c->session_key_enc_mode = AES_128_CTR;
                     } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->encryption_mode = AES_128_GCM;
+                        c->session_key_enc_mode = AES_128_GCM;
                     }
                     break;
                 case HMAC_MODE:
@@ -335,17 +336,20 @@ int load_config(config_t* c, const char* path) {
                     }
                     break;
                 case DIST_ENCRYPTION_MODE:
-                    SST_print_debug("Distribution key encryption mode: %s", ptr);
+                    SST_print_debug("Distribution key encryption mode: %s",
+                                    ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->dist_enc_mode = AES_128_CBC;
+                        c->dist_key_enc_mode = AES_128_CBC;
                     } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->dist_enc_mode = AES_128_CTR;
+                        c->dist_key_enc_mode = AES_128_CTR;
                     } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->dist_enc_mode = AES_128_GCM;
+                        c->dist_key_enc_mode = AES_128_GCM;
                     } else {
                         SST_print_error(
-                            "Wrong input for distKey.encryptionMode.\n Please type "
-                            "\"AES_128_CBC\" or \"AES_128_CTR\" or \"AES_128_GCM\".");
+                            "Wrong input for distKey.encryptionMode.\n Please "
+                            "type "
+                            "\"AES_128_CBC\" or \"AES_128_CTR\" or "
+                            "\"AES_128_GCM\".");
                         return -1;
                     }
                     break;
