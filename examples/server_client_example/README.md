@@ -23,7 +23,7 @@ Client Terminal
 `$ ./entity_client ../c_client.config`
 
 # Example 2
- * Gets multiple session keys, and save the IDs to a metadata file respectively.
+  Gets multiple session keys, and save the IDs to a metadata file respectively.
 
 - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
 - Turn on a terminal at `$SST_ROOT/entity/c/examples/server_client_example/build`
@@ -37,7 +37,9 @@ Other Terminal
 `$ ./threaded_get_target_id_server ../c_server.config`
 
 # Example 3
- * Use a permanent distribution key instead of using PKI.
+  Use a permanent distribution key instead of using PKI. 
+  When running `./generateAll.sh`, the graph file should configure the entity as `"usePermanentDistKey": false,` to create permanent distribution keys instead PKI certificates.
+
 
  - Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
 - Turn on a server terminal at `$SST_ROOT/entity/c/examples/server_client_example/build`
