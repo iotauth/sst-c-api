@@ -11,3 +11,4 @@ entity_server
 .vscode
 !/Makefile
 embedded/receiver/config/*
+/examples/SST_Testbed/config_clones

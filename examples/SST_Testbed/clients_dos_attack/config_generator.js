@@ -20,22 +20,23 @@ if (isNaN(count) || count < 1) {
   process.exit(1);
 }
 
-const client_template = 'client_template.config';
-const out_dir = '../config';
+const client_template_tcp = '../config/client.config';
+const client_template_udp = '../config/client_udp.config';
+const out_dir = '../config_clones';
 
-if (isNaN(count) || count < 1) {
-  console.error('Error: <count> must be a positive integer.');
-  process.exit(1);
+function loadTemplate(templatePath) {
+  try {
+    return fs.readFileSync(templatePath, 'utf8').split(/\r?\n/);
+  } catch (err) {
+    console.error(
+      `Failed to read the template client config \"${templatePath}\": ${err.message}`
+    );
+    process.exit(1);
+  }
 }
 
-// Read the input .graph file
-let lines;
-try {
-  lines = fs.readFileSync(client_template, 'utf8').split(/\r?\n/);
-} catch (err) {
-  console.error(`Failed to read the template client config \"${client_template}\": ${err.message}`);
-  process.exit(1);
-}
+const tcpLines = loadTemplate(client_template_tcp);
+const udpLines = loadTemplate(client_template_udp);
 
 // Create the output config folder
 if (!fs.existsSync(out_dir)) {
@@ -49,11 +50,10 @@ fs.readdirSync(out_dir).forEach(file => {
   }
 });
 
-// Output the new config files
-for (let i = 0; i < count; i++) {
+function makeConfigLines(lines, i) {
   const client_name = `net1.client${i}`;
   const key_filename = `Net1.Client${i}Key.pem`;
-  const out_lines = lines.map(line => {
+  return lines.map(line => {
     if (line.startsWith('entityInfo.name=')) {
       // add the client # to the client name
       return `entityInfo.name=${client_name}`;
@@ -66,9 +66,16 @@ for (let i = 0; i < count; i++) {
     }
     return line;
   });
-
-  const out_path = path.join(out_dir, `client${i}.config`);
-  fs.writeFileSync(out_path, out_lines.join('\n'), 'utf8');
 }
 
-console.log(`Generated ${count} configs in SST_Testbed/config/`);
+// Output the new TCP + UDP config files
+for (let i = 0; i < count; i++) {
+  const tcpOutPath = path.join(out_dir, `client${i}.config`);
+  const udpOutPath = path.join(out_dir, `client${i}_udp.config`);
+  fs.writeFileSync(tcpOutPath, makeConfigLines(tcpLines, i).join('\n'), 'utf8');
+  fs.writeFileSync(udpOutPath, makeConfigLines(udpLines, i).join('\n'), 'utf8');
+}
+
+console.log(
+  `Generated ${count} TCP and ${count} UDP configs in SST_Testbed/config_clones/`
+);

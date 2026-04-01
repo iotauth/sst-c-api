@@ -589,45 +589,62 @@ session_key_list_t* send_session_key_request_check_protocol(
     target_session_key_cache_length =
         (unsigned char)sizeof("none") / sizeof(unsigned char) - 1;
     memcpy(target_session_key_cache, "none", target_session_key_cache_length);
-    if (strcmp((const char*)ctx->config.network_protocol, "TCP") == 0) {  // TCP
-        session_key_list_t* s_key_list = send_session_key_req_via_TCP(ctx);
-        if (s_key_list == NULL) {
-            SST_print_error("Failed to send_session_key_req_via_TCP().");
-            return NULL;
-        }
-        SST_print_debug("Received %d keys.", ctx->config.numkey);
 
-        // SecureCommServer.js handleSessionKeyResp
-        //  if(){} //TODO: migration
-        //  if(){} //TODO: check received_dist_key null;
-        //  if(strncmp(callback_params.target_session_key_cache, "Clients",
-        //  callback_params.target_session_key_cache_length) == 0){}
-        if (strncmp((const char*)target_session_key_cache, "none",
-                    target_session_key_cache_length) == 0) {
-            if (strncmp((const char*)s_key_list->s_key[0].key_id,
-                        (const char*)target_key_id, SESSION_KEY_ID_SIZE) != 0) {
-                SST_print_error("Session key id is NOT as expected");
-                return NULL;
-            } else {
-                SST_print_debug("Session key id is as expected.");
-            }
-            return s_key_list;
-        }
-    } else if (strcmp((const char*)ctx->config.network_protocol, "UDP") == 0) {
-        // TODO:(Dongha Kim): Implement session key request via UDP.
-        // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
-        // return s_key_list;
+    session_key_list_t* s_key_list = send_session_key_req(ctx);
+    if (s_key_list == NULL) {
+        SST_print_error("Failed to send_session_key_req().");
+        return NULL;
     }
-    SST_print_error("Invalid network protocol name.");
+    SST_print_debug("Received %d keys.", ctx->config.numkey);
+
+    // SecureCommServer.js handleSessionKeyResp
+    //  if(){} //TODO: migration
+    //  if(){} //TODO: check received_dist_key null;
+    //  if(strncmp(callback_params.target_session_key_cache, "Clients",
+    //  callback_params.target_session_key_cache_length) == 0){}
+    if (strncmp((const char*)target_session_key_cache, "none",
+                target_session_key_cache_length) == 0) {
+        if (strncmp((const char*)s_key_list->s_key[0].key_id,
+                    (const char*)target_key_id, SESSION_KEY_ID_SIZE) != 0) {
+            SST_print_error("Session key id is NOT as expected");
+            return NULL;
+        } else {
+            SST_print_debug("Session key id is as expected.");
+        }
+        return s_key_list;
+    }
     return NULL;
 }
 
-session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
+bool get_network_protocol_type(const char* network_protocol_str) {
+    if (strcmp(network_protocol_str, "TCP") == 0) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+session_key_list_t* send_session_key_req(SST_ctx_t* ctx) {
     int sock;
+    bool use_tcp = get_network_protocol_type((const char*)ctx->config.network_protocol);
+
     if (connect_as_client((const char*)ctx->config.auth_ip_addr,
-                          ctx->config.auth_port_num, &sock) < 0) {
+                          ctx->config.auth_port_num, &sock, use_tcp) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
+    }
+
+    // Send ENTITY_HELLO kickoff for UDP
+    if (!use_tcp) {
+        unsigned char message[1]; // Assuming ENTITY_HELLO has no payload
+        unsigned int message_length = 1;
+        message[0] = ENTITY_HELLO;
+
+        int bytes_written = sst_write_to_socket(sock, message, message_length);
+        if (bytes_written < 0) {
+            SST_print_error("Failed to send ENTITY_HELLO kickoff.");
+            return NULL;
+        }
     }
 
     session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
@@ -642,9 +659,19 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
         int received_buf_length =
             sst_read_from_socket(sock, received_buf, sizeof(received_buf));
 
-        if (received_buf_length <= 0) {
+        if (received_buf_length < 0) {
             SST_print_error("Failed to sst_read_from_socket().");
             return NULL;
+        }
+        if (received_buf_length == 0) {
+            if (use_tcp) {
+                SST_print_error("Failed to sst_read_from_socket().");
+                return NULL;
+            } else {
+                SST_print_error(
+                    "UDP received a 0-length datagram on socket %d.", sock);
+                continue;  // don't treat it as fatal for UDP
+            }
         }
         unsigned char message_type;
         unsigned int data_buf_length;
@@ -772,12 +799,6 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
     // Should not come here.
     return NULL;
 }
-// TODO:(Dongha Kim): Implement session key request via UDP.
-// session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
-//     session_key_list_t *s_key_list;
-//     return s_key_list;
-//     SST_print_error("This function is not implemented yet.");
-// }
 
 unsigned char* check_handshake1_send_handshake2(
     unsigned char* received_buf, unsigned int received_buf_length,

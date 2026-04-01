@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Usage: ./clients_dos_setup.sh <number-of-clients>
+# Usage: ./clients_dos_setup.sh <number-of-clients> [password]
 
 # Function to launch a terminal with a command
 launch_terminal() {
@@ -19,32 +19,13 @@ launch_terminal() {
 }
 
 # Parameters check
-if [ $# -lt 1 ]; then
-  echo "Usage: $0 <number-of-clients> [-p|--password <password>]"
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+  echo "Usage: $0 <number-of-clients> [password]"
   exit 1
 fi
 
 COUNT="$1"
-shift
-
-PASSWORD=""
-
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -p|--password)
-      if [[ $# -lt 2 ]]; then
-        echo "Error: $1 requires a value"
-        exit 1
-      fi
-      PASSWORD="$2"
-      shift 2
-      ;;
-    *)
-      echo "Unknown option: $1"
-      exit 1
-      ;;
-  esac
-done
+PASSWORD="${2:-}"
 
 echo "Number of clients: $COUNT"
 if [[ -n "$PASSWORD" ]]; then
