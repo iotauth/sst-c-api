@@ -10,8 +10,9 @@
 const char entity_info_name[] = "entityInfo.name";
 const char entity_info_purpose[] = "entityInfo.purpose";
 const char entity_info_numkey[] = "entityInfo.number_key";
-const char encryption_mode[] = "encryptionMode";
+const char session_key_encryption_mode[] = "sessionKey.encryptionMode";
 const char hmac_mode[] = "HmacMode";
+const char permanent_dist_key_mode[] = "PermanentDistKeyMode";
 const char auth_id[] = "authInfo.id";
 const char authinfo_pubkey_path[] = "authInfo.pubkey.path";
 const char entity_info_privkey_path[] = "entityInfo.privkey.path";
@@ -22,6 +23,9 @@ const char entity_serverInfo_port_number[] = "entity.server.port.number";
 const char file_system_manager_ip_address[] = "fileSystemManager.ip.address";
 const char file_system_manager_port_number[] = "fileSystemManager.port.number";
 const char network_protocol[] = "network.protocol";
+const char dist_cipher_key_path_label[] = "distKey.cipherkey.path";
+const char dist_mac_key_path_label[] = "distkey.mackey.path";
+const char dist_encryption_mode_label[] = "distKey.encryptionMode";
 
 config_type_t get_key_value(char* ptr) {
     if (strcmp(ptr, entity_info_name) == 0) {
@@ -30,10 +34,12 @@ config_type_t get_key_value(char* ptr) {
         return ENTITY_INFO_PURPOSE;
     } else if (strcmp(ptr, entity_info_numkey) == 0) {
         return ENTITY_INFO_NUMKEY;
-    } else if (strcmp(ptr, encryption_mode) == 0) {
-        return ENCRYPTION_MODE;
+    } else if (strcmp(ptr, session_key_encryption_mode) == 0) {
+        return SESSION_KEY_ENCRYPTION_MODE;
     } else if (strcmp(ptr, hmac_mode) == 0) {
         return HMAC_MODE;
+    } else if (strcmp(ptr, permanent_dist_key_mode) == 0) {
+        return PERMANENT_DIST_KEY_MODE;
     } else if (strcmp(ptr, auth_id) == 0) {
         return AUTH_ID;
     } else if (strcmp(ptr, authinfo_pubkey_path) == 0) {
@@ -54,6 +60,12 @@ config_type_t get_key_value(char* ptr) {
         return FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS;
     } else if (strcmp(ptr, file_system_manager_port_number) == 0) {
         return FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER;
+    } else if (strcmp(ptr, dist_cipher_key_path_label) == 0) {
+        return DIST_CIPHER_KEY_PATH;
+    } else if (strcmp(ptr, dist_mac_key_path_label) == 0) {
+        return DIST_MAC_KEY_PATH;
+    } else if (strcmp(ptr, dist_encryption_mode_label) == 0) {
+        return DIST_ENCRYPTION_MODE;
     } else {
         return UNKNOWN_CONFIG;
     }
@@ -101,7 +113,14 @@ int load_config(config_t* c, const char* path) {
     unsigned short purpose_count = 0;  // Option for ipfs.
     c->purpose_index = 0;              // Option for ipfs.
     c->hmac_mode = USE_HMAC;           // Default with HMAC.
-    c->encryption_mode = AES_128_CBC;  // Default encryption mode.
+    c->perm_dist_key_mode =
+        NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
+                                // key.
+    c->dist_cipher_key_path[0] = '\0';
+    c->dist_mac_key_path[0] = '\0';
+    c->session_key_enc_mode =
+        AES_128_CBC;                     // Default session key encryption mode.
+    c->dist_key_enc_mode = AES_128_CBC;  // Default dist encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
         pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
@@ -154,14 +173,14 @@ int load_config(config_t* c, const char* path) {
                     SST_print_debug("Numkey: %s", ptr);
                     c->numkey = atoi((const char*)ptr);
                     break;
-                case ENCRYPTION_MODE:
-                    SST_print_debug("Encryption mode: %s", ptr);
+                case SESSION_KEY_ENCRYPTION_MODE:
+                    SST_print_debug("Session key encryption mode: %s", ptr);
                     if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->encryption_mode = AES_128_CBC;
+                        c->session_key_enc_mode = AES_128_CBC;
                     } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->encryption_mode = AES_128_CTR;
+                        c->session_key_enc_mode = AES_128_CTR;
                     } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->encryption_mode = AES_128_GCM;
+                        c->session_key_enc_mode = AES_128_GCM;
                     }
                     break;
                 case HMAC_MODE:
@@ -176,6 +195,24 @@ int load_config(config_t* c, const char* path) {
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
+                        return -1;
+                    }
+                    break;
+                case PERMANENT_DIST_KEY_MODE:
+                    if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
+                        c->perm_dist_key_mode = NO_PERMANENT_DIST_KEY;
+                    } else if (strcmp(ptr, "on") == 0 ||
+                               strcmp(ptr, "1") == 0) {
+                        c->perm_dist_key_mode = USE_PERMANENT_DIST_KEY;
+                    } else {
+                        SST_print_error(
+                            "Wrong input for use_permanent_dist_key.\n Please "
+                            "type "
+                            "\"off\" or \"0\" to not use permanent "
+                            "distribution key.\n Please "
+                            "type "
+                            "\"on\" or \"1\" to use permanent distribution "
+                            "key.");
                         return -1;
                     }
                     break;
@@ -274,10 +311,63 @@ int load_config(config_t* c, const char* path) {
                         return -1;
                     }
                     break;
+                case DIST_CIPHER_KEY_PATH:
+                    SST_print_debug(
+                        "Permanent Distribution Key Cipher Key Path: %s", ptr);
+                    if (safe_config_value_copy(
+                            c->dist_cipher_key_path, ptr,
+                            sizeof(c->dist_cipher_key_path)) < 0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "DIST_CIPHER_KEY_PATH");
+                        return -1;
+                    }
+                    break;
+                case DIST_MAC_KEY_PATH:
+                    SST_print_debug(
+                        "Permanent Distribution Key MAC Key Path: %s", ptr);
+                    if (safe_config_value_copy(c->dist_mac_key_path, ptr,
+                                               sizeof(c->dist_mac_key_path)) <
+                        0) {
+                        SST_print_error(
+                            "Failed safe_config_value_copy() "
+                            "DIST_MAC_KEY_PATH");
+                        return -1;
+                    }
+                    break;
+                case DIST_ENCRYPTION_MODE:
+                    SST_print_debug("Distribution key encryption mode: %s",
+                                    ptr);
+                    if (strcmp(ptr, "AES_128_CBC") == 0) {
+                        c->dist_key_enc_mode = AES_128_CBC;
+                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
+                        c->dist_key_enc_mode = AES_128_CTR;
+                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
+                        c->dist_key_enc_mode = AES_128_GCM;
+                    } else {
+                        SST_print_error(
+                            "Wrong input for distKey.encryptionMode.\n Please "
+                            "type "
+                            "\"AES_128_CBC\" or \"AES_128_CTR\" or "
+                            "\"AES_128_GCM\".");
+                        return -1;
+                    }
+                    break;
             }
             break;
         }
     }
     fclose(fp);
+
+    if (c->perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
+        if (strlen(c->dist_cipher_key_path) > 0 ||
+            strlen(c->dist_mac_key_path) > 0) {
+            SST_print_error(
+                "PermanentDistKeyMode is turned off, but dist_key path(s) are "
+                "provided.");
+            return -1;
+        }
+    }
+
     return 0;
 }
