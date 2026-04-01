@@ -5,7 +5,6 @@
 #include <fstream>
 #include <iomanip>
 #include <mutex>
-#include <cstdlib>
 
 using namespace std;
 
@@ -22,30 +21,6 @@ static inline long long epoch_us_now() {
         .count();
 }
 
-static long long malicious_number_from_env() {
-    const char* raw = std::getenv("SST_MALICIOUS_CLIENTS");
-    if (!raw || !*raw) return 0;
-    char* end = nullptr;
-    long long value = std::strtoll(raw, &end, 10);
-    if (end == raw || (end && *end != '\0') || value < 0) return 0;
-    return value;
-}
-
-static std::string with_malicious_number_suffix(const std::string& base) {
-    long long malicious_number = malicious_number_from_env();
-    if (malicious_number <= 0) return base;
-
-    auto slash = base.find_last_of("/\\");
-    std::string dir = (slash == std::string::npos) ? "" : base.substr(0, slash + 1);
-    std::string file = (slash == std::string::npos) ? base : base.substr(slash + 1);
-    auto dot = file.rfind('.');
-    if (dot == std::string::npos) {
-        return dir + file + "_mc" + std::to_string(malicious_number);
-    }
-    return dir + file.substr(0, dot) + "_mc" + std::to_string(malicious_number) +
-           file.substr(dot);
-}
-
 // helper function for metrics_open_new_file()
 static bool file_exists(const std::string& path) {
     std::ifstream p(path);
@@ -56,7 +31,7 @@ void metrics_open_new_file(const std::string& base) {
     std::lock_guard<std::mutex> lk(g_mu);
     if (g_open) return;
 
-    std::string name = with_malicious_number_suffix(base);
+    std::string name = base;
     if (file_exists(name)) {
         for (int i = 1;; ++i) {
             std::string cand = name;
@@ -91,7 +66,6 @@ void metrics_write_header_if_empty() {
 MetricsRow metrics_begin_row(const std::string& exp_id) {
     MetricsRow r;
     r.exp_id = exp_id;
-    r.malicious_number = malicious_number_from_env();
     r.ts_start_us = epoch_us_now();
     r.t0 = std::chrono::steady_clock::now();
     return r;

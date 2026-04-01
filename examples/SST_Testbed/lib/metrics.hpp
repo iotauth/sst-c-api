@@ -6,7 +6,7 @@
 
 struct MetricsRow {
     std::string exp_id;
-    long long malicious_number = 0;
+    std::string malicious_number;
     long long ts_start_us = 0;
     long long ts_end_us = 0;
 

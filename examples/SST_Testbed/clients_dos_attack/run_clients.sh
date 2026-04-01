@@ -168,7 +168,7 @@ for (( i=0; i<COUNT; i++ )); do
     exit 1
   fi
 
-  SHCMD="cd '$(pwd)' && SST_MALICIOUS_CLIENTS='$COUNT' $CLIENT_BIN '$CFG' '$CSV'"
+  SHCMD="cd '$(pwd)' && $CLIENT_BIN '$CFG' '$CSV'"
   if [[ -n "$METRICS_FLAG" ]]; then
     SHCMD+=" '$METRICS_FLAG'"
   fi

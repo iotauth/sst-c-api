@@ -8,6 +8,7 @@ It supports two input modes:
 - Row 1 → Config#2
 - Row 2 → Config#3
 - **Raw metrics mode**: provide the raw metrics logs for each configuration separately with `--config1`, `--config2`, and `--config3`.
+  Fill in the `malicious_number` column manually before plotting, since the metrics logger leaves it blank by default.
 
 In throughput mode, the script reads `attempt_rate_per_s`.  
 In latency mode, it converts `avg_us` to milliseconds.
@@ -49,6 +50,7 @@ Required columns:
 - avg_us (latency mode; converted to ms)
 
 In raw metrics mode, the script averages all rows/files for the same `malicious_number` within each config.
+The `malicious_number` column must be filled in manually before running the plotter.
 Rows missing required columns are skipped.
 
 ## Output

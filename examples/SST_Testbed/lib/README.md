@@ -6,7 +6,7 @@ The command should look like: `./client <config_file> <csv_file> -metrics`
 
 # Metric Log Values
 
-For the DoS and DDoS attacks, enabling metric logging will create a CSV file in the `SST_Testbed/metric_logs/` directory that contains information regarding the current execution of `client`. When launched through `run_clients.sh`, the file name is also tagged with the malicious-client count (for example, `client_metrics_log_mc10.csv`). The values stored in the metrics log file are:
+For the DoS and DDoS attacks, enabling metric logging will create a CSV file in the `SST_Testbed/metric_logs/` directory that contains information regarding the current execution of `client`. The values stored in the metrics log file are:
 
 1. `exp_id`
 
@@ -14,7 +14,7 @@ For the DoS and DDoS attacks, enabling metric logging will create a CSV file in 
 
 2. `malicious_number`
 
-    The number of malicious clients participating in the run. This is populated automatically when the client is launched through `run_clients.sh`, and is also written to every metrics row for plotting and aggregation.
+    The number of malicious clients participating in the run. This column is left blank by default so it can be filled in manually later for plotting and aggregation.
 
 3. `ts_start`
 
