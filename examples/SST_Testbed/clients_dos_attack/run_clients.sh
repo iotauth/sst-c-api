@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 # run_clients.sh
-# Usage: ./run_clients.sh <number-of-clients> <csv-file> [source-ip]
+# Usage: ./run_clients.sh <number-of-clients> <csv-file> [-metrics] [source-ip]
 
 OS=$(uname)
 SUDO_KEEPALIVE_PID=""
@@ -62,15 +62,33 @@ launch_terminal() {
   fi
 }
 
-# Require 2 or 3 arguments
-if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo "Usage: $0 <number-of-clients> <csv-file> [source-ip]"
+# Require 2 to 4 arguments
+if [[ $# -lt 2 || $# -gt 4 ]]; then
+  echo "Usage: $0 <number-of-clients> <csv-file> [-metrics] [source-ip]"
   exit 1
 fi
 
 COUNT="$1"
 CSV="$2"
-SRC_IP="${3:-}" # empty if not provided
+METRICS_FLAG=""
+SRC_IP=""
+
+for arg in "${@:3}"; do
+  if [[ "$arg" == "-metrics" ]]; then
+    if [[ -n "$METRICS_FLAG" ]]; then
+      echo "Duplicate -metrics flag."
+      echo "Usage: $0 <number-of-clients> <csv-file> [-metrics] [source-ip]"
+      exit 1
+    fi
+    METRICS_FLAG="-metrics"
+  elif [[ -z "$SRC_IP" ]]; then
+    SRC_IP="$arg"
+  else
+    echo "Too many positional arguments."
+    echo "Usage: $0 <number-of-clients> <csv-file> [-metrics] [source-ip]"
+    exit 1
+  fi
+done
 
 SERVER_BIN="../build/server"
 CLIENT_BIN="../build/client"
@@ -150,12 +168,12 @@ for (( i=0; i<COUNT; i++ )); do
     exit 1
   fi
 
+  SHCMD="cd '$(pwd)' && SST_MALICIOUS_CLIENTS='$COUNT' $CLIENT_BIN '$CFG' '$CSV'"
+  if [[ -n "$METRICS_FLAG" ]]; then
+    SHCMD+=" '$METRICS_FLAG'"
+  fi
   if [[ -n "$SRC_IP" ]]; then
-    # With source IP: third argument
-    SHCMD="cd '$(pwd)' && $CLIENT_BIN '$CFG' '$CSV' '$SRC_IP'"
-  else
-    # No source IP: only config + CSV
-    SHCMD="cd '$(pwd)' && $CLIENT_BIN '$CFG' '$CSV'"
+    SHCMD+=" '$SRC_IP'"
   fi
 
   launch_terminal "$SHCMD" "$USE_SUDO"

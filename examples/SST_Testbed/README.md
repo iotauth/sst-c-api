@@ -273,10 +273,14 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 4. If password is not provided, insert a password when prompted.
 
-5. Run `./run_clients.sh <number_of_clients> <input_file>`
+5. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip]`
     - `<number_of_clients>` is the number of clients that should be created during this execution.
     - `<input_file>` is the input CSV file that the program should read for this execution.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
-    - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
+    - `[-metrics]` is optional. If provided, each client writes metrics to `SST_Testbed/metric_logs/`.
+    - `[source-ip]` is optional. If provided, it is forwarded to each client after `-metrics`, matching the client's expected argument order.
+    - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv`
+    - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics`
+    - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics 192.168.1.10`
 
 Each client will be launched in a unique terminal window, along with a terminal window for the server, and will simultaneously perform the attack specified in the input CSV file.
