@@ -186,7 +186,7 @@ static void parse_distribution_key(distribution_key_t* parsed_distribution_key,
 // @param s_key The target session key to set the modes.
 static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t* ctx,
                                                          session_key_t* s_key) {
-    s_key->enc_mode = ctx->config.encryption_mode;
+    s_key->enc_mode = ctx->config.session_key_enc_mode;
     s_key->hmac_mode = ctx->config.hmac_mode;
 }
 
@@ -300,7 +300,9 @@ static int check_session_key_validity(session_key_t* session_key) {
 // @return -1 when expired, 0 when valid
 static int check_distribution_key_validity(distribution_key_t* dist_key) {
     int ret = check_validity(dist_key->abs_validity);
-    SST_print_debug("Distribution key expired!");
+    if (ret < 0) {
+        SST_print_debug("Distribution key expired!");
+    }
     return ret;
 }
 
@@ -425,7 +427,7 @@ int save_distribution_key(unsigned char* data_buf, SST_ctx_t* ctx,
 
     // parse decrypted_dist_key_buf to mac_key & cipher_key
     parse_distribution_key(&ctx->dist_key, decrypted_dist_key_buf);
-    ctx->dist_key.enc_mode = ctx->config.encryption_mode;
+    ctx->dist_key.enc_mode = ctx->config.dist_key_enc_mode;
     free(decrypted_dist_key_buf);
     return 0;
 }
@@ -669,7 +671,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config.encryption_mode, 0, &decrypted,
+                    ctx->config.session_key_enc_mode, 0, &decrypted,
                     &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate() after "
@@ -717,7 +719,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config.encryption_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, 0,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length) < 0) {
                 SST_print_error(
