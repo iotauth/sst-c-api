@@ -654,7 +654,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
             state = AUTH_HELLO_RECEIVED;
             if (handle_AUTH_HELLO(
                     data_buf, ctx, entity_nonce, sock, ctx->config.numkey,
-                    ctx->config.purpose[ctx->config.purpose_index], 1) < 0) {
+                    ctx->purpose_for_requesting_key, 1) < 0) {
                 return NULL;
             }
         } else if (state == AUTH_HELLO_RECEIVED &&
