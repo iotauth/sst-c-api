@@ -219,16 +219,19 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
         
-        // Restore the original purpose after the key has been fetched.
-        snprintf(ctx->purpose_for_requesting_key,
-                sizeof(ctx->purpose_for_requesting_key), "%s",
-                ctx->config.purpose[ctx->config.purpose_index]);
-
         if (s_key_list == NULL) {
             SST_print_error(
                 "Failed to send_session_key_request_check_protocol().");
             return NULL;
         }
+
+        if (strcmp(ctx->config.purpose[ctx->config.purpose_index], "{\"group\":\"Federates\"}") == 0) {
+            // Restore the original purpose after the key has been fetched.
+            snprintf(ctx->purpose_for_requesting_key,
+                    sizeof(ctx->purpose_for_requesting_key), "%s",
+                    ctx->config.purpose[ctx->config.purpose_index]);
+        }
+
         int index =
             add_session_key_to_list(s_key_list->s_key, existing_s_key_list);
         if (index < 0) {
