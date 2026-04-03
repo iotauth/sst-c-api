@@ -389,7 +389,8 @@ int read_secure_message(unsigned char* plaintext,
         session_ctx->sock, &message_type, received_buf,
         MAX_SECURE_COMM_MSG_LENGTH);
     if (bytes_read == 0) {
-        SST_print_debug("Socket was disconnected while reading secure message.");
+        SST_print_debug(
+            "Socket was disconnected while reading secure message.");
         return 0;
     } else if (bytes_read < 0) {
         SST_print_error("Failed to read_header_return_data_buf_pointer().");

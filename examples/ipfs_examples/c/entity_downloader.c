@@ -3,7 +3,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
-#include "../../../ipfs.h"
+#include "../../../src/ipfs.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

@@ -1,6 +1,6 @@
 extern "C" {
 #include "../../../c_crypto.h"
-#include "../../../ipfs.h"
+#include "../../../src/ipfs.h"
 }
 
 #include <unistd.h>
