@@ -176,10 +176,13 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
     // Read the first byte.
     int received_buf_length =
         sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-    if (received_buf_length <= 0) {
+    if (received_buf_length < 0) {
         SST_print_error(
             "Socket read error in read_header_return_data_buf_pointer().");
         return -1;
+    } else if (received_buf_length == 0) {
+        SST_print_log("End of file. Disconnected from socket %d", socket);
+        return 0;
     }
     *message_type = received_buf[0];
     // Read one bytes each, until the variable length buffer ends.

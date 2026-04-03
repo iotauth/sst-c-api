@@ -1,5 +1,5 @@
 extern "C" {
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 }
 
 #include <unistd.h>

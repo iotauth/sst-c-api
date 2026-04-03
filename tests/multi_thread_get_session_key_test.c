@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../c_api.h"
+#include "../src/c_api.h"
 
 void* send_request(void* SST_ctx) {
     SST_ctx_t* ctx = (SST_ctx_t*)SST_ctx;
