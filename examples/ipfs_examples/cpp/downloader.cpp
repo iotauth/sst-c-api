@@ -1,5 +1,5 @@
 extern "C" {
-#include "../../../c_crypto.h"
+#include "../../../src/c_crypto.h"
 #include "../../../src/ipfs.h"
 }
 
