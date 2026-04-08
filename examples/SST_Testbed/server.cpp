@@ -47,6 +47,7 @@ void* receive_and_print_messages(void* thread_args) {
 
     unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
     // Receive messages from client
+    int count = 0;
     for (;;) {
         int ret = read_secure_message(received_buf, session_ctx);
         if (ret < 0) {
@@ -57,9 +58,15 @@ void* receive_and_print_messages(void* thread_args) {
             break;
         }
         // Process the received_buf message
-        std::cout << "Received message from socket: " << clnt_sock << ": ";
+        std::cout << "Received message " << count
+                  << " from socket: " << clnt_sock << ": ";
         std::cout.write(reinterpret_cast<const char*>(received_buf), ret);
         std::cout << std::endl;
+        count++;
+        int msg = send_secure_message("Hello", strlen("Hello"), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
     }
 
     std::cout << "Client " << clnt_sock << " disconnected.\n";
