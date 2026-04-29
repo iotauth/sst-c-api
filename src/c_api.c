@@ -20,6 +20,14 @@ SST_ctx_t* init_SST(const char* config_path) {
         SST_print_error("Failed to load_config()");
         return NULL;
     }
+    // Copy the original purpose field from the config struct to the
+    // purpose_for_requesting_key field in the ctx struct The purpose field in
+    // the config struct will be read only and the purpose_for_requesting_key
+    // field will be used for acquiring session keys.
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s",
+             ctx->config.purpose[ctx->config.purpose_index]);
+
     int numkey = ctx->config.numkey;
     if (ctx->config.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
         ctx->pub_key =
@@ -205,19 +213,28 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
     if (session_key_idx >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx < 0) {
-        // WARNING: The following line overwrites the purpose.
-        snprintf(ctx->config.purpose[ctx->config.purpose_index],
-                 sizeof(ctx->config.purpose[ctx->config.purpose_index]),
-                 "{\"keyId\":%d}", target_session_key_id_int);
+        snprintf(ctx->purpose_for_requesting_key,
+                 sizeof(ctx->purpose_for_requesting_key), "{\"keyId\":%d}",
+                 target_session_key_id_int);
 
         session_key_list_t* s_key_list;
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
+
         if (s_key_list == NULL) {
             SST_print_error(
                 "Failed to send_session_key_request_check_protocol().");
             return NULL;
         }
+
+        if (strcmp(ctx->config.purpose[ctx->config.purpose_index],
+                   "{\"group\":\"Federates\"}") == 0) {
+            // Restore the original purpose after the key has been fetched.
+            snprintf(ctx->purpose_for_requesting_key,
+                     sizeof(ctx->purpose_for_requesting_key), "%s",
+                     ctx->config.purpose[ctx->config.purpose_index]);
+        }
+
         int index =
             add_session_key_to_list(s_key_list->s_key, existing_s_key_list);
         if (index < 0) {
