@@ -62,6 +62,9 @@ typedef struct {
 #define ATTRIBUTE_FORMAT_PRINTF(f, s)
 #endif
 
+void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error_exit(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+
 // Debug logging (only enabled in DEBUG mode)
 #ifdef DEBUG
 #define SST_DEBUG_ENABLED 1
