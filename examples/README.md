@@ -39,7 +39,22 @@ For compilation and step-by-step run instructions, see:
 
 ---
 
-## 3. File Block Encrypt Example
+## 3. Heterogeneous C Client
+
+A cross-language example where a C client connects securely to a Node.js server through Auth:
+
+- Uses the SST C API on the client side.
+- Uses the Node.js `SecureCommServer` accessor on the server side.
+- Demonstrates that session-key handshakes and secure messages interoperate across SDKs.
+
+For the full scenario, including graph generation and run order, see:
+
+- [`$SST_ROOT/examples/heterogeneous/README.md`](../../../examples/heterogeneous/README.md)
+- [`heterogeneous_client/README.md`](./heterogeneous_client/README.md)
+
+---
+
+## 4. File Block Encrypt Example
 
 An example focused on **block-based file encryption**, inspired by RocksDB-style block layouts:
 
@@ -58,7 +73,7 @@ For compilation and step-by-step run instructions, see:
 
 ---
 
-## 4. SST Testbed
+## 5. SST Testbed
 
 A testbed to experiment attacks on SST.
 
