@@ -36,6 +36,24 @@ void SST_print_log(const char* fmt, ...) {
     va_end(args);
 }
 
+// Print out warning messages along with errno if set.
+void SST_print_warning(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    // Print the "WARNING:" prefix to stderr
+    fprintf(stderr, "WARNING: ");
+    // Print the formatted warning message to stderr (without adding a newline)
+    vfprintf(stderr, fmt, args);
+    // Print errno if it is set
+    if (errno != 0) {
+        fprintf(stderr, " (errno: %d, %s)", errno, strerror(errno));
+    }
+    // End the line after the warning message and errno
+    fprintf(stderr, "\n");
+
+    va_end(args);
+}
+
 // Print out error messages along with errno if set.
 void SST_print_error(const char* fmt, ...) {
     va_list args;
