@@ -13,6 +13,8 @@ This directory includes unit tests and integration tests for the SST C API.
 
 - `multi_thread_get_session_key_test.c` : Tests `get_session_key()` called simultaneously by multiple threads. This test fails.
 
+- `multiple_request_get_session_key_test.c` : Tests `get_session_key()` called multiple times sequentially to check list capacity and append behavior.
+
 # Test Instructions
 
 We use $IOTAUTH for the root directory of `iotauth` repo.
