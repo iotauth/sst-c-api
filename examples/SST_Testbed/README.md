@@ -1,6 +1,95 @@
 # SST Testbed
 ---
 
+SST Testbed is an open-source, extensible platform for evaluating the security and resilience of embedded, resource-constrained networked systems. It supports replay and denial-of-service (DoS) attacks — including distributed variants — through configurable CSV input files and lightweight scripts that simplify setup and experimentation.
+
+> **Publication:** C. Beltran Quinonez, D. Kim, and H. Kim, "SST Testbed: An Experimental Platform of Attacks and Defenses for Networked Embedded Systems," in *Proc. 2026 IEEE International Conference on Industrial Technology (ICIT)*, 2026.
+> DOI: [10.1109/ICIT64854.2026.11490150](https://ieeexplore.ieee.org/document/11490150)
+
+---
+
+# Background
+
+## Overview
+
+The growing prevalence of IoT devices has introduced significant security challenges, as their constant connectivity and limited resources make them vulnerable to network-level attacks. SST Testbed addresses the lack of open-source security testbeds designed for constrained environments by providing a practical, reproducible environment for attack simulation and defense evaluation.
+
+SST Testbed builds upon the [Secure Swarm Toolkit (SST)](https://github.com/iotauth/iotauth) using the C API. SST introduces a local authorization entity, **Auth**, that acts as a Key Distribution Center (KDC), providing authentication and authorization services for connected devices.
+
+## Workflow
+
+The testbed workflow is organized into five stages:
+
+![SST Testbed Workflow](images/fig1_workflow.png)
+
+1. **Setup** — The user specifies the number of clients and attack type via an input CSV file, then runs `clients_dos_setup.sh` to initialize the environment.
+2. **Generate Testbed** — `graph_generator.js` produces the network topology; `config_generator.js` creates per-entity configuration files (credential paths, Auth IP/port, Auth ID, entity name).
+3. **Execution** — `run_clients.sh` launches the specified number of clients and the server, each loading its configuration file.
+4. **Network Attack Simulation** — Clients carry out attack scenarios defined in the CSV (replay, excessive key requests, message flooding, repeated connections).
+5. **Deployment** — The generated artifacts can run in simulation (ns-3) or be deployed directly to embedded devices such as Raspberry Pi boards without modifying attack logic.
+
+## Supported Attacks
+
+### Replay Attack
+
+The user manipulates the sequence number attached to each client message. Changing the sequence number simulates replaying a previous message to confuse or manipulate the server. The CSV parameter specifies the sequence number modification (`seq++`, `seq--`, `seq=N`).
+
+### DoS / DDoS via Session Key Requests (DoSK)
+
+Clients issue an excessive number of session key requests to the Auth/KDC, exhausting its key-provisioning capacity and preventing legitimate clients from obtaining keys.
+
+![DoSK — Clients launching excessive session key requests toward the Auth/KDC](images/fig2_ddos_key.png)
+
+### DoS / DDoS via Message Flooding (DoSM)
+
+Once a session is established, clients flood the server with a large volume of secure messages, overwhelming its message-handling loop and network buffers.
+
+![DoSM — Clients overwhelming the server with a large volume of secure messages](images/fig3_ddos_message.png)
+
+### DoS / DDoS via Connection Requests (DoSC)
+
+Clients repeatedly connect to the server, consuming its CPU and memory for session management. Each connection also triggers a session key request to Auth, amplifying load on both the server and Auth.
+
+![DoSC — Clients repeatedly connecting to the server, indirectly triggering excessive session key requests to Auth](images/fig4_ddos_connect.png)
+
+### DoS / DDoS via SYN Flooding
+
+Unlike the attacks above, a SYN flood requires no authentication. The attacker sends a large number of TCP SYN packets without completing the handshake, filling the target's connection table with half-open entries. A botnet can amplify this into a DDoS by distributing SYN streams across many sources.
+
+## Experimental Setup and Results
+
+The testbed was evaluated across three hardware configurations:
+
+| Config | Auth | Server | Benign Client | Attacker |
+|--------|------|--------|---------------|----------|
+| #1 | Workstation | Workstation | Workstation 2 | MacBook Pro |
+| #2 | Workstation | RPI 4B #1 | RPI 4B #2 | RPI 4B #3 |
+| #3 | Workstation | RPI 4B #1 | RPI 4B #2 | RPI 4B #3 + MacBook Pro |
+
+![Config #3 deployment topology](images/fig5_deployment.png)
+
+### DDoS Key Attack Results
+Benign client latency grows linearly up to **85x** and throughput drops up to **98.9%** as malicious clients increase from 0 to 100.
+
+![DDoS Key Attack — Latency and Throughput](images/fig6_key_results.png)
+
+### DDoS Message Attack Results
+Latency increases up to **301x** and throughput decreases up to **99.99%**.
+
+![DDoS Message Attack — Latency and Throughput](images/fig7_message_results.png)
+
+### DDoS Connect Attack Results
+Latency increases up to **9.6x** and throughput decreases up to **98.8%**. With 100 attackers, 90 out of 100 benign connection attempts failed.
+
+![DDoS Connect Attack — Latency and Throughput](images/fig8_connect_results.png)
+
+### DDoS SYN Flood Results
+Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No key-request failures were observed.
+
+![DDoS SYN Flood — Latency and Throughput](images/fig9_syn_flood_results.png)
+
+---
+
 # Prerequisites
 ### ***Auth***
 1. OpenSSL command line tools for creating certificates and keystores of Auths and example entities
@@ -224,4 +313,3 @@ So, also make sure that the ***Auth*** executed before is terminated.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
 
 Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
-
