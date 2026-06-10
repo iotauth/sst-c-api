@@ -33,7 +33,7 @@ Examples that integrate SST with [IPFS](https://ipfs.tech/) to realize a secure 
 For compilation and step-by-step run instructions, see:
 
 - Higher-level description in the main SST repo:  
-  [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/master/examples/file_sharing)
+  [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/main/examples/file_sharing)
 - C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
 - C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
 

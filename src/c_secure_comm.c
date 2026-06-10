@@ -915,7 +915,7 @@ int check_session_key_list_addable(int requested_num_key,
         }
         return ret;  // 1 for addable, 0 for not addable.
     } else {
-        return 0;
+        return 1;
     }
 }
 

@@ -48,7 +48,7 @@ SST_ctx_t* init_SST(const char* config_path) {
         }
     }
     if (numkey > MAX_SESSION_KEY) {
-        SST_print_error(
+        SST_print_warning(
             "Too much requests of session keys. The max number of requestable "
             "session keys are %d",
             MAX_SESSION_KEY);
@@ -69,7 +69,7 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config.numkey,
                                            existing_s_key_list) == 0) {
-            SST_print_error("The session key list is not addable.");
+            SST_print_warning("The session key list is not addable.");
             return existing_s_key_list;
         }
     }
