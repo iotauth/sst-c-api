@@ -11,3 +11,4 @@ entity_server
 .vscode
 !/Makefile
 embedded/receiver/config/*
+.DS_Store
