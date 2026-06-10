@@ -1,7 +1,7 @@
 # SST Testbed
 ---
 
-SST Testbed is an open-source, extensible platform for evaluating the security and resilience of embedded, resource-constrained networked systems. It supports replay and denial-of-service (DoS) attacks — including distributed variants — through configurable CSV input files and lightweight scripts that simplify setup and experimentation.
+SST Testbed is an open-source, extensible platform for evaluating the security and resilience of embedded, resource-constrained networked systems. It supports replay and denial-of-service (DoS) attacks, including distributed variants, through configurable CSV input files and lightweight scripts that simplify setup and experimentation. Notably, SST Testbed won [1st place](https://2025.esweek.org/awards-2025/) in the [Embedded System Software Competition (ESSC)](https://embedded-research-competition.github.io/) at [ESWEEK 2025](https://2025.esweek.org/).
 
 > **Publication:** C. Beltran Quinonez, D. Kim, and H. Kim, "SST Testbed: An Experimental Platform of Attacks and Defenses for Networked Embedded Systems," in *Proc. 2026 IEEE International Conference on Industrial Technology (ICIT)*, 2026.
 > DOI: [10.1109/ICIT64854.2026.11490150](https://ieeexplore.ieee.org/document/11490150)
