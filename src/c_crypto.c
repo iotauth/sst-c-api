@@ -459,7 +459,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
         if (memcmp(reproduced_tag, buf + iv_size + encrypted_length,
                    mac_key_size) != 0) {
             SST_print_debug("Received tag: ");
-            print_buf_debug(buf + encrypted_length, mac_key_size);
+            print_buf_debug(buf + iv_size + encrypted_length, mac_key_size);
             SST_print_debug("Hmac tag: ");
             print_buf_debug(reproduced_tag, mac_key_size);
             return -1;

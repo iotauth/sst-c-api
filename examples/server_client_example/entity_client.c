@@ -45,19 +45,6 @@ int main(int argc, char* argv[]) {
     pthread_join(thread, NULL);  // Needs to wait until the thread is joined.
     free_session_ctx(session_ctx);
 
-    s_key_list = get_session_key(ctx, s_key_list);
-    if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
-    }
-    s_key_list = get_session_key(ctx, s_key_list);
-    if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
-    }
-    s_key_list = get_session_key(ctx, s_key_list);  // Intended to fail.
-    if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
-    }
-
     sleep(3);
     pthread_t thread2;
     session_ctx = secure_connect_to_server(&s_key_list->s_key[1], ctx);

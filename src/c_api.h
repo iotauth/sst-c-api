@@ -378,6 +378,6 @@ void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char* fmt, ...);
+void SST_print_error_exit(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 
 #endif  // C_API_H
