@@ -141,16 +141,21 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
 
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
-    int received_buf_length =
-        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-    if (received_buf_length <= 0) {
-        SST_print_error("Failed sst_read_from_socket().");
+    unsigned char message_type;
+    int data_buf_length = read_header_return_data_buf_pointer(
+        sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+    if (data_buf_length < 0) {
+        SST_print_error(
+            "Failed read_header_return_data_buf_pointer(). Socket read "
+            "error in secure_connect_to_server_with_socket()");
+        return NULL;
+    } else if (data_buf_length == 0) {
+        SST_print_error(
+            "Socket disconnected during handshake2 in "
+            "secure_connect_to_server_with_socket()");
         return NULL;
     }
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char* data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
+    unsigned char* data_buf = received_buf;
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
             SST_print_error(
