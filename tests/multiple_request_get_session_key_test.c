@@ -33,33 +33,37 @@ int main(int argc, char* argv[]) {
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed 1st get_session_key().");
+    } else {
+        printf("1st request succeeded. num_key: %d\n", s_key_list->num_key);
+        assert(s_key_list->num_key == EXPECTED_KEYS_1ST);
     }
-    printf("1st request succeeded. num_key: %d\n", s_key_list->num_key);
-    assert(s_key_list->num_key == EXPECTED_KEYS_1ST);
 
     // 2nd request: Append to session key list.
     s_key_list = get_session_key(ctx, s_key_list);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed 2nd get_session_key().");
+    } else {
+        printf("2nd request completed. num_key: %d\n", s_key_list->num_key);
+        assert(s_key_list->num_key == EXPECTED_KEYS_2ND);
     }
-    printf("2nd request completed. num_key: %d\n", s_key_list->num_key);
-    assert(s_key_list->num_key == EXPECTED_KEYS_2ND);
 
     // 3rd request: Append to session key list again.
     s_key_list = get_session_key(ctx, s_key_list);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed 3rd get_session_key().");
+    } else {
+        printf("3rd request completed. num_key: %d\n", s_key_list->num_key);
+        assert(s_key_list->num_key == EXPECTED_KEYS_3RD);
     }
-    printf("3rd request completed. num_key: %d\n", s_key_list->num_key);
-    assert(s_key_list->num_key == EXPECTED_KEYS_3RD);
 
     // 4th request: This should reach the limit and fail to add.
     s_key_list = get_session_key(ctx, s_key_list);
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed 4th get_session_key().");
+    } else {
+        printf("4th request completed. num_key: %d\n", s_key_list->num_key);
+        assert(s_key_list->num_key == EXPECTED_KEYS_4TH);
     }
-    printf("4th request completed. num_key: %d\n", s_key_list->num_key);
-    assert(s_key_list->num_key == EXPECTED_KEYS_4TH);
 
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
