@@ -499,6 +499,10 @@ int save_session_key_list(session_key_list_t* session_key_list,
 
 int load_session_key_list(session_key_list_t* session_key_list,
                           const char* file_path) {
+    if (session_key_list == NULL || session_key_list->s_key == NULL) {
+        SST_print_error("session_key_list or session_key_list->s_key is NULL.");
+        return -1;
+    }
     FILE* load_file_fp;
     if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
         SST_print_error("Failed to fopen()");
@@ -589,6 +593,10 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
                                         unsigned int password_len,
                                         const char* salt,
                                         unsigned int salt_len) {
+    if (session_key_list == NULL || session_key_list->s_key == NULL) {
+        SST_print_error("session_key_list or session_key_list->s_key is NULL.");
+        return -1;
+    }
     unsigned char iv[AES_BLOCK_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
@@ -636,13 +644,16 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
         return -1;
     }
 
+    // Save the malloced pointer
+    session_key_t* s = session_key_list->s_key;
+
     // Deserialize the buffer into session_key_list
     memcpy(session_key_list, buffer, sizeof(session_key_list_t));
-    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
-    if (!session_key_list->s_key) {
-        SST_print_error("Memory allocation failed!");
-        return -1;
-    }
+
+    // Reload the saved pointer
+    session_key_list->s_key = s;
+
+    // Copy session keys into pre-allocated memory
     memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
            sizeof(session_key_t) * MAX_SESSION_KEY);
 
