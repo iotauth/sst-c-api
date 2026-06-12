@@ -62,9 +62,20 @@ typedef struct {
 #define ATTRIBUTE_FORMAT_PRINTF(f, s)
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_NORETURN __declspec(noreturn)
+#elif __STDC_VERSION__ >= 201112L
+#define ATTRIBUTE_NORETURN _Noreturn
+#else
+#define ATTRIBUTE_NORETURN
+#endif
+
 void SST_print_warning(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
-void SST_print_error_exit(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error_exit(const char* fmt, ...)
+    ATTRIBUTE_FORMAT_PRINTF(1, 2) ATTRIBUTE_NORETURN;
 
 // Debug logging (only enabled in DEBUG mode)
 #ifdef DEBUG
