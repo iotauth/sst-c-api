@@ -40,7 +40,6 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 -   Returns struct session_key_list_t.
 
 **SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key, SST_ctx_t *ctx)**
-
 -   `secure_connect_to_server()` is a function that establishes a secure connection with the entity server in the struct config.
 -   Input is the session key received from `get_session_key()` and struct config returned from `load_config()`.
 -   Returns struct SST_session_ctx_t
@@ -66,7 +65,6 @@ pthread_create(&thread, NULL, &receive_thread_read_one_each, (void \*)session_ct
 ```
 
 **int read_secure_message(unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
-
 - `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received decrypted message.
 - Input is the pointer to the user-declared buffer, and the given buffer's length (not the received message).
 - Returns the length of the decrypted message.
@@ -148,4 +146,14 @@ To run examples, please check out the [`examples/`](./examples/README.md) direct
         4. Change from `"Visual Studio"` to `"{ BasedOnStyle: Google, IndentWidth: 4 }"`
     -   To format the code, follow the instructions on this [page](https://code.visualstudio.com/docs/editor/codebasics#_formatting).
 
-*Last updated on June 10, 2026*
+-   To format all C/C++ source files in the repository using the project's clang-format style, run:
+    ```
+    make format
+    ```
+-   To check formatting without modifying files (exits with an error if any file is not properly formatted), run:
+    ```
+    make format-check
+    ```
+    Both commands operate on all `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, and `.hh` files, excluding the `build/` directory and `embedded/lib/`.
+
+*Last updated on June 12, 2026*

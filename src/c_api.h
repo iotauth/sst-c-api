@@ -355,6 +355,16 @@ int secure_rand(int min, int max);
 #define ATTRIBUTE_FORMAT_PRINTF(f, s)
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_NORETURN __declspec(noreturn)
+#elif __STDC_VERSION__ >= 201112L
+#define ATTRIBUTE_NORETURN _Noreturn
+#else
+#define ATTRIBUTE_NORETURN
+#endif
+
 // Print out debug messages. This will be printed only when the
 // cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // Uses printf-style formatting.
@@ -378,6 +388,7 @@ void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error_exit(const char* fmt, ...)
+    ATTRIBUTE_FORMAT_PRINTF(1, 2) ATTRIBUTE_NORETURN;
 
 #endif  // C_API_H
