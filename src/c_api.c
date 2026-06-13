@@ -72,8 +72,12 @@ session_key_list_t* init_empty_session_key_list(void) {
     return session_key_list;
 }
 
-session_key_list_t* get_session_key(SST_ctx_t* ctx,
-                                    session_key_list_t* existing_s_key_list) {
+session_key_list_t* get_session_key_with_index(
+    SST_ctx_t* ctx, int purpose_index,
+    session_key_list_t* existing_s_key_list) {
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s",
+             ctx->config.purpose[purpose_index]);
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config.numkey,
                                            existing_s_key_list) == 0) {
@@ -100,6 +104,12 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
         free_session_key_list_t(earned_s_key_list);
         return existing_s_key_list;
     }
+}
+
+session_key_list_t* get_session_key(SST_ctx_t* ctx,
+                                    session_key_list_t* existing_s_key_list) {
+    return get_session_key_with_index(ctx, ctx->config.purpose_index,
+                                      existing_s_key_list);
 }
 
 SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
@@ -232,13 +242,10 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
             return NULL;
         }
 
-        if (strcmp(ctx->config.purpose[ctx->config.purpose_index],
-                   "{\"group\":\"Federates\"}") == 0) {
-            // Restore the original purpose after the key has been fetched.
-            snprintf(ctx->purpose_for_requesting_key,
-                     sizeof(ctx->purpose_for_requesting_key), "%s",
-                     ctx->config.purpose[ctx->config.purpose_index]);
-        }
+        // Restore the original purpose after the key has been fetched.
+        snprintf(ctx->purpose_for_requesting_key,
+                 sizeof(ctx->purpose_for_requesting_key), "%s",
+                 ctx->config.purpose[ctx->config.purpose_index]);
 
         int index =
             add_session_key_to_list(s_key_list->s_key, existing_s_key_list);
