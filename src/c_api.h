@@ -137,8 +137,7 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
                                     session_key_list_t* existing_s_key_list);
 
 session_key_list_t* get_session_key_with_index(
-    SST_ctx_t* ctx, int purpose_index,
-    session_key_list_t* existing_s_key_list);
+    SST_ctx_t* ctx, int purpose_index, session_key_list_t* existing_s_key_list);
 
 // Connect to entity_server using the session key. This function can be called
 // after the connect() function, and uses the user's socket.

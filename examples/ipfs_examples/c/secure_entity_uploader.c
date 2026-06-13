@@ -47,7 +47,8 @@ int main(int argc, char* argv[]) {
     if (hash_value_len < 0) {
         SST_print_error_exit("Failed file_encrypt_upload()");
     }
-    unsigned int test_key_id = convert_skid_buf_to_int(s_key_list_0->s_key[0].key_id, SESSION_KEY_ID_SIZE);
+    unsigned int test_key_id = convert_skid_buf_to_int(
+        s_key_list_0->s_key[0].key_id, SESSION_KEY_ID_SIZE);
     printf("DEBUG: FileSharing session key ID to upload: %u\n", test_key_id);
     char concat_buffer[MAX_PAYLOAD_LENGTH];
     int concat_buffer_size =
