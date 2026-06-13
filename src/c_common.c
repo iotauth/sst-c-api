@@ -399,7 +399,7 @@ int sst_read_from_socket(int socket, unsigned char* buf,
     if (length_read < 0) {
         SST_print_error("Reading from socket %d failed.", socket);
     } else if (length_read == 0) {
-        SST_print_error("Connection closed from socket %d.", socket);
+        SST_print_debug("Connection closed from socket %d.", socket);
     }
     return length_read;
 }
