@@ -411,6 +411,9 @@ void* receive_thread_read_one_each(void* SST_session_ctx) {
             SST_print_error("Failed to read_secure_message().");
             return NULL;
         }
+        if (data_buf_length == 0) {
+            return NULL;
+        }
         SST_print_log("Received: %.*s", data_buf_length, data_buf);
     }
 }
