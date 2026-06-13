@@ -32,13 +32,12 @@ int main(int argc, char* argv[]) {
     }
     fclose(add_reader_file);
     // Set purpose to make session key request for file sharing.
-    ctx->config.purpose_index = 1;
     estimate_time_t estimate_time[5];
     struct timeval keygen_start, keygen_end;
     gettimeofday(&keygen_start, NULL);
-    session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list_0 = get_session_key_with_index(ctx, 1, NULL);
     if (s_key_list_0 == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
+        SST_print_error_exit("Failed get_session_key_with_index().");
     }
     gettimeofday(&keygen_end, NULL);
     float keygen_time = keygen_end.tv_sec - keygen_start.tv_sec;
