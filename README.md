@@ -14,7 +14,7 @@ This is a repository for C API of **[SST (Secure Swarm Toolkit)](https://github.
 
     - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation. 
 
-# Code Hiearchy
+# Code Hierarchy
 
 c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 
@@ -112,10 +112,32 @@ The four functions below are for saving and the `session_key_list_t`,
 
 -   `free_SST_ctx_t()` is a function that frees the memory assigned to the loaded SST_ctx. It recursively frees the memory assigned by SST_ctx.
 
+# C++ Implementation
+
+A complete C++ implementation is available in the `cpp/` directory that mirrors all functionality of the original C library while providing:
+
+- **Full API Compatibility** - All functions work exactly as in the C version
+- **Modern C++ Benefits** - Can use modern C++ features where appropriate  
+- **Build System Ready** - Full CMake integration for both library and tests
+- **Independent Development** - Separate build system from original C code
+
+## Building C++ Version
+
+```bash
+# Build C++ library and tests
+mkdir build_cpp && cd build_cpp
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+
+# Run all unit tests
+ctest
+```
+
+For detailed C++ implementation information, see `README_CPP.md`.
+
 # Compile
 
 For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
-
 
 ```
 $cd $SST_ROOT/entity/c
