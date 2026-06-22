@@ -21,7 +21,7 @@ env:
 jobs:
   iotauth-integration-test:
     if: ${{ inputs.iotauth-ref == '' }}
-    uses: iotauth/iotauth/.github/workflows/integration-test.yml@ci-fix
+    uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
     with:
       sst-c-api-ref: ${{ github.sha }}
 
