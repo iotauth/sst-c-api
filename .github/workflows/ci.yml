@@ -33,6 +33,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
 
@@ -56,8 +58,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out sst-c-api
+      if: ${{ inputs.iotauth-ref == '' }}
+      uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
     - name: Read branch name from iotauth-ref.txt
+      if: ${{ inputs.iotauth-ref == '' }}
       id: read_ref
       run: |
         ref=$(head -n 1 iotauth-ref.txt)
