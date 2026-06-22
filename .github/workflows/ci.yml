@@ -7,6 +7,12 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_call:
+    inputs:
+      iotauth-ref:
+        description: 'iotauth ref for integration test (overrides iotauth-ref.txt)'
+        required: false
+        type: string
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
@@ -57,7 +63,7 @@ jobs:
       with:
         repository: iotauth/iotauth
         submodules: true
-        ref: ${{ steps.read_ref.outputs.ref }}
+        ref: ${{ inputs.iotauth-ref || steps.read_ref.outputs.ref }}
     - name: Check out specific ref of sst-c-api
       uses: actions/checkout@v4
       with:
