@@ -193,9 +193,10 @@ jobs:
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
       run: |
-        pip3 install pycryptodome
+        pip3 install ../../entity/python
         nohup python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > secure_python.pid  # Save the PID
+        sleep 5  # Wait for the server to start and bind to port 22100
 
     - name: Run the secure ipfs examples.
       working-directory: entity/c/examples/ipfs_examples/c/build
