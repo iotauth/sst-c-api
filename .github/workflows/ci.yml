@@ -20,6 +20,7 @@ env:
 
 jobs:
   iotauth-integration-test:
+    if: github.event_name != 'workflow_call'
     uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
     with:
       sst-c-api-ref: ${{ github.sha }}
