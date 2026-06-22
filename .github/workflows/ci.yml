@@ -21,7 +21,7 @@ env:
 jobs:
   iotauth-integration-test:
     if: ${{ inputs.iotauth-ref == '' }}
-    uses: iotauth/iotauth/.github/workflows/integration-test.yml@ci-fix
+    uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
     with:
       sst-c-api-ref: ${{ github.sha }}
 
@@ -85,7 +85,6 @@ jobs:
         repository: iotauth/sst-c-api
         path: entity/c
         ref: ${{ github.event.pull_request.head.sha || github.sha }}
-        clean: false
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
