@@ -20,7 +20,7 @@ env:
 
 jobs:
   iotauth-integration-test:
-    if: github.event_name != 'workflow_call'
+    if: ${{ inputs.iotauth-ref == '' }}
     uses: iotauth/iotauth/.github/workflows/integration-test.yml@ci-fix
     with:
       sst-c-api-ref: ${{ github.sha }}
@@ -36,7 +36,7 @@ jobs:
     - uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
-        ref: ${{ github.event_name == 'workflow_call' && 'main' || (github.event.pull_request.head.sha || github.sha) }}
+        ref: ${{ inputs.iotauth-ref != '' && 'main' || (github.event.pull_request.head.sha || github.sha) }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
 
@@ -79,7 +79,7 @@ jobs:
         submodules: true
         ref: ${{ inputs.iotauth-ref || steps.read_ref.outputs.ref }}
     - name: Check out specific ref of sst-c-api
-      if: ${{ github.event_name != 'workflow_call' }}
+      if: ${{ inputs.iotauth-ref == '' }}
       uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
