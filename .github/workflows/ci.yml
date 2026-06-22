@@ -19,6 +19,11 @@ env:
   BUILD_TYPE: Release
 
 jobs:
+  iotauth-integration-test:
+    uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
+    with:
+      sst-c-api-ref: ${{ github.sha }}
+
   Unit-Test:
     name: Unit Test
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
