@@ -1,13 +1,19 @@
-# SST C++ Cryptography API
+# SST C++ API
 
-A C++ cryptography API for SST
+A C++ API for SST
 ([docs](https://iotauth.github.io/docs/c-api-reference/)), built on OpenSSL.
 
-It provides the cryptographic primitives used by SST: RSA key loading,
-public-key encryption/decryption, SHA-256 digests, RSA sign/verify, AES
-encryption (CBC / CTR / GCM), and symmetric encrypt-then-authenticate.
+It provides cryptographic primitives, RAII socket wrappers, and a high-level
+session API for SST communication. The project is organized into four layers:
 
-## Design
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Crypto** | `src/crypto.hpp/cpp` | Stateless primitives — RSA, AES, SHA-256, HMAC |
+| **Network** | `src/net/sockets.hpp/cpp`, `ssl_socket.hpp/cpp` | RAII POSIX socket wrappers + TLS layer |
+| **API** | `src/api.hpp/cpp` | High-level `SST_API` / `SST_Session` session management |
+| **Logging** | `src/log/log_manager.hpp/cpp` | Singleton logger with rotating file output |
+
+## Crypto Design
 
 All entry points are grouped into the `sst::Crypto` class:
 
@@ -23,7 +29,7 @@ as a strongly-typed namespace rather than something to instantiate.
 
 ### No dynamic allocation
 
-The API performs **no dynamic allocation** (`new` / `malloc` / `std::vector`
+The **Crypto** module performs **no dynamic allocation** (`new` / `malloc` / `std::vector`
 are not used anywhere in the module):
 
 - Every routine writes its result into a **caller-provided buffer**, which at
@@ -48,10 +54,16 @@ cpp/
 ├── CMakeLists.txt        # builds the library + tests
 ├── README.md             # this file
 ├── src/
-│   ├── crypto.hpp        # public API
-│   └── crypto.cpp        # implementation
+│   ├── api.hpp/cpp       # high-level SST_API / SST_Session
+│   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
+│   ├── net/
+│   │   ├── sockets.hpp/cpp       # RAII TCP sockets
+│   │   └── ssl_socket.hpp/cpp    # TLS layer (OpenSSL)
+│   └── log/
+│       └── log_manager.hpp/cpp   # spdlog-based logging
 └── tests/
-    └── crypto_test.cpp   # unit test
+    ├── api_test.cpp      # API integration tests
+    └── crypto_test.cpp   # crypto unit tests
 ```
 
 ## Requirements
@@ -77,31 +89,32 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-Or run the test executable directly:
+Or run the test executables directly:
 
 ```sh
 ./build/crypto_test
+./build/socket_test
+./build/api_test
 ```
 
-A successful run ends with:
+A successful crypto test run ends with:
 
 ```
 All C++ crypto tests passed.
 ```
 
-## What the test covers
+## What the tests cover
 
-`tests/crypto_test.cpp` exercises the API with stack buffers only:
+- `tests/crypto_test.cpp` exercises the **Crypto** layer with stack buffers only:
+  AES encrypt/decrypt round-trips (CBC, CTR, GCM), symmetric
+  encrypt-then-authenticate with and without HMAC, SHA-256 digest
+  determinism, and SHA-256 sign/verify with an in-memory RSA key pair.
 
-1. `Crypto::encrypt_aes()` / `Crypto::decrypt_aes()` round-trip for
-   AES-128 **CBC**, **CTR**, and **GCM**.
-2. `Crypto::symmetric_encrypt_authenticate()` /
-   `Crypto::symmetric_decrypt_authenticate()` for all three modes,
-   **with** and **without** HMAC, into stack `std::array` buffers.
-3. `Crypto::digest_message_sha256()` determinism plus a
-   `Crypto::sha256_sign()` / `Crypto::sha256_verify()` round-trip using a
-   freshly generated in-memory RSA key pair (and a tampered-message negative
-   check).
+- `tests/api_test.cpp` exercises the high-level **API** layer end-to-end
+  against a real server: config-file parsing, Auth handshake, key
+  distribution, session setup, and encrypted message exchange.
+
+Full docs: [C API reference](https://iotauth.github.io/docs/c-api-reference/).
 
 ## Usage example
 
