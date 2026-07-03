@@ -74,3 +74,7 @@ add_test(NAME crypto_test COMMAND crypto_test)
 add_executable(socket_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/socket_test.cpp)
 target_link_libraries(socket_test PRIVATE ${PROJECT_NAME})
 add_test(NAME socket_test COMMAND socket_test)
+
+add_executable(api_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_test.cpp)
+target_link_libraries(api_test PRIVATE ${PROJECT_NAME})
+add_test(NAME api_test COMMAND api_test)
