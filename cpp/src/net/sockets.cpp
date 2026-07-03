@@ -253,41 +253,28 @@ int sst::Socket::CreateAddr(SST_SOCK_DOMAIN domain, const char *host_or_path, in
 {
     if (domain == SST_SOCK_INET)
     {
-        auto *in_addr = static_cast<sockaddr_in *>(malloc(sizeof(sockaddr_in)));
-        if (!in_addr)
-        {
-            std::cerr << "Failed to allocate memory for IPv4 address" << std::endl;
-            return -1;
-        }
+        auto in_addr = std::make_unique<sockaddr_in>();
         in_addr->sin_family = AF_INET;
         in_addr->sin_port = htons(port);
         if (inet_pton(AF_INET, host_or_path, &in_addr->sin_addr) != 1)
         {
-            free(in_addr);
             std::cerr << "Invalid IPv4 address: " << host_or_path << std::endl;
             return -1;
         }
-        *addr = in_addr; // Assign allocated memory to the output pointer [2]
+        *addr = in_addr.release();
         *len = sizeof(struct sockaddr_in);
     }
     else if (domain == SST_SOCK_INET6)
     {
-        auto *in6_addr = static_cast<sockaddr_in6 *>(malloc(sizeof(sockaddr_in6)));
-        if (!in6_addr)
-        {
-            std::cerr << "Failed to allocate memory for IPv6 address" << std::endl;
-
-            return -1;
-        }
+        auto in6_addr = std::make_unique<sockaddr_in6>();
         in6_addr->sin6_family = AF_INET6;
         in6_addr->sin6_port = htons(port);
         if (inet_pton(AF_INET6, host_or_path, &in6_addr->sin6_addr) != 1)
         {
-            free(in6_addr);
             std::cerr << "Invalid IPv6 address: " << host_or_path << std::endl;
             return -1;
         }
-        *addr = in6_addr;
+        *addr = in6_addr.release();
         *len = sizeof(struct sockaddr_in6);
     }
     else
@@ -491,14 +478,14 @@ int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo **info, SST_SOCK_DOMA
     void *raw_addr = nullptr;
     int addr_len = 0;
 
-    // CreateAddr allocates memory via malloc [2]
+    // CreateAddr allocates memory via std::make_unique [2]
     if (sst::Socket::CreateAddr(domain, host_or_path, port, &raw_addr, &addr_len) == -1)
     {
         std::cerr << "Failed to create address for EndPointSocket" << std::endl;
         return -1; // new_info is automatically deleted here
     }
 
-    // Transfer ownership of the malloc'd address to the unique_ptr in SST_SocketInfo
+    // Transfer ownership of the address to the unique_ptr in SST_SocketInfo
     new_info->addr.reset(static_cast<sockaddr *>(raw_addr));
     new_info->len = addr_len;
 

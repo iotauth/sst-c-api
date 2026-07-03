@@ -32,7 +32,13 @@ SSL_Socket::~SSL_Socket() {
     }
 }
 
-SSL_Socket::SSL_Socket(SSL_Socket&& other) noexcept : ssl_(other.ssl_) {
+SSL_Socket::SSL_Socket(SSL_Socket&& other) noexcept
+    : Socket(), ssl_(other.ssl_)
+{
+    // Socket() default-constructs (mutex + nullptr info). Transfer the
+    // underlying socket via SetSocketInfo, then null out the source.
+    SetSocketInfo(std::move(other.info));
+    other.info.reset();
     other.ssl_ = nullptr;
 }
 
@@ -42,6 +48,8 @@ SSL_Socket& SSL_Socket::operator=(SSL_Socket&& other) noexcept {
             SSL_shutdown(ssl_);
             SSL_free(ssl_);
         }
+        SetSocketInfo(std::move(other.info));
+        other.info.reset();
         ssl_ = other.ssl_;
         other.ssl_ = nullptr;
     }
