@@ -242,7 +242,7 @@ class Crypto {
     // @return 0 on success, -1 on failure.
     static int generate_nonce(int length, unsigned char* buf);
 
-   private:
+private:
     // ---- Internal helpers ----
 
     // Prints the most recent OpenSSL error to stderr, prefixed with `msg`.
