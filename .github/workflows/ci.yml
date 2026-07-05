@@ -7,12 +7,24 @@ on:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+  workflow_call:
+    inputs:
+      iotauth-ref:
+        description: 'iotauth ref for integration test (overrides iotauth-ref.txt)'
+        required: false
+        type: string
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
 jobs:
+  iotauth-integration-test:
+    if: ${{ inputs.iotauth-ref == '' }}
+    uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
+    with:
+      sst-c-api-ref: ${{ github.sha }}
+
   Unit-Test:
     name: Unit Test
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
@@ -22,6 +34,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
+        ref: ${{ inputs.iotauth-ref != '' && 'main' || (github.event.pull_request.head.sha || github.sha) }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
 
@@ -45,8 +60,13 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out sst-c-api
+      if: ${{ inputs.iotauth-ref == '' }}
+      uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
     - name: Read branch name from iotauth-ref.txt
+      if: ${{ inputs.iotauth-ref == '' }}
       id: read_ref
       run: |
         ref=$(head -n 1 iotauth-ref.txt)
@@ -57,14 +77,14 @@ jobs:
       with:
         repository: iotauth/iotauth
         submodules: true
-        ref: ${{ steps.read_ref.outputs.ref }}
+        ref: ${{ inputs.iotauth-ref || steps.read_ref.outputs.ref }}
     - name: Check out specific ref of sst-c-api
+      if: ${{ inputs.iotauth-ref == '' }}
       uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
         path: entity/c
-        ref: ${{ github.ref }}
-      if: ${{ github.ref}}
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
@@ -173,9 +193,10 @@ jobs:
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
       run: |
-        pip3 install pycryptodome
+        pip3 install ../../entity/python
         nohup python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > secure_python.pid  # Save the PID
+        sleep 5  # Wait for the server to start and bind to port 22100
 
     - name: Run the secure ipfs examples.
       working-directory: entity/c/examples/ipfs_examples/c/build
