@@ -1,5 +1,6 @@
 /**
- * @file api.hpp
+
+* @file api.hpp
  * @brief High-level C++ API for SST (Secure Session Transport).
  *
  * Provides two main classes:
@@ -20,7 +21,7 @@
 
 #include <arpa/inet.h>
 #include <openssl/evp.h>
-
+#include <pthread.h>
 #include <cstdint>
 #include <cstring>
 #include <memory>
@@ -138,13 +139,18 @@ struct SST_ctx_t {
     config_t config;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key;
+    pthread_mutex_t     mutex;
 
     SST_ctx_t()
-        : dist_key{},
-          config{},
+        : dist_key{}, config{},
           pub_key(nullptr, &EVP_PKEY_free),
-          priv_key(nullptr, &EVP_PKEY_free) {
-        // All members are default-constructible or unique_ptr — no manual init.
+          priv_key(nullptr, &EVP_PKEY_free)
+    {
+        pthread_mutex_init(&mutex, nullptr);
+    }
+
+    ~SST_ctx_t() {
+        pthread_mutex_destroy(&mutex);
     }
 
     // Non-copyable
