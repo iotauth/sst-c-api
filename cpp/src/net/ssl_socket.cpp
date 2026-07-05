@@ -26,10 +26,13 @@ SSL_Socket::SSL_Socket() : ssl_(nullptr) { InitOpenSSL(); }
 
 SSL_Socket::~SSL_Socket() {
     if (ssl_) {
+        // Perform graceful shutdown
         SSL_shutdown(ssl_);
         SSL_free(ssl_);
         ssl_ = nullptr;
     }
+    // Note: SSL_shutdown can fail if the peer already closed the connection.
+    // In that case, we just free the SSL object without attempting a second shutdown.
 }
 
 SSL_Socket::SSL_Socket(SSL_Socket&& other) noexcept
@@ -58,53 +61,63 @@ SSL_Socket& SSL_Socket::operator=(SSL_Socket&& other) noexcept {
 int SSL_Socket::InitClientContext(const char* cert_file, const char* key_file,
                                   const char* ca_file) {
     InitOpenSSL();
-    if (client_ctx_) return 0;
 
-    SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
-    if (!ctx) return -1;
+    // Use a local once_flag for thread-safe initialization
+    static std::once_flag init_flag;
+    std::call_once(init_flag, [this, cert_file, key_file, ca_file]() {
+        if (client_ctx_) return;  // Already initialized by another thread
 
-    if (ca_file && SSL_CTX_load_verify_locations(ctx, ca_file, nullptr) != 1) {
-        SSL_CTX_free(ctx);
-        return -1;
-    }
+        SSL_CTX* ctx = SSL_CTX_new(TLS_client_method());
+        if (!ctx) return;
 
-    if (cert_file && key_file) {
-        if (SSL_CTX_use_certificate_chain_file(ctx, cert_file) != 1 ||
-            SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) != 1) {
+        if (ca_file && SSL_CTX_load_verify_locations(ctx, ca_file, nullptr) != 1) {
             SSL_CTX_free(ctx);
-            return -1;
+            return;
         }
-    }
 
-    client_ctx_ = ctx;
+        if (cert_file && key_file) {
+            if (SSL_CTX_use_certificate_chain_file(ctx, cert_file) != 1 ||
+                SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) != 1) {
+                SSL_CTX_free(ctx);
+                return;
+            }
+        }
+
+        client_ctx_ = ctx;
+    });
     return 0;
 }
 
 int SSL_Socket::InitServerContext(const char* cert_file, const char* key_file,
                                   const char* ca_file) {
     InitOpenSSL();
-    if (server_ctx_) return 0;
 
-    SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
-    if (!ctx) return -1;
+    // Thread-safe initialization using static once_flag
+    static std::once_flag init_flag;
+    std::call_once(init_flag, [&]() {
+        if (server_ctx_) return;  // Already initialized by another thread
 
-    if (!cert_file || !key_file) {
-        SSL_CTX_free(ctx);
-        return -1;
-    }
+        SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
+        if (!ctx) return;
 
-    if (SSL_CTX_use_certificate_chain_file(ctx, cert_file) != 1 ||
-        SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) != 1) {
-        SSL_CTX_free(ctx);
-        return -1;
-    }
+        if (!cert_file || !key_file) {
+            SSL_CTX_free(ctx);
+            return;
+        }
 
-    if (ca_file && SSL_CTX_load_verify_locations(ctx, ca_file, nullptr) != 1) {
-        SSL_CTX_free(ctx);
-        return -1;
-    }
+        if (SSL_CTX_use_certificate_chain_file(ctx, cert_file) != 1 ||
+            SSL_CTX_use_PrivateKey_file(ctx, key_file, SSL_FILETYPE_PEM) != 1) {
+            SSL_CTX_free(ctx);
+            return;
+        }
 
-    server_ctx_ = ctx;
+        if (ca_file && SSL_CTX_load_verify_locations(ctx, ca_file, nullptr) != 1) {
+            SSL_CTX_free(ctx);
+            return;
+        }
+
+        server_ctx_ = ctx;
+    });
     return 0;
 }
 
@@ -116,23 +129,20 @@ int SSL_Socket::Connect(SST_SOCK_DOMAIN domain, const char* host_or_path,
         return -1;
     }
 
-    // We'll use the base class mechanics if possible.
-    // But SSL_Socket doesn't have a constructor that takes an existing FD
-    // easily via public API. We'll manually create one and then set it into our
-    // info.
+    // Wrap the returned address in a unique_ptr with std::free as deleter
+    // This ensures the memory is properly freed when the unique_ptr goes out
+    // of scope, without using C++ delete on C new'd memory (which would be UB).
+    std::unique_ptr<void, decltype(&std::free)> addr_owner(addr, &std::free);
 
     int sock = ::socket(domain, SOCK_STREAM, 0);
     if (sock < 0) {
-        free(addr);
         return -1;
     }
 
     if (::connect(sock, static_cast<struct sockaddr*>(addr), len) != 0) {
         ::close(sock);
-        free(addr);
         return -1;
     }
-    free(addr);
 
     // Wrap this socket in our SSL_Socket.
     auto new_info = std::make_unique<SST_SocketInfo>();

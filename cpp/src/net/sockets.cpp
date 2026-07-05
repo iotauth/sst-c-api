@@ -33,8 +33,8 @@ bool sst::Socket::ReadyToReadTimeOut(int timeout) const {
     struct pollfd fds[1];
     fds[0].fd = info->sock;
     fds[0].events = POLLIN;
-    return poll(fds, 1, timeout) > 0 &&
-           (fds[0].revents & POLLIN);  // Use poll for timeout [1]
+return poll(fds, 1, timeout) > 0 &&
+       (fds[0].revents & POLLIN);  // Use poll for timeout [1]
 }
 
 bool sst::Socket::ReadyToRead() const {
@@ -44,7 +44,7 @@ bool sst::Socket::ReadyToRead() const {
     struct pollfd fds[1];
     fds[0].fd = info->sock;
     fds[0].events = POLLIN;
-    int ret = poll(fds, 1, -1);
+int ret = poll(fds, 1, -1);
     if (ret > 0 && (fds[0].revents & POLLIN)) {
         return true;
     }

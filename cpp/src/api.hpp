@@ -256,12 +256,16 @@ class SST_API {
     void perform_auth_handshake(const std::string& purpose);
 
     /**
-     * @brief Sends a message to the Auth server over an established socket.
+     * @brief Sends data to the Auth server over an established socket.
+     * @return Number of bytes sent on success.
+     * @throws SST_Exception on failure.
      */
     static int send_to_auth(int sock, const unsigned char* data, size_t len);
 
     /**
-     * @brief Receives a fixed-size response from the Auth server.
+     * @brief Receives data from the Auth server over an established socket.
+     * @return Number of bytes received on success.
+     * @throws SST_Exception on failure.
      */
     static int recv_from_auth(int sock, unsigned char* buf, size_t len);
 
@@ -288,9 +292,8 @@ class SST_Session {
      * session key from the API instance. Performs SKEY_HANDSHAKE_1/2/3.
      * @param api Reference to an initialized SST_API with valid keys.
      * @param session_key_id The 8-byte ID of the session key to use.
-     * @return A unique pointer to an initialized SST_Session, or nullptr on
-     * failure.
-     * @throws SST_Exception on failure.
+* @return A unique pointer to an initialized SST_Session on success.
+     * @throws SST_Exception on failure (e.g., session key not found, connection failed).
      */
     static std::unique_ptr<SST_Session> connect_to_server(
         SST_API& api, const std::vector<uint8_t>& session_key_id);

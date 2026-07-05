@@ -12,9 +12,24 @@
 #include <stdexcept>
 #include <vector>
 
+#include "net/sockets.hpp"
+#include "net/ssl_socket.hpp"
 #include "crypto.hpp"
 #include "log/log_manager.hpp"
 #include "net/sockets.hpp"
+
+// Centralized OpenSSL initialization - fix security issue #1
+namespace {
+    bool openssl_initialized = false;
+    void ensure_openssl_initialized() {
+        if (!openssl_initialized) {
+            SSL_library_init();
+            SSL_load_error_strings();
+            OpenSSL_add_all_algorithms();
+            openssl_initialized = true;
+        }
+    }
+}
 
 namespace sst {
 
@@ -38,7 +53,10 @@ void free_session_key_list_t(session_key_list_t* list) {
 /** @brief Free function for SST_session_ctx_t. */
 void free_session_ctx(SST_session_ctx_t* session_ctx) {
     if (!session_ctx) return;
-    ::close(session_ctx->sock);
+    // Fix reliability issue #1: Check if socket is valid before closing
+    if (session_ctx->sock > 0) {
+        ::close(session_ctx->sock);
+    }
     delete session_ctx;
 }
 
@@ -79,24 +97,29 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
 
         // Map keys to config fields
         if (key == "name") {
-            strncpy(cfg.name, value.c_str(), MAX_ENTITY_NAME_LENGTH);
-            cfg.name[MAX_ENTITY_NAME_LENGTH] = '\0';
+            snprintf(cfg.name, sizeof(cfg.name), "%.*s",
+                     static_cast<int>(sizeof(cfg.name) - 1),
+                     value.c_str());
         } else if (key == "auth_id") {
             cfg.auth_id = std::stoi(value);
         } else if (key == "auth_pubkey_path") {
-            strncpy(cfg.auth_pubkey_path, value.c_str(), MAX_PATH_LEN);
-            cfg.auth_pubkey_path[MAX_PATH_LEN - 1] = '\0';
+            snprintf(cfg.auth_pubkey_path, sizeof(cfg.auth_pubkey_path), "%.*s",
+                     static_cast<int>(sizeof(cfg.auth_pubkey_path) - 1),
+                     value.c_str());
         } else if (key == "entity_privkey_path") {
-            strncpy(cfg.entity_privkey_path, value.c_str(), MAX_PATH_LEN);
-            cfg.entity_privkey_path[MAX_PATH_LEN - 1] = '\0';
+            snprintf(cfg.entity_privkey_path, sizeof(cfg.entity_privkey_path), "%.*s",
+                     static_cast<int>(sizeof(cfg.entity_privkey_path) - 1),
+                     value.c_str());
         } else if (key == "auth_ip_addr") {
-            strncpy(cfg.auth_ip_addr, value.c_str(), INET_ADDRSTRLEN);
-            cfg.auth_ip_addr[INET_ADDRSTRLEN - 1] = '\0';
+            snprintf(cfg.auth_ip_addr, sizeof(cfg.auth_ip_addr), "%.*s",
+                     static_cast<int>(sizeof(cfg.auth_ip_addr) - 1),
+                     value.c_str());
         } else if (key == "auth_port_num") {
             cfg.auth_port_num = std::stoi(value);
         } else if (key == "entity_server_ip_addr") {
-            strncpy(cfg.entity_server_ip_addr, value.c_str(), INET_ADDRSTRLEN);
-            cfg.entity_server_ip_addr[INET_ADDRSTRLEN - 1] = '\0';
+            snprintf(cfg.entity_server_ip_addr, sizeof(cfg.entity_server_ip_addr), "%.*s",
+                     static_cast<int>(sizeof(cfg.entity_server_ip_addr) - 1),
+                     value.c_str());
         } else if (key == "entity_server_port_num") {
             cfg.entity_server_port_num = std::stoi(value);
         } else if (key == "session_key_enc_mode") {
@@ -123,9 +146,9 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
                 int idx = std::stoi(key.substr(
                     bracket_start + 1, bracket_end - bracket_start - 1));
                 if (idx >= 0 && idx < 2) {
-                    strncpy(cfg.purpose[idx], value.c_str(),
-                            MAX_PURPOSE_LENGTH);
-                    cfg.purpose[idx][MAX_PURPOSE_LENGTH] = '\0';
+snprintf(cfg.purpose[idx], sizeof(cfg.purpose[idx]), "%.*s",
+                             static_cast<int>(sizeof(cfg.purpose[idx]) - 1),
+                             value.c_str());
                 }
             }
         }
@@ -139,22 +162,25 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
 // ---------------------------------------------------------------------------
 
 SST_API::SST_API(const std::string& config_path)
-    : ctx_(new SST_ctx_t(), &free_SST_ctx_t), session_key_list_(nullptr) {
+    : ctx_(new SST_ctx_t(), &free_SST_ctx_t), session_key_list_(nullptr)
+{
+    // Ensure OpenSSL is initialized before any crypto operations
+    ensure_openssl_initialized();
     LOG_INF << "Initializing SST_API with config: " << config_path;
 
     // Parse configuration file
     parse_config_file(config_path, ctx_->config);
 
     LOG_INF << "Entity name: " << ctx_->config.name;
-    LOG_INF << "Auth server: " << ctx_->config.auth_ip_addr << ":"
-            << ctx_->config.auth_port_num;
+LOG_INF << "Auth server: " << ctx_->config.auth_ip_addr
+        << ":" << ctx_->config.auth_port_num;
 
     // Load Auth's public key
     EVP_PKEY* auth_pub_key =
         Crypto::load_auth_public_key(ctx_->config.auth_pubkey_path);
     if (!auth_pub_key) {
         throw SST_Exception("Failed to load Auth public key from: " +
-                            std::string(ctx_->config.auth_pubkey_path));
+std::string(ctx_->config.auth_pubkey_path));
     }
 
     // Transfer ownership to unique_ptr with custom deleter
@@ -167,7 +193,7 @@ SST_API::SST_API(const std::string& config_path)
         Crypto::load_entity_private_key(ctx_->config.entity_privkey_path);
     if (!entity_priv_key) {
         throw SST_Exception("Failed to load entity private key from: " +
-                            std::string(ctx_->config.entity_privkey_path));
+std::string(ctx_->config.entity_privkey_path));
     }
 
     ctx_->priv_key.reset(entity_priv_key);
@@ -272,158 +298,173 @@ std::optional<SessionKey> SST_API::get_session_key_by_id(
 }
 
 void SST_API::perform_auth_handshake(const std::string& purpose) {
+    // Fix reliability issue #2: Properly manage socket lifecycle
     // Connect to Auth server
     ClientSocket auth_socket(static_cast<SST_SOCK_DOMAIN>(AF_INET),
                              ctx_->config.auth_ip_addr,
                              ctx_->config.auth_port_num);
 
-    if (auth_socket.Connect() != 0) {
-        throw SST_Exception("Failed to connect to Auth server at " +
-                            std::string(ctx_->config.auth_ip_addr) + ":" +
-                            std::to_string(ctx_->config.auth_port_num));
-    }
+    try {
+        // Step 1: AUTH_HELLO - Send entity name, receive AUTH_ID and AUTH_nonce
+        unsigned char auth_hello_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    LOG_INF << "Connected to Auth server";
-
-    // Step 1: AUTH_HELLO - Send entity name, receive AUTH_ID and AUTH_nonce
-    unsigned char auth_hello_buf[MAX_SECURE_COMM_MSG_LENGTH];
-
-    int bytes_sent =
-        send_to_auth(auth_socket.get_fd(),
-                     reinterpret_cast<unsigned char*>(ctx_->config.name),
-                     strlen(ctx_->config.name));
-    if (bytes_sent <= 0) {
-        throw SST_Exception("Failed to send AUTH_HELLO");
-    }
-
-    int bytes_recv = recv_from_auth(auth_socket.get_fd(), auth_hello_buf,
-                                    sizeof(auth_hello_buf));
-    if (bytes_recv <= 0) {
-        throw SST_Exception("Failed to receive AUTH_HELLO response");
-    }
-
-    // Verify AUTH_ID and AUTH_nonce against Auth public key
-    if (bytes_recv < static_cast<int>(sizeof(unsigned char) * 2) +
-                         static_cast<int>(RSA_KEY_SIZE)) {
-        throw SST_Exception("AUTH_HELLO response too short");
-    }
-
-    unsigned char auth_id[6];
-    std::memcpy(auth_id, auth_hello_buf, sizeof(auth_id));
-
-    unsigned char auth_nonce[RSA_KEY_SIZE];
-    std::memcpy(auth_nonce, auth_hello_buf + sizeof(auth_id), RSA_KEY_SIZE);
-
-    // Verify signature
-    if (Crypto::sha256_verify(auth_nonce, RSA_KEY_SIZE, auth_id,
-                              sizeof(auth_id), ctx_->pub_key.get()) != 0) {
-        throw SST_Exception("AUTH_HELLO signature verification failed");
-    }
-
-    LOG_INF << "AUTH_HELLO verified successfully";
-
-    // Step 2: SESSION_KEY_REQ_IN_PUB_ENC - Request session keys
-    unsigned char req_buf[MAX_SECURE_COMM_MSG_LENGTH];
-
-    size_t req_len = 0;
-    int ret = Crypto::public_encrypt(
-        reinterpret_cast<const unsigned char*>(purpose.c_str()), purpose.size(),
-        RSA_PKCS1_OAEP_PADDING, ctx_->pub_key.get(), req_buf, &req_len);
-
-    if (ret != 0) {
-        throw SST_Exception("Failed to encrypt session key request");
-    }
-
-    bytes_sent = send_to_auth(auth_socket.get_fd(), req_buf, req_len);
-    if (bytes_sent <= 0) {
-        throw SST_Exception("Failed to send SESSION_KEY_REQ_IN_PUB_ENC");
-    }
-
-    // Step 3: Receive SESSION_KEY_RESP_WITH_DIST_KEY or AUTH_ALERT
-    unsigned char resp_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    bytes_recv =
-        recv_from_auth(auth_socket.get_fd(), resp_buf, sizeof(resp_buf));
-
-    if (bytes_recv <= 0) {
-        throw SST_Exception("Failed to receive session key response");
-    }
-
-    // Decrypt the response using entity's private key
-    unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
-    size_t dec_len = sizeof(decrypted);
-
-    ret = Crypto::private_decrypt(resp_buf, bytes_recv, RSA_PKCS1_OAEP_PADDING,
-                                  ctx_->priv_key.get(), decrypted, &dec_len);
-
-    if (ret != 0) {
-        throw SST_Exception("Failed to decrypt session key response");
-    }
-
-    // Parse the decrypted response
-    size_t offset = 0;
-
-    // Check for AUTH_ALERT (message type 0xFF)
-    if (dec_len > 0 && decrypted[0] == 0xFF) {
-        throw SST_Exception("AUTH_ALERT received from Auth server");
-    }
-
-    // Parse distribution key
-    if (dec_len < sizeof(distribution_key_t)) {
-        throw SST_Exception("Response too short for distribution key");
-    }
-
-    std::memcpy(&ctx_->dist_key, decrypted + offset,
-                sizeof(distribution_key_t));
-    offset += sizeof(distribution_key_t);
-
-    // Parse number of session keys
-    if (offset + sizeof(int) > dec_len) {
-        throw SST_Exception("Response too short for key count");
-    }
-    int num_keys = 0;
-    std::memcpy(&num_keys, decrypted + offset, sizeof(int));
-    offset += sizeof(int);
-
-    LOG_INF << "Received " << num_keys << " session key(s)";
-
-    // Clear existing session keys
-    session_key_list_->num_key = 0;
-    session_key_list_->rear_idx = 0;
-
-    // Parse each session key
-    for (int i = 0; i < num_keys && i < static_cast<int>(MAX_SESSION_KEY);
-         ++i) {
-        if (offset + sizeof(session_key_t) > dec_len) {
-            throw SST_Exception("Response too short for session key");
+        int bytes_sent = send_to_auth(auth_socket.get_fd(),
+                                      reinterpret_cast<unsigned char*>(ctx_->config.name),
+                                      strlen(ctx_->config.name));
+        if (bytes_sent <= 0) {
+            throw SST_Exception("Failed to send AUTH_HELLO");
         }
 
-        std::memcpy(&session_key_list_->s_key[i], decrypted + offset,
-                    sizeof(session_key_t));
-        offset += sizeof(session_key_t);
-
-        session_key_list_->num_key = i + 1;
-        session_key_list_->rear_idx = (i + 1) % MAX_SESSION_KEY;
-
-        LOG_DBG << "Session key " << i << " ID: ";
-        for (int j = 0; j < static_cast<int>(SESSION_KEY_ID_SIZE); ++j) {
-            LOG_DBG << std::hex
-                    << static_cast<int>(session_key_list_->s_key[i].key_id[j]);
+        int bytes_recv = recv_from_auth(auth_socket.get_fd(), auth_hello_buf,
+                                        sizeof(auth_hello_buf));
+        if (bytes_recv <= 0) {
+            throw SST_Exception("Failed to receive AUTH_HELLO response");
         }
-        LOG_DBG << std::dec;
-    }
 
-    LOG_INF << "Session keys received and parsed successfully";
+        // Verify AUTH_ID and AUTH_nonce against Auth public key
+        // Need at least sizeof(auth_id) + RSA_KEY_SIZE bytes
+        unsigned char auth_id[6] = {};
+        if (bytes_recv < static_cast<int>(sizeof(auth_id)) +
+                        static_cast<int>(RSA_KEY_SIZE)) {
+            throw SST_Exception("AUTH_HELLO response too short");
+        }
+
+        std::memcpy(auth_id, auth_hello_buf, sizeof(auth_id));
+
+        unsigned char auth_nonce[RSA_KEY_SIZE];
+        std::memcpy(auth_nonce, auth_hello_buf + sizeof(auth_id), RSA_KEY_SIZE);
+
+        // Verify signature
+        if (Crypto::sha256_verify(auth_nonce, RSA_KEY_SIZE, auth_id, sizeof(auth_id),
+                                  ctx_->pub_key.get()) != 0) {
+            throw SST_Exception("AUTH_HELLO signature verification failed");
+        }
+
+        LOG_INF << "AUTH_HELLO verified successfully";
+
+        // Step 2: SESSION_KEY_REQ_IN_PUB_ENC - Request session keys
+        unsigned char req_buf[MAX_SECURE_COMM_MSG_LENGTH];
+
+        size_t req_len = 0;
+        int ret = Crypto::public_encrypt(
+            reinterpret_cast<const unsigned char*>(purpose.c_str()),
+            purpose.size(),
+            RSA_PKCS1_OAEP_PADDING,
+            ctx_->pub_key.get(),
+            req_buf, &req_len);
+
+        if (ret != 0) {
+            throw SST_Exception("Failed to encrypt session key request");
+        }
+
+        bytes_sent = send_to_auth(auth_socket.get_fd(), req_buf, req_len);
+        if (bytes_sent <= 0) {
+            throw SST_Exception("Failed to send SESSION_KEY_REQ_IN_PUB_ENC");
+        }
+
+        // Step 3: Receive SESSION_KEY_RESP_WITH_DIST_KEY or AUTH_ALERT
+        unsigned char resp_buf[MAX_SECURE_COMM_MSG_LENGTH];
+        bytes_recv = recv_from_auth(auth_socket.get_fd(), resp_buf, sizeof(resp_buf));
+
+        if (bytes_recv <= 0) {
+            throw SST_Exception("Failed to receive session key response");
+        }
+
+        // Decrypt the response using entity's private key
+        unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
+        size_t dec_len = sizeof(decrypted);
+
+        ret = Crypto::private_decrypt(
+            resp_buf, bytes_recv,
+            RSA_PKCS1_OAEP_PADDING,
+            ctx_->priv_key.get(),
+            decrypted, &dec_len);
+
+        if (ret != 0) {
+            throw SST_Exception("Failed to decrypt session key response");
+        }
+
+        // Parse the decrypted response
+        size_t offset = 0;
+
+        // Check for AUTH_ALERT (message type 0xFF)
+        if (dec_len > 0 && decrypted[0] == 0xFF) {
+            throw SST_Exception("AUTH_ALERT received from Auth server");
+        }
+
+        // Parse distribution key
+        if (dec_len < sizeof(distribution_key_t)) {
+            throw SST_Exception("Response too short for distribution key");
+        }
+
+        std::memcpy(&ctx_->dist_key, decrypted + offset, sizeof(distribution_key_t));
+        offset += sizeof(distribution_key_t);
+
+        // Parse number of session keys
+        if (offset + sizeof(int) > dec_len) {
+            throw SST_Exception("Response too short for key count");
+        }
+        int num_keys = 0;
+        std::memcpy(&num_keys, decrypted + offset, sizeof(int));
+        offset += sizeof(int);
+
+        // Validate num_keys is within acceptable range
+        if (num_keys < 0 || num_keys > static_cast<int>(MAX_SESSION_KEY)) {
+            throw SST_Exception("Invalid session key count: " + std::to_string(num_keys) +
+                               " (expected 0-" + std::to_string(MAX_SESSION_KEY) + ")");
+        }
+
+        // Verify we have enough data to parse num_keys session keys
+        size_t required_bytes = offset + (static_cast<size_t>(num_keys) * sizeof(session_key_t));
+        if (required_bytes > dec_len) {
+            throw SST_Exception("Response too short: claimed " + std::to_string(num_keys) +
+                               " session keys but only " + std::to_string(dec_len) + " bytes available");
+        }
+
+        LOG_INF << "Received " << num_keys << " session key(s)";
+
+        // Clear existing session keys
+        session_key_list_->num_key = 0;
+        session_key_list_->rear_idx = 0;
+
+        // Parse each session key
+        for (int i = 0; i < num_keys && i < static_cast<int>(MAX_SESSION_KEY); ++i) {
+            if (offset + sizeof(session_key_t) > dec_len) {
+                throw SST_Exception("Response too short for session key");
+            }
+
+            std::memcpy(&session_key_list_->s_key[i], decrypted + offset,
+                       sizeof(session_key_t));
+            offset += sizeof(session_key_t);
+
+            session_key_list_->num_key = i + 1;
+            session_key_list_->rear_idx = (i + 1) % MAX_SESSION_KEY;
+
+            LOG_DBG << "Session key " << i << " ID: ";
+            for (int j = 0; j < static_cast<int>(SESSION_KEY_ID_SIZE); ++j) {
+                LOG_DBG << std::hex << static_cast<int>(session_key_list_->s_key[i].key_id[j]);
+            }
+            LOG_DBG << std::dec;
+        }
+
+        LOG_INF << "Session keys received and parsed successfully";
+    } catch (...) {
+        // RAII guard will automatically close the socket
+        throw;
+    }
 }
 
 int SST_API::send_to_auth(int sock, const unsigned char* data, size_t len) {
-    if (sock < 0) return -1;
+    if (sock < 0) {
+        throw SST_Exception("Invalid socket FD");
+    }
 
     ssize_t total = 0;
     while (total < static_cast<ssize_t>(len)) {
         ssize_t n = ::send(sock, data + total, len - total, MSG_NOSIGNAL);
         if (n <= 0) {
             LOG_ERR << "Failed to send to Auth server";
-            return -1;
+            throw SST_Exception("Failed to send to Auth server");
         }
         total += n;
     }
@@ -432,14 +473,16 @@ int SST_API::send_to_auth(int sock, const unsigned char* data, size_t len) {
 }
 
 int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
-    if (sock < 0) return -1;
+    if (sock < 0) {
+        throw SST_Exception("Invalid socket FD");
+    }
 
     ssize_t total = 0;
     while (total < static_cast<ssize_t>(len)) {
         ssize_t n = ::recv(sock, buf + total, len - total, 0);
         if (n <= 0) {
             LOG_ERR << "Failed to receive from Auth server";
-            return -1;
+            throw SST_Exception("Failed to receive from Auth server");
         }
         total += n;
     }
@@ -591,6 +634,16 @@ std::vector<uint8_t> SST_Session::read_message() {
 
     // Parse length (big-endian)
     uint16_t msg_len = (static_cast<uint16_t>(frame[1]) << 8) | frame[2];
+
+    // Bounds check: validate msg_len before reading
+    if (msg_len == 0) {
+        throw SST_Exception("Received message with zero length");
+    }
+    if (msg_len > MAX_SECURE_COMM_MSG_LENGTH) {
+        throw SST_Exception("Received message too large: " +
+                           std::to_string(msg_len) + " bytes (max: " +
+                           std::to_string(MAX_SECURE_COMM_MSG_LENGTH) + ")");
+    }
 
     LOG_INF << "Received message with length: " << msg_len;
 

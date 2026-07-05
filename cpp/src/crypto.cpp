@@ -15,12 +15,32 @@
 
 namespace sst {
 
+// Centralized OpenSSL initialization — no-op for OpenSSL 3.0+
+// (SSL_library_init/SSL_load_error_strings/OpenSSL_add_all_algorithms were
+// required in OpenSSL 1.x but removed in 3.0; modern OpenSSL initializes
+// everything automatically.)
+static bool openssl_initialized = false;
+
+static void ensure_openssl_initialized() {
+    if (!openssl_initialized) {
+        // Intentionally empty: OpenSSL 3.0+ handles initialization
+        // automatically. The flag remains to document that the call site
+        // was visited, but no library functions need to be invoked.
+        openssl_initialized = true;
+    }
+}
+
 // ---- Internal helpers (private) ----
 
 void Crypto::print_crypto_error(const std::string& msg) {
+    // Ensure OpenSSL is initialized before using its functions
+    ensure_openssl_initialized();
+
     std::string err(MAX_ERROR_MESSAGE_LENGTH, '\0');
-    ERR_load_crypto_strings();
-    ERR_error_string(ERR_get_error(), err.data());
+    const char* err_str = ERR_error_string(ERR_get_error(), nullptr);
+    if (err_str != nullptr) {
+        err = err_str;
+    }
     std::fprintf(stderr, "%s ERROR: %s\n", msg.c_str(), err.c_str());
 }
 
