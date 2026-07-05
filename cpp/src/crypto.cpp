@@ -226,9 +226,8 @@ int Crypto::digest_message_sha256(const unsigned char* data, size_t data_len,
 
 int Crypto::encrypt_aes(const unsigned char* plaintext,
                         unsigned int plaintext_length, const unsigned char* key,
-                        const unsigned char* iv,
-                        AES_encryption_mode_t enc_mode, unsigned char* ret,
-                        unsigned int* ret_length) {
+                        const unsigned char* iv, AES_encryption_mode_t enc_mode,
+                        unsigned char* ret, unsigned int* ret_length) {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         print_crypto_error("EVP_CIPHER_CTX_new failed");
@@ -281,9 +280,8 @@ int Crypto::encrypt_aes(const unsigned char* plaintext,
 
 int Crypto::decrypt_aes(const unsigned char* encrypted,
                         unsigned int encrypted_length, const unsigned char* key,
-                        const unsigned char* iv,
-                        AES_encryption_mode_t enc_mode, unsigned char* ret,
-                        unsigned int* ret_length) {
+                        const unsigned char* iv, AES_encryption_mode_t enc_mode,
+                        unsigned char* ret, unsigned int* ret_length) {
     EVP_CIPHER_CTX* ctx = EVP_CIPHER_CTX_new();
     if (!ctx) {
         print_crypto_error("EVP_CIPHER_CTX_new failed");
@@ -348,7 +346,8 @@ unsigned int Crypto::get_expected_encrypted_total_length(
         encrypted_total_length = buf_length + AES_GCM_TAG_SIZE;
     }
     if (hmac_mode == USE_HMAC) {
-        encrypted_total_length = iv_size + encrypted_total_length + mac_key_size;
+        encrypted_total_length =
+            iv_size + encrypted_total_length + mac_key_size;
     } else {
         encrypted_total_length = iv_size + encrypted_total_length;
     }
@@ -440,8 +439,8 @@ int Crypto::get_symmetric_decrypt_authenticate_buffer(
             std::fprintf(stderr, "ERROR: HMAC_key_size is not supported.\n");
             return -1;
         }
-        if (std::memcmp(reproduced_tag.data(),
-                        buf + iv_size + encrypted_length, mac_key_size) != 0) {
+        if (std::memcmp(reproduced_tag.data(), buf + iv_size + encrypted_length,
+                        mac_key_size) != 0) {
             std::fprintf(stderr, "ERROR: HMAC tag does not match.\n");
             return -1;
         }

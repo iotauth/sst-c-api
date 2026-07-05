@@ -3,7 +3,8 @@
  * @brief High-level C++ API for SST (Secure Session Transport).
  *
  * Provides two main classes:
- *   - SST_API  : session management, Auth handshake orchestration, key retrieval.
+ *   - SST_API  : session management, Auth handshake orchestration, key
+ * retrieval.
  *   - SST_Session : secure messaging over a connected TLS socket.
  *
  * Protocol flow (client side):
@@ -18,17 +19,18 @@
 #define SST_API_HPP
 
 #include <arpa/inet.h>
-#include <mutex>      // recursive_mutex for re-entrant lock in auth handshake
 #include <openssl/evp.h>
+
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <mutex>  // recursive_mutex for re-entrant lock in auth handshake
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
-#include "crypto.hpp"  // for AES_encryption_mode_t, hmac_mode_t
+#include "crypto.hpp"          // for AES_encryption_mode_t, hmac_mode_t
 #include "net/ssl_socket.hpp"  // for SSL_Socket
 
 namespace sst {
@@ -37,19 +39,19 @@ namespace sst {
 // Constants (mirrors the C API)
 // ---------------------------------------------------------------------------
 constexpr unsigned int DIST_KEY_EXPIRATION_TIME_SIZE = 6;
-constexpr unsigned int KEY_EXPIRATION_TIME_SIZE      = 6;
-constexpr unsigned int SESSION_KEY_ID_SIZE            = 8;
-constexpr unsigned int MAC_KEY_SIZE                   = 32;
-constexpr unsigned int MAX_CIPHER_KEY_SIZE            = 32;
-constexpr unsigned int MAX_SESSION_KEY                = 10;
-constexpr unsigned int MAX_ENTITY_NAME_LENGTH         = 32;
-constexpr unsigned int MAX_PURPOSE_LENGTH             = 64;
-constexpr unsigned int NETWORK_PROTOCOL_NAME_LENGTH   = 4;
-constexpr unsigned int MAX_PATH_LEN                   = 512;
+constexpr unsigned int KEY_EXPIRATION_TIME_SIZE = 6;
+constexpr unsigned int SESSION_KEY_ID_SIZE = 8;
+constexpr unsigned int MAC_KEY_SIZE = 32;
+constexpr unsigned int MAX_CIPHER_KEY_SIZE = 32;
+constexpr unsigned int MAX_SESSION_KEY = 10;
+constexpr unsigned int MAX_ENTITY_NAME_LENGTH = 32;
+constexpr unsigned int MAX_PURPOSE_LENGTH = 64;
+constexpr unsigned int NETWORK_PROTOCOL_NAME_LENGTH = 4;
+constexpr unsigned int MAX_PATH_LEN = 512;
 
-constexpr unsigned int AES_IV_SIZE                    = 16;
-constexpr unsigned int SEQ_NUM_SIZE                   = 8;
-constexpr unsigned int MAX_PAYLOAD_LENGTH             = 1024;
+constexpr unsigned int AES_IV_SIZE = 16;
+constexpr unsigned int SEQ_NUM_SIZE = 8;
+constexpr unsigned int MAX_PAYLOAD_LENGTH = 1024;
 
 #define ROUND_UP_TO_Y(X, Y) ((((X) / (Y)) + 1) * (Y))
 constexpr unsigned int MAX_SECURE_COMM_MSG_LENGTH =
@@ -65,7 +67,7 @@ constexpr unsigned int MAX_SECURE_COMM_MSG_LENGTH =
  * @brief Exception class for SST API errors.
  */
 class SST_Exception : public std::runtime_error {
-public:
+   public:
     explicit SST_Exception(const std::string& message)
         : std::runtime_error(message) {}
 };
@@ -83,24 +85,24 @@ enum perm_dist_key_mode_t {
 /** @brief Session key with all cryptographic parameters. */
 struct session_key_t {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    uint64_t      abs_validity;
-    uint64_t      rel_validity;
+    uint64_t abs_validity;
+    uint64_t rel_validity;
     unsigned char mac_key[MAC_KEY_SIZE];
-    unsigned int  mac_key_size;
+    unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
-    unsigned int  cipher_key_size;
+    unsigned int cipher_key_size;
     AES_encryption_mode_t enc_mode;
-    hmac_mode_t   hmac_mode;
+    hmac_mode_t hmac_mode;
     perm_dist_key_mode_t perm_dist_key_mode;
 };
 
 /** @brief Distribution key with cryptographic parameters. */
 struct distribution_key_t {
     unsigned char mac_key[MAC_KEY_SIZE];
-    unsigned int  mac_key_size;
+    unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
-    unsigned int  cipher_key_size;
-    uint64_t      abs_validity;
+    unsigned int cipher_key_size;
+    uint64_t abs_validity;
     AES_encryption_mode_t enc_mode;
 };
 
@@ -112,15 +114,15 @@ struct config_t {
     int numkey;
     AES_encryption_mode_t session_key_enc_mode;
     AES_encryption_mode_t dist_key_enc_mode;
-    hmac_mode_t           hmac_mode;
-    perm_dist_key_mode_t  perm_dist_key_mode;
-    int                   auth_id;
-    char                  auth_pubkey_path[MAX_PATH_LEN];
-    char                  entity_privkey_path[MAX_PATH_LEN];
-    char                  auth_ip_addr[INET_ADDRSTRLEN];
-    int                   auth_port_num;
-    char                  entity_server_ip_addr[INET_ADDRSTRLEN];
-    int                   entity_server_port_num;
+    hmac_mode_t hmac_mode;
+    perm_dist_key_mode_t perm_dist_key_mode;
+    int auth_id;
+    char auth_pubkey_path[MAX_PATH_LEN];
+    char entity_privkey_path[MAX_PATH_LEN];
+    char auth_ip_addr[INET_ADDRSTRLEN];
+    int auth_port_num;
+    char entity_server_ip_addr[INET_ADDRSTRLEN];
+    int entity_server_port_num;
 };
 
 /** @brief List of session keys (circular buffer). */
@@ -133,15 +135,15 @@ struct session_key_list_t {
 /** @brief Full SST context: config, keys, distribution key. */
 struct SST_ctx_t {
     distribution_key_t dist_key;
-    config_t           config;
+    config_t config;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key;
 
     SST_ctx_t()
-        : dist_key{}, config{}
-        , pub_key(nullptr, &EVP_PKEY_free)
-        , priv_key(nullptr, &EVP_PKEY_free)
-    {
+        : dist_key{},
+          config{},
+          pub_key(nullptr, &EVP_PKEY_free),
+          priv_key(nullptr, &EVP_PKEY_free) {
         // All members are default-constructible or unique_ptr — no manual init.
     }
 
@@ -162,7 +164,8 @@ struct SST_session_ctx_t {
 };
 
 // ---------------------------------------------------------------------------
-// Forward declarations for internal free functions (used as unique_ptr deleters)
+// Forward declarations for internal free functions (used as unique_ptr
+// deleters)
 // ---------------------------------------------------------------------------
 void free_SST_ctx_t(SST_ctx_t* ctx);
 void free_session_key_list_t(session_key_list_t* list);
@@ -192,7 +195,7 @@ struct SessionKey {
  * endpoints for key retrieval and authentication.
  */
 class SST_API {
-public:
+   public:
     /**
      * @brief Initializes the SST context from a configuration file.
      * Loads entity private key, Auth public key, and distribution key.
@@ -243,7 +246,7 @@ public:
      */
     SST_ctx_t& get_ctx() { return *ctx_; }
 
-private:
+   private:
     /**
      * @brief Connects to the Auth server and performs the full handshake:
      * AUTH_HELLO → SESSION_KEY_REQ_IN_PUB_ENC → SESSION_KEY_RESP_WITH_DIST_KEY.
@@ -263,9 +266,9 @@ private:
     static int recv_from_auth(int sock, unsigned char* buf, size_t len);
 
     std::unique_ptr<SST_ctx_t, decltype(&free_SST_ctx_t)> ctx_;
-    session_key_list_t*                                   session_key_list_ = nullptr;
+    session_key_list_t* session_key_list_ = nullptr;
 
-    mutable std::recursive_mutex                        key_list_mutex_;
+    mutable std::recursive_mutex key_list_mutex_;
 };
 
 // ---------------------------------------------------------------------------
@@ -279,20 +282,22 @@ private:
  * sending and receiving encrypted messages using the entity's session key.
  */
 class SST_Session {
-public:
+   public:
     /**
      * @brief Connects to the target server using a previously retrieved
      * session key from the API instance. Performs SKEY_HANDSHAKE_1/2/3.
      * @param api Reference to an initialized SST_API with valid keys.
      * @param session_key_id The 8-byte ID of the session key to use.
-     * @return A unique pointer to an initialized SST_Session, or nullptr on failure.
+     * @return A unique pointer to an initialized SST_Session, or nullptr on
+     * failure.
      * @throws SST_Exception on failure.
      */
     static std::unique_ptr<SST_Session> connect_to_server(
         SST_API& api, const std::vector<uint8_t>& session_key_id);
 
     /**
-     * @brief Sends a secure (encrypted + authenticated) message over the session.
+     * @brief Sends a secure (encrypted + authenticated) message over the
+     * session.
      * @param data The raw byte payload to send.
      * @return Number of bytes sent on success, -1 on failure.
      */
@@ -304,10 +309,10 @@ public:
      */
     std::vector<uint8_t> read_message();
 
-private:
+   private:
     SST_Session(SST_session_ctx_t* session_ctx, SSL_Socket socket);
 
-public:
+   public:
     // Public destructor — needed so unique_ptr default deleter can destroy
     // instances created via connect_to_server(). Constructor remains private
     // so the only construction path is the factory method.
@@ -322,7 +327,7 @@ public:
     SST_Session& operator=(SST_Session&&) noexcept = default;
 
     SST_session_ctx_t* session_ctx_;
-    SSL_Socket         socket_;  // Owns the TLS socket for the session lifetime
+    SSL_Socket socket_;  // Owns the TLS socket for the session lifetime
 };
 
 }  // namespace sst

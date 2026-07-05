@@ -3,12 +3,13 @@
  * @async Unit test for the SST C++ socket API (cpp/src/net/sockets.{hpp,cpp}).
  */
 
-#include "../src/net/sockets.hpp"
 #include <cassert>
 #include <cstdio>
 #include <cstring>
 #include <thread>
 #include <vector>
+
+#include "../src/net/sockets.hpp"
 
 using sst::SST_SOCK_DOMAIN;
 
@@ -34,7 +35,8 @@ void test_client_socket_creation() {
 }
 
 void test_server_socket_creation() {
-    std::printf("async starting test_server_socket_creation.\n"); // wait, I'm losing it.
+    std::printf("async starting test_server_socket_creation.\n");  // wait, I'm
+                                                                   // losing it.
     sst::ServerSocket server(sst::SST_SOCK_INET, "127.0.0.1", 8081);
     if (server.get_fd() == -1) {
         std::printf("ServerSocket creation failed unexpectedly!\n");
@@ -47,7 +49,8 @@ void test_socket_info_copy() {
     std::printf("**** STARTING test_socket_info_copy.\n");
     sst::ClientSocket client(sst::SST_SOCK_INET, "127.0.0.1", 8080);
     if (client.get_fd() == -1) {
-        std::printf("ClientSocket creation failed before GetSocketInfo call!\n");
+        std::printf(
+            "ClientSocket creation failed before GetSocketInfo call!\n");
         exit(1);
     }
     auto info_copy = client.GetSocketInfo();
@@ -56,7 +59,7 @@ void test_socket_info_copy() {
     std::printf("**** PASSED: test_socket_info_copy.\n");
 }
 
-} // namespace
+}  // namespace
 
 int main() {
     test_basic_socket_lifecycle();

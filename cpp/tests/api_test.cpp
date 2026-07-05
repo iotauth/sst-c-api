@@ -118,7 +118,8 @@ void test_get_session_key_by_id_empty_list() {
         SST_API api(config_path);
     } catch (const SST_Exception& e) {
         caught = true;
-        std::printf("  Caught expected SST_Exception during init: %s\n", e.what());
+        std::printf("  Caught expected SST_Exception during init: %s\n",
+                    e.what());
     }
 
     cleanup_test_config(config_path);

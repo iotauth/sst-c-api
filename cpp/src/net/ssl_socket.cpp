@@ -33,8 +33,7 @@ SSL_Socket::~SSL_Socket() {
 }
 
 SSL_Socket::SSL_Socket(SSL_Socket&& other) noexcept
-    : Socket(), ssl_(other.ssl_)
-{
+    : Socket(), ssl_(other.ssl_) {
     // Socket() default-constructs (mutex + nullptr info). Transfer the
     // underlying socket via SetSocketInfo, then null out the source.
     SetSocketInfo(std::move(other.info));

@@ -1,4 +1,4 @@
-/** 
+/**
  * @file ssl_socket.hpp
  * @brief SSL/TLS wrapper over the Socket class using OpenSSL.
  * @details

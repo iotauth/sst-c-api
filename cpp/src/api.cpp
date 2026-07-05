@@ -1,18 +1,20 @@
 #include "api.hpp"
+
+#include <unistd.h>
+
 #include <array>
-#include <mutex>
 #include <cstring>
 #include <fstream>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
-#include <unistd.h>
 #include <vector>
 
-#include "net/sockets.hpp"
 #include "crypto.hpp"
 #include "log/log_manager.hpp"
+#include "net/sockets.hpp"
 
 namespace sst {
 
@@ -98,13 +100,16 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
         } else if (key == "entity_server_port_num") {
             cfg.entity_server_port_num = std::stoi(value);
         } else if (key == "session_key_enc_mode") {
-            cfg.session_key_enc_mode = static_cast<AES_encryption_mode_t>(std::stoi(value));
+            cfg.session_key_enc_mode =
+                static_cast<AES_encryption_mode_t>(std::stoi(value));
         } else if (key == "dist_key_enc_mode") {
-            cfg.dist_key_enc_mode = static_cast<AES_encryption_mode_t>(std::stoi(value));
+            cfg.dist_key_enc_mode =
+                static_cast<AES_encryption_mode_t>(std::stoi(value));
         } else if (key == "hmac_mode") {
             cfg.hmac_mode = static_cast<hmac_mode_t>(std::stoi(value));
         } else if (key == "perm_dist_key_mode") {
-            cfg.perm_dist_key_mode = static_cast<perm_dist_key_mode_t>(std::stoi(value));
+            cfg.perm_dist_key_mode =
+                static_cast<perm_dist_key_mode_t>(std::stoi(value));
         } else if (key == "numkey") {
             cfg.numkey = std::stoi(value);
         } else if (key == "purpose_index") {
@@ -113,10 +118,13 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
             // purpose[0] or purpose[1]
             size_t bracket_start = key.find('[');
             size_t bracket_end = key.find(']');
-            if (bracket_start != std::string::npos && bracket_end != std::string::npos) {
-                int idx = std::stoi(key.substr(bracket_start + 1, bracket_end - bracket_start - 1));
+            if (bracket_start != std::string::npos &&
+                bracket_end != std::string::npos) {
+                int idx = std::stoi(key.substr(
+                    bracket_start + 1, bracket_end - bracket_start - 1));
                 if (idx >= 0 && idx < 2) {
-                    strncpy(cfg.purpose[idx], value.c_str(), MAX_PURPOSE_LENGTH);
+                    strncpy(cfg.purpose[idx], value.c_str(),
+                            MAX_PURPOSE_LENGTH);
                     cfg.purpose[idx][MAX_PURPOSE_LENGTH] = '\0';
                 }
             }
@@ -130,23 +138,23 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
 // SST_API Implementation
 // ---------------------------------------------------------------------------
 
-SST_API::SST_API(const std::string& config_path) 
-    : ctx_(new SST_ctx_t(), &free_SST_ctx_t), session_key_list_(nullptr)
-{
+SST_API::SST_API(const std::string& config_path)
+    : ctx_(new SST_ctx_t(), &free_SST_ctx_t), session_key_list_(nullptr) {
     LOG_INF << "Initializing SST_API with config: " << config_path;
 
     // Parse configuration file
     parse_config_file(config_path, ctx_->config);
 
     LOG_INF << "Entity name: " << ctx_->config.name;
-    LOG_INF << "Auth server: " << ctx_->config.auth_ip_addr 
-            << ":" << ctx_->config.auth_port_num;
+    LOG_INF << "Auth server: " << ctx_->config.auth_ip_addr << ":"
+            << ctx_->config.auth_port_num;
 
     // Load Auth's public key
-    EVP_PKEY* auth_pub_key = Crypto::load_auth_public_key(ctx_->config.auth_pubkey_path);
+    EVP_PKEY* auth_pub_key =
+        Crypto::load_auth_public_key(ctx_->config.auth_pubkey_path);
     if (!auth_pub_key) {
-        throw SST_Exception("Failed to load Auth public key from: " + 
-                           std::string(ctx_->config.auth_pubkey_path));
+        throw SST_Exception("Failed to load Auth public key from: " +
+                            std::string(ctx_->config.auth_pubkey_path));
     }
 
     // Transfer ownership to unique_ptr with custom deleter
@@ -155,10 +163,11 @@ SST_API::SST_API(const std::string& config_path)
     LOG_INF << "Auth public key loaded successfully";
 
     // Load entity's private key
-    EVP_PKEY* entity_priv_key = Crypto::load_entity_private_key(ctx_->config.entity_privkey_path);
+    EVP_PKEY* entity_priv_key =
+        Crypto::load_entity_private_key(ctx_->config.entity_privkey_path);
     if (!entity_priv_key) {
-        throw SST_Exception("Failed to load entity private key from: " + 
-                           std::string(ctx_->config.entity_privkey_path));
+        throw SST_Exception("Failed to load entity private key from: " +
+                            std::string(ctx_->config.entity_privkey_path));
     }
 
     ctx_->priv_key.reset(entity_priv_key);
@@ -201,9 +210,9 @@ void SST_API::auth_hello() {
 std::vector<SessionKey> SST_API::get_session_keys(const std::string& purpose) {
     LOG_INF << "Requesting session keys for purpose: " << purpose;
 
-    // Lock guards the full operation: perform_auth_handshake writes session_key_list_,
-    // and the iteration below reads it. Holding the lock across both ensures we never
-    // iterate over a list being mutated.
+    // Lock guards the full operation: perform_auth_handshake writes
+    // session_key_list_, and the iteration below reads it. Holding the lock
+    // across both ensures we never iterate over a list being mutated.
     std::scoped_lock lock(key_list_mutex_);
     perform_auth_handshake(purpose);
 
@@ -212,11 +221,13 @@ std::vector<SessionKey> SST_API::get_session_keys(const std::string& purpose) {
     if (!session_key_list_) return result;
 
     for (int i = 0; i < session_key_list_->num_key; ++i) {
-        int idx = (session_key_list_->rear_idx - 1 - i + MAX_SESSION_KEY) % MAX_SESSION_KEY;
+        int idx = (session_key_list_->rear_idx - 1 - i + MAX_SESSION_KEY) %
+                  MAX_SESSION_KEY;
 
         SessionKey sk;
-        sk.id.assign(session_key_list_->s_key[idx].key_id,
-                     session_key_list_->s_key[idx].key_id + SESSION_KEY_ID_SIZE);
+        sk.id.assign(
+            session_key_list_->s_key[idx].key_id,
+            session_key_list_->s_key[idx].key_id + SESSION_KEY_ID_SIZE);
         sk.abs_validity = session_key_list_->s_key[idx].abs_validity;
         sk.rel_validity = session_key_list_->s_key[idx].rel_validity;
 
@@ -228,26 +239,28 @@ std::vector<SessionKey> SST_API::get_session_keys(const std::string& purpose) {
 }
 
 std::optional<SessionKey> SST_API::get_session_key_by_id(
-    const std::vector<uint8_t>& session_key_id) const
-{
+    const std::vector<uint8_t>& session_key_id) const {
     // Lock guards read of session_key_list_ while perform_auth_handshake
     // (called by get_session_keys/auth_hello) may concurrently mutate it.
     std::scoped_lock lock(key_list_mutex_);
 
-    if (!session_key_list_ || session_key_id.empty() || session_key_id.size() > SESSION_KEY_ID_SIZE) {
+    if (!session_key_list_ || session_key_id.empty() ||
+        session_key_id.size() > SESSION_KEY_ID_SIZE) {
         return std::nullopt;
     }
 
     // Search through the circular buffer
     for (int i = 0; i < session_key_list_->num_key; ++i) {
-        int idx = (session_key_list_->rear_idx - 1 - i + MAX_SESSION_KEY) % MAX_SESSION_KEY;
+        int idx = (session_key_list_->rear_idx - 1 - i + MAX_SESSION_KEY) %
+                  MAX_SESSION_KEY;
 
         if (std::memcmp(session_key_id.data(),
                         session_key_list_->s_key[idx].key_id,
                         session_key_id.size()) == 0) {
             SessionKey sk;
-            sk.id.assign(session_key_list_->s_key[idx].key_id,
-                        session_key_list_->s_key[idx].key_id + SESSION_KEY_ID_SIZE);
+            sk.id.assign(
+                session_key_list_->s_key[idx].key_id,
+                session_key_list_->s_key[idx].key_id + SESSION_KEY_ID_SIZE);
             sk.abs_validity = session_key_list_->s_key[idx].abs_validity;
             sk.rel_validity = session_key_list_->s_key[idx].rel_validity;
 
@@ -261,13 +274,13 @@ std::optional<SessionKey> SST_API::get_session_key_by_id(
 void SST_API::perform_auth_handshake(const std::string& purpose) {
     // Connect to Auth server
     ClientSocket auth_socket(static_cast<SST_SOCK_DOMAIN>(AF_INET),
-                            ctx_->config.auth_ip_addr,
-                            ctx_->config.auth_port_num);
+                             ctx_->config.auth_ip_addr,
+                             ctx_->config.auth_port_num);
 
     if (auth_socket.Connect() != 0) {
         throw SST_Exception("Failed to connect to Auth server at " +
-                           std::string(ctx_->config.auth_ip_addr) + ":" +
-                           std::to_string(ctx_->config.auth_port_num));
+                            std::string(ctx_->config.auth_ip_addr) + ":" +
+                            std::to_string(ctx_->config.auth_port_num));
     }
 
     LOG_INF << "Connected to Auth server";
@@ -275,9 +288,10 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
     // Step 1: AUTH_HELLO - Send entity name, receive AUTH_ID and AUTH_nonce
     unsigned char auth_hello_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_sent = send_to_auth(auth_socket.get_fd(),
-                                  reinterpret_cast<unsigned char*>(ctx_->config.name),
-                                  strlen(ctx_->config.name));
+    int bytes_sent =
+        send_to_auth(auth_socket.get_fd(),
+                     reinterpret_cast<unsigned char*>(ctx_->config.name),
+                     strlen(ctx_->config.name));
     if (bytes_sent <= 0) {
         throw SST_Exception("Failed to send AUTH_HELLO");
     }
@@ -290,7 +304,7 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
     // Verify AUTH_ID and AUTH_nonce against Auth public key
     if (bytes_recv < static_cast<int>(sizeof(unsigned char) * 2) +
-                    static_cast<int>(RSA_KEY_SIZE)) {
+                         static_cast<int>(RSA_KEY_SIZE)) {
         throw SST_Exception("AUTH_HELLO response too short");
     }
 
@@ -301,8 +315,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
     std::memcpy(auth_nonce, auth_hello_buf + sizeof(auth_id), RSA_KEY_SIZE);
 
     // Verify signature
-    if (Crypto::sha256_verify(auth_nonce, RSA_KEY_SIZE, auth_id, sizeof(auth_id),
-                              ctx_->pub_key.get()) != 0) {
+    if (Crypto::sha256_verify(auth_nonce, RSA_KEY_SIZE, auth_id,
+                              sizeof(auth_id), ctx_->pub_key.get()) != 0) {
         throw SST_Exception("AUTH_HELLO signature verification failed");
     }
 
@@ -313,11 +327,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
     size_t req_len = 0;
     int ret = Crypto::public_encrypt(
-        reinterpret_cast<const unsigned char*>(purpose.c_str()),
-        purpose.size(),
-        RSA_PKCS1_OAEP_PADDING,
-        ctx_->pub_key.get(),
-        req_buf, &req_len);
+        reinterpret_cast<const unsigned char*>(purpose.c_str()), purpose.size(),
+        RSA_PKCS1_OAEP_PADDING, ctx_->pub_key.get(), req_buf, &req_len);
 
     if (ret != 0) {
         throw SST_Exception("Failed to encrypt session key request");
@@ -330,7 +341,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
     // Step 3: Receive SESSION_KEY_RESP_WITH_DIST_KEY or AUTH_ALERT
     unsigned char resp_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    bytes_recv = recv_from_auth(auth_socket.get_fd(), resp_buf, sizeof(resp_buf));
+    bytes_recv =
+        recv_from_auth(auth_socket.get_fd(), resp_buf, sizeof(resp_buf));
 
     if (bytes_recv <= 0) {
         throw SST_Exception("Failed to receive session key response");
@@ -340,11 +352,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
     unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
     size_t dec_len = sizeof(decrypted);
 
-    ret = Crypto::private_decrypt(
-        resp_buf, bytes_recv,
-        RSA_PKCS1_OAEP_PADDING,
-        ctx_->priv_key.get(),
-        decrypted, &dec_len);
+    ret = Crypto::private_decrypt(resp_buf, bytes_recv, RSA_PKCS1_OAEP_PADDING,
+                                  ctx_->priv_key.get(), decrypted, &dec_len);
 
     if (ret != 0) {
         throw SST_Exception("Failed to decrypt session key response");
@@ -363,7 +372,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         throw SST_Exception("Response too short for distribution key");
     }
 
-    std::memcpy(&ctx_->dist_key, decrypted + offset, sizeof(distribution_key_t));
+    std::memcpy(&ctx_->dist_key, decrypted + offset,
+                sizeof(distribution_key_t));
     offset += sizeof(distribution_key_t);
 
     // Parse number of session keys
@@ -381,13 +391,14 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
     session_key_list_->rear_idx = 0;
 
     // Parse each session key
-    for (int i = 0; i < num_keys && i < static_cast<int>(MAX_SESSION_KEY); ++i) {
+    for (int i = 0; i < num_keys && i < static_cast<int>(MAX_SESSION_KEY);
+         ++i) {
         if (offset + sizeof(session_key_t) > dec_len) {
             throw SST_Exception("Response too short for session key");
         }
 
         std::memcpy(&session_key_list_->s_key[i], decrypted + offset,
-                   sizeof(session_key_t));
+                    sizeof(session_key_t));
         offset += sizeof(session_key_t);
 
         session_key_list_->num_key = i + 1;
@@ -395,7 +406,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
         LOG_DBG << "Session key " << i << " ID: ";
         for (int j = 0; j < static_cast<int>(SESSION_KEY_ID_SIZE); ++j) {
-            LOG_DBG << std::hex << static_cast<int>(session_key_list_->s_key[i].key_id[j]);
+            LOG_DBG << std::hex
+                    << static_cast<int>(session_key_list_->s_key[i].key_id[j]);
         }
         LOG_DBG << std::dec;
     }
@@ -405,7 +417,7 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
 int SST_API::send_to_auth(int sock, const unsigned char* data, size_t len) {
     if (sock < 0) return -1;
-    
+
     ssize_t total = 0;
     while (total < static_cast<ssize_t>(len)) {
         ssize_t n = ::send(sock, data + total, len - total, MSG_NOSIGNAL);
@@ -415,13 +427,13 @@ int SST_API::send_to_auth(int sock, const unsigned char* data, size_t len) {
         }
         total += n;
     }
-    
+
     return static_cast<int>(total);
 }
 
 int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
     if (sock < 0) return -1;
-    
+
     ssize_t total = 0;
     while (total < static_cast<ssize_t>(len)) {
         ssize_t n = ::recv(sock, buf + total, len - total, 0);
@@ -431,7 +443,7 @@ int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
         }
         total += n;
     }
-    
+
     return static_cast<int>(total);
 }
 
@@ -440,8 +452,7 @@ int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
 // ---------------------------------------------------------------------------
 
 SST_Session::SST_Session(SST_session_ctx_t* session_ctx, SSL_Socket socket)
-    : session_ctx_(session_ctx), socket_(std::move(socket))
-{
+    : session_ctx_(session_ctx), socket_(std::move(socket)) {
     LOG_INF << "SST_Session created with FD: " << session_ctx_->sock;
 }
 
@@ -451,8 +462,7 @@ SST_Session::~SST_Session() {
 }
 
 std::unique_ptr<SST_Session> SST_Session::connect_to_server(
-    SST_API& api, const std::vector<uint8_t>& session_key_id)
-{
+    SST_API& api, const std::vector<uint8_t>& session_key_id) {
     LOG_INF << "Connecting to server with session key ID";
 
     // Get the session key from API context
@@ -484,8 +494,8 @@ std::unique_ptr<SST_Session> SST_Session::connect_to_server(
     }
 
     ret = ssl_socket.Connect(static_cast<SST_SOCK_DOMAIN>(AF_INET),
-                            api.get_ctx().config.entity_server_ip_addr,
-                            api.get_ctx().config.entity_server_port_num);
+                             api.get_ctx().config.entity_server_ip_addr,
+                             api.get_ctx().config.entity_server_port_num);
 
     if (ret != 0) {
         throw SST_Exception("Failed to connect to entity server via TLS");
@@ -516,30 +526,29 @@ int SST_Session::send_message(const std::vector<uint8_t>& data) {
 
     LOG_INF << "Sending secure message, payload size: " << data.size();
 
-    // Stack-allocated buffers — no heap allocation (per crypto design principle).
+    // Stack-allocated buffers — no heap allocation (per crypto design
+    // principle).
     std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> enc_buf{};
     std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH + 3> frame{};
 
     // Encrypt and authenticate the payload
     unsigned int enc_len = Crypto::get_expected_encrypted_total_length(
-        data.size(), AES_IV_SIZE, MAC_KEY_SIZE,
-        session_ctx_->s_key.enc_mode,
+        data.size(), AES_IV_SIZE, MAC_KEY_SIZE, session_ctx_->s_key.enc_mode,
         session_ctx_->s_key.hmac_mode);
 
     int ret = Crypto::symmetric_encrypt_authenticate(
         data.data(), static_cast<unsigned int>(data.size()),
         session_ctx_->s_key.mac_key, session_ctx_->s_key.mac_key_size,
         session_ctx_->s_key.cipher_key, session_ctx_->s_key.cipher_key_size,
-        AES_IV_SIZE,
-        session_ctx_->s_key.enc_mode,
-        session_ctx_->s_key.hmac_mode,
-        enc_buf.data(), &enc_len);
+        AES_IV_SIZE, session_ctx_->s_key.enc_mode,
+        session_ctx_->s_key.hmac_mode, enc_buf.data(), &enc_len);
 
     if (ret != 0) {
         throw SST_Exception("Failed to encrypt message");
     }
 
-    // Build the full frame: [type=0x01][2-byte length][IV + encrypted_payload + HMAC]
+    // Build the full frame: [type=0x01][2-byte length][IV + encrypted_payload +
+    // HMAC]
     frame[0] = 0x01;  // DATA message type
     uint16_t msg_len = static_cast<uint16_t>(enc_len + AES_IV_SIZE);
     frame[1] = static_cast<unsigned char>((msg_len >> 8) & 0xFF);
@@ -547,8 +556,8 @@ int SST_Session::send_message(const std::vector<uint8_t>& data) {
     std::memcpy(frame.data() + 3, enc_buf.data(), enc_len);
 
     // Send the frame using the SSL/TLS socket (uses SSL_write internally)
-    int bytes_sent = socket_.Write(reinterpret_cast<char*>(frame.data()),
-                                   3 + enc_len);
+    int bytes_sent =
+        socket_.Write(reinterpret_cast<char*>(frame.data()), 3 + enc_len);
 
     if (bytes_sent <= 0) {
         throw SST_Exception("Failed to send secure message");
@@ -567,9 +576,10 @@ std::vector<uint8_t> SST_Session::read_message() {
 
     LOG_INF << "Reading secure message";
 
-    // Stack-allocated buffers — no heap allocation (per crypto design principle).
-    // Frame: [type=0x01][2-byte length][IV + encrypted_payload + HMAC]
-    // Max frame size = 3 (header) + MAX_SECURE_COMM_MSG_LENGTH (encrypted body)
+    // Stack-allocated buffers — no heap allocation (per crypto design
+    // principle). Frame: [type=0x01][2-byte length][IV + encrypted_payload +
+    // HMAC] Max frame size = 3 (header) + MAX_SECURE_COMM_MSG_LENGTH (encrypted
+    // body)
     std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH + 3> frame{};
 
     // Read the frame header: type (1 byte) + length (2 bytes)
@@ -585,9 +595,8 @@ std::vector<uint8_t> SST_Session::read_message() {
     LOG_INF << "Received message with length: " << msg_len;
 
     // Read the rest of the frame: IV + encrypted data
-    bytes_recv = socket_.Read(
-        reinterpret_cast<char*>(frame.data() + 3),
-        static_cast<int>(msg_len));
+    bytes_recv = socket_.Read(reinterpret_cast<char*>(frame.data() + 3),
+                              static_cast<int>(msg_len));
 
     if (bytes_recv <= 0) {
         throw SST_Exception("Failed to read message body");
@@ -598,8 +607,7 @@ std::vector<uint8_t> SST_Session::read_message() {
 
     // Compute expected decrypted length
     unsigned int dec_len = Crypto::get_expected_decrypted_maximum_length(
-        enc_len, AES_IV_SIZE, MAC_KEY_SIZE,
-        session_ctx_->s_key.enc_mode,
+        enc_len, AES_IV_SIZE, MAC_KEY_SIZE, session_ctx_->s_key.enc_mode,
         session_ctx_->s_key.hmac_mode);
 
     // Decrypt and verify the message
@@ -607,12 +615,10 @@ std::vector<uint8_t> SST_Session::read_message() {
         decrypted{};
 
     int ret = Crypto::symmetric_decrypt_authenticate(
-        frame.data() + 3 + AES_IV_SIZE, enc_len,
-        session_ctx_->s_key.mac_key, session_ctx_->s_key.mac_key_size,
-        session_ctx_->s_key.cipher_key, session_ctx_->s_key.cipher_key_size,
-        AES_IV_SIZE,
-        session_ctx_->s_key.enc_mode,
-        session_ctx_->s_key.hmac_mode,
+        frame.data() + 3 + AES_IV_SIZE, enc_len, session_ctx_->s_key.mac_key,
+        session_ctx_->s_key.mac_key_size, session_ctx_->s_key.cipher_key,
+        session_ctx_->s_key.cipher_key_size, AES_IV_SIZE,
+        session_ctx_->s_key.enc_mode, session_ctx_->s_key.hmac_mode,
         decrypted.data(), &dec_len);
 
     if (ret != 0) {
