@@ -308,16 +308,18 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         //   Message: [1 byte: msgType][variable-length: payloadLen][payload]
         //
         // Step 1: Receive AUTH_HELLO from Auth server.
-        //   msgType = 0x00, payload = auth_id[6 bytes] + auth_nonce[8 bytes] = 14 bytes.
-        unsigned char auth_hello_buf[MAX_SECURE_COMM_MSG_LENGTH];
-        int bytes_recv = recv_from_auth(auth_socket.get_fd(), auth_hello_buf,
-                                        sizeof(auth_hello_buf));
-        if (bytes_recv <= 0) {
+        //   msgType = 0x00, payloadLen = 12, payload = auth_id[4 BE] + auth_nonce[8]
+        //   Total message = 1 + 1 + 12 = 14 bytes.
+        const int AUTH_HELLO_MSG_SIZE = 14;
+        unsigned char auth_hello_buf[AUTH_HELLO_MSG_SIZE];
+        int bytes_recv = recv(auth_socket.get_fd(), auth_hello_buf,
+                              AUTH_HELLO_MSG_SIZE, 0);
+        if (bytes_recv != AUTH_HELLO_MSG_SIZE) {
             throw SST_Exception("Failed to receive AUTH_HELLO from Auth server");
         }
 
-        // Parse AUTH_HELLO payload: auth_id (6 bytes) + auth_nonce (RSA_KEY_SIZE bytes)
-        const unsigned int AUTH_ID_SIZE = 6;
+        // Parse AUTH_HELLO payload: auth_id (4 bytes, big-endian) + auth_nonce (8 bytes)
+        const unsigned int AUTH_ID_SIZE = 4;
         unsigned char auth_id[AUTH_ID_SIZE] = {};
         if (bytes_recv < static_cast<int>(AUTH_ID_SIZE + RSA_KEY_SIZE)) {
             throw SST_Exception("AUTH_HELLO response too short: " +
@@ -627,13 +629,17 @@ int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
         throw SST_Exception("Invalid socket FD");
     }
 
-    // Parse IoTSP header first to get actual payload length
+    // Parse IoTSP header first to get actual payload length.
+    // This avoids blocking when the server sends a short message (e.g. AUTH_HELLO = 14 bytes)
+    // into a buffer sized for MAX_SECURE_COMM_MSG_LENGTH.
     int payload_len = read_iotsp_header(sock);
     if (payload_len < 0) {
         throw SST_Exception("Failed to receive IoTSP header from Auth server");
     }
 
-    // Sanity check: header (1 + varint) + payload should fit in buf
+    // Sanity check: header (1 byte msgType + varint bytes) + payload should fit in buf.
+    // We already consumed the header bytes from the socket, so we just need to
+    // read msgType (1 byte) + payload (payload_len bytes).
     size_t total_msg_size = static_cast<size_t>(payload_len) + 1; // +1 for msgType
     if (total_msg_size > len) {
         LOG_ERR << "IoTSP message too large: " << total_msg_size << " > " << len;
@@ -649,8 +655,8 @@ int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
 
     // Read payload bytes
     ssize_t total = 1;
-    while (total < total_msg_size) {
-        n = ::recv(sock, buf + total, total_msg_size - total, 0);
+    while (total < static_cast<ssize_t>(total_msg_size)) {
+        n = ::recv(sock, buf + total, total_msg_size - static_cast<size_t>(total), 0);
         if (n <= 0) {
             LOG_ERR << "Failed to receive payload from Auth server (got "
                     << total << " of " << total_msg_size << " bytes)";
