@@ -14,6 +14,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <cstddef>
 #include <cstring>
 #include <iostream>
 #include <memory>
@@ -53,7 +54,8 @@ struct SST_SocketInfo {
      * @brief Constructor initializing an empty/invalid socket info.
      */
     SST_SocketInfo()
-        : sock(-1), len(0), addr(nullptr, [](sockaddr* p) { free(p); }) {}
+        : sock(-1), len(0),
+          addr(nullptr, [](sockaddr* p) { std::free(p); }) {}
 
     /**
      * @brief Destructor that closes the socket if it is open.
@@ -74,10 +76,14 @@ struct SST_SocketInfo {
      */
     static std::unique_ptr<sockaddr, void (*)(sockaddr*)> AllocAddr(
         const void* src, socklen_t length) {
-        void* raw = malloc(length);
-        if (!raw) return {nullptr, [](sockaddr* p) { free(p); }};
-        memcpy(raw, src, length);
-        return {static_cast<sockaddr*>(raw), [](sockaddr* p) { free(p); }};
+        std::byte* raw = reinterpret_cast<std::byte*>(std::malloc(length));
+        if (!raw) return {nullptr, [](sockaddr* p) { std::free(p); }};
+        memcpy(reinterpret_cast<void*>(raw), src, length);
+        // reinterpret_cast for POSIX socket programming: sockaddr_in/embeds
+        // sockaddr as first member, pointer layout is compatible
+        return {reinterpret_cast<sockaddr*>(raw), [](sockaddr* p) {
+            std::free(p);
+        }};
     }
 };
 
@@ -185,9 +191,18 @@ class Socket {
      * @return 0 on success, non-zero on error.
      */
     static int CreateAddr(SST_SOCK_DOMAIN domain, const char* host_or_path,
-                          int port, void** addr, int* len);
+                          int port, std::byte** addr, int* len);
 
-   protected:
+    /** @brief Returns the managed socket info for derived classes. */
+    std::unique_ptr<SST_SocketInfo>& get_info_ref() { return info; }
+
+    /** @brief Returns the managed socket info for derived classes. */
+    const std::unique_ptr<SST_SocketInfo>& get_info_ref() const { return info; }
+
+    /** @brief Returns the thread-safe mutex for socket operations. */
+    std::mutex& get_gate_ref() const { return gate; }
+
+   private:
     std::unique_ptr<SST_SocketInfo> info;  ///< Managed socket resources.
     mutable std::mutex gate;  ///< Mutex for thread-safe socket operations.
 };
@@ -202,7 +217,7 @@ class ClientSocket : public Socket {
      * @brief Constructs a client socket with an existing SocketInfo.
      * @param info Unique pointer to a pre-populated SocketInfo structure.
      */
-    ClientSocket(std::unique_ptr<SST_SocketInfo> info);
+    ClientSocket(std::unique_ptr<SST_SocketInfo> socket_info);
 
     /**
      * @brief Constructs a client socket.
@@ -218,11 +233,11 @@ class ClientSocket : public Socket {
     int Connect();
 
     /** @brief Internal method to open a client socket. */
-    int SocketClientOpen(SST_SocketInfo** info, SST_SOCK_DOMAIN domain,
-                         const char* host_or_path, int port);
+    int SocketClientOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
+                         const char* host_or_path, int port) const;
 
     /** @brief Internal method to connect a prepared socket info. */
-    int SocketClientConnect(SST_SocketInfo* info);
+    int SocketClientConnect(SST_SocketInfo* socket_info) const;
 };
 
 /**
@@ -247,11 +262,11 @@ class ServerSocket : public Socket {
     int Accept(ServerSocket& acceptedSocket);
 
     /** @brief Internal method to set up the listener socket. */
-    int SocketServerOpen(SST_SocketInfo** info, SST_SOCK_DOMAIN domain,
-                         const char* host_or_path, int port);
+    int SocketServerOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
+                         const char* host_or_path, int port) const;
 
     /** @brief Internal method to accept a raw connection. */
-    int SocketServerAccept(SST_SocketInfo* info, SST_SocketInfo* peer);
+    int SocketServerAccept(SST_SocketInfo* socket_info, SST_SocketInfo* peer) const;
 };
 
 /**
@@ -265,8 +280,8 @@ class EndPointSocket : public Socket {
     virtual ~EndPointSocket();
 
     /** @brief Internal method to open the endpoint. */
-    int SocketEndPointOpen(SST_SocketInfo** info, SST_SOCK_DOMAIN domain,
-                           const char* host_or_path, int port);
+    int SocketEndPointOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
+                           const char* host_or_path, int port) const;
 };
 }  // namespace sst
 #endif  // SOCKET_H

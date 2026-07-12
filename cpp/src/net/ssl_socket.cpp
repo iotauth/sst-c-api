@@ -39,8 +39,8 @@ SSL_Socket::SSL_Socket(SSL_Socket&& other) noexcept
     : Socket(), ssl_(other.ssl_) {
     // Socket() default-constructs (mutex + nullptr info). Transfer the
     // underlying socket via SetSocketInfo, then null out the source.
-    SetSocketInfo(std::move(other.info));
-    other.info.reset();
+    SetSocketInfo(std::move(other.get_info_ref()));
+    other.get_info_ref().reset();
     other.ssl_ = nullptr;
 }
 
@@ -50,8 +50,8 @@ SSL_Socket& SSL_Socket::operator=(SSL_Socket&& other) noexcept {
             SSL_shutdown(ssl_);
             SSL_free(ssl_);
         }
-        SetSocketInfo(std::move(other.info));
-        other.info.reset();
+        SetSocketInfo(std::move(other.get_info_ref()));
+        other.get_info_ref().reset();
         ssl_ = other.ssl_;
         other.ssl_ = nullptr;
     }
@@ -94,7 +94,7 @@ int SSL_Socket::InitServerContext(const char* cert_file, const char* key_file,
 
     // Thread-safe initialization using static once_flag
     static std::once_flag init_flag;
-    std::call_once(init_flag, [&]() {
+    std::call_once(init_flag, [this, cert_file, key_file, ca_file]() {
         if (server_ctx_) return;  // Already initialized by another thread
 
         SSL_CTX* ctx = SSL_CTX_new(TLS_server_method());
@@ -123,15 +123,13 @@ int SSL_Socket::InitServerContext(const char* cert_file, const char* key_file,
 
 int SSL_Socket::Connect(SST_SOCK_DOMAIN domain, const char* host_or_path,
                         int port) {
-    void* addr = nullptr;
+    std::byte* addr = nullptr;
     int len = 0;
     if (Socket::CreateAddr(domain, host_or_path, port, &addr, &len) != 0) {
         return -1;
     }
 
     // Wrap the returned address in a unique_ptr with std::free as deleter
-    // This ensures the memory is properly freed when the unique_ptr goes out
-    // of scope, without using C++ delete on C new'd memory (which would be UB).
     std::unique_ptr<void, decltype(&std::free)> addr_owner(addr, &std::free);
 
     int sock = ::socket(domain, SOCK_STREAM, 0);
@@ -139,7 +137,7 @@ int SSL_Socket::Connect(SST_SOCK_DOMAIN domain, const char* host_or_path,
         return -1;
     }
 
-    if (::connect(sock, static_cast<struct sockaddr*>(addr), len) != 0) {
+    if (::connect(sock, reinterpret_cast<struct sockaddr*>(addr), len) != 0) {
         ::close(sock);
         return -1;
     }

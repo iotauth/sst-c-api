@@ -142,7 +142,7 @@ struct SST_ctx_t {
     pthread_mutex_t     mutex;
 
     SST_ctx_t()
-        : dist_key{}, config{},
+        : dist_key{},
           pub_key(nullptr, &EVP_PKEY_free),
           priv_key(nullptr, &EVP_PKEY_free)
     {

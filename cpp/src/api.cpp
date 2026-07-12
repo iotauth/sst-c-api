@@ -38,6 +38,7 @@ namespace sst {
 // ---------------------------------------------------------------------------
 
 /** @brief Free function for SST_ctx_t (used as unique_ptr deleter). */
+// NOLINTNEX-TLINE(cppcoreguidelines-owning-memory): Custom deleter for unique_ptr.
 void free_SST_ctx_t(SST_ctx_t* ctx) {
     if (!ctx) return;
     // std::mutex is RAII — no manual destroy needed.
@@ -45,12 +46,14 @@ void free_SST_ctx_t(SST_ctx_t* ctx) {
 }
 
 /** @brief Free function for session_key_list_t. */
+// NOLINTNEXTLINE(cppcoreguidelines-owning-memory): Custom deleter for unique_ptr.
 void free_session_key_list_t(session_key_list_t* list) {
     if (!list) return;
     delete list;
 }
 
 /** @brief Free function for SST_session_ctx_t. */
+// NOLINTNEXTLINE(cppcoreguidelines-owning-memory): Custom deleter for unique_ptr.
 void free_session_ctx(SST_session_ctx_t* session_ctx) {
     if (!session_ctx) return;
     // Fix reliability issue #1: Check if socket is valid before closing
@@ -64,6 +67,7 @@ void free_session_ctx(SST_session_ctx_t* session_ctx) {
 // Config file parser (simple key=value format)
 // ---------------------------------------------------------------------------
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-magic-numbers): Protocol constants.
 static void parse_config_file(const std::string& path, config_t& cfg) {
     std::ifstream file(path);
     if (!file.is_open()) {
@@ -162,7 +166,7 @@ snprintf(cfg.purpose[idx], sizeof(cfg.purpose[idx]), "%.*s",
 // ---------------------------------------------------------------------------
 
 SST_API::SST_API(const std::string& config_path)
-    : ctx_(new SST_ctx_t(), &free_SST_ctx_t), session_key_list_(nullptr)
+    : ctx_(new SST_ctx_t(), &free_SST_ctx_t)
 {
     // Ensure OpenSSL is initialized before any crypto operations
     ensure_openssl_initialized();
@@ -312,6 +316,10 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         //   Total message = 1 + 1 + 12 = 14 bytes.
         const int AUTH_HELLO_MSG_SIZE = 14;
         unsigned char auth_hello_buf[AUTH_HELLO_MSG_SIZE];
+
+        // Blocking recv is intentional: auth socket is local to this function
+        // and the outer scoped_lock in get_session_keys/auth_hello serializes
+        // access to session_key_list_ during the handshake.
         int bytes_recv = recv(auth_socket.get_fd(), auth_hello_buf,
                               AUTH_HELLO_MSG_SIZE, 0);
         if (bytes_recv != AUTH_HELLO_MSG_SIZE) {
@@ -354,8 +362,10 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
         // --- 2a. Build the plaintext payload ---
         size_t entity_nonce_size = 8;
-        size_t num_keys = static_cast<size_t>(ctx_->config.numkey);
-        size_t name_len = strlen(ctx_->config.name);
+        const size_t num_keys = static_cast<size_t>(ctx_->config.numkey);
+        (void)num_keys;
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): Fixed-size C string from config.
+        const size_t name_len = strlen(ctx_->config.name);
         size_t purpose_len = purpose.size();
 
         // Variable-length integer encoding: each byte has high bit set except the last.
@@ -383,6 +393,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         // Calculate payload size
         size_t name_varlen_size = 1; // short name fits in 1 varint byte
         size_t purpose_varlen_size = 1;
+        (void)name_varlen_size;
+        (void)purpose_varlen_size;
         unsigned char plaintext_payload[MAX_SECURE_COMM_MSG_LENGTH];
         size_t offset = 0;
 
@@ -441,7 +453,6 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         }
 
         // --- 2d. Build the IoTSP message: [msgType][payloadLen varint][ciphertext + signature] ---
-        // Auth server expects: ciphertext + signature appended (see EntityConnectionHandler)
         size_t total_payload_size = encrypted_len + RSA_KEY_SIZE;
 
         unsigned char iotsp_msg[MAX_SECURE_COMM_MSG_LENGTH + RSA_KEY_SIZE * 2];
@@ -482,7 +493,7 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
 
         // --- 3a. Check for AUTH_ALERT (msgType = 0x64 = 100) ---
         if (bytes_recv >= 2 && resp_buf[0] == 0x64) {
-            unsigned char alert_code = resp_buf[1];
+            const unsigned char alert_code = resp_buf[1];
             throw SST_Exception("AUTH_ALERT received from Auth server: code=" +
                                 std::to_string(alert_code));
         }
@@ -491,7 +502,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         if (bytes_recv < 2) {
             throw SST_Exception("Session key response too short");
         }
-        unsigned char resp_msg_type = resp_buf[0];
+        const unsigned char resp_msg_type = resp_buf[0];
+        (void)resp_msg_type;
         // Parse variable-length integer for payload length
         size_t resp_payload_len = 0;
         size_t resp_len_varint_size = 0;
@@ -632,34 +644,25 @@ int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
     // Parse IoTSP header first to get actual payload length.
     // This avoids blocking when the server sends a short message (e.g. AUTH_HELLO = 14 bytes)
     // into a buffer sized for MAX_SECURE_COMM_MSG_LENGTH.
+    // Note: read_iotsp_header() already consumed msgType (1 byte) + varint payloadLen
+    // from the socket. The caller does NOT need to read msgType again.
     int payload_len = read_iotsp_header(sock);
     if (payload_len < 0) {
         throw SST_Exception("Failed to receive IoTSP header from Auth server");
     }
 
-    // Sanity check: header (1 byte msgType + varint bytes) + payload should fit in buf.
-    // We already consumed the header bytes from the socket, so we just need to
-    // read msgType (1 byte) + payload (payload_len bytes).
-    size_t total_msg_size = static_cast<size_t>(payload_len) + 1; // +1 for msgType
-    if (total_msg_size > len) {
-        LOG_ERR << "IoTSP message too large: " << total_msg_size << " > " << len;
+    if (payload_len < 0 || static_cast<size_t>(payload_len) > len) {
+        LOG_ERR << "Payload too large: " << payload_len << " > " << len;
         throw SST_Exception("IoTSP message too large");
     }
 
-    // Read msgType byte
-    ssize_t n = ::recv(sock, buf, 1, 0);
-    if (n <= 0) {
-        LOG_ERR << "Failed to receive msgType from Auth server";
-        throw SST_Exception("Failed to receive from Auth server");
-    }
-
-    // Read payload bytes
-    ssize_t total = 1;
-    while (total < static_cast<ssize_t>(total_msg_size)) {
-        n = ::recv(sock, buf + total, total_msg_size - static_cast<size_t>(total), 0);
+    // Read payload bytes (msgType was already consumed by read_iotsp_header)
+    ssize_t total = 0;
+    while (total < payload_len) {
+        ssize_t n = ::recv(sock, buf + total, payload_len - total, 0);
         if (n <= 0) {
             LOG_ERR << "Failed to receive payload from Auth server (got "
-                    << total << " of " << total_msg_size << " bytes)";
+                    << total << " of " << payload_len << " bytes)";
             throw SST_Exception("Failed to receive from Auth server");
         }
         total += n;

@@ -268,6 +268,7 @@ int Crypto::encrypt_aes(const unsigned char* plaintext,
         }
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): EVP API requires int*.
     if (!EVP_EncryptUpdate(ctx, ret, reinterpret_cast<int*>(ret_length),
                            plaintext, plaintext_length)) {
         EVP_CIPHER_CTX_free(ctx);
@@ -332,6 +333,7 @@ int Crypto::decrypt_aes(const unsigned char* encrypted,
         encrypted_length -= AES_GCM_TAG_SIZE;
     }
 
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-reinterpret-cast): EVP API requires int*.
     if (!EVP_DecryptUpdate(ctx, ret, reinterpret_cast<int*>(ret_length),
                            encrypted, encrypted_length)) {
         EVP_CIPHER_CTX_free(ctx);

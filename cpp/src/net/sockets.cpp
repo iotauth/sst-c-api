@@ -1,5 +1,7 @@
 #include "sockets.hpp"
 
+#include <cstddef>
+
 #include "log/log_manager.hpp"
 
 // Implementation of Socket class methods
@@ -8,20 +10,20 @@ sst::Socket::Socket() : info(nullptr) {}
 sst::Socket::~Socket() { Close(); }
 
 void sst::Socket::Close() {
-    std::lock_guard<std::mutex> lock(gate);
-    if (info) {
-        LOG_TRA << "Closing socket with FD: " << info->sock;
-        info.reset();
+    std::lock_guard<std::mutex> lock(get_gate_ref());
+    if (get_info_ref()) {
+        LOG_TRA << "Closing socket with FD: " << get_info_ref()->sock;
+        get_info_ref().reset();
     }
 }
 
 int sst::Socket::Pending() const {
-    if (!info || info->sock == -1) {
+    if (!get_info_ref() || get_info_ref()->sock == -1) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
     int pending;
-    if (ioctl(info->sock, FIONREAD, &pending) == -1) {
+    if (ioctl(get_info_ref()->sock, FIONREAD, &pending) == -1) {
         std::cerr << "Failed to get pending bytes" << std::endl;
         return -1;
     }
@@ -29,35 +31,35 @@ int sst::Socket::Pending() const {
 }
 
 bool sst::Socket::ReadyToReadTimeOut(int timeout) const {
-    if (!info) return false;
+    if (!get_info_ref()) return false;
     struct pollfd fds[1];
-    fds[0].fd = info->sock;
+    fds[0].fd = get_info_ref()->sock;
     fds[0].events = POLLIN;
-return poll(fds, 1, timeout) > 0 &&
-       (fds[0].revents & POLLIN);  // Use poll for timeout [1]
+    return poll(fds, 1, timeout) > 0 &&
+           (fds[0].revents & POLLIN);  // Use poll for timeout [1]
 }
 
 bool sst::Socket::ReadyToRead() const {
-    if (!info) {
+    if (!get_info_ref()) {
         return false;
     }
     struct pollfd fds[1];
-    fds[0].fd = info->sock;
+    fds[0].fd = get_info_ref()->sock;
     fds[0].events = POLLIN;
-int ret = poll(fds, 1, -1);
+    int ret = poll(fds, 1, -1);
     if (ret > 0 && (fds[0].revents & POLLIN)) {
         return true;
     }
-    std::cerr << "Socket with FD: " << info->sock << " is not ready to read."
-              << std::endl;
+    std::cerr << "Socket with FD: " << get_info_ref()->sock
+              << " is not ready to read." << std::endl;
     return false;
 }
 
 int sst::Socket::Read(char* buf, int nbytes) const {
-    if (!info || info->sock == -1) return -1;
+    if (!get_info_ref() || get_info_ref()->sock == -1) return -1;
     int total = 0;
     while (total < nbytes) {
-        int n = read(info->sock, buf + total, nbytes - total);
+        int n = read(get_info_ref()->sock, buf + total, nbytes - total);
         if (n <= 0) return (n == 0 && total > 0) ? total : n;  // EOF or error
         total += n;
     }
@@ -65,77 +67,85 @@ int sst::Socket::Read(char* buf, int nbytes) const {
 }
 
 int sst::Socket::Write(char* buf, int nbytes) {
-    std::lock_guard<std::mutex> lock(gate);
-    if (!info || info->sock == -1) {
+    std::lock_guard<std::mutex> lock(get_gate_ref());
+    if (!get_info_ref() || get_info_ref()->sock == -1) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    return write(info->sock, buf, nbytes);  // Standard write [1]
+    return write(get_info_ref()->sock, buf, nbytes);  // Standard write [1]
 }
 
 int sst::Socket::NonBlockingRead(char* buf, int size, int timeout) const {
-    if (!info) {
+    if (!get_info_ref()) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    int flags = fcntl(info->sock, F_GETFL, 0);
-    fcntl(info->sock, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(get_info_ref()->sock, F_GETFL, 0);
+    fcntl(get_info_ref()->sock, F_SETFL, flags | O_NONBLOCK);
 
-    int ret = read(info->sock, buf, size);
+    int ret = read(get_info_ref()->sock, buf, size);
     if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         if (ReadyToReadTimeOut(timeout)) {
-            ret = read(info->sock, buf, size);
+            ret = read(get_info_ref()->sock, buf, size);
         } else {
-            LOG_TRA << "Socket with FD: " << info->sock << " read timed out";
+            LOG_TRA << "Socket with FD: " << get_info_ref()->sock
+                    << " read timed out";
             ret = 0;  // Indicate timeout
         }
     }
-    fcntl(info->sock, F_SETFL, flags);  // Restore socket flags
+    fcntl(get_info_ref()->sock, F_SETFL, flags);  // Restore socket flags
     return ret;
 }
 
 int sst::Socket::NonBlockingWrite(char* buf, int size, int timeout) {
-    std::lock_guard<std::mutex> lock(gate);
-    if (!info) {
+    std::lock_guard<std::mutex> lock(get_gate_ref());
+    if (!get_info_ref()) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    int flags = fcntl(info->sock, F_GETFL, 0);
-    fcntl(info->sock, F_SETFL, flags | O_NONBLOCK);
+    int flags = fcntl(get_info_ref()->sock, F_GETFL, 0);
+    fcntl(get_info_ref()->sock, F_SETFL, flags | O_NONBLOCK);
 
-    int ret = write(info->sock, buf, size);
+    int ret = write(get_info_ref()->sock, buf, size);
     if (ret == -1 && (errno == EAGAIN || errno == EWOULDBLOCK)) {
         struct pollfd fds[1];
-        fds[0].fd = info->sock;
+        fds[0].fd = get_info_ref()->sock;
         fds[0].events = POLLOUT;
         if (poll(fds, 1, timeout) > 0) {
-            ret = write(info->sock, buf, size);
+            ret = write(get_info_ref()->sock, buf, size);
         } else {
-            LOG_TRA << "Socket with FD: " << info->sock << " write timed out";
+            LOG_TRA << "Socket with FD: " << get_info_ref()->sock
+                    << " write timed out";
             ret = 0;  // Indicate timeout
         }
     }
-    fcntl(info->sock, F_SETFL, flags);
+    fcntl(get_info_ref()->sock, F_SETFL, flags);
     return ret;
 }
 
 void sst::Socket::DebugDump() const {
-    if (!info || info->sock == -1) {
+    if (!get_info_ref() || get_info_ref()->sock == -1) {
         return;
     }
 
     struct sockaddr_storage addr;
     socklen_t len = sizeof(addr);
 
-    if (getsockname(info->sock, reinterpret_cast<sockaddr*>(&addr), &len) ==
-        0) {
+    // reinterpret_cast: sockaddr_storage is a union type used in POSIX socket
+    // programming; casting to sockaddr* is required by getsockname() API
+    if (getsockname(get_info_ref()->sock,
+                    reinterpret_cast<sockaddr*>(&addr), &len) == 0) {
         if (addr.ss_family == AF_INET) {
+            // reinterpret_cast is safe here: sockaddr_in embeds sockaddr
+            // as its first member; the C standard guarantees this layout.
             struct sockaddr_in* in_addr = reinterpret_cast<sockaddr_in*>(&addr);
             char ipstr[INET_ADDRSTRLEN];
             inet_ntop(AF_INET, &in_addr->sin_addr, ipstr, sizeof(ipstr));
             LOG_TRA << "Local address: " << ipstr << ":"
                     << ntohs(in_addr->sin_port);
         } else if (addr.ss_family == AF_INET6) {
+            // reinterpret_cast is safe here: sockaddr_in6 embeds sockaddr
+            // as its first member; the C standard guarantees this layout.
             struct sockaddr_in6* in6_addr =
                 reinterpret_cast<sockaddr_in6*>(&addr);
             char ipstr[INET6_ADDRSTRLEN];
@@ -149,13 +159,13 @@ void sst::Socket::DebugDump() const {
 }
 
 void sst::Socket::SetSocketInfo(std::unique_ptr<SST_SocketInfo> tmp) {
-    std::lock_guard<std::mutex> lock(gate);
-    info = std::move(tmp);
+    std::lock_guard<std::mutex> lock(get_gate_ref());
+    get_info_ref() = std::move(tmp);
 }
 
 std::unique_ptr<sst::SST_SocketInfo> sst::Socket::GetSocketInfo() const {
-    std::lock_guard<std::mutex> lock(gate);
-    if (!info) {
+    std::lock_guard<std::mutex> lock(get_gate_ref());
+    if (!get_info_ref()) {
         std::cerr << "GetSocketInfo called on uninitialized socket"
                   << std::endl;
         return nullptr;
@@ -163,15 +173,16 @@ std::unique_ptr<sst::SST_SocketInfo> sst::Socket::GetSocketInfo() const {
     // Return a copy of the SocketInfo; dup() the fd so the copy
     // can be destroyed independently without closing the original socket.
     auto copy_info = std::make_unique<SST_SocketInfo>();
-    copy_info->sock = (info->sock != -1) ? dup(info->sock) : -1;
-    if (info->sock != -1 && copy_info->sock == -1) {
+    copy_info->sock = (get_info_ref()->sock != -1) ? dup(get_info_ref()->sock)
+                                                   : -1;
+    if (get_info_ref()->sock != -1 && copy_info->sock == -1) {
         std::cerr << "Failed to dup socket fd in GetSocketInfo" << std::endl;
         return nullptr;
     }
-    copy_info->len = info->len;
-    if (info->addr) {
-        copy_info->addr =
-            SST_SocketInfo::AllocAddr(info->addr.get(), info->len);
+    copy_info->len = get_info_ref()->len;
+    if (get_info_ref()->addr) {
+        copy_info->addr = SST_SocketInfo::AllocAddr(
+            get_info_ref()->addr.get(), get_info_ref()->len);
         if (!copy_info->addr) {
             std::cerr << "Failed to allocate memory for GetSocketInfo"
                       << std::endl;
@@ -181,10 +192,12 @@ std::unique_ptr<sst::SST_SocketInfo> sst::Socket::GetSocketInfo() const {
     return copy_info;
 }
 
-int sst::Socket::get_fd() const { return info ? info->sock : -1; }
+int sst::Socket::get_fd() const {
+    return get_info_ref() ? get_info_ref()->sock : -1;
+}
 
 int sst::Socket::GetPeerName(SST_SocketInfo* peer) const {
-    if (!info || info->sock == -1 || !peer) {
+    if (!get_info_ref() || get_info_ref()->sock == -1 || !peer) {
         std::cerr << "Invalid socket info or peer info" << std::endl;
         return -1;
     }
@@ -192,7 +205,10 @@ int sst::Socket::GetPeerName(SST_SocketInfo* peer) const {
     struct sockaddr_storage addr_store;
     socklen_t addr_len = sizeof(addr_store);
 
-    if (getpeername(info->sock, reinterpret_cast<sockaddr*>(&addr_store),
+    // reinterpret_cast: sockaddr_storage is a union type used in POSIX socket
+    // programming; casting to sockaddr* is required by getpeername() API
+    if (getpeername(get_info_ref()->sock,
+                    reinterpret_cast<sockaddr*>(&addr_store),
                     &addr_len) == -1) {
         std::cerr << "Failed to get peer name" << std::endl;
         return -1;
@@ -210,26 +226,32 @@ int sst::Socket::GetPeerName(SST_SocketInfo* peer) const {
 }
 
 int sst::Socket::CreateAddr(SST_SOCK_DOMAIN domain, const char* host_or_path,
-                            int port, void** addr, int* len) {
+                            int port, std::byte** addr, int* len) {
     if (domain == SST_SOCK_INET) {
-        auto in_addr = std::make_unique<sockaddr_in>();
+        sockaddr_in* in_addr =
+            static_cast<sockaddr_in*>(std::malloc(sizeof(sockaddr_in)));
+        if (!in_addr) return -1;
         in_addr->sin_family = AF_INET;
         in_addr->sin_port = htons(port);
         if (inet_pton(AF_INET, host_or_path, &in_addr->sin_addr) != 1) {
             std::cerr << "Invalid IPv4 address: " << host_or_path << std::endl;
+            std::free(in_addr);
             return -1;
         }
-        *addr = in_addr.release();
+        *addr = reinterpret_cast<std::byte*>(in_addr);
         *len = sizeof(struct sockaddr_in);
     } else if (domain == SST_SOCK_INET6) {
-        auto in6_addr = std::make_unique<sockaddr_in6>();
+        sockaddr_in6* in6_addr =
+            static_cast<sockaddr_in6*>(std::malloc(sizeof(sockaddr_in6)));
+        if (!in6_addr) return -1;
         in6_addr->sin6_family = AF_INET6;
         in6_addr->sin6_port = htons(port);
         if (inet_pton(AF_INET6, host_or_path, &in6_addr->sin6_addr) != 1) {
             std::cerr << "Invalid IPv6 address: " << host_or_path << std::endl;
+            std::free(in6_addr);
             return -1;
         }
-        *addr = in6_addr.release();
+        *addr = reinterpret_cast<std::byte*>(in6_addr);
         *len = sizeof(struct sockaddr_in6);
     } else {
         std::cerr << "Unsupported socket domain" << std::endl;
@@ -238,18 +260,24 @@ int sst::Socket::CreateAddr(SST_SOCK_DOMAIN domain, const char* host_or_path,
     return 0;
 }
 
-sst::ClientSocket::ClientSocket(std::unique_ptr<SST_SocketInfo> info) {
-    SetSocketInfo(std::move(info));
+sst::ClientSocket::ClientSocket(std::unique_ptr<SST_SocketInfo> socket_info) {
+    SetSocketInfo(std::move(socket_info));
 }
 
 // Implementation of ClientSocket class methods
 sst::ClientSocket::ClientSocket(SST_SOCK_DOMAIN domain,
                                 const char* host_or_path, int port) {
-    SST_SocketInfo* info = nullptr;
-    if (SocketClientOpen(&info, domain, host_or_path, port) == 0 &&
-        info != nullptr) {
-        SetSocketInfo(std::unique_ptr<SST_SocketInfo>(info));
-        LOG_TRA << "ClientSocket created with FD: " << info->sock;
+    SST_SocketInfo* raw_info = nullptr;
+    if (SocketClientOpen(&raw_info, domain, host_or_path, port) == 0 &&
+        raw_info != nullptr) {
+        SetSocketInfo(std::unique_ptr<SST_SocketInfo>(raw_info));
+        LOG_TRA << "ClientSocket created with FD: " << raw_info->sock;
+        // Connect to the target — SocketClientOpen only creates the socket
+        // without calling ::connect(). Must connect explicitly here.
+        if (Connect() != 0) {
+            std::cerr << "Failed to connect ClientSocket to " << host_or_path
+                      << ":" << port << std::endl;
+        }
     } else {
         std::cerr << "Failed to create ClientSocket for host: " << host_or_path
                   << ", port: " << port << std::endl;
@@ -259,18 +287,18 @@ sst::ClientSocket::ClientSocket(SST_SOCK_DOMAIN domain,
 sst::ClientSocket::~ClientSocket() {}
 
 int sst::ClientSocket::Connect() {
-    if (info == nullptr) {
+    if (get_info_ref() == nullptr) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    return sst::ClientSocket::SocketClientConnect(info.get());
+    return SocketClientConnect(get_info_ref().get());
 }
 
-int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** info,
+int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** socket_info,
                                         SST_SOCK_DOMAIN domain,
-                                        const char* host_or_path, int port) {
+                                        const char* host_or_path, int port) const {
     auto new_info = std::make_unique<SST_SocketInfo>();
-    void* raw_addr = nullptr;
+    std::byte* raw_addr = nullptr;
     int addr_len = 0;
 
     // Allocate address via static helper [2]
@@ -279,7 +307,7 @@ int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** info,
         std::cerr << "Failed to create address for ClientSocket" << std::endl;
         return -1;
     }
-    new_info->addr.reset(static_cast<sockaddr*>(raw_addr));
+    new_info->addr.reset(reinterpret_cast<sockaddr*>(raw_addr));
     new_info->len = addr_len;
 
     // Initialize socket [1]
@@ -289,18 +317,18 @@ int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** info,
         return -1;
     }
 
-    *info = new_info.release();  // Transfer ownership to the caller
-    LOG_TRA << "Client socket opened with FD: " << (*info)->sock;
+    *socket_info = new_info.release();  // Transfer ownership to the caller
+    LOG_TRA << "Client socket opened with FD: " << (*socket_info)->sock;
     return 0;
 }
 
-int sst::ClientSocket::SocketClientConnect(SST_SocketInfo* info) {
-    if (!info || info->sock == -1 || !info->addr) {
+int sst::ClientSocket::SocketClientConnect(SST_SocketInfo* socket_info) const {
+    if (!socket_info || socket_info->sock == -1 || !socket_info->addr) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    return connect(info->sock, info->addr.get(),
-                   info->len);  // Standard connection [1]
+    return connect(socket_info->sock, socket_info->addr.get(),
+                   socket_info->len);  // Standard connection [1]
 }
 
 // Implementation of ServerSocket class methods
@@ -319,11 +347,12 @@ sst::ServerSocket::ServerSocket(SST_SOCK_DOMAIN domain, const char* host,
 
 sst::ServerSocket::~ServerSocket() {}
 
-int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** info,
+int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** socket_info,
                                         SST_SOCK_DOMAIN domain,
-                                        const char* host_or_path, int port) {
+                                        const char* host_or_path,
+                                        int port) const {
     auto new_info = std::make_unique<SST_SocketInfo>();
-    void* raw_addr = nullptr;
+    std::byte* raw_addr = nullptr;
     int addr_len = 0;
 
     if (sst::Socket::CreateAddr(domain, host_or_path, port, &raw_addr,
@@ -331,7 +360,9 @@ int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** info,
         std::cerr << "Failed to create address for ServerSocket" << std::endl;
         return -1;
     }
-    new_info->addr.reset(static_cast<sockaddr*>(raw_addr));
+    // reinterpret_cast: sockaddr_in embeds sockaddr as first member;
+    // pointer layout is compatible for byte-oriented storage
+    new_info->addr.reset(reinterpret_cast<sockaddr*>(raw_addr));
     new_info->len = addr_len;
 
     new_info->sock = socket(domain, SOCK_STREAM, 0);
@@ -350,17 +381,21 @@ int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** info,
         return -1;
     }
 
-    *info = new_info.release();
-    LOG_TRA << "Server socket opened and listening with FD: " << (*info)->sock;
+    *socket_info = new_info.release();
+    LOG_TRA << "Server socket opened and listening with FD: "
+            << (*socket_info)->sock;
     return 0;
 }
 
-int sst::ServerSocket::SocketServerAccept(SST_SocketInfo* info,
-                                          SST_SocketInfo* peer) {
+int sst::ServerSocket::SocketServerAccept(SST_SocketInfo* socket_info,
+                                          SST_SocketInfo* peer) const {
     struct sockaddr_storage ss;
     socklen_t slen = sizeof(ss);
 
-    int newsock = accept(info->sock, reinterpret_cast<sockaddr*>(&ss), &slen);
+    // reinterpret_cast: sockaddr_storage is a union type used in POSIX socket
+    // programming; casting to sockaddr* is required by accept() API
+    int newsock = accept(socket_info->sock,
+                         reinterpret_cast<sockaddr*>(&ss), &slen);
     if (newsock == -1) {
         std::cerr << "Failed to accept connection on ServerSocket" << std::endl;
         return -1;
@@ -381,14 +416,14 @@ int sst::ServerSocket::SocketServerAccept(SST_SocketInfo* info,
 }
 
 int sst::ServerSocket::Accept(sst::ServerSocket& acceptedSocket) {
-    if (!info) {
+    if (!get_info_ref()) {
         std::cerr << "Invalid socket info for accepting connection"
                   << std::endl;
         return -1;
     }
     auto peer_info = std::make_unique<SST_SocketInfo>();
-    if (sst::ServerSocket::SocketServerAccept(info.get(), peer_info.get()) ==
-        0) {
+    if (sst::ServerSocket::SocketServerAccept(get_info_ref().get(),
+                                              peer_info.get()) == 0) {
         acceptedSocket.SetSocketInfo(std::move(peer_info));
         return 0;
     }
@@ -412,14 +447,14 @@ sst::EndPointSocket::EndPointSocket(SST_SOCK_DOMAIN domain, const char* host,
 
 sst::EndPointSocket::~EndPointSocket() {}
 
-int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** info,
+int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** socket_info,
                                             SST_SOCK_DOMAIN domain,
                                             const char* host_or_path,
-                                            int port) {
+                                            int port) const {
     // Use unique_ptr to handle automatic cleanup if the function returns early
     auto new_info = std::make_unique<SST_SocketInfo>();
 
-    void* raw_addr = nullptr;
+    std::byte* raw_addr = nullptr;
     int addr_len = 0;
 
     // CreateAddr allocates memory via std::make_unique [2]
@@ -430,7 +465,9 @@ int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** info,
     }
 
     // Transfer ownership of the address to the unique_ptr in SST_SocketInfo
-    new_info->addr.reset(static_cast<sockaddr*>(raw_addr));
+    // reinterpret_cast: sockaddr embeds sockaddr as first member;
+    // pointer layout is compatible for byte-oriented storage
+    new_info->addr.reset(reinterpret_cast<sockaddr*>(raw_addr));
     new_info->len = addr_len;
 
     new_info->sock = socket(domain, SOCK_STREAM, 0);
@@ -439,7 +476,7 @@ int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** info,
         return -1;  // new_info (and its addr) are automatically deleted here
     }
 
-    *info = new_info.release();
-    LOG_TRA << "EndPoint socket opened with FD: " << (*info)->sock;
+    *socket_info = new_info.release();
+    LOG_TRA << "EndPoint socket opened with FD: " << (*socket_info)->sock;
     return 0;
 }
