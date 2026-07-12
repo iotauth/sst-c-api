@@ -298,145 +298,257 @@ std::optional<SessionKey> SST_API::get_session_key_by_id(
 }
 
 void SST_API::perform_auth_handshake(const std::string& purpose) {
-    // Fix reliability issue #2: Properly manage socket lifecycle
     // Connect to Auth server
     ClientSocket auth_socket(static_cast<SST_SOCK_DOMAIN>(AF_INET),
                              ctx_->config.auth_ip_addr,
                              ctx_->config.auth_port_num);
 
     try {
-        // Step 1: AUTH_HELLO - Send entity name, receive AUTH_ID and AUTH_nonce
+        // The Auth server wire protocol (IoTSP):
+        //   Message: [1 byte: msgType][variable-length: payloadLen][payload]
+        //
+        // Step 1: Receive AUTH_HELLO from Auth server.
+        //   msgType = 0x00, payload = auth_id[6 bytes] + auth_nonce[8 bytes] = 14 bytes.
         unsigned char auth_hello_buf[MAX_SECURE_COMM_MSG_LENGTH];
-
-        int bytes_sent = send_to_auth(auth_socket.get_fd(),
-                                      reinterpret_cast<unsigned char*>(ctx_->config.name),
-                                      strlen(ctx_->config.name));
-        if (bytes_sent <= 0) {
-            throw SST_Exception("Failed to send AUTH_HELLO");
-        }
-
         int bytes_recv = recv_from_auth(auth_socket.get_fd(), auth_hello_buf,
                                         sizeof(auth_hello_buf));
         if (bytes_recv <= 0) {
-            throw SST_Exception("Failed to receive AUTH_HELLO response");
+            throw SST_Exception("Failed to receive AUTH_HELLO from Auth server");
         }
 
-        // Verify AUTH_ID and AUTH_nonce against Auth public key
-        // Need at least sizeof(auth_id) + RSA_KEY_SIZE bytes
-        unsigned char auth_id[6] = {};
-        if (bytes_recv < static_cast<int>(sizeof(auth_id)) +
-                        static_cast<int>(RSA_KEY_SIZE)) {
-            throw SST_Exception("AUTH_HELLO response too short");
+        // Parse AUTH_HELLO payload: auth_id (6 bytes) + auth_nonce (RSA_KEY_SIZE bytes)
+        const unsigned int AUTH_ID_SIZE = 6;
+        unsigned char auth_id[AUTH_ID_SIZE] = {};
+        if (bytes_recv < static_cast<int>(AUTH_ID_SIZE + RSA_KEY_SIZE)) {
+            throw SST_Exception("AUTH_HELLO response too short: " +
+                                std::to_string(bytes_recv));
         }
-
-        std::memcpy(auth_id, auth_hello_buf, sizeof(auth_id));
-
+        std::memcpy(auth_id, auth_hello_buf, AUTH_ID_SIZE);
         unsigned char auth_nonce[RSA_KEY_SIZE];
-        std::memcpy(auth_nonce, auth_hello_buf + sizeof(auth_id), RSA_KEY_SIZE);
+        std::memcpy(auth_nonce, auth_hello_buf + AUTH_ID_SIZE, RSA_KEY_SIZE);
 
-        // Verify signature
-        if (Crypto::sha256_verify(auth_nonce, RSA_KEY_SIZE, auth_id, sizeof(auth_id),
-                                  ctx_->pub_key.get()) != 0) {
-            throw SST_Exception("AUTH_HELLO signature verification failed");
+        LOG_INF << "AUTH_HELLO received. Auth ID: ";
+        for (int i = 0; i < AUTH_ID_SIZE; ++i) {
+            LOG_DBG << std::hex << static_cast<int>(auth_id[i]);
         }
+        LOG_DBG << std::dec << " Nonce: ";
+        for (int i = 0; i < RSA_KEY_SIZE; ++i) {
+            LOG_DBG << std::hex << static_cast<int>(auth_nonce[i]);
+        }
+        LOG_DBG << std::dec;
 
-        LOG_INF << "AUTH_HELLO verified successfully";
+        // Step 2: Build and send SESSION_KEY_REQ_IN_PUB_ENC (IoTSP message).
+        //
+        // Wire format:
+        //   [msgType=0x14][payloadLen varint][payload]
+        //
+        // payload = entity_nonce[8] + auth_nonce[8] + numKeys[4 BE] +
+        //           entityName (varlen string) + purpose (varlen string)
+        //
+        // The payload is then:
+        //   - Encrypted with Auth's public key (RSA_PKCS1_OAEP_PADDING)
+        //   - Signed with entity's private key (SHA-256 + RSA)
+        //   - Auth appends the RSA signature (RSA_KEY_SIZE bytes) to the ciphertext.
 
-        // Step 2: SESSION_KEY_REQ_IN_PUB_ENC - Request session keys
-        unsigned char req_buf[MAX_SECURE_COMM_MSG_LENGTH];
+        // --- 2a. Build the plaintext payload ---
+        size_t entity_nonce_size = 8;
+        size_t num_keys = static_cast<size_t>(ctx_->config.numkey);
+        size_t name_len = strlen(ctx_->config.name);
+        size_t purpose_len = purpose.size();
 
-        size_t req_len = 0;
-        int ret = Crypto::public_encrypt(
-            reinterpret_cast<const unsigned char*>(purpose.c_str()),
-            purpose.size(),
+        // Variable-length integer encoding: each byte has high bit set except the last.
+        auto encode_varint = [](size_t val, unsigned char* out) -> size_t {
+            size_t n = 0;
+            if (val < 128) {
+                out[n++] = static_cast<unsigned char>(val);
+            } else {
+                // Encode with high bit set for continuation bytes
+                unsigned char tmp[5];
+                size_t count = 0;
+                while (val >= 128) {
+                    tmp[count++] = static_cast<unsigned char>(128 | (val & 0x7F));
+                    val >>= 7;
+                }
+                tmp[count++] = static_cast<unsigned char>(val);
+                // Write in reverse (little-endian varint)
+                for (size_t i = 0; i < count; ++i) {
+                    out[n++] = tmp[count - 1 - i];
+                }
+            }
+            return n;
+        };
+
+        // Calculate payload size
+        size_t name_varlen_size = 1; // short name fits in 1 varint byte
+        size_t purpose_varlen_size = 1;
+        unsigned char plaintext_payload[MAX_SECURE_COMM_MSG_LENGTH];
+        size_t offset = 0;
+
+        // Entity nonce (8 bytes, random)
+        int ret = Crypto::generate_nonce(entity_nonce_size, plaintext_payload);
+        if (ret != 0) {
+            throw SST_Exception("Failed to generate entity nonce");
+        }
+        offset += entity_nonce_size;
+
+        // Auth nonce (8 bytes, received from AUTH_HELLO)
+        std::memcpy(plaintext_payload + offset, auth_nonce, RSA_KEY_SIZE);
+        offset += RSA_KEY_SIZE;
+
+        // numKeys as 4-byte big-endian
+        plaintext_payload[offset++] = static_cast<unsigned char>((ctx_->config.numkey >> 24) & 0xFF);
+        plaintext_payload[offset++] = static_cast<unsigned char>((ctx_->config.numkey >> 16) & 0xFF);
+        plaintext_payload[offset++] = static_cast<unsigned char>((ctx_->config.numkey >> 8) & 0xFF);
+        plaintext_payload[offset++] = static_cast<unsigned char>(ctx_->config.numkey & 0xFF);
+
+        // Entity name: [varint length][entity name bytes]
+        size_t name_prefix_len = encode_varint(name_len, plaintext_payload + offset);
+        offset += name_prefix_len;
+        std::memcpy(plaintext_payload + offset, ctx_->config.name, name_len);
+        offset += name_len;
+
+        // Purpose: [varint length][purpose JSON bytes]
+        size_t purpose_prefix_len = encode_varint(purpose_len, plaintext_payload + offset);
+        offset += purpose_prefix_len;
+        std::memcpy(plaintext_payload + offset, purpose.c_str(), purpose_len);
+        offset += purpose_len;
+
+        size_t plaintext_len = offset;
+        LOG_INF << "Plaintext payload size: " << plaintext_len << " bytes";
+
+        // --- 2b. Encrypt payload with Auth's public key (RSA-OAEP) ---
+        unsigned char encrypted[MAX_SECURE_COMM_MSG_LENGTH + RSA_KEY_SIZE];
+        size_t encrypted_len = sizeof(encrypted);
+        ret = Crypto::public_encrypt(
+            plaintext_payload, plaintext_len,
             RSA_PKCS1_OAEP_PADDING,
             ctx_->pub_key.get(),
-            req_buf, &req_len);
-
+            encrypted, &encrypted_len);
         if (ret != 0) {
-            throw SST_Exception("Failed to encrypt session key request");
+            throw SST_Exception("Failed to encrypt session key request with OAEP");
+        }
+        LOG_INF << "Encrypted payload size: " << encrypted_len << " bytes";
+
+        // --- 2c. Sign the encrypted payload with entity's private key (SHA-256 + RSA) ---
+        unsigned char signature[RSA_KEY_SIZE];
+        size_t sig_len = RSA_KEY_SIZE;
+        ret = Crypto::sha256_sign(encrypted, static_cast<unsigned int>(encrypted_len),
+                                  ctx_->priv_key.get(), signature, &sig_len);
+        if (ret != 0) {
+            throw SST_Exception("Failed to sign session key request");
         }
 
-        bytes_sent = send_to_auth(auth_socket.get_fd(), req_buf, req_len);
+        // --- 2d. Build the IoTSP message: [msgType][payloadLen varint][ciphertext + signature] ---
+        // Auth server expects: ciphertext + signature appended (see EntityConnectionHandler)
+        size_t total_payload_size = encrypted_len + RSA_KEY_SIZE;
+
+        unsigned char iotsp_msg[MAX_SECURE_COMM_MSG_LENGTH + RSA_KEY_SIZE * 2];
+        size_t iotsp_offset = 0;
+
+        // msgType = 0x14 (SESSION_KEY_REQ_IN_PUB_ENC)
+        iotsp_msg[iotsp_offset++] = 0x14;
+
+        // payloadLen as variable-length integer
+        size_t len_varint_size = encode_varint(total_payload_size, iotsp_msg + iotsp_offset);
+        iotsp_offset += len_varint_size;
+
+        // Copy encrypted payload
+        std::memcpy(iotsp_msg + iotsp_offset, encrypted, encrypted_len);
+        iotsp_offset += encrypted_len;
+
+        // Append signature
+        std::memcpy(iotsp_msg + iotsp_offset, signature, RSA_KEY_SIZE);
+        iotsp_offset += RSA_KEY_SIZE;
+
+        LOG_INF << "Total IoTSP message size: " << iotsp_offset << " bytes";
+
+        // --- 2e. Send the IoTSP message ---
+        int bytes_sent = send_to_auth(auth_socket.get_fd(), iotsp_msg, iotsp_offset);
         if (bytes_sent <= 0) {
-            throw SST_Exception("Failed to send SESSION_KEY_REQ_IN_PUB_ENC");
+            throw SST_Exception("Failed to send SESSION_KEY_REQ_IN_PUB_ENC to Auth server");
         }
+        LOG_INF << "Sent " << bytes_sent << " bytes to Auth server";
 
         // Step 3: Receive SESSION_KEY_RESP_WITH_DIST_KEY or AUTH_ALERT
         unsigned char resp_buf[MAX_SECURE_COMM_MSG_LENGTH];
         bytes_recv = recv_from_auth(auth_socket.get_fd(), resp_buf, sizeof(resp_buf));
 
         if (bytes_recv <= 0) {
-            throw SST_Exception("Failed to receive session key response");
+            throw SST_Exception("Failed to receive session key response from Auth server");
+        }
+        LOG_INF << "Received " << bytes_recv << " bytes from Auth server";
+
+        // --- 3a. Check for AUTH_ALERT (msgType = 0x64 = 100) ---
+        if (bytes_recv >= 2 && resp_buf[0] == 0x64) {
+            unsigned char alert_code = resp_buf[1];
+            throw SST_Exception("AUTH_ALERT received from Auth server: code=" +
+                                std::to_string(alert_code));
         }
 
-        // Decrypt the response using entity's private key
+        // --- 3b. Parse IoTSP response: [msgType][payloadLen varint][payload] ---
+        if (bytes_recv < 2) {
+            throw SST_Exception("Session key response too short");
+        }
+        unsigned char resp_msg_type = resp_buf[0];
+        // Parse variable-length integer for payload length
+        size_t resp_payload_len = 0;
+        size_t resp_len_varint_size = 0;
+        unsigned char tmp_val[5];
+        size_t tmp_count = 0;
+        for (size_t i = 1; i < static_cast<size_t>(bytes_recv) && i < 6; ++i) {
+            tmp_val[tmp_count++] = resp_buf[i];
+            resp_payload_len |= static_cast<size_t>(resp_buf[i] & 0x7F) << (7 * (i - 1));
+            if ((resp_buf[i] & 0x80) == 0) {
+                resp_len_varint_size = i - 1 + 1; // +1 for the last byte
+                break;
+            }
+        }
+
+        if (resp_payload_len == 0 ||
+            static_cast<size_t>(bytes_recv) < 1 + resp_len_varint_size + resp_payload_len) {
+            throw SST_Exception("Invalid session key response format");
+        }
+
+        const unsigned char* resp_payload = resp_buf + 1 + resp_len_varint_size;
+
+        // --- 3c. Decrypt the response using entity's private key (RSA-OAEP) ---
         unsigned char decrypted[MAX_SECURE_COMM_MSG_LENGTH];
         size_t dec_len = sizeof(decrypted);
-
         ret = Crypto::private_decrypt(
-            resp_buf, bytes_recv,
+            resp_payload, static_cast<size_t>(resp_payload_len),
             RSA_PKCS1_OAEP_PADDING,
             ctx_->priv_key.get(),
             decrypted, &dec_len);
-
         if (ret != 0) {
-            throw SST_Exception("Failed to decrypt session key response");
+            throw SST_Exception("Failed to decrypt session key response with OAEP");
+        }
+        LOG_INF << "Decrypted response size: " << dec_len << " bytes";
+
+        // --- 3d. Parse the decrypted response ---
+        // Format: distribution_key + num_keys(4 BE) + session_keys[]
+        if (dec_len < sizeof(distribution_key_t) + 4) {
+            throw SST_Exception("Decrypted response too short for distribution key");
         }
 
-        // Parse the decrypted response
-        size_t offset = 0;
+        std::memcpy(&ctx_->dist_key, decrypted, sizeof(distribution_key_t));
+        size_t resp_offset = sizeof(distribution_key_t);
 
-        // Check for AUTH_ALERT (message type 0xFF)
-        if (dec_len > 0 && decrypted[0] == 0xFF) {
-            throw SST_Exception("AUTH_ALERT received from Auth server");
-        }
-
-        // Parse distribution key
-        if (dec_len < sizeof(distribution_key_t)) {
-            throw SST_Exception("Response too short for distribution key");
-        }
-
-        std::memcpy(&ctx_->dist_key, decrypted + offset, sizeof(distribution_key_t));
-        offset += sizeof(distribution_key_t);
-
-        // Parse number of session keys
-        if (offset + sizeof(int) > dec_len) {
-            throw SST_Exception("Response too short for key count");
-        }
-        int num_keys = 0;
-        std::memcpy(&num_keys, decrypted + offset, sizeof(int));
-        offset += sizeof(int);
-
-        // Validate num_keys is within acceptable range
-        if (num_keys < 0 || num_keys > static_cast<int>(MAX_SESSION_KEY)) {
-            throw SST_Exception("Invalid session key count: " + std::to_string(num_keys) +
-                               " (expected 0-" + std::to_string(MAX_SESSION_KEY) + ")");
-        }
-
-        // Verify we have enough data to parse num_keys session keys
-        size_t required_bytes = offset + (static_cast<size_t>(num_keys) * sizeof(session_key_t));
-        if (required_bytes > dec_len) {
-            throw SST_Exception("Response too short: claimed " + std::to_string(num_keys) +
-                               " session keys but only " + std::to_string(dec_len) + " bytes available");
-        }
-
-        LOG_INF << "Received " << num_keys << " session key(s)";
+        int num_keys_resp = 0;
+        std::memcpy(&num_keys_resp, decrypted + resp_offset, sizeof(int));
+        resp_offset += sizeof(int);
+        LOG_INF << "Auth returned " << num_keys_resp << " session key(s)";
 
         // Clear existing session keys
         session_key_list_->num_key = 0;
         session_key_list_->rear_idx = 0;
 
-        // Parse each session key
-        for (int i = 0; i < num_keys && i < static_cast<int>(MAX_SESSION_KEY); ++i) {
+        for (int i = 0; i < num_keys_resp && i < static_cast<int>(MAX_SESSION_KEY); ++i) {
             if (offset + sizeof(session_key_t) > dec_len) {
                 throw SST_Exception("Response too short for session key");
             }
-
             std::memcpy(&session_key_list_->s_key[i], decrypted + offset,
                        sizeof(session_key_t));
             offset += sizeof(session_key_t);
-
             session_key_list_->num_key = i + 1;
             session_key_list_->rear_idx = (i + 1) % MAX_SESSION_KEY;
 
@@ -472,16 +584,76 @@ int SST_API::send_to_auth(int sock, const unsigned char* data, size_t len) {
     return static_cast<int>(total);
 }
 
+// Read the IoTSP message header: [1 byte: msgType][variable-length: payloadLen]
+// Returns the payload length, or -1 on error.
+static int read_iotsp_header(int sock) {
+    unsigned char header_buf[5]; // 1 byte msgType + up to 4 bytes varint
+    ssize_t total = 0;
+
+    // Read msgType byte
+    ssize_t n = ::recv(sock, header_buf, 1, 0);
+    if (n <= 0) {
+        LOG_ERR << "Failed to receive msgType from Auth server";
+        return -1;
+    }
+    total += n;
+
+    // Read variable-length payloadLen (until byte with high bit clear)
+    while (total < 5) {
+        n = ::recv(sock, header_buf + total, 1, 0);
+        if (n <= 0) {
+            LOG_ERR << "Failed to receive payloadLen from Auth server";
+            return -1;
+        }
+        total += n;
+        if (!(header_buf[total - 1] & 0x80)) {
+            break; // last byte
+        }
+    }
+
+    // Decode payloadLen from varint (little-endian, 7 bits per byte)
+    int payload_len = 0;
+    int shift = 0;
+    for (int i = 1; i < total; ++i) {
+        payload_len |= (header_buf[i] & 0x7F) << shift;
+        shift += 7;
+    }
+
+    return payload_len;
+}
+
 int SST_API::recv_from_auth(int sock, unsigned char* buf, size_t len) {
     if (sock < 0) {
         throw SST_Exception("Invalid socket FD");
     }
 
-    ssize_t total = 0;
-    while (total < static_cast<ssize_t>(len)) {
-        ssize_t n = ::recv(sock, buf + total, len - total, 0);
+    // Parse IoTSP header first to get actual payload length
+    int payload_len = read_iotsp_header(sock);
+    if (payload_len < 0) {
+        throw SST_Exception("Failed to receive IoTSP header from Auth server");
+    }
+
+    // Sanity check: header (1 + varint) + payload should fit in buf
+    size_t total_msg_size = static_cast<size_t>(payload_len) + 1; // +1 for msgType
+    if (total_msg_size > len) {
+        LOG_ERR << "IoTSP message too large: " << total_msg_size << " > " << len;
+        throw SST_Exception("IoTSP message too large");
+    }
+
+    // Read msgType byte
+    ssize_t n = ::recv(sock, buf, 1, 0);
+    if (n <= 0) {
+        LOG_ERR << "Failed to receive msgType from Auth server";
+        throw SST_Exception("Failed to receive from Auth server");
+    }
+
+    // Read payload bytes
+    ssize_t total = 1;
+    while (total < total_msg_size) {
+        n = ::recv(sock, buf + total, total_msg_size - total, 0);
         if (n <= 0) {
-            LOG_ERR << "Failed to receive from Auth server";
+            LOG_ERR << "Failed to receive payload from Auth server (got "
+                    << total << " of " << total_msg_size << " bytes)";
             throw SST_Exception("Failed to receive from Auth server");
         }
         total += n;
