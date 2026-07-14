@@ -329,20 +329,20 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         // Parse AUTH_HELLO payload: auth_id (4 bytes, big-endian) + auth_nonce (8 bytes)
         const unsigned int AUTH_ID_SIZE = 4;
         unsigned char auth_id[AUTH_ID_SIZE] = {};
-        if (bytes_recv < static_cast<int>(AUTH_ID_SIZE + RSA_KEY_SIZE)) {
+        if (bytes_recv < static_cast<int>(AUTH_ID_SIZE + 8)) {
             throw SST_Exception("AUTH_HELLO response too short: " +
                                 std::to_string(bytes_recv));
         }
         std::memcpy(auth_id, auth_hello_buf, AUTH_ID_SIZE);
-        unsigned char auth_nonce[RSA_KEY_SIZE];
-        std::memcpy(auth_nonce, auth_hello_buf + AUTH_ID_SIZE, RSA_KEY_SIZE);
+        unsigned char auth_nonce[8];
+        std::memcpy(auth_nonce, auth_hello_buf + AUTH_ID_SIZE, 8);
 
         LOG_INF << "AUTH_HELLO received. Auth ID: ";
         for (int i = 0; i < AUTH_ID_SIZE; ++i) {
             LOG_DBG << std::hex << static_cast<int>(auth_id[i]);
         }
         LOG_DBG << std::dec << " Nonce: ";
-        for (int i = 0; i < RSA_KEY_SIZE; ++i) {
+        for (int i = 0; i < 8; ++i) {
             LOG_DBG << std::hex << static_cast<int>(auth_nonce[i]);
         }
         LOG_DBG << std::dec;
@@ -406,8 +406,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         offset += entity_nonce_size;
 
         // Auth nonce (8 bytes, received from AUTH_HELLO)
-        std::memcpy(plaintext_payload + offset, auth_nonce, RSA_KEY_SIZE);
-        offset += RSA_KEY_SIZE;
+        std::memcpy(plaintext_payload + offset, auth_nonce, 8);
+        offset += 8;
 
         // numKeys as 4-byte big-endian
         plaintext_payload[offset++] = static_cast<unsigned char>((ctx_->config.numkey >> 24) & 0xFF);
