@@ -1,8 +1,9 @@
-#include "../src/api.hpp"
-#include <iostream>
 #include <fstream>
+#include <iostream>
 #include <string>
 #include <vector>
+
+#include "../src/api.hpp"
 
 using sst::SST_API;
 using sst::SST_Exception;
@@ -29,7 +30,8 @@ int main(int argc, char* argv[]) {
 
         std::cout << "[3/4] Requesting session keys..." << std::endl;
         auto keys = api.get_session_keys("default");
-        std::cout << "  Retrieved " << keys.size() << " session key(s)." << std::endl;
+        std::cout << "  Retrieved " << keys.size() << " session key(s)."
+                  << std::endl;
 
         for (size_t i = 0; i < keys.size(); ++i) {
             std::cout << "    Key " << i << " ID: [";
