@@ -83,7 +83,7 @@ jobs:
       uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
-        path: entity/c
+        path: entity
         ref: ${{ github.event.pull_request.head.sha || github.sha }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
@@ -108,7 +108,7 @@ jobs:
         echo $! > auth.pid  # Save the PID
 
     - name: Run the file_block_encrypt_example examples.
-      working-directory: entity/c/examples/file_block_encrypt_example
+      working-directory: entity/examples/file_block_encrypt_example
       run: |
         mkdir build && cd build && cmake ../ && make
         ./block_writer ../block_writer.config
@@ -116,7 +116,7 @@ jobs:
         ./block_reader_load_s_key_list
 
     - name: Run the server_client_example examples.
-      working-directory: entity/c/examples/server_client_example
+      working-directory: entity/examples/server_client_example
       run: |
         mkdir build && cd build && cmake ../ && make
         ./entity_server ../c_server.config &
@@ -125,7 +125,7 @@ jobs:
         ./threaded_get_target_id_server ../c_server.config
 
     - name: Run the tests examples.
-      working-directory: entity/c/tests
+      working-directory: entity/tests
       run: |
         mkdir build && cd build && cmake ../ && make
         ./save_load_session_key_list_with_password_test ../test_configs/client.config
@@ -169,14 +169,14 @@ jobs:
         echo $! > python.pid  # Save the PID
 
     - name: Run the ipfs examples.
-      working-directory: entity/c/examples/ipfs_examples
+      working-directory: entity/examples/ipfs_examples
       run: |
         touch plain_text
-        cd c
+        cd ../../c
         mkdir build && cd build && cmake ../ && make
         ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
         ./entity_downloader ../../downloader.config
-        cd ../../cpp
+        cd ../../c/cpp
         mkdir build && cd build && cmake ../ && make
         ./uploader ../../uploader.config ../../plain_text ../../addReader.txt & # This waits for the downloader, execute in background and sleep 3 second.
         sleep 3
@@ -199,7 +199,7 @@ jobs:
         sleep 5  # Wait for the server to start and bind to port 22100
 
     - name: Run the secure ipfs examples.
-      working-directory: entity/c/examples/ipfs_examples/c/build
+      working-directory: entity/examples/ipfs_examples/c/build
       run: |
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
