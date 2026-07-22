@@ -1,0 +1,13 @@
+*.o
+*.a
+*.so
+**/build/**
+**/build_test/**
+**/build-clang/**
+**/Testing/**
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CMakeFiles/
+**/Makefile
+.vscode
+.DS_Store
