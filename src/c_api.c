@@ -54,8 +54,6 @@ SST_ctx_t* init_SST(const char* config_path) {
         ctx->dist_key.enc_mode = ctx->config.dist_key_enc_mode;
 
         if (load_permanent_distribution_key(ctx) < 0) {
-            SST_print_error("Failed load_permanent_distribution_key(). Given path: %s",
-                            ctx->config.dist_key_path);
             return NULL;
         }
     }
