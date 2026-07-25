@@ -33,13 +33,15 @@ SST_ctx_t* init_SST(const char* config_path) {
         ctx->pub_key =
             (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
         if (ctx->pub_key == NULL) {
-            SST_print_error("Failed load_auth_public_key().");
+            SST_print_error("Failed load_auth_public_key(). Given path: %s",
+                            ctx->config.auth_pubkey_path);
             return NULL;
         }
         ctx->priv_key =
             (void*)load_entity_private_key(ctx->config.entity_privkey_path);
         if (ctx->priv_key == NULL) {
-            SST_print_error("Failed load_entity_private_key().");
+            SST_print_error("Failed load_entity_private_key(). Given path: %s",
+                            ctx->config.entity_privkey_path);
             return NULL;
         }
         memset(&ctx->dist_key, 0,
@@ -52,6 +54,8 @@ SST_ctx_t* init_SST(const char* config_path) {
         ctx->dist_key.enc_mode = ctx->config.dist_key_enc_mode;
 
         if (load_permanent_distribution_key(ctx) < 0) {
+            SST_print_error("Failed load_permanent_distribution_key(). Given path: %s",
+                            ctx->config.dist_key_path);
             return NULL;
         }
     }
