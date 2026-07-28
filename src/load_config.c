@@ -119,8 +119,6 @@ int load_config(config_t* c, const char* path) {
                                 // key.
     c->dist_cipher_key_path[0] = '\0';
     c->dist_mac_key_path[0] = '\0';
-    c->session_key_enc_mode =
-        AES_128_CBC;                     // Default session key encryption mode.
     c->dist_key_enc_mode = AES_128_CBC;  // Default dist encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
     while (!feof(fp)) {
@@ -175,14 +173,7 @@ int load_config(config_t* c, const char* path) {
                     c->numkey = atoi((const char*)ptr);
                     break;
                 case SESSION_KEY_ENCRYPTION_MODE:
-                    SST_print_debug("Session key encryption mode: %s", ptr);
-                    if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->session_key_enc_mode = AES_128_CBC;
-                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->session_key_enc_mode = AES_128_CTR;
-                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->session_key_enc_mode = AES_128_GCM;
-                    }
+                    SST_print_debug("Session key encryption mode: %s (Ignored)", ptr);
                     break;
                 case HMAC_MODE:
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {

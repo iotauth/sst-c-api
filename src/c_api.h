@@ -69,7 +69,6 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
-    AES_encryption_mode_t session_key_enc_mode;
     AES_encryption_mode_t dist_key_enc_mode;
     hmac_mode_t hmac_mode;
     bool no_hmac;

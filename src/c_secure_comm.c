@@ -201,10 +201,10 @@ static void update_enc_mode_and_hmac_mode_to_session_key(
             } else if (strcmp(cipher_val, "AES-128-GCM") == 0) {
                 s_key->enc_mode = AES_128_GCM;
             } else {
-                s_key->enc_mode = ctx->config.session_key_enc_mode;
+                s_key->enc_mode = AES_128_CBC;
             }
         } else {
-            s_key->enc_mode = ctx->config.session_key_enc_mode;
+            s_key->enc_mode = AES_128_CBC;
         }
 
         if (parse_json_string_value((const char*)crypto_spec, "mac", mac_val, sizeof(mac_val)) == 0) {
@@ -220,7 +220,7 @@ static void update_enc_mode_and_hmac_mode_to_session_key(
             s_key->no_hmac = ctx->config.no_hmac;
         }
     } else {
-        s_key->enc_mode = ctx->config.session_key_enc_mode;
+        s_key->enc_mode = AES_128_CBC;
         s_key->hmac_mode = ctx->config.hmac_mode;
         s_key->no_hmac = ctx->config.no_hmac;
     }
@@ -705,7 +705,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config.session_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode, &decrypted,
+                    ctx->config.dist_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode, &decrypted,
                     &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate() after "
@@ -753,7 +753,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode,
+                    AES_128_CBC_IV_SIZE, ctx->config.dist_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length) < 0) {
                 SST_print_error(
