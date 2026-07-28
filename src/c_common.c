@@ -450,8 +450,10 @@ int check_SECURE_COMM_MSG_type(unsigned char message_type) {
     }
 }
 
-int parse_json_string_value(const char* json_str, const char* key, char* value_buf, size_t value_buf_size) {
-    if (json_str == NULL || key == NULL || value_buf == NULL || value_buf_size == 0) {
+int parse_json_string_value(const char* json_str, const char* key,
+                            char* value_buf, size_t value_buf_size) {
+    if (json_str == NULL || key == NULL || value_buf == NULL ||
+        value_buf_size == 0) {
         return -1;
     }
 
@@ -468,7 +470,8 @@ int parse_json_string_value(const char* json_str, const char* key, char* value_b
     const char* cur = key_pos + strlen(key_pattern);
 
     // Skip spaces and the colon
-    while (*cur != '\0' && (*cur == ' ' || *cur == '\t' || *cur == '\n' || *cur == '\r' || *cur == ':')) {
+    while (*cur != '\0' && (*cur == ' ' || *cur == '\t' || *cur == '\n' ||
+                            *cur == '\r' || *cur == ':')) {
         cur++;
     }
 
@@ -476,7 +479,7 @@ int parse_json_string_value(const char* json_str, const char* key, char* value_b
     if (*cur != '\"') {
         return -1;
     }
-    cur++; // Skip the opening quote
+    cur++;  // Skip the opening quote
 
     // Find the closing quote
     const char* end_quote = strchr(cur, '\"');
@@ -486,7 +489,7 @@ int parse_json_string_value(const char* json_str, const char* key, char* value_b
 
     size_t val_len = end_quote - cur;
     if (val_len >= value_buf_size) {
-        val_len = value_buf_size - 1; // leave room for null terminator
+        val_len = value_buf_size - 1;  // leave room for null terminator
     }
 
     strncpy(value_buf, cur, val_len);

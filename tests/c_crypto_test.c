@@ -81,8 +81,7 @@ void AES_test(void) {
     AES_GCM_test();
 }
 
-void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
-                                                   bool no_hmac,
+void symmetric_encrypt_decrypt_authenticate_common(char enc_mode, bool no_hmac,
                                                    char without_malloc) {
     // Generate cipher_key
     unsigned char cipher_key[AES_128_KEY_SIZE_IN_BYTES];  // 16 bytes
@@ -133,8 +132,8 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
         s = symmetric_encrypt_authenticate_without_malloc(
             (const unsigned char*)plaintext, strlen(plaintext), mac_key,
             MAC_KEY_SHA256_SIZE, cipher_key, AES_128_KEY_SIZE_IN_BYTES,
-            AES_128_IV_SIZE, enc_mode, no_hmac, MAC_TYPE_SHA256, &encrypted_stack[0],
-            &encrypted_length);
+            AES_128_IV_SIZE, enc_mode, no_hmac, MAC_TYPE_SHA256,
+            &encrypted_stack[0], &encrypted_length);
         encrypted = &encrypted_stack[0];
         printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
         print_buf_log(encrypted, encrypted_length);

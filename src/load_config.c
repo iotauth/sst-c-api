@@ -112,8 +112,8 @@ int load_config(config_t* c, const char* path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0;  // Option for ipfs.
     c->purpose_index = 0;              // Option for ipfs.
-    c->hmac_mode = MAC_TYPE_SHA256;           // Default HMAC mode.
-    c->no_hmac = false;              // Default with HMAC.
+    c->hmac_mode = MAC_TYPE_SHA256;    // Default HMAC mode.
+    c->no_hmac = false;                // Default with HMAC.
     c->perm_dist_key_mode =
         NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
                                 // key.
@@ -173,7 +173,8 @@ int load_config(config_t* c, const char* path) {
                     c->numkey = atoi((const char*)ptr);
                     break;
                 case SESSION_KEY_ENCRYPTION_MODE:
-                    SST_print_debug("Session key encryption mode: %s (Ignored)", ptr);
+                    SST_print_debug("Session key encryption mode: %s (Ignored)",
+                                    ptr);
                     break;
                 case HMAC_MODE:
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
