@@ -449,3 +449,48 @@ int check_SECURE_COMM_MSG_type(unsigned char message_type) {
         return -1;
     }
 }
+
+int parse_json_string_value(const char* json_str, const char* key, char* value_buf, size_t value_buf_size) {
+    if (json_str == NULL || key == NULL || value_buf == NULL || value_buf_size == 0) {
+        return -1;
+    }
+
+    // Create a key pattern with quotes, e.g., "\"cipher\""
+    char key_pattern[256];
+    snprintf(key_pattern, sizeof(key_pattern), "\"%s\"", key);
+
+    const char* key_pos = strstr(json_str, key_pattern);
+    if (key_pos == NULL) {
+        return -1;
+    }
+
+    // Move past the key
+    const char* cur = key_pos + strlen(key_pattern);
+
+    // Skip spaces and the colon
+    while (*cur != '\0' && (*cur == ' ' || *cur == '\t' || *cur == '\n' || *cur == '\r' || *cur == ':')) {
+        cur++;
+    }
+
+    // Now we should be at the opening quote of the value
+    if (*cur != '\"') {
+        return -1;
+    }
+    cur++; // Skip the opening quote
+
+    // Find the closing quote
+    const char* end_quote = strchr(cur, '\"');
+    if (end_quote == NULL) {
+        return -1;
+    }
+
+    size_t val_len = end_quote - cur;
+    if (val_len >= value_buf_size) {
+        val_len = value_buf_size - 1; // leave room for null terminator
+    }
+
+    strncpy(value_buf, cur, val_len);
+    value_buf[val_len] = '\0';
+
+    return 0;
+}

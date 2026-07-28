@@ -149,7 +149,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
                                                  unsigned int iv_size,
                                                  unsigned int mac_key_size,
                                                  AES_encryption_mode_t enc_mode,
-                                                 hmac_mode_t hmac_mode);
+                                                 bool no_hmac, hmac_mode_t hmac_mode);
 
 // Get the expected encrypted length depnding on encryption modes and
 // hmac_mode. However, for block ciphers such as CBC mode, it cannot get the
@@ -165,7 +165,7 @@ unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
 // maximum length.
 unsigned int get_expected_decrypted_maximum_length(
     unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode);
+    AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode);
 
 // Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
@@ -190,7 +190,7 @@ int symmetric_encrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
-    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode,
     unsigned char** ret, unsigned int* ret_length);
 
 // Decrypt the ciphertext with cipher key and optionally make HMAC(Hashed
@@ -216,7 +216,7 @@ int symmetric_decrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
-    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode,
     unsigned char** ret, unsigned int* ret_length);
 
 // This works similar with the symmetric_encrypt_authenticate() function,
@@ -239,7 +239,7 @@ int symmetric_encrypt_authenticate_without_malloc(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
-    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode,
     unsigned char* ret, unsigned int* ret_length);
 
 // This works similar with the symmetric_decrypt_authenticate() function,
@@ -262,7 +262,7 @@ int symmetric_decrypt_authenticate_without_malloc(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
-    unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
+    unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode,
     unsigned char* ret, unsigned int* ret_length);
 
 // Create a 32 byte digested password using the salt.

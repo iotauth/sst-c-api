@@ -231,4 +231,13 @@ int sst_write_to_socket(int socket, const unsigned char* buf,
 // @return int 0 for true, -1 for false.
 int check_SECURE_COMM_MSG_type(unsigned char message_type);
 
+// Parses a string value for a given key from a simple JSON object string.
+// E.g., parses "AES-128-CBC" from {"cipher":"AES-128-CBC", "mac":"SHA256"} for key "cipher".
+// @param json_str The JSON string to parse.
+// @param key The key to look for.
+// @param value_buf Buffer to store the extracted string value.
+// @param value_buf_size Size of the value buffer.
+// @return 0 for success, -1 for fail (not found or error).
+int parse_json_string_value(const char* json_str, const char* key, char* value_buf, size_t value_buf_size);
+
 #endif  // C_COMMON_H

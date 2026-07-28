@@ -112,7 +112,8 @@ int load_config(config_t* c, const char* path) {
     static const char delimiters[] = " \n";
     unsigned short purpose_count = 0;  // Option for ipfs.
     c->purpose_index = 0;              // Option for ipfs.
-    c->hmac_mode = USE_HMAC;           // Default with HMAC.
+    c->hmac_mode = MAC_TYPE_SHA256;           // Default HMAC mode.
+    c->no_hmac = false;              // Default with HMAC.
     c->perm_dist_key_mode =
         NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
                                 // key.
@@ -185,10 +186,11 @@ int load_config(config_t* c, const char* path) {
                     break;
                 case HMAC_MODE:
                     if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
-                        c->hmac_mode = NO_HMAC;
+                        c->no_hmac = true;
                     } else if (strcmp(ptr, "on") == 0 ||
                                strcmp(ptr, "1") == 0) {
-                        c->hmac_mode = USE_HMAC;
+                        c->no_hmac = false;
+                        c->hmac_mode = MAC_TYPE_SHA256;
                     } else {
                         SST_print_error(
                             "Wrong input for hmac_mode.\n Please type "

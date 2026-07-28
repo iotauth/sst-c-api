@@ -49,7 +49,7 @@ int main(int argc, char* argv[]) {
         (const unsigned char*)plaintext, strlen(plaintext),
         s_key_list->s_key->mac_key, MAC_KEY_SHA256_SIZE,
         s_key_list->s_key->cipher_key, AES_128_KEY_SIZE_IN_BYTES,
-        AES_128_CBC_IV_SIZE, AES_128_CTR, 1, &encrypted, &encrypted_length);
+        AES_128_CBC_IV_SIZE, AES_128_CTR, false, MAC_TYPE_SHA256, &encrypted, &encrypted_length);
     assert(ret == 0);
     printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
     print_buf_log(encrypted, encrypted_length);
@@ -67,7 +67,7 @@ int main(int argc, char* argv[]) {
     ret = symmetric_decrypt_authenticate(
         encrypted, encrypted_length, new_s_key_list->s_key->mac_key,
         MAC_KEY_SHA256_SIZE, new_s_key_list->s_key->cipher_key,
-        AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE, AES_128_CTR, 1,
+        AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE, AES_128_CTR, false, MAC_TYPE_SHA256,
         &decrypted, &decrypted_length);
     printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
            decrypted);

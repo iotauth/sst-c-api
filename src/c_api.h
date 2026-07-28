@@ -3,6 +3,7 @@
 
 #include <arpa/inet.h>
 #include <pthread.h>
+#include <stdbool.h>
 
 #define DIST_KEY_EXPIRATION_TIME_SIZE 6
 #define KEY_EXPIRATION_TIME_SIZE 6
@@ -31,8 +32,7 @@ typedef enum {
 } AES_encryption_mode_t;
 
 typedef enum {
-    USE_HMAC,
-    NO_HMAC,
+    MAC_TYPE_SHA256,
 } hmac_mode_t;
 
 typedef enum {
@@ -50,6 +50,7 @@ typedef struct {
     unsigned int cipher_key_size;
     AES_encryption_mode_t enc_mode;
     hmac_mode_t hmac_mode;
+    bool no_hmac;
     perm_dist_key_mode_t perm_dist_key_mode;
 } session_key_t;
 
@@ -71,6 +72,7 @@ typedef struct {
     AES_encryption_mode_t session_key_enc_mode;
     AES_encryption_mode_t dist_key_enc_mode;
     hmac_mode_t hmac_mode;
+    bool no_hmac;
     perm_dist_key_mode_t perm_dist_key_mode;
     int auth_id;
     char auth_pubkey_path[MAX_PATH_LEN];

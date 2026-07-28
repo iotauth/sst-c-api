@@ -129,7 +129,7 @@ static unsigned char* serialize_session_key_req_with_distribution_key(
             serialized, serialized_length, dist_key->mac_key,
             dist_key->mac_key_size, dist_key->cipher_key,
             dist_key->cipher_key_size, AES_128_CBC_IV_SIZE, dist_key->enc_mode,
-            0, &temp, &temp_length) < 0) {
+            false, MAC_TYPE_SHA256, &temp, &temp_length) < 0) {
         SST_print_error(
             "Error during encryption while "
             "symmetric_encrypt_authenticate().");
@@ -181,13 +181,49 @@ static void parse_distribution_key(distribution_key_t* parsed_distribution_key,
 }
 
 // Set the session key's encryption mode and hmac_mode to the SST_ctx's
-// modes.
+// modes or from cryptoSpec if available.
+// @param crypto_spec The cryptoSpec JSON string to parse.
 // @param ctx The SST_ctx_t to get the config.
 // @param s_key The target session key to set the modes.
-static void update_enc_mode_and_hmac_mode_to_session_key(SST_ctx_t* ctx,
-                                                         session_key_t* s_key) {
-    s_key->enc_mode = ctx->config.session_key_enc_mode;
-    s_key->hmac_mode = ctx->config.hmac_mode;
+static void update_enc_mode_and_hmac_mode_to_session_key(
+    unsigned char* crypto_spec, SST_ctx_t* ctx, session_key_t* s_key) {
+    if (crypto_spec != NULL) {
+        char cipher_val[64] = {0};
+        char mac_val[64] = {0};
+
+        if (parse_json_string_value((const char*)crypto_spec, "cipher", cipher_val, sizeof(cipher_val)) == 0) {
+            if (strcmp(cipher_val, "AES-128-CBC") == 0 ||
+                strcmp(cipher_val, "AES-192-CBC") == 0 ||
+                strcmp(cipher_val, "AES-256-CBC") == 0) {
+                s_key->enc_mode = AES_128_CBC;
+            } else if (strcmp(cipher_val, "AES-128-CTR") == 0) {
+                s_key->enc_mode = AES_128_CTR;
+            } else if (strcmp(cipher_val, "AES-128-GCM") == 0) {
+                s_key->enc_mode = AES_128_GCM;
+            } else {
+                s_key->enc_mode = ctx->config.session_key_enc_mode;
+            }
+        } else {
+            s_key->enc_mode = ctx->config.session_key_enc_mode;
+        }
+
+        if (parse_json_string_value((const char*)crypto_spec, "mac", mac_val, sizeof(mac_val)) == 0) {
+            if (strcmp(mac_val, "SHA256") == 0) {
+                s_key->hmac_mode = MAC_TYPE_SHA256;
+                s_key->no_hmac = false;
+            } else {
+                s_key->hmac_mode = ctx->config.hmac_mode;
+                s_key->no_hmac = ctx->config.no_hmac;
+            }
+        } else {
+            s_key->hmac_mode = ctx->config.hmac_mode;
+            s_key->no_hmac = ctx->config.no_hmac;
+        }
+    } else {
+        s_key->enc_mode = ctx->config.session_key_enc_mode;
+        s_key->hmac_mode = ctx->config.hmac_mode;
+        s_key->no_hmac = ctx->config.no_hmac;
+    }
 }
 
 // Used in parse_session_key_response() for index.
@@ -264,9 +300,6 @@ static int parse_session_key_response(SST_ctx_t* ctx, unsigned char* buf,
         SST_print_error("Failed parse_string_param().");
         return -1;
     }
-    // TODO: need to apply cryptoSpec?
-    //~~use ret~~
-    free(ret);
     buf_idx += ret_length;
     unsigned int session_key_list_length =
         read_unsigned_int_BE(&buf[buf_idx], 4);
@@ -276,8 +309,9 @@ static int parse_session_key_response(SST_ctx_t* ctx, unsigned char* buf,
         buf = buf + buf_idx;
         buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
         update_enc_mode_and_hmac_mode_to_session_key(
-            ctx, &session_key_list->s_key[i]);
+            ret, ctx, &session_key_list->s_key[i]);
     }
+    free(ret);
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
     return 0;
@@ -445,7 +479,7 @@ unsigned char* parse_handshake_1(session_key_t* s_key,
     if (symmetric_encrypt_authenticate(
             indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &encrypted,
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode, &encrypted,
             &encrypted_length) < 0) {
         SST_print_error("Failed to symmetric_encrypt_authenticate().");
         return NULL;
@@ -470,7 +504,7 @@ unsigned char* check_handshake_2_send_handshake_3(unsigned char* data_buf,
     if (symmetric_decrypt_authenticate(
             data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, 0, &decrypted, &decrypted_length) < 0) {
+            s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode, &decrypted, &decrypted_length) < 0) {
         SST_print_error("Error during decryption in checking handshake2.");
         return NULL;
     }
@@ -501,7 +535,7 @@ unsigned char* check_handshake_2_send_handshake_3(unsigned char* data_buf,
     if (symmetric_encrypt_authenticate(
             buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, 0, &ret, ret_length) < 0) {
+            s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode, &ret, ret_length) < 0) {
         SST_print_error("Error during encryption while send_handshake_3.");
         return NULL;
     }
@@ -522,7 +556,7 @@ int send_SECURE_COMM_message(char* msg, unsigned int msg_length,
     unsigned int estimate_encrypted_length =
         get_expected_encrypted_total_length(
             SEQ_NUM_SIZE + msg_length, AES_128_IV_SIZE, MAC_KEY_SHA256_SIZE,
-            session_ctx->s_key.enc_mode, session_ctx->s_key.hmac_mode);
+            session_ctx->s_key.enc_mode, session_ctx->s_key.no_hmac, session_ctx->s_key.hmac_mode);
     unsigned char encrypted_stack[estimate_encrypted_length];
     unsigned int encrypted_length;
     if (encrypt_buf_with_session_key_without_malloc(
@@ -561,7 +595,7 @@ int decrypt_received_message(unsigned char* encrypted_data,
             encrypted_data, encrypted_data_length, session_ctx->s_key.mac_key,
             MAC_KEY_SIZE, session_ctx->s_key.cipher_key, CIPHER_KEY_SIZE,
             AES_128_CBC_IV_SIZE, session_ctx->s_key.enc_mode,
-            session_ctx->s_key.hmac_mode, decrypted_data,
+            session_ctx->s_key.no_hmac, session_ctx->s_key.hmac_mode, decrypted_data,
             decrypted_buf_length) < 0) {
         SST_print_error(
             "Failed to symmetric_decrypt_authenticate_without_malloc().");
@@ -671,7 +705,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     data_buf, data_buf_length, ctx->dist_key.mac_key,
                     ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
                     ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config.session_key_enc_mode, 0, &decrypted,
+                    ctx->config.session_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode, &decrypted,
                     &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate() after "
@@ -719,7 +753,7 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
                     encrypted_session_key, encrypted_session_key_length,
                     ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
                     ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, 0,
+                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, ctx->config.no_hmac, ctx->config.hmac_mode,
                     &decrypted_session_key_response,
                     &decrypted_session_key_response_length) < 0) {
                 SST_print_error(
@@ -791,7 +825,7 @@ unsigned char* check_handshake1_send_handshake2(
             received_buf + SESSION_KEY_ID_SIZE,
             received_buf_length - SESSION_KEY_ID_SIZE, s_key->mac_key,
             MAC_KEY_SIZE, s_key->cipher_key, CIPHER_KEY_SIZE,
-            AES_128_CBC_IV_SIZE, s_key->enc_mode, 0, &decrypted,
+            AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode, &decrypted,
             &decrypted_length) < 0) {
         SST_print_error(
             "Failed to symmetric_decrypt_authenticate(). Error during "
@@ -822,7 +856,7 @@ unsigned char* check_handshake1_send_handshake2(
     if (symmetric_encrypt_authenticate(
             buf, HS_INDICATOR_SIZE, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, 0, &ret, ret_length) < 0) {
+            s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode, &ret, ret_length) < 0) {
         SST_print_error(
             "Failed symmetric_encrypt_authenticate(). Error during encryption "
             "while sending handshake2.");
@@ -928,7 +962,7 @@ int encrypt_or_decrypt_buf_with_session_key(
             if (symmetric_encrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode,
                     output, output_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_encrypt_authenticate(). Error during "
@@ -941,7 +975,7 @@ int encrypt_or_decrypt_buf_with_session_key(
             if (symmetric_decrypt_authenticate(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode,
                     output, output_length) < 0) {
                 SST_print_error(
                     "Failed to symmetric_decrypt_authenticate(). Error during "
@@ -964,7 +998,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
             if (symmetric_encrypt_authenticate_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode,
                     output, output_length) < 0) {
                 SST_print_error(
                     "Failed to "
@@ -977,7 +1011,7 @@ int encrypt_or_decrypt_buf_with_session_key_without_malloc(
             if (symmetric_decrypt_authenticate_without_malloc(
                     input, input_length, s_key->mac_key, s_key->mac_key_size,
                     s_key->cipher_key, s_key->cipher_key_size,
-                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->hmac_mode,
+                    AES_128_CBC_IV_SIZE, s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode,
                     output, output_length) < 0) {
                 SST_print_error(
                     "Failed to "
