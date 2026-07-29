@@ -50,9 +50,6 @@ jobs:
     - name: Read branch name from iotauth-ref.txt
       id: read_ref
       run: |
-        echo "=== Checking iotauth-ref.txt ==="
-        ls -la iotauth-ref.txt 2>&1 || echo "iotauth-ref.txt NOT FOUND!"
-        cat iotauth-ref.txt 2>&1
         ref=$(head -n 1 iotauth-ref.txt)
         echo "Ref to use: $ref"
         echo "ref=$ref" >> "$GITHUB_OUTPUT"
@@ -140,10 +137,6 @@ jobs:
         chmod +x ./cleanAll.sh ./generateAll.sh
         ./cleanAll.sh
         ./generateAll.sh -g configs/file_sharing.graph -p asdf
-        echo "=== Checking generated files ==="
-        echo "CWD: $(pwd)"
-        ls -la ../entity/auth_certs/ 2>&1 || echo "entity/auth_certs/ NOT FOUND!"
-        ls -la ../entity/credentials/ 2>&1 || echo "entity/credentials/ NOT FOUND!"
     - name: Run the auth in background.
       working-directory: auth/auth-server
       run: |
@@ -188,10 +181,6 @@ jobs:
     - name: Run the secure ipfs examples (C++ API).
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
-        echo "=== CWD: $(pwd) ==="
-        echo "=== Checking auth_certs at expected path ==="
-        ls -la ../../../../../auth_certs/ 2>&1 || echo "auth_certs/ NOT FOUND at ../../../../../auth_certs/"
-        echo "=== Running secure_entity_uploader ==="
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
