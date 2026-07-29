@@ -4,7 +4,7 @@
 # the iotauth repository. Mirrors the structure of master's ci.yml but
 # targets the C++ API (cpp/ directory) instead of the C API.
 #
-# Duplicate of master's Integration-test steps for now — hokeun:
+# Duplicate of master's Integration-test steps for now - hokeun:
 # "It's ok to duplicate some tests for now, we can do refactoring later."
 
 name: C++ Unit & Integration tests
