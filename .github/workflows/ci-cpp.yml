@@ -140,16 +140,17 @@ jobs:
     - name: Run the credential generation scripts for IPFS examples.
       run: |
         cd examples
-        echo "=== Before cleanAll.sh ==="
+        echo "=== CWD before scripts ==="
         pwd
-        ls -la
+        echo "EXAMPLES_DIR would be: $(pwd)"
         chmod +x ./cleanAll.sh ./generateAll.sh
-        ./cleanAll.sh
-        echo "=== After cleanAll.sh ==="
+        echo "=== Running cleanAll.sh ==="
+        bash -x ./cleanAll.sh 2>&1 | tail -20
+        echo "=== CWD after cleanAll.sh ==="
         pwd
-        ls -la ../entity/ 2>&1 | head -10
-        ./generateAll.sh -g configs/file_sharing.graph -p asdf
-        echo "=== After generateAll.sh ==="
+        echo "=== Running generateAll.sh with trace ==="
+        bash -x ./generateAll.sh -g configs/file_sharing.graph -p asdf 2>&1 | tail -50
+        echo "=== CWD after generateAll.sh ==="
         pwd
         ls -la ../entity/auth_certs/ 2>&1 | head -10
         cd ..
