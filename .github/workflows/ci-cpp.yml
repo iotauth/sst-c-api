@@ -46,6 +46,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - uses: actions/checkout@v4
     - name: Read branch name from iotauth-ref.txt
       id: read_ref
       run: |
