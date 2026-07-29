@@ -65,6 +65,14 @@ jobs:
         repository: iotauth/iotauth
         submodules: true
         ref: ${{ steps.read_ref.outputs.ref }}
+    - name: Verify iotauth checkout
+      run: |
+        echo "=== iotauth workspace contents ==="
+        ls -la
+        echo "=== entity/ contents ==="
+        ls -la entity/ 2>&1 | head -10
+        echo "=== examples/ contents ==="
+        ls -la examples/ 2>&1 | head -10
     - name: Check out specific ref of sst-c-api
       uses: actions/checkout@v4
       with:
