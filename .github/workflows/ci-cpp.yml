@@ -49,6 +49,9 @@ jobs:
     - name: Read branch name from iotauth-ref.txt
       id: read_ref
       run: |
+        echo "=== Checking iotauth-ref.txt ==="
+        ls -la iotauth-ref.txt 2>&1 || echo "iotauth-ref.txt NOT FOUND!"
+        cat iotauth-ref.txt 2>&1
         ref=$(head -n 1 iotauth-ref.txt)
         echo "Ref to use: $ref"
         echo "ref=$ref" >> "$GITHUB_OUTPUT"
