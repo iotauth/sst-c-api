@@ -47,6 +47,12 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+    - name: Debug workspace
+      run: |
+        echo "=== Workspace contents ==="
+        ls -la
+        echo "=== iotauth-ref.txt ==="
+        cat iotauth-ref.txt
     - name: Read branch name from iotauth-ref.txt
       id: read_ref
       run: |
