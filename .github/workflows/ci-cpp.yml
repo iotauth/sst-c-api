@@ -65,9 +65,6 @@ jobs:
         repository: iotauth/iotauth
         submodules: true
         ref: ${{ steps.read_ref.outputs.ref }}
-    - name: Verify iotauth checkout succeeded
-      run: echo "Iotauth checkout OK: $(ls -d entity/ 2>/dev/null && echo YES || echo NO)"
-    - name: Verify iotauth checkout
       run: |
         echo "=== iotauth workspace contents ==="
         ls -la
@@ -81,9 +78,6 @@ jobs:
         repository: iotauth/sst-c-api
         path: entity/c
         ref: ${{ github.ref }}
-    - name: Verify sst-c-api checkout succeeded
-      run: echo "sst-c-api checkout OK: $(ls -d entity/c/ 2>/dev/null && echo YES || echo NO)"
-    - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
       uses: actions/setup-java@v4
