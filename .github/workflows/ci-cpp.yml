@@ -80,6 +80,7 @@ jobs:
       run: |
         chmod +x ./cleanAll.sh ./generateAll.sh
         ./cleanAll.sh
+        cd examples
         ./generateAll.sh -p asdf
     - name: Run the auth in background.
       working-directory: auth/auth-server
@@ -179,6 +180,10 @@ jobs:
     - name: Run the secure ipfs examples (C++ API).
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
+        echo "=== CWD: $(pwd) ==="
+        echo "=== Checking auth_certs at expected path ==="
+        ls -la ../../../../../auth_certs/ 2>&1 || echo "auth_certs/ NOT FOUND at ../../../../../auth_certs/"
+        echo "=== Running secure_entity_uploader ==="
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
