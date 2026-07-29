@@ -79,7 +79,6 @@ jobs:
         repository: iotauth/sst-c-api
         path: entity/c
         ref: ${{ github.ref }}
-      if: ${{ github.ref}}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
@@ -146,22 +145,11 @@ jobs:
         nohup ipfs daemon &
 
     - name: Run the credential generation scripts for IPFS examples.
+      working-directory: examples
       run: |
-        cd examples
-        echo "=== CWD before scripts ==="
-        pwd
-        echo "EXAMPLES_DIR would be: $(pwd)"
         chmod +x ./cleanAll.sh ./generateAll.sh
-        echo "=== Running cleanAll.sh ==="
-        bash -x ./cleanAll.sh 2>&1 | tail -20
-        echo "=== CWD after cleanAll.sh ==="
-        pwd
-        echo "=== Running generateAll.sh with trace ==="
-        bash -x ./generateAll.sh -g configs/file_sharing.graph -p asdf 2>&1 | tail -50
-        echo "=== CWD after generateAll.sh ==="
-        pwd
-        ls -la ../entity/auth_certs/ 2>&1 | head -10
-        cd ..
+        ./cleanAll.sh
+        ./generateAll.sh -g configs/file_sharing.graph -p asdf
     - name: Run the auth in background.
       working-directory: auth/auth-server
       run: |
