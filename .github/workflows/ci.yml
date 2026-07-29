@@ -20,7 +20,7 @@ env:
 
 jobs:
   iotauth-integration-test:
-    if: ${{ inputs.iotauth-ref == '' }}
+    if: false  # Disabled: Python entity server/file system manager deprecated and removed (commit 61342ea)
     uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
     with:
       sst-c-api-ref: ${{ github.sha }}

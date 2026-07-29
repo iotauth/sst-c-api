@@ -13,3 +13,4 @@ entity_server
 embedded/receiver/config/*
 .DS_Store
 .claude
+cpp/build-clean
