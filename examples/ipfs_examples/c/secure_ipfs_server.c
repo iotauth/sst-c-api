@@ -1,10 +1,10 @@
 #include <netinet/in.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#include <pthread.h>
 
 #include "../../../src/c_api.h"
 
@@ -48,7 +48,8 @@ int main(int argc, char* argv[]) {
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(atoi(PORT_NUM));
 
-    if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) == -1) {
+    if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) ==
+        -1) {
         SST_print_error_exit("bind() error");
         close(serv_sock);
         return -1;
@@ -63,7 +64,8 @@ int main(int argc, char* argv[]) {
     printf("Secure IPFS Server listening on port %s...\n", PORT_NUM);
 
     clnt_addr_size = sizeof(clnt_addr);
-    clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+    clnt_sock =
+        accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
         SST_print_error_exit("accept() error");
         close(serv_sock);
