@@ -12,7 +12,7 @@
 #define MAX_CIPHER_KEY_SIZE 32
 #define MAX_SESSION_KEY 10
 #define MAX_ENTITY_NAME_LENGTH 32
-#define MAX_PURPOSE_LENGTH 64
+#define MAX_PURPOSE_LENGTH 128
 #define NETWORK_PROTOCOL_NAME_LENGTH 4
 #define MAX_PATH_LEN 512
 
@@ -52,6 +52,7 @@ typedef struct {
     hmac_mode_t hmac_mode;
     bool no_hmac;
     perm_dist_key_mode_t perm_dist_key_mode;
+    char challenge[64];
 } session_key_t;
 
 typedef struct {
