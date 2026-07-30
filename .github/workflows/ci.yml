@@ -197,12 +197,27 @@ jobs:
         echo $! > secure_python.pid  # Save the PID
         sleep 5  # Wait for the server to start and bind to port 22100
 
+    - name: Start secure IPFS server
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        ./secure_ipfs_server ../../../server_client_example/c_server.config &
+        echo $! > secure_ipfs_server.pid
+        sleep 2
+
     - name: Run the secure ipfs examples.
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop secure IPFS server
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        if [ -f secure_ipfs_server.pid ]; then
+          kill $(cat secure_ipfs_server.pid) || echo "Secure IPFS server already stopped."
+        else
+          echo "No secure_ipfs_server.pid file found"
+        fi
     - name: Stop python file system manager.
       working-directory: examples/file_sharing
       run: |
