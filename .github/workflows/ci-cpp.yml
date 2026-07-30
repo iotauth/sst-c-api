@@ -137,12 +137,26 @@ jobs:
       run: |
         python3 file_sharing/secure_file_system_manager.py -p ../properties/exampleFileSystemManagerSecure.properties --password=asdf &
         echo $! > fsMgr.pid
+    - name: Start secure IPFS server
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        ./secure_ipfs_server ../../../server_client_example/c_server.config &
+        echo $! > secureServer.pid
+        sleep 1
     - name: Run the secure ipfs examples
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop secure IPFS server
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        if [ -f secureServer.pid ]; then
+          kill $(cat secureServer.pid) || echo "Secure server already stopped."
+        else
+          echo "No secureServer.pid file found"
+        fi
     - name: Stop python file system manager.
       working-directory: examples
       run: |
