@@ -111,6 +111,11 @@ jobs:
       run: |
         nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
         echo $! > auth.pid
+    - name: Run the python file system manager.
+      working-directory: examples
+      run: |
+        python3 file_sharing/file_system_manager.py -p ../properties/exampleFileSystemManager.properties --password=asdf &
+        echo $! > fsMgr.pid
     - name: Run the ipfs examples
       working-directory: entity/c/examples/ipfs_examples
       run: |
@@ -119,12 +124,33 @@ jobs:
         mkdir build && cd build && cmake ../ && make
         ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
         ./entity_downloader ../../downloader.config
+    - name: Stop python file system manager.
+      working-directory: examples
+      run: |
+        if [ -f fsMgr.pid ]; then
+          kill $(cat fsMgr.pid) || echo "FS Manager already stopped."
+        else
+          echo "No fsMgr.pid file found"
+        fi
+    - name: Run the secure python file system manager.
+      working-directory: examples
+      run: |
+        python3 file_sharing/secure_file_system_manager.py -p ../properties/exampleFileSystemManagerSecure.properties --password=asdf &
+        echo $! > fsMgr.pid
     - name: Run the secure ipfs examples
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
         ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop python file system manager.
+      working-directory: examples
+      run: |
+        if [ -f fsMgr.pid ]; then
+          kill $(cat fsMgr.pid) || echo "FS Manager already stopped."
+        else
+          echo "No fsMgr.pid file found"
+        fi
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |
