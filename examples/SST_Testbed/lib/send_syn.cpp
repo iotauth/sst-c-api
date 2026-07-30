@@ -2,7 +2,10 @@ extern "C" {
 #include "../../../c_api.h"
 }
 
+#include "metrics.hpp"
+
 #include <arpa/inet.h>
+#include <chrono>
 #include <errno.h>
 #include <netinet/in.h>
 #include <netinet/ip.h> // struct ip (BSD)
@@ -36,9 +39,9 @@ static uint16_t csum16(const void* data, size_t len) {
     return (uint16_t)(~sum);
 }
 
-extern "C" bool send_raw_syn_packets(const char* src_ip_str,
-                                     const char* dst_ip,
-                                     unsigned short dst_port, int repeat) {
+bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
+                                   unsigned short dst_port, int repeat,
+                                   MetricsRow* row) {
     // Build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
     unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr)];
@@ -122,21 +125,39 @@ extern "C" bool send_raw_syn_packets(const char* src_ip_str,
 
     bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
+        auto t0 = std::chrono::steady_clock::now();
         ssize_t n = sendto(s, packet, sizeof(packet), 0, (struct sockaddr*)&dst,
                            sizeof(dst));
+        auto t1 = std::chrono::steady_clock::now();
+        long long dur_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                .count();
         if (n < 0) {
             SST_print_error("sendto() error");
             all_sent = false;
+            if (row != nullptr) {
+                metrics_add_sample(*row, dur_us, false);
+            }
             continue;
         }
         SST_print_debug("Sent raw SYN from %s:%u to %s:%u (%zd bytes)",
                         src_ip_str, ntohs(tcph->th_sport), dst_ip, dst_port, n);
         SST_print_log("Sent SYN packet %d of %d", i + 1, repeat);
+        if (row != nullptr) {
+            metrics_add_sample(*row, dur_us, true);
+        }
     }
 
     close(s);
 
     return all_sent;
+}
+
+extern "C" bool send_raw_syn_packets(const char* src_ip_str,
+                                     const char* dst_ip,
+                                     unsigned short dst_port, int repeat) {
+    return send_raw_syn_packets_measured(src_ip_str, dst_ip, dst_port, repeat,
+                                         nullptr);
 }
 
 // UDP pseudo header
@@ -148,9 +169,9 @@ struct udp_pseudo_header {
     uint16_t udp_len;
 } __attribute__((packed));
 
-extern "C" bool send_raw_udp_packets(const char* src_ip_str,
-                                     const char* dst_ip,
-                                     unsigned short dst_port, int repeat) {
+bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
+                                   unsigned short dst_port, int repeat,
+                                   MetricsRow* row) {
     const size_t payload_len = 0;
     const size_t ip_len  = sizeof(struct ip);
     const size_t udp_len = sizeof(struct udphdr);
@@ -253,20 +274,40 @@ extern "C" bool send_raw_udp_packets(const char* src_ip_str,
 
     bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
+        auto t0 = std::chrono::steady_clock::now();
         ssize_t n = sendto(s, packet, total_len, 0, (struct sockaddr*)&dst, sizeof(dst));
+        auto t1 = std::chrono::steady_clock::now();
+        long long dur_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                .count();
         if (n < 0) {
             SST_print_error("sendto() error");
             all_sent = false;
+            if (row != nullptr) {
+                metrics_add_sample(*row, dur_us, false);
+            }
             continue;
         }
 
         SST_print_debug("Sent raw UDP from %s:%u to %s:%u (%zd bytes)",
                         src_ip_str, src_port, dst_ip, dst_port, n);
-        SST_print_log("Sent UDP packet %d of %d", i + 1, repeat);
+        if (repeat > 1) {
+            SST_print_log("Sent UDP packet %d of %d", i + 1, repeat);
+        }
+        if (row != nullptr) {
+            metrics_add_sample(*row, dur_us, true);
+        }
     }
 
     close(s);
     return all_sent;
+}
+
+extern "C" bool send_raw_udp_packets(const char* src_ip_str,
+                                     const char* dst_ip,
+                                     unsigned short dst_port, int repeat) {
+    return send_raw_udp_packets_measured(src_ip_str, dst_ip, dst_port, repeat,
+                                         nullptr);
 }
 
 extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,

@@ -90,7 +90,7 @@ fi
 OS=$(uname)
 SHCMD="cd '$SCRIPT_DIR' && cd '$SERVER_DIR' && $SERVER_CMD"
 
-# Launch in a new terminal with the server command
+# Launch in a new terminal with the Auth server command
 launch_terminal "$SHCMD"
 
 # 4) Return to the original directory and generate client configs

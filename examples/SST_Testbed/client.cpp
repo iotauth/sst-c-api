@@ -407,21 +407,12 @@ int main(int argc, char* argv[]) {
                     metrics_open_new_file();
                     metrics_write_header_if_empty();
                     MetricsRow row = metrics_begin_row(exp_id);
-                    for (int i = 0; i < repeat; ++i) {
-                        auto t0 = std::chrono::steady_clock::now();
-                        bool success = send_raw_syn_packets(
-                            src_ip_to_use, // spoofed source IP
-                            dst_ip_str, // destination IP
-                            dst_port, // destination port
-                            1 // one packet per metrics sample
-                        );
-                        auto t1 = std::chrono::steady_clock::now();
-                        long long dur_us =
-                            std::chrono::duration_cast<
-                                std::chrono::microseconds>(t1 - t0)
-                                .count();
-                        metrics_add_sample(row, dur_us, success);
-                    }
+                    send_raw_syn_packets_measured(
+                        src_ip_to_use, // spoofed source IP
+                        dst_ip_str, // destination IP
+                        dst_port, // destination port
+                        repeat, // number of packets
+                        &row);
                     metrics_end_row_and_write(row);
                 } else {
                     send_raw_syn_packets(
@@ -487,21 +478,12 @@ int main(int argc, char* argv[]) {
                     metrics_open_new_file();
                     metrics_write_header_if_empty();
                     MetricsRow row = metrics_begin_row(exp_id);
-                    for (int i = 0; i < repeat; ++i) {
-                        auto t0 = std::chrono::steady_clock::now();
-                        bool success = send_raw_udp_packets(
-                            src_ip_to_use, // spoofed source IP
-                            dst_ip_str, // destination IP
-                            dst_port, // destination port
-                            1 // one packet per metrics sample
-                        );
-                        auto t1 = std::chrono::steady_clock::now();
-                        long long dur_us =
-                            std::chrono::duration_cast<
-                                std::chrono::microseconds>(t1 - t0)
-                                .count();
-                        metrics_add_sample(row, dur_us, success);
-                    }
+                    send_raw_udp_packets_measured(
+                        src_ip_to_use, // spoofed source IP
+                        dst_ip_str, // destination IP
+                        dst_port, // destination port
+                        repeat, // number of packets
+                        &row);
                     metrics_end_row_and_write(row);
                 } else {
                     send_raw_udp_packets(

@@ -14,7 +14,11 @@ volatile int active_clients = 0;
 volatile sig_atomic_t stop_server = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 const int UDP_IDLE_TIMEOUT_SEC = 10;
-const int UDP_WORKER_COUNT = 512;
+const int UDP_WORKER_COUNT = 16;
+
+static void handle_shutdown_signal(int) {
+    stop_server = 1;
+}
 
 // Returns the number of UDP worker threads to start
 // based on the SST_UDP_WORKERS environment variable (default: UDP_WORKER_COUNT).
@@ -58,9 +62,10 @@ void* receive_and_print_messages(void* thread_args) {
     bool close_socket = args->close_socket;
     delete args;  // no longer needed
 
-    bool udp_idle_timeout = false;
-
     while (true) {
+        if (stop_server) {
+            break;
+        }
         if (use_udp) {
             fd_set rfds;
             FD_ZERO(&rfds);
@@ -73,14 +78,16 @@ void* receive_and_print_messages(void* thread_args) {
             int ready = select(clnt_sock + 1, &rfds, NULL, NULL, &tv);
             if (ready < 0) {
                 if (errno == EINTR) {
+                    if (stop_server) {
+                        break;
+                    }
                     continue;
                 }
                 SST_print_error("select() error in UDP thread");
                 break;
             }
             if (ready == 0) {
-                udp_idle_timeout = true;
-                break;
+                continue;
             }
         }
 
@@ -137,11 +144,6 @@ void* receive_and_print_messages(void* thread_args) {
         }
     }
 
-    if (udp_idle_timeout) {
-        SST_print_log("UDP worker on socket %d idle for %d seconds, exiting.",
-                      clnt_sock, UDP_IDLE_TIMEOUT_SEC);
-    }
-
     if (close_socket && close(clnt_sock) < 0) {
         SST_print_error("close() error");
     }
@@ -150,7 +152,7 @@ void* receive_and_print_messages(void* thread_args) {
     // Use a mutex to protect the counter
     pthread_mutex_lock(&count_mutex);
     --active_clients;
-    if (active_clients == 0)
+    if (!use_udp && active_clients == 0)
         stop_server = 1;  // If this was the last client, tell main to stop
     pthread_mutex_unlock(&count_mutex);
 
@@ -165,6 +167,7 @@ int main(int argc, char* argv[]) {
 
     // Do not terminate process on write() to a disconnected socket.
     signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, handle_shutdown_signal);
 
     SST_ctx_t* ctx = init_SST(argv[1]);
     if (ctx == NULL) {

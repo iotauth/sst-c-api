@@ -2,6 +2,10 @@
 #define SEND_SYN_H
 
 #ifdef __cplusplus
+struct MetricsRow;
+#endif
+
+#ifdef __cplusplus
 extern "C" {
 #endif
 
@@ -46,6 +50,22 @@ bool resolve_src_ip_or_default(const char* provided_src_ip, const char* dst_ip,
 
 #ifdef __cplusplus
 }
+
+// Measured variants used by the client metrics path.
+// These functions perform the same syn/udp attacks but also record latency and success/failure
+// metrics in the provided MetricsRow struct. If row is nullptr, no metrics are recorded.
+// @param src_ip_str: Source IP address in string format (e.g., "192.168.1.1").
+// @param dst_ip: Destination IP address in string format.
+// @param dst_port: Destination port number.
+// @param repeat: Number of packets to send.
+// @param row: Pointer to the metrics row to record results in.
+// @return true on success, false on error.
+bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
+                                   unsigned short dst_port, int repeat,
+                                   MetricsRow* row);
+bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
+                                   unsigned short dst_port, int repeat,
+                                   MetricsRow* row);
 #endif
 
 #endif  // SEND_SYN_H
