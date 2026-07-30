@@ -92,3 +92,44 @@ jobs:
         else
           echo "No auth.pid file found"
         fi
+    - name: Install IPFS
+      run: |
+        wget https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
+        tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
+        cd kubo
+        sudo bash install.sh
+        ipfs init
+        nohup ipfs daemon &
+    - name: Run the credential generation scripts for IPFS examples
+      working-directory: examples
+      run: |
+        chmod +x ./cleanAll.sh ./generateAll.sh
+        ./cleanAll.sh
+        ./generateAll.sh -g configs/file_sharing.graph -p asdf
+    - name: Run the auth in background
+      working-directory: auth/auth-server
+      run: |
+        nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
+        echo $! > auth.pid
+    - name: Run the ipfs examples
+      working-directory: entity/c/examples/ipfs_examples
+      run: |
+        touch plain_text
+        cd c
+        mkdir build && cd build && cmake ../ && make
+        ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
+        ./entity_downloader ../../downloader.config
+    - name: Run the secure ipfs examples
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
+        sleep 3
+        ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop auth server
+      working-directory: auth/auth-server
+      run: |
+        if [ -f auth.pid ]; then
+          kill $(cat auth.pid) || echo "Auth server already stopped."
+        else
+          echo "No auth.pid file found"
+        fi
