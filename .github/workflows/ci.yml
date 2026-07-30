@@ -200,7 +200,7 @@ jobs:
     - name: Start secure IPFS server
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
-        ./secure_ipfs_server ../../../server_client_example/c_server.config &
+        ./secure_ipfs_server ../../secure_ipfs_server.config &
         echo $! > secure_ipfs_server.pid
         sleep 2
 
