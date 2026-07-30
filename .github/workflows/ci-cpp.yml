@@ -138,6 +138,11 @@ jobs:
       run: |
         python3 file_sharing/secure_file_system_manager.py -p ../properties/exampleFileSystemManagerSecure.properties --password=asdf &
         echo $! > fsMgr.pid
+    - name: DEBUG - Test step before secure server
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        echo "DEBUG: This step should appear in job steps"
+        ls -la
     - name: Start secure IPFS server
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
