@@ -1,12 +1,25 @@
-name: Test Workflow
+name: C++ Unit & Integration tests
 
 on:
   push:
     branches: [cpp-api]
+  pull_request:
+    branches: [cpp-api]
 
 jobs:
-  test:
+  Unit-Test:
+    name: C++ Unit Test
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - run: echo "Hello"
+    - name: Install openssl
+      run: sudo apt-get update && sudo apt-get install -y openssl
+    - name: Configure CMake
+      working-directory: cpp
+      run: cmake -B build -DCMAKE_BUILD_TYPE=Release
+    - name: Build
+      working-directory: cpp
+      run: cmake --build build --config Release
+    - name: Unit Test
+      working-directory: cpp/build
+      run: ctest -C Release
