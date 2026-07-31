@@ -36,6 +36,24 @@ void SST_print_log(const char* fmt, ...) {
     va_end(args);
 }
 
+// Print out warning messages along with errno if set.
+void SST_print_warning(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    // Print the "WARNING:" prefix to stderr
+    fprintf(stderr, "WARNING: ");
+    // Print the formatted warning message to stderr (without adding a newline)
+    vfprintf(stderr, fmt, args);
+    // Print errno if it is set
+    if (errno != 0) {
+        fprintf(stderr, " (errno: %d, %s)", errno, strerror(errno));
+    }
+    // End the line after the warning message and errno
+    fprintf(stderr, "\n");
+
+    va_end(args);
+}
+
 // Print out error messages along with errno if set.
 void SST_print_error(const char* fmt, ...) {
     va_list args;
@@ -184,6 +202,9 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
     if (get_socket_type(socket, &type) < 0) {
         SST_print_error("getsockopt(SO_TYPE) failed on socket %d: %s", socket, strerror(errno));
         return -1;
+    } else if (received_buf_length == 0) {
+        SST_print_log("End of file. Disconnected from socket %d", socket);
+        return 0;
     }
 
     int received_buf_length = 0; // total bytes available in received_buf (UDP) or header bytes (TCP)
@@ -413,7 +434,6 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp
                 SST_print_error("socket() error during retry: %s", strerror(errno));
                 ret = -1;
                 break;
-            }
         }
         usleep(50000);
     }
@@ -481,11 +501,19 @@ int sst_read_from_socket(int socket, unsigned char* buf,
         errno = EBADF;
         return -1;
     }
+<<<<<<< HEAD:c_common.c
 
     int type;
     if (get_socket_type(socket, &type) < 0) {
         SST_print_error("getsockopt(SO_TYPE) failed on socket %d: %s", socket, strerror(errno));
         return -1;
+=======
+    int length_read = read(socket, buf, buf_length);
+    if (length_read < 0) {
+        SST_print_error("Reading from socket %d failed.", socket);
+    } else if (length_read == 0) {
+        SST_print_debug("Connection closed from socket %d.", socket);
+>>>>>>> 46247bacfba72b1e55c5c2692e1bc7c9c42dafb9:src/c_common.c
     }
 
     int length_read = 0;

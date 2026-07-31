@@ -7,7 +7,7 @@
 #include <cstring>  // memset
 #include <vector>
 extern "C" {
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 }
 
 volatile int active_clients = 0;

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "../../../ipfs.h"
+#include "../../../src/ipfs.h"
 
 #define MAX_PAYLOAD_LENGTH 1024
 #define SEQ_NUM_SIZE 8
@@ -17,10 +17,9 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("init_SST() failed.");
     }
     session_key_list_t* s_key_list = init_empty_session_key_list();
-    ctx->config.purpose_index = 0;
-    session_key_list_t* s_key_list_0 = get_session_key(ctx, NULL);
+    session_key_list_t* s_key_list_0 = get_session_key_with_index(ctx, 0, NULL);
     if (s_key_list_0 == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
+        SST_print_error_exit("Failed get_session_key_with_index().");
     }
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list_0->s_key[0], ctx);
