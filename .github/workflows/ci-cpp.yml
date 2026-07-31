@@ -133,6 +133,9 @@ jobs:
         else
           echo "No fsMgr.pid file found"
         fi
+    - name: Install iotauth Python SDK
+      working-directory: entity/python
+      run: pip install .
     - name: Run the secure python file system manager.
       working-directory: examples
       run: |
