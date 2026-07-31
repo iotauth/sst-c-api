@@ -200,11 +200,8 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
                                         unsigned int buf_length) {
     int type;
     if (get_socket_type(socket, &type) < 0) {
-        SST_print_error("getsockopt(SO_TYPE) failed on socket %d: %s", socket, strerror(errno));
+        SST_print_error("getsockopt(SO_TYPE) failed during read_header_return_data_buf_pointer() on socket %d: %s", socket, strerror(errno));
         return -1;
-    } else if (received_buf_length == 0) {
-        SST_print_log("End of file. Disconnected from socket %d", socket);
-        return 0;
     }
 
     int received_buf_length = 0; // total bytes available in received_buf (UDP) or header bytes (TCP)
@@ -215,10 +212,13 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         // Read the first byte.
         received_buf_length =
             sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-        if (received_buf_length <= 0) {
+        if (received_buf_length < 0) {
             SST_print_error(
                 "Socket read error in read_header_return_data_buf_pointer().");
             return -1;
+        } else if (received_buf_length == 0) {
+            SST_print_log("End of file. Disconnected from socket %d", socket);
+            return 0;
         }
         *message_type = received_buf[0];
         // Read one bytes each, until the variable length buffer ends.
@@ -434,6 +434,7 @@ int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp
                 SST_print_error("socket() error during retry: %s", strerror(errno));
                 ret = -1;
                 break;
+            }
         }
         usleep(50000);
     }
@@ -501,19 +502,11 @@ int sst_read_from_socket(int socket, unsigned char* buf,
         errno = EBADF;
         return -1;
     }
-<<<<<<< HEAD:c_common.c
 
     int type;
     if (get_socket_type(socket, &type) < 0) {
-        SST_print_error("getsockopt(SO_TYPE) failed on socket %d: %s", socket, strerror(errno));
+        SST_print_error("getsockopt(SO_TYPE) failed during sst_read_from_socket() on socket %d: %s", socket, strerror(errno));
         return -1;
-=======
-    int length_read = read(socket, buf, buf_length);
-    if (length_read < 0) {
-        SST_print_error("Reading from socket %d failed.", socket);
-    } else if (length_read == 0) {
-        SST_print_debug("Connection closed from socket %d.", socket);
->>>>>>> 46247bacfba72b1e55c5c2692e1bc7c9c42dafb9:src/c_common.c
     }
 
     int length_read = 0;
@@ -521,13 +514,12 @@ int sst_read_from_socket(int socket, unsigned char* buf,
         length_read = read(socket, buf, buf_length);
 
         if (length_read < 0) {
-            SST_print_error("Reading from stream socket %d failed: %s", socket, strerror(errno));
+            SST_print_error("Reading from socket %d failed.", socket);
         } else if (length_read == 0) {
-            SST_print_error("Stream socket %d closed by peer.", socket);
+            SST_print_debug("Connection closed from socket %d.", socket);
         }
         return length_read;
-    }
-    if (type == SOCK_DGRAM) { // use udp
+    } else if (type == SOCK_DGRAM) { // use udp
         struct sockaddr_in from;
         socklen_t fromlen = sizeof(from);
         length_read = (int)recvfrom(socket, buf, buf_length, 0, (struct sockaddr*)&from, &fromlen);
@@ -563,7 +555,7 @@ int sst_write_to_socket(int socket, const unsigned char* buf,
 
     int type;
     if (get_socket_type(socket, &type) < 0) {
-        SST_print_error("getsockopt(SO_TYPE) failed on socket %d: %s", socket, strerror(errno));
+        SST_print_error("getsockopt(SO_TYPE) failed during sst_write_to_socket() on socket %d: %s", socket, strerror(errno));
         return -1;
     }
 
