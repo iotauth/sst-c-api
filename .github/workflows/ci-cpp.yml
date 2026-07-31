@@ -139,7 +139,7 @@ jobs:
     - name: Run the secure python file system manager.
       working-directory: examples
       run: |
-        python3 file_sharing/secure_file_system_manager.py -p ../properties/exampleFileSystemManagerSecure.properties --password=asdf &
+        python3 file_sharing/secure_file_system_manager.py ../properties/exampleFileSystemManagerSecure.properties -p asdf &
         echo $! > fsMgr.pid
     - name: DEBUG - Test step before secure server
       working-directory: entity/c/examples/ipfs_examples/c/build
