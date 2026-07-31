@@ -151,7 +151,14 @@ jobs:
       run: |
         ./secure_ipfs_server ../../../server_client_example/c_server.config &
         echo $! > secureServer.pid
-        sleep 1
+        sleep 2
+        echo "Checking if secure IPFS server is running..."
+        if kill -0 $(cat secureServer.pid) 2>/dev/null; then
+          echo "Secure IPFS server is running (PID: $(cat secureServer.pid))"
+        else
+          echo "ERROR: Secure IPFS server is not running!"
+          exit 1
+        fi
     - name: Run the secure ipfs examples
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
