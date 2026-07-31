@@ -137,9 +137,9 @@ jobs:
       working-directory: entity/python
       run: pip install .
     - name: Run the secure python file system manager.
-      working-directory: examples
+      working-directory: examples/file_sharing
       run: |
-        python3 file_sharing/secure_file_system_manager.py ../properties/exampleFileSystemManagerSecure.properties -p asdf &
+        python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > fsMgr.pid
     - name: DEBUG - Test step before secure server
       working-directory: entity/c/examples/ipfs_examples/c/build
