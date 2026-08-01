@@ -20,26 +20,47 @@ SST_ctx_t* init_SST(const char* config_path) {
         SST_print_error("Failed to load_config()");
         return NULL;
     }
-    int numkey = ctx->config.numkey;
+    // Copy the original purpose field from the config struct to the
+    // purpose_for_requesting_key field in the ctx struct The purpose field in
+    // the config struct will be read only and the purpose_for_requesting_key
+    // field will be used for acquiring session keys.
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s",
+             ctx->config.purpose[ctx->config.purpose_index]);
 
-    ctx->pub_key = (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
-    if (ctx->pub_key == NULL) {
-        SST_print_error("Failed load_auth_public_key().");
-        return NULL;
-    }
-    ctx->priv_key =
-        (void*)load_entity_private_key(ctx->config.entity_privkey_path);
-    if (ctx->priv_key == NULL) {
-        SST_print_error("Failed load_entity_private_key().");
-        return NULL;
+    int numkey = ctx->config.numkey;
+    if (ctx->config.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
+        ctx->pub_key =
+            (void*)load_auth_public_key(ctx->config.auth_pubkey_path);
+        if (ctx->pub_key == NULL) {
+            SST_print_error("Failed load_auth_public_key().");
+            return NULL;
+        }
+        ctx->priv_key =
+            (void*)load_entity_private_key(ctx->config.entity_privkey_path);
+        if (ctx->priv_key == NULL) {
+            SST_print_error("Failed load_entity_private_key().");
+            return NULL;
+        }
+        memset(&ctx->dist_key, 0,
+               sizeof(distribution_key_t));  // This also sets the abs_validiy
+                                             // to 0, which will always make the
+                                             // key invalid.
+    } else {
+        // Load distribution key.
+        ctx->dist_key.abs_validity = UINT64_MAX;
+        ctx->dist_key.enc_mode = ctx->config.dist_key_enc_mode;
+
+        if (load_permanent_distribution_key(ctx) < 0) {
+            return NULL;
+        }
     }
     if (numkey > MAX_SESSION_KEY) {
-        SST_print_error(
+        SST_print_warning(
             "Too much requests of session keys. The max number of requestable "
             "session keys are %d",
             MAX_SESSION_KEY);
     }
-    bzero(&ctx->dist_key, sizeof(distribution_key_t));
     return ctx;
 }
 
@@ -51,25 +72,24 @@ session_key_list_t* init_empty_session_key_list(void) {
     return session_key_list;
 }
 
-session_key_list_t* get_session_key(SST_ctx_t* ctx,
-                                    session_key_list_t* existing_s_key_list) {
+session_key_list_t* get_session_key_with_index(
+    SST_ctx_t* ctx, int purpose_index,
+    session_key_list_t* existing_s_key_list) {
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s",
+             ctx->config.purpose[purpose_index]);
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config.numkey,
                                            existing_s_key_list) == 0) {
-            SST_print_error("The session key list is not addable.");
+            SST_print_warning("The session key list is not addable.");
             return existing_s_key_list;
         }
     }
     session_key_list_t* earned_s_key_list = NULL;
-    if (strcmp((const char*)ctx->config.network_protocol, "TCP") == 0) {
-        earned_s_key_list = send_session_key_req_via_TCP(ctx);
-        if (earned_s_key_list == NULL) {
-            SST_print_error("Failed to send_session_key_req_via_TCP().");
-            return NULL;
-        }
-    } else if (strcmp((const char*)ctx->config.network_protocol, "UDP") == 0) {
-        // TODO:(Dongha Kim): Implement session key request via UDP.
-        // earned_s_key_list = send_session_key_req_via_UDP(ctx);
+    earned_s_key_list = send_session_key_req(ctx);
+    if (earned_s_key_list == NULL) {
+        SST_print_error("Failed to send_session_key_req().");
+        return NULL;
     }
 
     if (existing_s_key_list == NULL) {
@@ -81,11 +101,19 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
     }
 }
 
+session_key_list_t* get_session_key(SST_ctx_t* ctx,
+                                    session_key_list_t* existing_s_key_list) {
+    return get_session_key_with_index(ctx, ctx->config.purpose_index,
+                                      existing_s_key_list);
+}
+
 SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
                                             SST_ctx_t* ctx) {
     int sock;
+    bool use_tcp = get_network_protocol_type((const char*)ctx->config.network_protocol);
+
     if (connect_as_client((const char*)ctx->config.entity_server_ip_addr,
-                          ctx->config.entity_server_port_num, &sock) < 0) {
+                          ctx->config.entity_server_port_num, &sock, use_tcp) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
@@ -128,16 +156,21 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
 
     // received handshake 2
     unsigned char received_buf[MAX_HS_BUF_LENGTH];
-    int received_buf_length =
-        sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-    if (received_buf_length <= 0) {
-        SST_print_error("Failed sst_read_from_socket().");
+    unsigned char message_type;
+    int data_buf_length = read_header_return_data_buf_pointer(
+        sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+    if (data_buf_length < 0) {
+        SST_print_error(
+            "Failed read_header_return_data_buf_pointer(). Socket read "
+            "error in secure_connect_to_server_with_socket()");
+        return NULL;
+    } else if (data_buf_length == 0) {
+        SST_print_error(
+            "Socket disconnected during handshake2 in "
+            "secure_connect_to_server_with_socket()");
         return NULL;
     }
-    unsigned char message_type;
-    unsigned int data_buf_length;
-    unsigned char* data_buf = parse_received_message(
-        received_buf, received_buf_length, &message_type, &data_buf_length);
+    unsigned char* data_buf = received_buf;
     if (message_type == SKEY_HANDSHAKE_2) {
         if (entity_client_state != HANDSHAKE_1_SENT) {
             SST_print_error(
@@ -192,19 +225,25 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
     if (session_key_idx >= 0) {
         s_key = &existing_s_key_list->s_key[session_key_idx];
     } else if (session_key_idx < 0) {
-        // WARNING: The following line overwrites the purpose.
-        snprintf(ctx->config.purpose[ctx->config.purpose_index],
-                 sizeof(ctx->config.purpose[ctx->config.purpose_index]),
-                 "{\"keyId\":%d}", target_session_key_id_int);
+        snprintf(ctx->purpose_for_requesting_key,
+                 sizeof(ctx->purpose_for_requesting_key), "{\"keyId\":%d}",
+                 target_session_key_id_int);
 
         session_key_list_t* s_key_list;
         s_key_list =
             send_session_key_request_check_protocol(ctx, target_session_key_id);
+
         if (s_key_list == NULL) {
             SST_print_error(
                 "Failed to send_session_key_request_check_protocol().");
             return NULL;
         }
+
+        // Restore the original purpose after the key has been fetched.
+        snprintf(ctx->purpose_for_requesting_key,
+                 sizeof(ctx->purpose_for_requesting_key), "%s",
+                 ctx->config.purpose[ctx->config.purpose_index]);
+
         int index =
             add_session_key_to_list(s_key_list->s_key, existing_s_key_list);
         if (index < 0) {
@@ -233,18 +272,21 @@ SST_session_ctx_t* server_secure_comm_setup(
 
     if (entity_server_state == IDLE) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length =
-            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_1_LENGTH);
-        if (received_buf_length <= 0) {
+        unsigned char message_type;
+        int data_buf_length = read_header_return_data_buf_pointer(
+            clnt_sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+        if (data_buf_length < 0) {
             SST_print_error(
-                "Failed sst_read_from_socket(). Socket read error in "
+                "Failed read_header_return_data_buf_pointer(). Socket read "
+                "error in server_secure_comm_setup()");
+            return NULL;
+        } else if (data_buf_length == 0) {
+            SST_print_error(
+                "Socket disconnected during handshake1 in "
                 "server_secure_comm_setup()");
             return NULL;
         }
-        unsigned char message_type;
-        unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
-            received_buf, received_buf_length, &message_type, &data_buf_length);
+        unsigned char* data_buf = received_buf;
         if (message_type == SKEY_HANDSHAKE_1) {
             SST_print_debug("Received session key handshake1.");
             if (entity_server_state != IDLE) {
@@ -296,18 +338,21 @@ SST_session_ctx_t* server_secure_comm_setup(
     }
     if (entity_server_state == HANDSHAKE_2_SENT) {
         unsigned char received_buf[MAX_HS_BUF_LENGTH];
-        int received_buf_length =
-            sst_read_from_socket(clnt_sock, received_buf, HANDSHAKE_3_LENGTH);
-        if (received_buf_length <= 0) {
+        unsigned char message_type;
+        int data_buf_length = read_header_return_data_buf_pointer(
+            clnt_sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+        if (data_buf_length < 0) {
             SST_print_error(
-                "Failed sst_read_from_socket().Socket read error in "
+                "Failed read_header_return_data_buf_pointer(). Socket read "
+                "error in server_secure_comm_setup()");
+            return NULL;
+        } else if (data_buf_length == 0) {
+            SST_print_error(
+                "Socket disconnected during handshake3 in "
                 "server_secure_comm_setup()");
             return NULL;
         }
-        unsigned char message_type;
-        unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
-            received_buf, received_buf_length, &message_type, &data_buf_length);
+        unsigned char* data_buf = received_buf;
         if (message_type == SKEY_HANDSHAKE_3) {
             SST_print_debug("Received session key handshake3!");
             if (entity_server_state != HANDSHAKE_2_SENT) {
@@ -363,6 +408,9 @@ void* receive_thread_read_one_each(void* SST_session_ctx) {
             SST_print_error("Failed to read_secure_message().");
             return NULL;
         }
+        if (data_buf_length == 0) {
+            return NULL;
+        }
         SST_print_log("Received: %.*s", data_buf_length, data_buf);
     }
 }
@@ -375,7 +423,11 @@ int read_secure_message(unsigned char* plaintext,
     bytes_read = read_header_return_data_buf_pointer(
         session_ctx->sock, &message_type, received_buf,
         MAX_SECURE_COMM_MSG_LENGTH);
-    if (bytes_read < 0) {
+    if (bytes_read == 0) {
+        SST_print_debug(
+            "Socket was disconnected while reading secure message.");
+        return 0;
+    } else if (bytes_read < 0) {
         SST_print_error("Failed to read_header_return_data_buf_pointer().");
         return -1;
     }
@@ -454,6 +506,10 @@ int save_session_key_list(session_key_list_t* session_key_list,
 
 int load_session_key_list(session_key_list_t* session_key_list,
                           const char* file_path) {
+    if (session_key_list == NULL || session_key_list->s_key == NULL) {
+        SST_print_error("session_key_list or session_key_list->s_key is NULL.");
+        return -1;
+    }
     FILE* load_file_fp;
     if ((load_file_fp = fopen(file_path, "rb")) == NULL) {
         SST_print_error("Failed to fopen()");
@@ -544,6 +600,10 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
                                         unsigned int password_len,
                                         const char* salt,
                                         unsigned int salt_len) {
+    if (session_key_list == NULL || session_key_list->s_key == NULL) {
+        SST_print_error("session_key_list or session_key_list->s_key is NULL.");
+        return -1;
+    }
     unsigned char iv[AES_BLOCK_SIZE];
     unsigned char ciphertext[sizeof(session_key_list_t) +
                              sizeof(session_key_t) * MAX_SESSION_KEY];
@@ -591,13 +651,16 @@ int load_session_key_list_with_password(session_key_list_t* session_key_list,
         return -1;
     }
 
+    // Save the malloced pointer
+    session_key_t* s = session_key_list->s_key;
+
     // Deserialize the buffer into session_key_list
     memcpy(session_key_list, buffer, sizeof(session_key_list_t));
-    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
-    if (!session_key_list->s_key) {
-        SST_print_error("Memory allocation failed!");
-        return -1;
-    }
+
+    // Reload the saved pointer
+    session_key_list->s_key = s;
+
+    // Copy session keys into pre-allocated memory
     memcpy(session_key_list->s_key, buffer + sizeof(session_key_list_t),
            sizeof(session_key_t) * MAX_SESSION_KEY);
 
