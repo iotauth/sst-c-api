@@ -151,7 +151,19 @@ jobs:
       run: |
         ./secure_ipfs_server ../../../server_client_example/c_server.config &
         echo $! > secureServer.pid
-        sleep 1
+        # Wait for secure IPFS server to be ready (max 30 seconds)
+        echo "Waiting for secure IPFS server to accept connections on port 21100..."
+        for i in $(seq 1 30); do
+          if nc -z 127.0.0.1 21100 2>/dev/null; then
+            echo "Secure IPFS server is ready."
+            break
+          fi
+          if [ $i -eq 30 ]; then
+            echo "ERROR: Secure IPFS server failed to start within 30 seconds."
+            exit 1
+          fi
+          sleep 1
+        done
     - name: Run the secure ipfs examples
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
