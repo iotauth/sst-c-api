@@ -2,16 +2,16 @@
  * Ultrasonic Communication using GGWave and ALSA
  *
  * Compilation:
- *   gcc -O3 -o <naem_of_binary> gg_rxtx_driver.c -lggwave -lasound
+ *   gcc -O3 -o gg_driver gg_rxtx_driver.c -lggwave -lasound
  *
  * Usage:
  *   Transmit (TX):
- *     ./ultrasound tx <device> "Message to send"
- *     Example: ./ultrasound tx plughw:2,0 "Hello Pi"
+ *     ./gg_driver tx <device> "Message to send"
+ *     Example: ./gg_driver tx plughw:3,0 "Hello Pi"
  *
  *   Receive (RX):
- *     ./ultrasound rx <device>
- *     Example: ./ultrasound rx plughw:1,0
+ *     ./gg_driver rx <device>
+ *     Example: ./gg_driver rx plughw:4,0
  */
 #include <stdio.h>
 #include <stdlib.h>
