@@ -340,7 +340,7 @@ int decrypt_AES(const unsigned char* encrypted, unsigned int encrypted_length,
 
 unsigned int get_expected_encrypted_total_length(
     unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode) {
+    AES_encryption_mode_t enc_mode, bool no_hmac) {
     unsigned int encrypted_total_length = 0;
     if (enc_mode == AES_128_CBC) {
         // This requires, paddings, making the encrypted length multiples of the
@@ -368,8 +368,8 @@ static int get_symmetric_encrypt_authenticate_buffer(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned int expected_encrypted_total_length,
-    unsigned char* ret, unsigned int* ret_length) {
+    unsigned int expected_encrypted_total_length, unsigned char* ret,
+    unsigned int* ret_length) {
     // The return of encrypt_AES will look like this.
     // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
     // First attach IV.
@@ -415,7 +415,7 @@ static int get_symmetric_encrypt_authenticate_buffer(
 
 unsigned int get_expected_decrypted_maximum_length(
     unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode) {
+    AES_encryption_mode_t enc_mode, bool no_hmac) {
     unsigned int decrypted_maximum_length;
     // First remove the IV length attached on front.
     decrypted_maximum_length = buf_length - iv_size;
@@ -439,8 +439,8 @@ static int get_symmetric_decrypt_authenticate_buffer(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned int expected_decrypted_total_length,
-    unsigned char* ret, unsigned int* ret_length) {
+    unsigned int expected_decrypted_total_length, unsigned char* ret,
+    unsigned int* ret_length) {
     // The encrypted buffer is composed like below.
     // encrypted = iv (16) + encrypted (plaintext) + HMAC (IV + encrypted)(32)
     unsigned int encrypted_length = buf_length - iv_size;
@@ -496,16 +496,16 @@ int symmetric_encrypt_authenticate(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char** ret, unsigned int* ret_length) {
+    unsigned char** ret, unsigned int* ret_length) {
     // First, get the expected encrypted length, to assign a buffer size.
     unsigned int expected_encrypted_total_length =
         get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
-                                            enc_mode, no_hmac, hmac_mode);
+                                            enc_mode, no_hmac);
     *ret = (unsigned char*)malloc(expected_encrypted_total_length);
     return get_symmetric_encrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-        iv_size, enc_mode, no_hmac, hmac_mode, expected_encrypted_total_length,
-        *ret, ret_length);
+        iv_size, enc_mode, no_hmac, expected_encrypted_total_length, *ret,
+        ret_length);
 }
 
 int symmetric_decrypt_authenticate(
@@ -513,15 +513,15 @@ int symmetric_decrypt_authenticate(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char** ret, unsigned int* ret_length) {
+    unsigned char** ret, unsigned int* ret_length) {
     unsigned int expected_decrypted_total_length =
         get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
-                                              enc_mode, no_hmac, hmac_mode);
+                                              enc_mode, no_hmac);
     *ret = (unsigned char*)malloc(expected_decrypted_total_length);
     return get_symmetric_decrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-        iv_size, enc_mode, no_hmac, hmac_mode, expected_decrypted_total_length,
-        *ret, ret_length);
+        iv_size, enc_mode, no_hmac, expected_decrypted_total_length, *ret,
+        ret_length);
 }
 
 int symmetric_encrypt_authenticate_without_malloc(
@@ -529,15 +529,15 @@ int symmetric_encrypt_authenticate_without_malloc(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char* ret, unsigned int* ret_length) {
+    unsigned char* ret, unsigned int* ret_length) {
     unsigned int expected_encrypted_total_length =
         get_expected_encrypted_total_length(buf_length, iv_size, mac_key_size,
-                                            enc_mode, no_hmac, hmac_mode);
+                                            enc_mode, no_hmac);
 
     return get_symmetric_encrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-        iv_size, enc_mode, no_hmac, hmac_mode, expected_encrypted_total_length,
-        ret, ret_length);
+        iv_size, enc_mode, no_hmac, expected_encrypted_total_length, ret,
+        ret_length);
 }
 
 int symmetric_decrypt_authenticate_without_malloc(
@@ -545,14 +545,14 @@ int symmetric_decrypt_authenticate_without_malloc(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char* ret, unsigned int* ret_length) {
+    unsigned char* ret, unsigned int* ret_length) {
     unsigned int expected_decrypted_total_length =
         get_expected_decrypted_maximum_length(buf_length, iv_size, mac_key_size,
-                                              enc_mode, no_hmac, hmac_mode);
+                                              enc_mode, no_hmac);
     return get_symmetric_decrypt_authenticate_buffer(
         buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-        iv_size, enc_mode, no_hmac, hmac_mode, expected_decrypted_total_length,
-        ret, ret_length);
+        iv_size, enc_mode, no_hmac, expected_decrypted_total_length, ret,
+        ret_length);
 }
 
 int create_salted_password_to_32bytes(const char* password,
