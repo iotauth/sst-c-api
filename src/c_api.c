@@ -370,8 +370,8 @@ SST_session_ctx_t* server_secure_comm_setup(
             if (symmetric_decrypt_authenticate(
                     data_buf, data_buf_length, s_key->mac_key, MAC_KEY_SIZE,
                     s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-                    s_key->enc_mode, s_key->no_hmac, s_key->hmac_mode,
-                    &decrypted, &decrypted_length) < 0) {
+                    s_key->enc_mode, s_key->no_hmac, &decrypted,
+                    &decrypted_length) < 0) {
                 SST_print_error(
                     "Failed symmetric_decrypt_authenticate(). Error during "
                     "decryption in HANDSHAKE_2_SENT state.");

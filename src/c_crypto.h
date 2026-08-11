@@ -135,22 +135,21 @@ int decrypt_AES(const unsigned char* encrypted, unsigned int encrypted_length,
                 AES_encryption_mode_t enc_mode, unsigned char* ret,
                 unsigned int* ret_length);
 
-// Get the expected encrypted length depnding on encryption modes and
-// hmac_mode. Use it together with
-// symmetric_encrypt_authenticate_without_malloc() function to not dynamically
-// assign memory.
+// Get the expected encrypted length depnding on encryption modes.
+// Use it together with symmetric_encrypt_authenticate_without_malloc()
+// function to not dynamically assign memory.
 // @param buf_length length of buf
 // @param iv_size size of iv(initialize vector)
 // @param mac_key_size size of mac key
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @return expected_encrypted_total_length The expected encrypted length
 unsigned int get_expected_encrypted_total_length(
     unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode);
+    AES_encryption_mode_t enc_mode, bool no_hmac);
 
-// Get the expected encrypted length depnding on encryption modes and
-// hmac_mode. However, for block ciphers such as CBC mode, it cannot get the
+// Get the expected encrypted length depnding on encryption modes.
+// However, for block ciphers such as CBC mode, it cannot get the
 // exact decrypted length, only the maximum length. Use it together with
 // symmetric_decrypt_authenticate_without_malloc() function to not dynamically
 // assign memory.
@@ -158,12 +157,12 @@ unsigned int get_expected_encrypted_total_length(
 // @param iv_size size of iv(initialize vector)
 // @param mac_key_size size of mac key
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @return expected_decrypted_maximum_length The expected decrypted length's
 // maximum length.
 unsigned int get_expected_decrypted_maximum_length(
     unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, bool no_hmac, hmac_mode_t hmac_mode);
+    AES_encryption_mode_t enc_mode, bool no_hmac);
 
 // Encrypt the plaintext message with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
@@ -180,7 +179,7 @@ unsigned int get_expected_decrypted_maximum_length(
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
@@ -189,7 +188,7 @@ int symmetric_encrypt_authenticate(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char** ret, unsigned int* ret_length);
+    unsigned char** ret, unsigned int* ret_length);
 
 // Decrypt the ciphertext with cipher key and optionally make HMAC(Hashed
 // Message Authenticate Code) with mac key from session key. This function
@@ -206,7 +205,7 @@ int symmetric_encrypt_authenticate(
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @param ret The double pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
@@ -215,7 +214,7 @@ int symmetric_decrypt_authenticate(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char** ret, unsigned int* ret_length);
+    unsigned char** ret, unsigned int* ret_length);
 
 // This works similar with the symmetric_encrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -229,7 +228,7 @@ int symmetric_decrypt_authenticate(
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @param ret The pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
@@ -238,7 +237,7 @@ int symmetric_encrypt_authenticate_without_malloc(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char* ret, unsigned int* ret_length);
+    unsigned char* ret, unsigned int* ret_length);
 
 // This works similar with the symmetric_decrypt_authenticate() function,
 // however does not dynamically assign memory. The ret pointer should have been
@@ -252,7 +251,7 @@ int symmetric_encrypt_authenticate_without_malloc(
 // @param cipher_key_size size of cipher key
 // @param iv_size size of iv(initialize vector)
 // @param enc_mode AES encryption mode.
-// @param hmac_mode Boolean to use or not use HMAC
+// @param no_hmac Boolean to use or not use HMAC
 // @param ret The pointer of the result of the encrypted buffer
 // @param ret_length length of return buffer
 // @return 0 for success, -1 for error.
@@ -261,7 +260,7 @@ int symmetric_decrypt_authenticate_without_malloc(
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     unsigned int iv_size, AES_encryption_mode_t enc_mode, bool no_hmac,
-    hmac_mode_t hmac_mode, unsigned char* ret, unsigned int* ret_length);
+    unsigned char* ret, unsigned int* ret_length);
 
 // Create a 32 byte digested password using the salt.
 // @param password password's pointer
