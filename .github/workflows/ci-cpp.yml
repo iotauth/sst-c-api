@@ -3,9 +3,9 @@ name: C++ Unit & Integration tests v2
 
 on:
   push:
-    branches: [cpp-api]
+    branches: [main]
   pull_request:
-    branches: [cpp-api]
+    branches: [main]
 
 env:
   BUILD_TYPE: Release
@@ -50,7 +50,7 @@ jobs:
       with:
         repository: iotauth/sst-c-api
         path: entity/c
-        ref: ${{ github.ref }}
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
@@ -73,7 +73,7 @@ jobs:
         nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
         echo $! > auth.pid
     - name: Run the file_block_encrypt_example examples
-      working-directory: entity/c/cpp/examples/file_block_encrypt_example
+      working-directory: entity/c/examples/file_block_encrypt_example
       run: |
         mkdir build && cd build && cmake ../ && make
         ./block_writer ../block_writer.config
@@ -141,11 +141,7 @@ jobs:
       run: |
         python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > fsMgr.pid
-    - name: DEBUG - Test step before secure server
-      working-directory: entity/c/examples/ipfs_examples/c/build
-      run: |
-        echo "DEBUG: This step should appear in job steps"
-        ls -la
+        sleep 5  # Wait for the server to start and bind to port 22100
     - name: Start secure IPFS server
       working-directory: entity/c/examples/ipfs_examples/c/build
       run: |
@@ -167,7 +163,7 @@ jobs:
           echo "No secureServer.pid file found"
         fi
     - name: Stop python file system manager.
-      working-directory: examples
+      working-directory: examples/file_sharing
       run: |
         if [ -f fsMgr.pid ]; then
           kill $(cat fsMgr.pid) || echo "FS Manager already stopped."

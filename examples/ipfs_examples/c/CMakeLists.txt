@@ -11,8 +11,9 @@ add_executable(entity_uploader entity_uploader.c)
 add_executable(entity_downloader entity_downloader.c)
 add_executable(secure_entity_uploader secure_entity_uploader.c)
 add_executable(secure_entity_downloader secure_entity_downloader.c)
+add_executable(secure_ipfs_server secure_ipfs_server.c)
 
 # Link against SST library and dependencies
-foreach(prog entity_uploader entity_downloader secure_entity_uploader secure_entity_downloader)
+foreach(prog entity_uploader entity_downloader secure_entity_uploader secure_entity_downloader secure_ipfs_server)
     target_link_libraries(${prog} sst-c-api Threads::Threads)
 endforeach()
