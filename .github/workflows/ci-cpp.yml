@@ -133,12 +133,13 @@ jobs:
         else
           echo "No fsMgr.pid file found"
         fi
-    - name: Install iotauth Python SDK
-      working-directory: entity/python
+    - name: Install Python dependencies for the iotauth SDK
       run: |
-        pip install --only-binary :all: cryptography==50.0.0 .
+        pip install --only-binary :all: cryptography==50.0.0
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
+      env:
+        PYTHONPATH: ${{ github.workspace }}/entity/python
       run: |
         python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > fsMgr.pid

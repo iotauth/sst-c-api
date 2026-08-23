@@ -189,11 +189,14 @@ jobs:
         else
           echo "No python.pid file found"
         fi    
-
+    - name: Install Python dependencies for the iotauth SDK
+      run: |
+        pip install --only-binary :all: cryptography==50.0.0
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
+      env:
+        PYTHONPATH: ${{ github.workspace }}/entity/python
       run: |
-        pip3 install ../../entity/python
         nohup python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > secure_python.pid  # Save the PID
         sleep 5  # Wait for the server to start and bind to port 22100
