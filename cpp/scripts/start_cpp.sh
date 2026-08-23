@@ -1,14 +1,13 @@
 #!/bin/bash
 
 # =============================================================================
-# start_cpp.sh — Agent to build and connect sst-cpp-api to the Auth server
+# start_cpp.sh — Build sst-cpp-api and connect it to the Auth server
 #
 # This script:
-#   1. Reads sst-c-api/cpp/README.md to understand the project
-#   2. Builds sst-cpp-api with CMake
-#   3. Generates a configuration file for the C++ entity
-#   4. Connects to the Auth server (using the first agent's infrastructure)
-#   5. Runs integration tests
+#   1. Builds sst-cpp-api with CMake
+#   2. Generates a configuration file for the C++ entity
+#   3. Starts the Auth server and connects to it
+#   4. Runs integration tests
 #
 # Usage: ./start_cpp.sh [options]
 #
@@ -75,7 +74,7 @@ show_help() {
 	cat <<EOF
 Usage: $(basename "$0") [options]
 
-Build and connect sst-cpp-api to the Auth server (first agent).
+Build and connect sst-cpp-api to the Auth server.
 
 Options:
   --password <pass>       Password for Auth (default: 1234)
@@ -157,7 +156,7 @@ log "All prerequisites met."
 
 log "Step 1: Checking credentials..."
 if [[ ! -f "$IOTAUTH_ROOT/auth/credentials/keystores/Auth101Entity.pfx" ]]; then
-	error "Auth101Entity.pfx not found. Run the auth-server agent first."
+	error "Auth101Entity.pfx not found. Generate the Auth credentials first (examples/generateAll.sh)."
 	exit 1
 fi
 if [[ ! -f "$AUTH_JAR" ]]; then
@@ -229,7 +228,7 @@ elif [[ "$BUILD_ONLY" == true ]]; then
 	exit 0
 fi
 
-# --- Step 5: Start Auth server (first agent) ---
+# --- Step 5: Start Auth server ---
 
 log "Step 5: Starting Auth server..."
 cd "$AUTH_SERVER_DIR"

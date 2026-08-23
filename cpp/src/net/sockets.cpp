@@ -35,8 +35,7 @@ bool sst::Socket::ReadyToReadTimeOut(int timeout) const {
     struct pollfd fds[1];
     fds[0].fd = get_info_ref()->sock;
     fds[0].events = POLLIN;
-    return poll(fds, 1, timeout) > 0 &&
-           (fds[0].revents & POLLIN);  // Use poll for timeout [1]
+    return poll(fds, 1, timeout) > 0 && (fds[0].revents & POLLIN);
 }
 
 bool sst::Socket::ReadyToRead() const {
@@ -72,7 +71,7 @@ int sst::Socket::Write(char* buf, int nbytes) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
     }
-    return write(get_info_ref()->sock, buf, nbytes);  // Standard write [1]
+    return write(get_info_ref()->sock, buf, nbytes);
 }
 
 int sst::Socket::NonBlockingRead(char* buf, int size, int timeout) const {
@@ -302,7 +301,6 @@ int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** socket_info,
     std::byte* raw_addr = nullptr;
     int addr_len = 0;
 
-    // Allocate address via static helper [2]
     if (sst::Socket::CreateAddr(domain, host_or_path, port, &raw_addr,
                                 &addr_len) == -1) {
         std::cerr << "Failed to create address for ClientSocket" << std::endl;
@@ -311,7 +309,6 @@ int sst::ClientSocket::SocketClientOpen(SST_SocketInfo** socket_info,
     new_info->addr.reset(reinterpret_cast<sockaddr*>(raw_addr));
     new_info->len = addr_len;
 
-    // Initialize socket [1]
     new_info->sock = socket(domain, SOCK_STREAM, 0);
     if (new_info->sock == -1) {
         std::cerr << "Failed to create socket for ClientSocket" << std::endl;
@@ -329,7 +326,7 @@ int sst::ClientSocket::SocketClientConnect(SST_SocketInfo* socket_info) const {
         return -1;
     }
     return connect(socket_info->sock, socket_info->addr.get(),
-                   socket_info->len);  // Standard connection [1]
+                   socket_info->len);
 }
 
 // Implementation of ServerSocket class methods
@@ -372,7 +369,6 @@ int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** socket_info,
         return -1;
     }
 
-    // Bind and listen logic [1]
     if (bind(new_info->sock, new_info->addr.get(), new_info->len) == -1) {
         std::cerr << "Failed to bind socket for ServerSocket" << std::endl;
         return -1;
@@ -458,7 +454,6 @@ int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** socket_info,
     std::byte* raw_addr = nullptr;
     int addr_len = 0;
 
-    // CreateAddr allocates memory via std::make_unique [2]
     if (sst::Socket::CreateAddr(domain, host_or_path, port, &raw_addr,
                                 &addr_len) == -1) {
         std::cerr << "Failed to create address for EndPointSocket" << std::endl;

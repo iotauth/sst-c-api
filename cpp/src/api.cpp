@@ -23,7 +23,7 @@ namespace sst {
 // ---------------------------------------------------------------------------
 
 /** @brief Free function for SST_ctx_t (used as unique_ptr deleter). */
-// NOLINTNEX-TLINE(cppcoreguidelines-owning-memory): Custom deleter for
+// NOLINTNEXTLINE(cppcoreguidelines-owning-memory): Custom deleter for
 // unique_ptr.
 void free_SST_ctx_t(SST_ctx_t* ctx) {
     if (!ctx) return;
@@ -44,7 +44,6 @@ void free_session_key_list_t(session_key_list_t* list) {
 // unique_ptr.
 void free_session_ctx(SST_session_ctx_t* session_ctx) {
     if (!session_ctx) return;
-    // Fix reliability issue #1: Check if socket is valid before closing
     if (session_ctx->sock > 0) {
         ::close(session_ctx->sock);
     }

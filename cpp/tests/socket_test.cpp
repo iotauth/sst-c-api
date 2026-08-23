@@ -1,6 +1,6 @@
 /**
  * @file socket_test.cpp
- * @async Unit test for the SST C++ socket API (cpp/src/net/sockets.{hpp,cpp}).
+ * @brief Unit test for the SST C++ socket API (cpp/src/net/sockets.{hpp,cpp}).
  */
 
 #include <cassert>
@@ -35,8 +35,7 @@ void test_client_socket_creation() {
 }
 
 void test_server_socket_creation() {
-    std::printf("async starting test_server_socket_creation.\n");  // wait, I'm
-                                                                   // losing it.
+    std::printf("**** STARTING test_server_socket_creation.\n");
     sst::ServerSocket server(sst::SST_SOCK_INET, "127.0.0.1", 8081);
     if (server.get_fd() == -1) {
         std::printf("ServerSocket creation failed unexpectedly!\n");

@@ -53,6 +53,9 @@ are not used anywhere in the module):
 cpp/
 ├── CMakeLists.txt        # builds the library + tests
 ├── README.md             # this file
+├── examples/
+│   ├── file_block_encrypt_example/   # block encrypt/decrypt via sst::Crypto
+│   └── ipfs_examples/    # secure IPFS server (C++ sockets + C session API)
 ├── src/
 │   ├── api.hpp/cpp       # high-level SST_API
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)

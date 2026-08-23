@@ -6,7 +6,6 @@
 #include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
 
-// Add this line to define the static mutex
 std::mutex Log::_log_mutex;
 std::shared_ptr<spdlog::logger> LogManager::logger = nullptr;
 bool LogManager::is_verbose = false;  // Definition
