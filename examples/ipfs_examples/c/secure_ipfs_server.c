@@ -51,14 +51,10 @@ int main(int argc, char* argv[]) {
     if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) ==
         -1) {
         SST_print_error_exit("bind() error");
-        close(serv_sock);
-        return -1;
     }
 
     if (listen(serv_sock, 5) == -1) {
         SST_print_error_exit("listen() error");
-        close(serv_sock);
-        return -1;
     }
 
     printf("Secure IPFS Server listening on port %s...\n", PORT_NUM);
@@ -68,8 +64,6 @@ int main(int argc, char* argv[]) {
         accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
     if (clnt_sock == -1) {
         SST_print_error_exit("accept() error");
-        close(serv_sock);
-        return -1;
     }
 
     printf("Client connected\n");
@@ -78,9 +72,6 @@ int main(int argc, char* argv[]) {
     SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
-        close(clnt_sock);
-        close(serv_sock);
-        return -1;
     }
 
     session_key_list_t* s_key_list = init_empty_session_key_list();
@@ -88,10 +79,6 @@ int main(int argc, char* argv[]) {
         server_secure_comm_setup(ctx, clnt_sock, s_key_list);
     if (session_ctx == NULL) {
         SST_print_error_exit("Failed server_secure_comm_setup().");
-        free_SST_ctx_t(ctx);
-        close(clnt_sock);
-        close(serv_sock);
-        return -1;
     }
 
     pthread_t thread;
