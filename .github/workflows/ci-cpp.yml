@@ -95,7 +95,7 @@ jobs:
         fi
     - name: Install IPFS
       run: |
-        wget https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
+        wget --max-redirect=0 https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
         tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
         cd kubo
         sudo bash install.sh
@@ -135,7 +135,8 @@ jobs:
         fi
     - name: Install iotauth Python SDK
       working-directory: entity/python
-      run: pip install .
+      run: |
+        pip install --only-binary :all: cryptography==50.0.0 .
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
       run: |
