@@ -409,7 +409,7 @@ cmake -S "$BUILD_DIR" -B "$BUILD_DIR/test_build" \
     g++ -std=c++17 -I"$CPP_ROOT/src" \
         auth_connect_test.cpp \
         -L. -lsst-cpp-api \
-        -lssl -lcrypto \
+        -lcrypto \
         -lpthread \
         -o auth_connect_test 2>&1
 )

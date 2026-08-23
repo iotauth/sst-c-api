@@ -40,8 +40,6 @@ add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/crypto.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/net/sockets.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/net/sockets.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/net/ssl_socket.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/net/ssl_socket.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/api.hpp
@@ -53,7 +51,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto OpenSSL::SSL)
+target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
 

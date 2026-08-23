@@ -17,17 +17,15 @@ Three test targets: `crypto_test`, `socket_test`, `api_test`.
 
 ```
 src/
-├── api.hpp/cpp          # High-level API (SST_API, SST_Session)
+├── api.hpp/cpp          # High-level API (SST_API)
 ├── crypto.hpp/cpp       # Stateless cryptographic primitives (sst::Crypto)
 ├── net/
-│   ├── sockets.hpp/cpp  # RAII POSIX socket wrappers
-│   └── ssl_socket.hpp/cpp  # TLS layer on top of sockets
+│   └── sockets.hpp/cpp  # RAII POSIX socket wrappers
 └── log/
     └── log_manager.hpp/cpp  # Singleton logger + LOG_INF / LOG_ERR / LOG_DBG / LOG_TRA macros
 ```
 
 - `SST_API` — session management, Auth handshake orchestration.
-- `SST_Session` — secure messaging over a connected socket (factory method `connect_to_server`).
 - `Crypto` — all static methods; **no dynamic allocation** in this module.
 - All public types live in `namespace sst`.
 
@@ -41,8 +39,6 @@ The network layer (`sockets.hpp` / `sockets.cpp`) uses `std::make_unique<uint8_t
 
 ### RAII everywhere
 - Sockets: `Socket`, `ClientSocket`, `ServerSocket` close FDs in destructors.
-- SSL: `SSL_Socket` shuts down and frees in destructor; move-only.
-- API sessions: `SST_Session::connect_to_server()` returns `unique_ptr`; constructor is private.
 
 ### Error handling
 - Crypto/sockets return `-1` on failure (errors logged to stderr).
@@ -72,5 +68,5 @@ Use macros: `LOG_INF`, `LOG_ERR`, etc. from `src/log/log_manager.hpp`. Note: if 
 - [Crypto API reference](https://iotauth.github.io/docs/c-api-reference/) — full C API docs.
 - `README.md` — project overview and build instructions.
 - `log/README.md` - overview of the utilization of `log_manager.hpp/cpp`
-- `net/README.md` - overview of the utilization of `socket.hpp/cpp` and `ssl_socket.hpp/cpp`
+- `net/README.md` - overview of the utilization of `socket.hpp/cpp`
 

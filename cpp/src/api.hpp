@@ -3,10 +3,9 @@
 * @file api.hpp
  * @brief High-level C++ API for SST (Secure Session Transport).
  *
- * Provides two main classes:
+ * Provides the main class:
  *   - SST_API  : session management, Auth handshake orchestration, key
  * retrieval.
- *   - SST_Session : secure messaging over a connected TLS socket.
  *
  * Protocol flow (client side):
  *   1. AUTH_HELLO       Entity ↔ Auth     Auth → Entity
@@ -32,8 +31,7 @@
 #include <string>
 #include <vector>
 
-#include "crypto.hpp"          // for AES_encryption_mode_t, hmac_mode_t
-#include "net/ssl_socket.hpp"  // for SSL_Socket
+#include "crypto.hpp"  // for AES_encryption_mode_t, hmac_mode_t
 
 namespace sst {
 
@@ -162,9 +160,6 @@ struct SST_session_ctx_t {
     session_key_t s_key;
     unsigned int sent_seq_num;
     unsigned int received_seq_num;
-    bool sock_closed = false;  ///< Tracks whether the socket FD has been closed
-                               ///< by free_session_ctx to avoid double-close
-                               ///< when socket_ (SSL_Socket) is destroyed.
 };
 
 // ---------------------------------------------------------------------------
@@ -277,65 +272,6 @@ class SST_API {
     session_key_list_t* session_key_list_ = nullptr;
 
     mutable std::recursive_mutex key_list_mutex_;
-};
-
-// ---------------------------------------------------------------------------
-// SST_Session — secure messaging over a connected TLS socket
-// ---------------------------------------------------------------------------
-
-/**
- * @brief Represents a secure communication session with a specific server.
- *
- * Wraps an active SST_session_ctx_t and provides methods for
- * sending and receiving encrypted messages using the entity's session key.
- */
-class SST_Session {
-   public:
-    /**
-     * @brief Connects to the target server using a previously retrieved
-     * session key from the API instance. Performs SKEY_HANDSHAKE_1/2/3.
-     * @param api Reference to an initialized SST_API with valid keys.
-     * @param session_key_id The 8-byte ID of the session key to use.
-     * @return A unique pointer to an initialized SST_Session on success.
-     * @throws SST_Exception on failure (e.g., session key not found, connection
-     * failed).
-     */
-    static std::unique_ptr<SST_Session> connect_to_server(
-        SST_API& api, const std::vector<uint8_t>& session_key_id);
-
-    /**
-     * @brief Sends a secure (encrypted + authenticated) message over the
-     * session.
-     * @param data The raw byte payload to send.
-     * @return Number of bytes sent on success, -1 on failure.
-     */
-    int send_message(const std::vector<uint8_t>& data);
-
-    /**
-     * @brief Reads and decrypts a secure message from the session.
-     * @return A vector containing the decrypted payload, or empty on error.
-     */
-    std::vector<uint8_t> read_message();
-
-   private:
-    SST_Session(SST_session_ctx_t* session_ctx, SSL_Socket socket);
-
-   public:
-    // Public destructor — needed so unique_ptr default deleter can destroy
-    // instances created via connect_to_server(). Constructor remains private
-    // so the only construction path is the factory method.
-    ~SST_Session();
-
-    // Prevent copying
-    SST_Session(const SST_Session&) = delete;
-    SST_Session& operator=(const SST_Session&) = delete;
-
-    // Allow move (SSL_Socket is move-only)
-    SST_Session(SST_Session&&) noexcept = default;
-    SST_Session& operator=(SST_Session&&) noexcept = default;
-
-    SST_session_ctx_t* session_ctx_;
-    SSL_Socket socket_;  // Owns the TLS socket for the session lifetime
 };
 
 }  // namespace sst

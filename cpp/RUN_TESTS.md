@@ -30,7 +30,7 @@ g++ -std=c++17 -I../src \
     auth_connect_test.cpp \
     -L. -lsst-cpp-api \
     ./_deps/spdlog-build/libspdlog.a \
-    -lssl -lcrypto -lpthread \
+    -lcrypto -lpthread \
     -o auth_connect_test
 ```
 

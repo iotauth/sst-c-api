@@ -9,8 +9,8 @@ session API for SST communication. The project is organized into four layers:
 | Layer | Location | Purpose |
 |-------|----------|---------|
 | **Crypto** | `src/crypto.hpp/cpp` | Stateless primitives — RSA, AES, SHA-256, HMAC |
-| **Network** | `src/net/sockets.hpp/cpp`, `ssl_socket.hpp/cpp` | RAII POSIX socket wrappers + TLS layer |
-| **API** | `src/api.hpp/cpp` | High-level `SST_API` / `SST_Session` session management |
+| **Network** | `src/net/sockets.hpp/cpp` | RAII POSIX socket wrappers |
+| **API** | `src/api.hpp/cpp` | High-level `SST_API` session management |
 | **Logging** | `src/log/log_manager.hpp/cpp` | Singleton logger with rotating file output |
 
 ## Crypto Design
@@ -54,11 +54,10 @@ cpp/
 ├── CMakeLists.txt        # builds the library + tests
 ├── README.md             # this file
 ├── src/
-│   ├── api.hpp/cpp       # high-level SST_API / SST_Session
+│   ├── api.hpp/cpp       # high-level SST_API
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
 │   ├── net/
-│   │   ├── sockets.hpp/cpp       # RAII TCP sockets
-│   │   └── ssl_socket.hpp/cpp    # TLS layer (OpenSSL)
+│   │   └── sockets.hpp/cpp       # RAII TCP sockets
 │   └── log/
 │       └── log_manager.hpp/cpp   # spdlog-based logging
 └── tests/
