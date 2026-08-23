@@ -1,0 +1,185 @@
+# CI workflow for C++ API tests
+name: C++ Unit & Integration tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  BUILD_TYPE: Release
+
+jobs:
+  Unit-Test:
+    name: C++ Unit Test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install openssl
+      run: sudo apt-get update && sudo apt-get install -y openssl
+    - name: Configure CMake
+      working-directory: cpp
+      run: cmake -B build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+    - name: Build
+      working-directory: cpp
+      run: cmake --build build --config ${{env.BUILD_TYPE}}
+    - name: Unit Test
+      working-directory: cpp/build
+      run: ctest -C ${{env.BUILD_TYPE}}
+
+  Integration-test:
+    name: C++ Integration-test
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Read branch name from iotauth-ref.txt
+      id: read_ref
+      run: |
+        ref=$(head -n 1 iotauth-ref.txt)
+        echo "Ref to use: $ref"
+        echo "ref=$ref" >> "$GITHUB_OUTPUT"
+    - name: Check out iotauth repository
+      uses: actions/checkout@v4
+      with:
+        repository: iotauth/iotauth
+        submodules: true
+        ref: ${{ steps.read_ref.outputs.ref }}
+    - name: Check out specific ref of sst-c-api
+      uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
+        path: entity/c
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
+    - name: Install openssl
+      run: sudo apt-get update && sudo apt-get install -y openssl
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+        cache: maven
+    - name: Build with Maven
+      run: mvn -B package --file auth/pom.xml
+    - name: Run the credential generation scripts
+      working-directory: examples
+      run: |
+        chmod +x ./cleanAll.sh ./generateAll.sh
+        ./cleanAll.sh
+        ./generateAll.sh -p asdf
+    - name: Run the auth in background
+      working-directory: auth/auth-server
+      run: |
+        nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
+        echo $! > auth.pid
+    - name: Run the C++ file_block_encrypt_example examples
+      working-directory: entity/c/cpp/examples/file_block_encrypt_example
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        seq 1 2000 > plain.txt
+        ./block_writer plain.txt encrypted.bin block.key
+        ./block_reader encrypted.bin block.key decrypted.txt plain.txt
+    - name: Run the server_client_example examples
+      working-directory: entity/c/examples/server_client_example
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        ./entity_server ../c_server.config &
+        sleep 2
+        ./entity_client ../c_client.config
+    - name: Stop auth server
+      working-directory: auth/auth-server
+      run: |
+        if [ -f auth.pid ]; then
+          kill $(cat auth.pid) || echo "Auth server already stopped."
+        else
+          echo "No auth.pid file found"
+        fi
+    - name: Install IPFS
+      run: |
+        wget --max-redirect=0 https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
+        tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
+        cd kubo
+        sudo bash install.sh
+        ipfs init
+        nohup ipfs daemon &
+    - name: Run the credential generation scripts for IPFS examples
+      working-directory: examples
+      run: |
+        chmod +x ./cleanAll.sh ./generateAll.sh
+        ./cleanAll.sh
+        ./generateAll.sh -g configs/file_sharing.graph -p asdf
+    - name: Run the auth in background
+      working-directory: auth/auth-server
+      run: |
+        nohup java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf &
+        echo $! > auth.pid
+    - name: Run the python file system manager.
+      working-directory: examples
+      run: |
+        python3 file_sharing/file_system_manager.py -p ../properties/exampleFileSystemManager.properties --password=asdf &
+        echo $! > fsMgr.pid
+    - name: Run the ipfs examples
+      working-directory: entity/c/examples/ipfs_examples
+      run: |
+        touch plain_text
+        cd c
+        mkdir build && cd build && cmake ../ && make
+        ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
+        ./entity_downloader ../../downloader.config
+    - name: Stop python file system manager.
+      working-directory: examples
+      run: |
+        if [ -f fsMgr.pid ]; then
+          kill $(cat fsMgr.pid) || echo "FS Manager already stopped."
+        else
+          echo "No fsMgr.pid file found"
+        fi
+    - name: Install Python dependencies for the iotauth SDK
+      run: |
+        pip install --only-binary :all: cryptography==50.0.0
+    - name: Run the secure python file system manager.
+      working-directory: examples/file_sharing
+      env:
+        PYTHONPATH: ${{ github.workspace }}/entity/python
+      run: |
+        python3 secure_file_system_manager.py file_system_manager.config -p asdf &
+        echo $! > fsMgr.pid
+        sleep 5  # Wait for the server to start and bind to port 22100
+    - name: Start secure IPFS server
+      working-directory: entity/c/cpp/examples/ipfs_examples
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        cd ..
+        ./build/secure_ipfs_server ../../../examples/server_client_example/c_server.config &
+        echo $! > secureServer.pid
+        sleep 1
+    - name: Run the secure ipfs examples
+      working-directory: entity/c/examples/ipfs_examples/c/build
+      run: |
+        ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
+        sleep 3
+        ./secure_entity_downloader ../../secure_downloader.config
+    - name: Stop secure IPFS server
+      working-directory: entity/c/cpp/examples/ipfs_examples
+      run: |
+        if [ -f secureServer.pid ]; then
+          kill $(cat secureServer.pid) || echo "Secure server already stopped."
+        else
+          echo "No secureServer.pid file found"
+        fi
+    - name: Stop python file system manager.
+      working-directory: examples/file_sharing
+      run: |
+        if [ -f fsMgr.pid ]; then
+          kill $(cat fsMgr.pid) || echo "FS Manager already stopped."
+        else
+          echo "No fsMgr.pid file found"
+        fi
+    - name: Stop auth server
+      working-directory: auth/auth-server
+      run: |
+        if [ -f auth.pid ]; then
+          kill $(cat auth.pid) || echo "Auth server already stopped."
+        else
+          echo "No auth.pid file found"
+        fi
