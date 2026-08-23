@@ -1,4 +1,4 @@
-# CI workflow for C++ API tests - Updated 2026-07-30 v2
+# CI workflow for C++ API tests
 name: C++ Unit & Integration tests
 
 on:
