@@ -83,9 +83,9 @@ jobs:
       working-directory: entity/c/examples/server_client_example
       run: |
         mkdir build && cd build && cmake ../ && make
-        ./entity_server ../c_server.config &
+        ./entity_server ../../../example_configs/c_cpp_server.config &
         sleep 2
-        ./entity_client ../c_client.config
+        ./entity_client ../../../example_configs/c_cpp_client.config
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |
@@ -149,7 +149,8 @@ jobs:
       working-directory: entity/c/cpp/examples/ipfs_examples
       run: |
         mkdir build && cd build && cmake ../ && make
-        ./secure_ipfs_server ../../../../examples/server_client_example/c_server.config &
+        cd ..
+        ./build/secure_ipfs_server ../../../example_configs/c_cpp_server.config &
         echo $! > secureServer.pid
         sleep 1
     - name: Run the secure ipfs examples
@@ -159,7 +160,7 @@ jobs:
         sleep 3
         ./secure_entity_downloader ../../secure_downloader.config
     - name: Stop secure IPFS server
-      working-directory: entity/c/cpp/examples/ipfs_examples/build
+      working-directory: entity/c/cpp/examples/ipfs_examples
       run: |
         if [ -f secureServer.pid ]; then
           kill $(cat secureServer.pid) || echo "Secure server already stopped."

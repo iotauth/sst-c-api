@@ -119,10 +119,10 @@ jobs:
       working-directory: entity/c/examples/server_client_example
       run: |
         mkdir build && cd build && cmake ../ && make
-        ./entity_server ../c_server.config &
-        ./entity_client ../c_client.config
-        ./threaded_get_target_id_client ../c_client.config
-        ./threaded_get_target_id_server ../c_server.config
+        ./entity_server ../../../example_configs/c_cpp_server.config &
+        ./entity_client ../../../example_configs/c_cpp_client.config
+        ./threaded_get_target_id_client ../../../example_configs/c_cpp_client.config
+        ./threaded_get_target_id_server ../../../example_configs/c_cpp_server.config
 
     - name: Run the tests examples.
       working-directory: entity/c/tests

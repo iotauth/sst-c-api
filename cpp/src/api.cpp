@@ -61,6 +61,11 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
         throw SST_Exception("Failed to open config file: " + path);
     }
 
+    // Zero all fields first so keys absent from the file stay at 0 instead
+    // of reading uninitialized memory.
+    cfg = config_t{};
+    int c_style_purpose_count = 0;
+
     std::string line;
     while (std::getline(file, line)) {
         // Skip empty lines and comments
@@ -86,49 +91,76 @@ static void parse_config_file(const std::string& path, config_t& cfg) {
         trim(key);
         trim(value);
 
-        // Map keys to config fields
-        if (key == "name") {
+        // Encryption modes appear either as numbers or as symbolic names
+        // (the C API config style).
+        auto parse_enc_mode = [](const std::string& v) {
+            if (v == "AES_128_CBC") return AES_128_CBC;
+            if (v == "AES_128_CTR") return AES_128_CTR;
+            if (v == "AES_128_GCM") return AES_128_GCM;
+            return static_cast<AES_encryption_mode_t>(std::stoi(v));
+        };
+
+        // Map keys to config fields. Each field accepts the C++ key and its
+        // C API config-file equivalent, so one config file can drive both
+        // APIs.
+        if (key == "name" || key == "entityInfo.name") {
             snprintf(cfg.name, sizeof(cfg.name), "%.*s",
                      static_cast<int>(sizeof(cfg.name) - 1), value.c_str());
-        } else if (key == "auth_id") {
+        } else if (key == "auth_id" || key == "authInfo.id") {
             cfg.auth_id = std::stoi(value);
-        } else if (key == "auth_pubkey_path") {
+        } else if (key == "auth_pubkey_path" || key == "authInfo.pubkey.path") {
             snprintf(cfg.auth_pubkey_path, sizeof(cfg.auth_pubkey_path), "%.*s",
                      static_cast<int>(sizeof(cfg.auth_pubkey_path) - 1),
                      value.c_str());
-        } else if (key == "entity_privkey_path") {
+        } else if (key == "entity_privkey_path" ||
+                   key == "entityInfo.privkey.path") {
             snprintf(cfg.entity_privkey_path, sizeof(cfg.entity_privkey_path),
                      "%.*s",
                      static_cast<int>(sizeof(cfg.entity_privkey_path) - 1),
                      value.c_str());
-        } else if (key == "auth_ip_addr") {
+        } else if (key == "auth_ip_addr" || key == "auth.ip.address") {
             snprintf(cfg.auth_ip_addr, sizeof(cfg.auth_ip_addr), "%.*s",
                      static_cast<int>(sizeof(cfg.auth_ip_addr) - 1),
                      value.c_str());
-        } else if (key == "auth_port_num") {
+        } else if (key == "auth_port_num" || key == "auth.port.number") {
             cfg.auth_port_num = std::stoi(value);
-        } else if (key == "entity_server_ip_addr") {
+        } else if (key == "entity_server_ip_addr" ||
+                   key == "entity.server.ip.address") {
             snprintf(cfg.entity_server_ip_addr,
                      sizeof(cfg.entity_server_ip_addr), "%.*s",
                      static_cast<int>(sizeof(cfg.entity_server_ip_addr) - 1),
                      value.c_str());
-        } else if (key == "entity_server_port_num") {
+        } else if (key == "entity_server_port_num" ||
+                   key == "entity.server.port.number") {
             cfg.entity_server_port_num = std::stoi(value);
-        } else if (key == "session_key_enc_mode") {
-            cfg.session_key_enc_mode =
-                static_cast<AES_encryption_mode_t>(std::stoi(value));
-        } else if (key == "dist_key_enc_mode") {
-            cfg.dist_key_enc_mode =
-                static_cast<AES_encryption_mode_t>(std::stoi(value));
+        } else if (key == "session_key_enc_mode" ||
+                   key == "sessionKey.encryptionMode") {
+            cfg.session_key_enc_mode = parse_enc_mode(value);
+        } else if (key == "dist_key_enc_mode" ||
+                   key == "distKey.encryptionMode") {
+            cfg.dist_key_enc_mode = parse_enc_mode(value);
         } else if (key == "hmac_mode") {
             cfg.hmac_mode = static_cast<hmac_mode_t>(std::stoi(value));
         } else if (key == "perm_dist_key_mode") {
             cfg.perm_dist_key_mode =
                 static_cast<perm_dist_key_mode_t>(std::stoi(value));
-        } else if (key == "numkey") {
+        } else if (key == "numkey" || key == "entityInfo.number_key") {
             cfg.numkey = std::stoi(value);
         } else if (key == "purpose_index") {
             cfg.purpose_index = static_cast<unsigned short>(std::stoi(value));
+        } else if (key == "entityInfo.purpose") {
+            // Repeated C-style purpose lines fill purpose[0..1]; the last one
+            // becomes the active purpose_index, matching the C API parser.
+            if (c_style_purpose_count < 2) {
+                snprintf(cfg.purpose[c_style_purpose_count],
+                         sizeof(cfg.purpose[c_style_purpose_count]), "%.*s",
+                         static_cast<int>(
+                             sizeof(cfg.purpose[c_style_purpose_count]) - 1),
+                         value.c_str());
+                cfg.purpose_index =
+                    static_cast<unsigned short>(c_style_purpose_count);
+                c_style_purpose_count++;
+            }
         } else if (key.substr(0, 7) == "purpose") {
             // purpose[0] or purpose[1]
             size_t bracket_start = key.find('[');
