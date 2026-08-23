@@ -214,23 +214,21 @@ SST_API::~SST_API() {
 void SST_API::auth_hello() {
     LOG_INF << "Performing AUTH_HELLO handshake";
 
-    // Lock guards session_key_list_ — perform_auth_handshake writes it,
-    // and get_session_key_by_id (called from within perform_auth_handshake)
-    // reads it. We hold the lock across the entire call chain; the recursive
-    // path inside perform_auth_handshake uses std::scoped_lock which is safe
-    // with std::mutex when we only enter from public API methods.
-    std::scoped_lock lock(key_list_mutex_);
+    // perform_auth_handshake does its network I/O unlocked and takes
+    // key_list_mutex_ only while storing the received keys.
     perform_auth_handshake("");  // Empty purpose for initial hello
 }
 
 std::vector<SessionKey> SST_API::get_session_keys(const std::string& purpose) {
     LOG_INF << "Requesting session keys for purpose: " << purpose;
 
-    // Lock guards the full operation: perform_auth_handshake writes
-    // session_key_list_, and the iteration below reads it. Holding the lock
-    // across both ensures we never iterate over a list being mutated.
-    std::scoped_lock lock(key_list_mutex_);
+    // perform_auth_handshake does its network I/O unlocked and takes
+    // key_list_mutex_ only while storing the received keys.
     perform_auth_handshake(purpose);
+
+    // Lock guards the iteration below against a concurrent handshake
+    // mutating session_key_list_.
+    std::scoped_lock lock(key_list_mutex_);
 
     // Convert internal session_key_list_t to high-level SessionKey vector
     std::vector<SessionKey> result;
@@ -303,9 +301,8 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
         const int AUTH_HELLO_MSG_SIZE = 14;
         unsigned char auth_hello_buf[AUTH_HELLO_MSG_SIZE];
 
-        // Blocking recv is intentional: auth socket is local to this function
-        // and the outer scoped_lock in get_session_keys/auth_hello serializes
-        // access to session_key_list_ during the handshake.
+        // Blocking recv is fine here: the auth socket is local to this
+        // function and no lock is held during network I/O.
         int bytes_recv =
             recv(auth_socket.get_fd(), auth_hello_buf, AUTH_HELLO_MSG_SIZE, 0);
         if (bytes_recv != AUTH_HELLO_MSG_SIZE) {
@@ -553,6 +550,10 @@ void SST_API::perform_auth_handshake(const std::string& purpose) {
             throw SST_Exception(
                 "Decrypted response too short for distribution key");
         }
+
+        // All network I/O is done; lock only while mutating the shared
+        // distribution key and session key list.
+        std::scoped_lock lock(key_list_mutex_);
 
         std::memcpy(&ctx_->dist_key, decrypted, sizeof(distribution_key_t));
         size_t resp_offset = sizeof(distribution_key_t);

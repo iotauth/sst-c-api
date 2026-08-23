@@ -228,30 +228,30 @@ int sst::Socket::GetPeerName(SST_SocketInfo* peer) const {
 int sst::Socket::CreateAddr(SST_SOCK_DOMAIN domain, const char* host_or_path,
                             int port, std::byte** addr, int* len) {
     if (domain == SST_SOCK_INET) {
-        sockaddr_in* in_addr =
-            static_cast<sockaddr_in*>(std::malloc(sizeof(sockaddr_in)));
-        if (!in_addr) return -1;
+        std::byte* raw = new (std::nothrow) std::byte[sizeof(sockaddr_in)];
+        if (!raw) return -1;
+        sockaddr_in* in_addr = reinterpret_cast<sockaddr_in*>(raw);
         in_addr->sin_family = AF_INET;
         in_addr->sin_port = htons(port);
         if (inet_pton(AF_INET, host_or_path, &in_addr->sin_addr) != 1) {
             std::cerr << "Invalid IPv4 address: " << host_or_path << std::endl;
-            std::free(in_addr);
+            delete[] raw;
             return -1;
         }
-        *addr = reinterpret_cast<std::byte*>(in_addr);
+        *addr = raw;
         *len = sizeof(struct sockaddr_in);
     } else if (domain == SST_SOCK_INET6) {
-        sockaddr_in6* in6_addr =
-            static_cast<sockaddr_in6*>(std::malloc(sizeof(sockaddr_in6)));
-        if (!in6_addr) return -1;
+        std::byte* raw = new (std::nothrow) std::byte[sizeof(sockaddr_in6)];
+        if (!raw) return -1;
+        sockaddr_in6* in6_addr = reinterpret_cast<sockaddr_in6*>(raw);
         in6_addr->sin6_family = AF_INET6;
         in6_addr->sin6_port = htons(port);
         if (inet_pton(AF_INET6, host_or_path, &in6_addr->sin6_addr) != 1) {
             std::cerr << "Invalid IPv6 address: " << host_or_path << std::endl;
-            std::free(in6_addr);
+            delete[] raw;
             return -1;
         }
-        *addr = reinterpret_cast<std::byte*>(in6_addr);
+        *addr = raw;
         *len = sizeof(struct sockaddr_in6);
     } else {
         std::cerr << "Unsupported socket domain" << std::endl;
@@ -284,7 +284,7 @@ sst::ClientSocket::ClientSocket(SST_SOCK_DOMAIN domain,
     }
 }
 
-sst::ClientSocket::~ClientSocket() {}
+sst::ClientSocket::~ClientSocket() = default;
 
 int sst::ClientSocket::Connect() {
     if (get_info_ref() == nullptr) {
@@ -346,7 +346,7 @@ sst::ServerSocket::ServerSocket(SST_SOCK_DOMAIN domain, const char* host,
     }
 }
 
-sst::ServerSocket::~ServerSocket() {}
+sst::ServerSocket::~ServerSocket() = default;
 
 int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** socket_info,
                                         SST_SOCK_DOMAIN domain,
@@ -446,7 +446,7 @@ sst::EndPointSocket::EndPointSocket(SST_SOCK_DOMAIN domain, const char* host,
     }
 }
 
-sst::EndPointSocket::~EndPointSocket() {}
+sst::EndPointSocket::~EndPointSocket() = default;
 
 int sst::EndPointSocket::SocketEndPointOpen(SST_SocketInfo** socket_info,
                                             SST_SOCK_DOMAIN domain,

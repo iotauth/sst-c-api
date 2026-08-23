@@ -92,53 +92,59 @@ Log::Log([[maybe_unused]] const std::string& fileName,
 
 Log::~Log() {
 #ifndef GIT_VERSION
-    std::lock_guard<std::mutex> lock(Log::_log_mutex);
+    // Destructors are implicitly noexcept: an exception escaping here would
+    // terminate the program, so logging failures are swallowed instead.
+    try {
+        std::lock_guard<std::mutex> lock(Log::_log_mutex);
 
-    std::string log_line;
-    log_line = _stream.str();
+        std::string log_line;
+        log_line = _stream.str();
 
-    switch (_log_level) {
-        case spdlog::level::level_enum::info:
-            LogManager::GetLogger().info(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cout << "[INF]" << log_line << std::endl;
-            }
-            break;
-        case spdlog::level::level_enum::err:
-            LogManager::GetLogger().error(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cerr << "[ERR]" << log_line << std::endl;
-            }
-            break;
-        case spdlog::level::level_enum::debug:
-            LogManager::GetLogger().debug(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cout << "[DBG]" << log_line << std::endl;
-            }
-            break;
-        case spdlog::level::level_enum::trace:
-            LogManager::GetLogger().trace(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cout << "[TRC]" << log_line << std::endl;
-            }
-            break;
-        case spdlog::level::level_enum::warn:
-            LogManager::GetLogger().warn(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cout << "[WRN]" << log_line << std::endl;
-            }
-            break;
-        case spdlog::level::level_enum::critical:
-            LogManager::GetLogger().critical(log_line);
-            if (LogManager::IsVerbose()) {
-                std::cerr << "[CRT]" << log_line << std::endl;
-            }
-            break;
-        default:
-            if (LogManager::IsVerbose()) {
-                std::cout << log_line << std::endl;
-            }
-            break;
+        switch (_log_level) {
+            case spdlog::level::level_enum::info:
+                LogManager::GetLogger().info(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cout << "[INF]" << log_line << std::endl;
+                }
+                break;
+            case spdlog::level::level_enum::err:
+                LogManager::GetLogger().error(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cerr << "[ERR]" << log_line << std::endl;
+                }
+                break;
+            case spdlog::level::level_enum::debug:
+                LogManager::GetLogger().debug(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cout << "[DBG]" << log_line << std::endl;
+                }
+                break;
+            case spdlog::level::level_enum::trace:
+                LogManager::GetLogger().trace(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cout << "[TRC]" << log_line << std::endl;
+                }
+                break;
+            case spdlog::level::level_enum::warn:
+                LogManager::GetLogger().warn(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cout << "[WRN]" << log_line << std::endl;
+                }
+                break;
+            case spdlog::level::level_enum::critical:
+                LogManager::GetLogger().critical(log_line);
+                if (LogManager::IsVerbose()) {
+                    std::cerr << "[CRT]" << log_line << std::endl;
+                }
+                break;
+            default:
+                if (LogManager::IsVerbose()) {
+                    std::cout << log_line << std::endl;
+                }
+                break;
+        }
+    } catch (...) {
+        // Nothing safe to do if logging itself fails; drop the log line.
     }
 #endif
 }

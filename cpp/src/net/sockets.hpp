@@ -19,6 +19,7 @@
 #include <iostream>
 #include <memory>
 #include <mutex>
+#include <new>
 #include <string>
 
 namespace sst {
@@ -46,15 +47,23 @@ struct SST_SocketInfo {
 
     /**
      * @brief Smart pointer managing the sockaddr lifecycle.
-     * Uses a custom deleter to call free() on memory allocated via malloc.
+     * Uses a custom deleter that releases the underlying byte-array
+     * allocation.
      */
     std::unique_ptr<sockaddr, void (*)(sockaddr*)> addr;
 
     /**
+     * @brief Deleter for the managed sockaddr: releases the byte array
+     * backing the address storage.
+     */
+    static void FreeAddr(sockaddr* p) {
+        delete[] reinterpret_cast<std::byte*>(p);
+    }
+
+    /**
      * @brief Constructor initializing an empty/invalid socket info.
      */
-    SST_SocketInfo()
-        : sock(-1), len(0), addr(nullptr, [](sockaddr* p) { std::free(p); }) {}
+    SST_SocketInfo() : sock(-1), len(0), addr(nullptr, &FreeAddr) {}
 
     /**
      * @brief Destructor that closes the socket if it is open.
@@ -70,18 +79,17 @@ struct SST_SocketInfo {
      * unique_ptr.
      * @param src Pointer to the source address data.
      * @param length Size of the address structure in bytes.
-     * @return A unique_ptr<sockaddr> with a free() deleter, or nullptr on
+     * @return A unique_ptr<sockaddr> with the FreeAddr deleter, or nullptr on
      * failure.
      */
     static std::unique_ptr<sockaddr, void (*)(sockaddr*)> AllocAddr(
         const void* src, socklen_t length) {
-        std::byte* raw = reinterpret_cast<std::byte*>(std::malloc(length));
-        if (!raw) return {nullptr, [](sockaddr* p) { std::free(p); }};
+        std::byte* raw = new (std::nothrow) std::byte[length];
+        if (!raw) return {nullptr, &FreeAddr};
         memcpy(reinterpret_cast<void*>(raw), src, length);
         // reinterpret_cast for POSIX socket programming: sockaddr_in/embeds
         // sockaddr as first member, pointer layout is compatible
-        return {reinterpret_cast<sockaddr*>(raw),
-                [](sockaddr* p) { std::free(p); }};
+        return {reinterpret_cast<sockaddr*>(raw), &FreeAddr};
     }
 };
 

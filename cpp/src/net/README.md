@@ -19,7 +19,7 @@ graph TD
 
 ### `sockets.hpp` — Base TCP sockets
 
-**`SST_SocketInfo`** — RAII container for a raw file descriptor and its address. Closes the FD in the destructor; manages `sockaddr` address storage with `std::make_unique<uint8_t[]>` and a custom deleter that calls `delete[]` on a `uint8_t*`. All allocation is exception-safe — no `malloc` or `free` anywhere in the layer.
+**`SST_SocketInfo`** — RAII container for a raw file descriptor and its address. Closes the FD in the destructor; manages `sockaddr` address storage as a `std::byte` array owned by a `unique_ptr` whose deleter calls `delete[]`. No `malloc` or `free` anywhere in the layer.
 
 **`Socket`** (abstract base)
 - Thread-safe I/O: every read/write is guarded by a `mutable std::mutex gate_`.
