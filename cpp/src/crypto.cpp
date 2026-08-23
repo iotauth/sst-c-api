@@ -19,15 +19,9 @@ namespace sst {
 // (SSL_library_init/SSL_load_error_strings/OpenSSL_add_all_algorithms were
 // required in OpenSSL 1.x but removed in 3.0; modern OpenSSL initializes
 // everything automatically.)
-static bool openssl_initialized = false;
-
 static void ensure_openssl_initialized() {
-    if (!openssl_initialized) {
-        // Intentionally empty: OpenSSL 3.0+ handles initialization
-        // automatically. The flag remains to document that the call site
-        // was visited, but no library functions need to be invoked.
-        openssl_initialized = true;
-    }
+    // Intentionally empty: OpenSSL 3.0+ handles initialization
+    // automatically. No library functions need to be invoked.
 }
 
 // ---- Internal helpers (private) ----

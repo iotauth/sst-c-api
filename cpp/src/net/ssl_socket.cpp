@@ -7,9 +7,9 @@ namespace sst {
 // Initialize static members
 SSL_CTX* SSL_Socket::client_ctx_ = nullptr;
 SSL_CTX* SSL_Socket::server_ctx_ = nullptr;
-static std::once_flag ssl_init_flag;
 
 void SSL_Socket::InitOpenSSL() {
+    static std::once_flag ssl_init_flag;
     std::call_once(ssl_init_flag, []() {
         SSL_library_init();
         SSL_load_error_strings();

@@ -17,16 +17,14 @@
 #include "net/sockets.hpp"
 #include "net/ssl_socket.hpp"
 
-// Centralized OpenSSL initialization - fix security issue #1
 namespace {
-bool openssl_initialized = false;
 void ensure_openssl_initialized() {
-    if (!openssl_initialized) {
+    [[maybe_unused]] static const bool openssl_initialized = [] {
         SSL_library_init();
         SSL_load_error_strings();
         OpenSSL_add_all_algorithms();
-        openssl_initialized = true;
-    }
+        return true;
+    }();
 }
 }  // namespace
 
