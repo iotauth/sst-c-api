@@ -42,6 +42,14 @@ static bool execute_verification_plan(const char* challenge) {
     return false;
 }
 
+// Reads the target locker's entity ID via the robot's camera (e.g., a QR
+// code on the locker). Camera-based scanning is not implemented here; this
+// simply stands in for it and returns as if "net1.locker1" had been scanned.
+// @return The scanned locker's entity name.
+static const char* scan_locker_id_from_qr_code(void) {
+    return "net1.locker1";
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
@@ -55,9 +63,9 @@ int main(int argc, char* argv[]) {
     }
 
     // Case 1: solo action, no target entity. Request authorization for
-    // gripping an item on the floor (purpose index 1: "action":"GRIP_ITEM").
+    // gripping an item on the floor (purpose index 0: "action":"GRIP_ITEM").
     // Runs first since it needs no peer entity to be reachable.
-    session_key_list_t* grip_s_key_list = get_session_key_with_index(ctx, 1, NULL);
+    session_key_list_t* grip_s_key_list = get_session_key_with_index(ctx, 0, NULL);
     if (grip_s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key_with_index() for GRIP_ITEM.");
     }
@@ -69,13 +77,22 @@ int main(int argc, char* argv[]) {
     SST_print_log("GRIP_ITEM authorized: robot may grip the item.");
     free_session_key_list_t(grip_s_key_list);
 
-    // Case 2: interactive action, needs a session key to talk to the Locker.
-    // Request session key from Auth server (purpose index 0: "group":"Lockers").
-    session_key_list_t* s_key_list = get_session_key_with_index(ctx, 0, NULL);
+    // Case 2: interactive action, targeting a specific locker identified at
+    // runtime (not known ahead of time, so it can't live in a static config
+    // purpose slot). The purpose is built dynamically with the scanned ID.
+    const char* target_locker = scan_locker_id_from_qr_code();
+    SST_print_log("Scanned locker ID: %s", target_locker);
+
+    char retrieve_purpose[MAX_PURPOSE_LENGTH + 1];
+    snprintf(retrieve_purpose, sizeof(retrieve_purpose),
+             "{\"action\":\"RETRIEVE_ITEM\",\"target\":\"%s\"}", target_locker);
+
+    session_key_list_t* s_key_list =
+        get_session_key_with_purpose(ctx, retrieve_purpose, NULL);
     if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key_with_index() for Locker.");
+        SST_print_error_exit("Failed get_session_key_with_purpose() for RETRIEVE_ITEM.");
     }
-    SST_print_log("Received session key for Locker successfully!");
+    SST_print_log("Received session key for RETRIEVE_ITEM successfully!");
 
     // Execute the physical presence verification plan locally, and proceed
     // only when verified (fail-closed).
