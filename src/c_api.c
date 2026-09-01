@@ -72,12 +72,11 @@ session_key_list_t* init_empty_session_key_list(void) {
     return session_key_list;
 }
 
-session_key_list_t* get_session_key_with_index(
-    SST_ctx_t* ctx, int purpose_index,
-    session_key_list_t* existing_s_key_list) {
-    snprintf(ctx->purpose_for_requesting_key,
-             sizeof(ctx->purpose_for_requesting_key), "%s",
-             ctx->config.purpose[purpose_index]);
+// Sends the session key request using whatever purpose is currently set in
+// ctx->purpose_for_requesting_key. Shared by get_session_key_with_index() and
+// get_session_key_with_purpose().
+static session_key_list_t* get_session_key_internal(
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list) {
     if (existing_s_key_list != NULL) {
         if (check_session_key_list_addable(ctx->config.numkey,
                                            existing_s_key_list) == 0) {
@@ -104,6 +103,23 @@ session_key_list_t* get_session_key_with_index(
         free_session_key_list_t(earned_s_key_list);
         return existing_s_key_list;
     }
+}
+
+session_key_list_t* get_session_key_with_index(
+    SST_ctx_t* ctx, int purpose_index,
+    session_key_list_t* existing_s_key_list) {
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s",
+             ctx->config.purpose[purpose_index]);
+    return get_session_key_internal(ctx, existing_s_key_list);
+}
+
+session_key_list_t* get_session_key_with_purpose(
+    SST_ctx_t* ctx, const char* purpose,
+    session_key_list_t* existing_s_key_list) {
+    snprintf(ctx->purpose_for_requesting_key,
+             sizeof(ctx->purpose_for_requesting_key), "%s", purpose);
+    return get_session_key_internal(ctx, existing_s_key_list);
 }
 
 session_key_list_t* get_session_key(SST_ctx_t* ctx,
