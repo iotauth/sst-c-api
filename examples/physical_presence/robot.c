@@ -4,6 +4,43 @@
 #include <unistd.h>
 
 #include "../../src/c_api.h"
+#include "../../src/c_common.h"
+
+// Executes the verification plan received from Auth for a physical presence
+// check, and reports whether the requester is verified.
+//
+// This currently only supports the "DUMMY" verification method, which
+// requires no real sensor/actuator interaction and always passes. Real
+// mechanisms (e.g. ultrasonic/IR ranging, camera, thermometer) would be
+// executed here in the same way.
+// @param challenge The physical presence verification plan JSON received
+// from Auth (session_key_t.challenge).
+// @return true if the requester is verified, false otherwise.
+static bool execute_verification_plan(const char* challenge) {
+    if (challenge == NULL || strlen(challenge) == 0) {
+        SST_print_log("No physical presence verification plan specified.");
+        return true;
+    }
+
+    SST_print_log("Received verification plan: %s", challenge);
+
+    char method[64] = {0};
+    if (parse_json_string_value(challenge, "method", method,
+                                sizeof(method)) != 0) {
+        SST_print_error("Verification plan has no selected method.");
+        return false;
+    }
+
+    if (strcmp(method, "DUMMY") == 0) {
+        SST_print_log(
+            "Executing DUMMY verification method (no sensor required): "
+            "PASS.");
+        return true;
+    }
+
+    SST_print_error("Unsupported verification method: %s", method);
+    return false;
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -22,14 +59,12 @@ int main(int argc, char* argv[]) {
     if (s_key_list == NULL) {
         SST_print_error_exit("Failed get_session_key().");
     }
-
-    // Inspect returned physical presence challenge rules
     SST_print_log("Received session key successfully!");
-    if (strlen(s_key_list->s_key[0].challenge) > 0) {
-        SST_print_log("Physical Presence Challenge Rule: %s",
-                      s_key_list->s_key[0].challenge);
-    } else {
-        SST_print_log("No Physical Presence Challenge Rule specified.");
+
+    // Execute the physical presence verification plan locally, and proceed
+    // only when verified (fail-closed).
+    if (!execute_verification_plan(s_key_list->s_key[0].challenge)) {
+        SST_print_error_exit("Physical presence verification failed.");
     }
 
     // Securely connect to target Box server
