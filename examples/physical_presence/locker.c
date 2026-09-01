@@ -42,7 +42,7 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    SST_print_log("Box server listening on port %s...", PORT_NUM);
+    SST_print_log("Locker server listening on port %s...", PORT_NUM);
 
     clnt_addr_size = sizeof(clnt_addr);
     clnt_sock =
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
     }
 
     char* config_path = argv[1];
-    // Initialize SST context for Box
+    // Initialize SST context for Locker
     SST_ctx_t* ctx = init_SST(config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
@@ -70,8 +70,8 @@ int main(int argc, char* argv[]) {
                        (void*)session_ctx);
         sleep(1);
 
-        int msg = send_secure_message("Box: Hello Robot!",
-                                      strlen("Box: Hello Robot!"), session_ctx);
+        int msg = send_secure_message("Locker: Hello Robot!",
+                                      strlen("Locker: Hello Robot!"), session_ctx);
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
@@ -80,7 +80,7 @@ int main(int argc, char* argv[]) {
         pthread_cancel(thread);
         pthread_join(thread, NULL);
         free_session_ctx(session_ctx);
-        SST_print_log("Box: Finished secure communication with Robot.");
+        SST_print_log("Locker: Finished secure communication with Robot.");
     }
 
     free_session_key_list_t(s_key_list);
