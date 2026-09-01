@@ -54,12 +54,28 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("init_SST() failed.");
     }
 
-    // Request session key from Auth server
-    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
-    if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key().");
+    // Case 1: solo action, no target entity. Request authorization for
+    // gripping an item on the floor (purpose index 1: "action":"GRIP_ITEM").
+    // Runs first since it needs no peer entity to be reachable.
+    session_key_list_t* grip_s_key_list = get_session_key_with_index(ctx, 1, NULL);
+    if (grip_s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key_with_index() for GRIP_ITEM.");
     }
-    SST_print_log("Received session key successfully!");
+    SST_print_log("Received authorization for GRIP_ITEM successfully!");
+
+    if (!execute_verification_plan(grip_s_key_list->s_key[0].challenge)) {
+        SST_print_error_exit("Physical presence verification failed for GRIP_ITEM.");
+    }
+    SST_print_log("GRIP_ITEM authorized: robot may grip the item.");
+    free_session_key_list_t(grip_s_key_list);
+
+    // Case 2: interactive action, needs a session key to talk to the Locker.
+    // Request session key from Auth server (purpose index 0: "group":"Lockers").
+    session_key_list_t* s_key_list = get_session_key_with_index(ctx, 0, NULL);
+    if (s_key_list == NULL) {
+        SST_print_error_exit("Failed get_session_key_with_index() for Locker.");
+    }
+    SST_print_log("Received session key for Locker successfully!");
 
     // Execute the physical presence verification plan locally, and proceed
     // only when verified (fail-closed).
@@ -67,7 +83,7 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("Physical presence verification failed.");
     }
 
-    // Securely connect to target Box server
+    // Securely connect to target Locker server
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
     if (session_ctx == NULL) {
@@ -79,9 +95,9 @@ int main(int argc, char* argv[]) {
     pthread_create(&thread, NULL, &receive_thread_read_one_each,
                    (void*)session_ctx);
 
-    // Send secure messages to Box
-    int msg = send_secure_message("Robot: Hello Box!",
-                                  strlen("Robot: Hello Box!"), session_ctx);
+    // Send secure messages to Locker
+    int msg = send_secure_message("Robot: Hello Locker!",
+                                  strlen("Robot: Hello Locker!"), session_ctx);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
