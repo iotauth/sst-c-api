@@ -7,7 +7,10 @@
 
 // This file includes functions that uses the struct "session_key"
 
-#define MAX_AUTH_COMM_LENGTH 1024
+// Sized to fit a SESSION_KEY_RESP_WITH_DIST_KEY message carrying a physical
+// presence verification plan (crypto spec "challenge" field) in addition to
+// the RSA-encrypted distribution key and session key material.
+#define MAX_AUTH_COMM_LENGTH 4096
 
 #define IDLE 0
 #define HANDSHAKE_1_SENT 10
