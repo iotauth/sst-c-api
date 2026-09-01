@@ -233,7 +233,8 @@ int check_SECURE_COMM_MSG_type(unsigned char message_type);
 
 // Parses a string value for a given key from a simple JSON object string.
 // E.g., parses "AES-128-CBC" from {"cipher":"AES-128-CBC", "mac":"SHA256"} for
-// key "cipher".
+// key "cipher". Unescapes \" and \\ in the value, so a JSON string nested
+// inside the value (e.g. a challenge JSON string) is copied out intact.
 // @param json_str The JSON string to parse.
 // @param key The key to look for.
 // @param value_buf Buffer to store the extracted string value.
