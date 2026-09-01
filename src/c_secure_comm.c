@@ -180,8 +180,9 @@ static void parse_distribution_key(distribution_key_t* parsed_distribution_key,
     memcpy(parsed_distribution_key->mac_key, buf + cur_index, mac_key_size);
 }
 
-// Set the session key's encryption mode and hmac_mode to the SST_ctx's
-// modes or from cryptoSpec if available.
+// Set the session key's encryption mode, hmac_mode, and physical presence
+// challenge (verification plan) to the SST_ctx's modes or from cryptoSpec if
+// available.
 // @param crypto_spec The cryptoSpec JSON string to parse.
 // @param ctx The SST_ctx_t to get the config.
 // @param s_key The target session key to set the modes.
@@ -221,10 +222,17 @@ static void update_enc_mode_and_hmac_mode_to_session_key(
             s_key->hmac_mode = ctx->config.hmac_mode;
             s_key->no_hmac = ctx->config.no_hmac;
         }
+
+        if (parse_json_string_value((const char*)crypto_spec, "challenge",
+                                    s_key->challenge,
+                                    sizeof(s_key->challenge)) != 0) {
+            s_key->challenge[0] = '\0';
+        }
     } else {
         s_key->enc_mode = AES_128_CBC;
         s_key->hmac_mode = ctx->config.hmac_mode;
         s_key->no_hmac = ctx->config.no_hmac;
+        s_key->challenge[0] = '\0';
     }
 }
 
@@ -676,18 +684,23 @@ session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
 
     int state = INIT;
     while (state == INIT || state == AUTH_HELLO_RECEIVED) {
+        // Read the full message (looping until the declared payload length is
+        // received), instead of a single read(), since Auth's response can
+        // arrive split across multiple TCP segments once it carries a
+        // physical presence verification plan.
         unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        int received_buf_length =
-            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-
-        if (received_buf_length <= 0) {
-            SST_print_error("Failed to sst_read_from_socket().");
+        unsigned char message_type;
+        int received_buf_length = read_header_return_data_buf_pointer(
+            sock, &message_type, received_buf, sizeof(received_buf));
+        if (received_buf_length < 0) {
+            SST_print_error("Failed to read_header_return_data_buf_pointer().");
+            return NULL;
+        } else if (received_buf_length == 0) {
+            SST_print_error("Socket disconnected while waiting for Auth response.");
             return NULL;
         }
-        unsigned char message_type;
-        unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
-            received_buf, received_buf_length, &message_type, &data_buf_length);
+        unsigned char* data_buf = received_buf;
+        unsigned int data_buf_length = (unsigned int)received_buf_length;
         if (state == INIT && message_type == AUTH_HELLO) {
             state = AUTH_HELLO_RECEIVED;
             if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock,
