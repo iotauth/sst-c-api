@@ -6,6 +6,10 @@
 #include "../../src/c_api.h"
 #include "../../src/c_common.h"
 
+#ifdef HAVE_GGWAVE_TRANSPORT
+#include "../../ultrasonic_com/ggwave_sst_handshake.h"
+#endif
+
 // Executes one named check's selected verification method from the physical
 // presence verification plan received from Auth (e.g. "HUMAN_PRESENCE" or
 // "CO_LOCATION"), and reports whether it passed.
@@ -62,10 +66,28 @@ static const char* scan_locker_id_from_qr_code(void) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
+    const char* comm_type = "tcp";
+    const char* mic_device = "plughw:3,0";
+    const char* spk_device = "plughw:4,0";
+    if (argc < 2) {
+        SST_print_error_exit(
+            "Usage: %s <config_file_path> [--comm_type tcp|ultrasound] "
+            "[--mic <alsa_device>] [--spk <alsa_device>]",
+            argv[0]);
     }
     char* config_path = argv[1];
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
+            comm_type = argv[i + 1];
+            i++;
+        } else if (strcmp(argv[i], "--mic") == 0 && i + 1 < argc) {
+            mic_device = argv[i + 1];
+            i++;
+        } else if (strcmp(argv[i], "--spk") == 0 && i + 1 < argc) {
+            spk_device = argv[i + 1];
+            i++;
+        }
+    }
 
     // Initialize SST context with configuration file
     SST_ctx_t* ctx = init_SST(config_path);
@@ -116,36 +138,60 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("Physical presence verification failed.");
     }
 
-    // Securely connect to target Locker server
-    SST_session_ctx_t* session_ctx =
-        secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    if (session_ctx == NULL) {
-        SST_print_error_exit("Failed secure_connect_to_server().");
+    // Securely connect to target Locker server. --comm_type picks the
+    // transport for this robot<->Locker handshake only; the session key
+    // itself was still obtained from Auth over TCP either way.
+    SST_session_ctx_t* session_ctx = NULL;
+    if (strcmp(comm_type, "tcp") == 0) {
+        session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed secure_connect_to_server().");
+        }
+    } else if (strcmp(comm_type, "ultrasound") == 0) {
+#ifdef HAVE_GGWAVE_TRANSPORT
+        session_ctx = secure_connect_to_server_via_ggwave(
+            &s_key_list->s_key[0], mic_device, spk_device);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed secure_connect_to_server_via_ggwave().");
+        }
+        SST_print_log(
+            "Robot: GGWAVE handshake with Locker succeeded. (Ongoing secure "
+            "messaging over ultrasound is not implemented yet in this demo.)");
+#else
+        SST_print_error_exit(
+            "This build has no ggwave/ALSA support (Linux only). Rebuild on "
+            "the Raspberry Pi to use --comm_type ultrasound.");
+#endif
+    } else {
+        SST_print_error_exit("Unknown --comm_type '%s'. Expected tcp or ultrasound.",
+                             comm_type);
     }
 
-    sleep(1);
-    pthread_t thread;
-    pthread_create(&thread, NULL, &receive_thread_read_one_each,
-                   (void*)session_ctx);
+    if (strcmp(comm_type, "tcp") == 0) {
+        sleep(1);
+        pthread_t thread;
+        pthread_create(&thread, NULL, &receive_thread_read_one_each,
+                       (void*)session_ctx);
 
-    // Send secure messages to Locker
-    int msg = send_secure_message("Robot: Hello Locker!",
-                                  strlen("Robot: Hello Locker!"), session_ctx);
-    if (msg < 0) {
-        SST_print_error_exit("Failed send_secure_message().");
+        // Send secure messages to Locker
+        int msg = send_secure_message("Robot: Hello Locker!",
+                                      strlen("Robot: Hello Locker!"), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
+        sleep(1);
+
+        msg = send_secure_message("Robot: Physical presence verified.",
+                                  strlen("Robot: Physical presence verified."),
+                                  session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
+        sleep(1);
+
+        pthread_cancel(thread);
+        pthread_join(thread, NULL);
     }
-    sleep(1);
-
-    msg = send_secure_message("Robot: Physical presence verified.",
-                              strlen("Robot: Physical presence verified."),
-                              session_ctx);
-    if (msg < 0) {
-        SST_print_error_exit("Failed send_secure_message().");
-    }
-    sleep(1);
-
-    pthread_cancel(thread);
-    pthread_join(thread, NULL);
     free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);

@@ -7,6 +7,10 @@
 
 #include "../../src/c_api.h"
 
+#ifdef HAVE_GGWAVE_TRANSPORT
+#include "../../ultrasonic_com/ggwave_sst_handshake.h"
+#endif
+
 // Listens on the given TCP port and accepts one incoming connection.
 // @param serv_sock Receives the listening socket, so the caller can close it.
 // @return The accepted client socket, or -1 on error.
@@ -54,9 +58,12 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
+    const char* mic_device = "plughw:3,0";
+    const char* spk_device = "plughw:4,0";
     if (argc < 2) {
         SST_print_error_exit(
-            "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound]",
+            "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
+            "[--mic <alsa_device>] [--spk <alsa_device>]",
             argv[0]);
     }
     char* config_path = argv[1];
@@ -64,40 +71,63 @@ int main(int argc, char* argv[]) {
         if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
             comm_type = argv[i + 1];
             i++;
+        } else if (strcmp(argv[i], "--mic") == 0 && i + 1 < argc) {
+            mic_device = argv[i + 1];
+            i++;
+        } else if (strcmp(argv[i], "--spk") == 0 && i + 1 < argc) {
+            spk_device = argv[i + 1];
+            i++;
         }
     }
 
+    // Initialize SST context for Locker. This is used to talk to Auth over
+    // TCP regardless of --comm_type: only the handshake/communication with
+    // the robot itself is affected by that choice.
+    SST_ctx_t* ctx = init_SST(config_path);
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
+
     int serv_sock = -1;
-    int clnt_sock;
+    int clnt_sock = -1;
+    session_key_list_t* s_key_list = init_empty_session_key_list();
+    SST_session_ctx_t* session_ctx = NULL;
+
     if (strcmp(comm_type, "tcp") == 0) {
         clnt_sock = accept_tcp_connection(PORT_NUM, &serv_sock);
         if (clnt_sock == -1) {
             SST_print_error_exit("Failed accept_tcp_connection().");
         }
-    } else if (strcmp(comm_type, "ir") == 0 ||
-               strcmp(comm_type, "ultrasound") == 0) {
-        // TODO: Listen for and accept a connection over IR/ultrasound once
-        // that transport is implemented.
+        session_ctx = server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed server_secure_comm_setup().");
+        }
+    } else if (strcmp(comm_type, "ultrasound") == 0) {
+#ifdef HAVE_GGWAVE_TRANSPORT
+        session_ctx = server_secure_comm_setup_via_ggwave(
+            ctx, mic_device, spk_device, s_key_list);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed server_secure_comm_setup_via_ggwave().");
+        }
+        SST_print_log(
+            "Locker: GGWAVE handshake with Robot succeeded. (Ongoing secure "
+            "messaging over ultrasound is not implemented yet in this demo.)");
+#else
         SST_print_error_exit(
-            "--comm_type %s is not implemented yet in this demo.", comm_type);
+            "This build has no ggwave/ALSA support (Linux only). Rebuild on "
+            "the Raspberry Pi to use --comm_type ultrasound.");
+#endif
+    } else if (strcmp(comm_type, "ir") == 0) {
+        // TODO: Listen for and accept a connection over IR once that
+        // transport is implemented.
+        SST_print_error_exit("--comm_type ir is not implemented yet in this demo.");
     } else {
         SST_print_error_exit(
             "Unknown --comm_type '%s'. Expected tcp, ir, or ultrasound.",
             comm_type);
     }
 
-    // Initialize SST context for Locker
-    SST_ctx_t* ctx = init_SST(config_path);
-    if (ctx == NULL) {
-        SST_print_error_exit("init_SST() failed.");
-    }
-
-    session_key_list_t* s_key_list = init_empty_session_key_list();
-    SST_session_ctx_t* session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
-    if (session_ctx == NULL) {
-        SST_print_error_exit("Failed server_secure_comm_setup().");
-    } else {
+    if (session_ctx != NULL && strcmp(comm_type, "tcp") == 0) {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void*)session_ctx);
@@ -112,13 +142,15 @@ int main(int argc, char* argv[]) {
 
         pthread_cancel(thread);
         pthread_join(thread, NULL);
-        free_session_ctx(session_ctx);
         SST_print_log("Locker: Finished secure communication with Robot.");
+    }
+    if (session_ctx != NULL) {
+        free_session_ctx(session_ctx);
     }
 
     free_session_key_list_t(s_key_list);
-    close(clnt_sock);
-    close(serv_sock);
+    if (clnt_sock != -1) close(clnt_sock);
+    if (serv_sock != -1) close(serv_sock);
     free_SST_ctx_t(ctx);
 
     return 0;
