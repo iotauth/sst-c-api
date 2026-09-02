@@ -54,10 +54,10 @@ void SST_print_warning(const char* fmt, ...) {
     va_end(args);
 }
 
-// Print out error messages along with errno if set.
-void SST_print_error(const char* fmt, ...) {
-    va_list args;
-    va_start(args, fmt);
+// Shared implementation for SST_print_error()/SST_print_error_exit(), taking
+// an already-started va_list rather than being passed one as a plain vararg
+// (which would not forward the caller's actual arguments).
+static void SST_print_error_valist(const char* fmt, va_list args) {
     // Print the "ERROR:" prefix to stderr
     fprintf(stderr, "ERROR: ");
     // Print the formatted error message to stderr (without adding a newline)
@@ -68,14 +68,20 @@ void SST_print_error(const char* fmt, ...) {
     }
     // End the line after the error message and errno
     fprintf(stderr, "\n");
+}
 
+// Print out error messages along with errno if set.
+void SST_print_error(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    SST_print_error_valist(fmt, args);
     va_end(args);
 }
 
 void SST_print_error_exit(const char* fmt, ...) {
     va_list args;
     va_start(args, fmt);
-    SST_print_error(fmt, args);
+    SST_print_error_valist(fmt, args);
     va_end(args);
     exit(1);
 }
