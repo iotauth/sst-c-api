@@ -128,11 +128,51 @@ session_key_list_t* get_session_key(SST_ctx_t* ctx,
                                       existing_s_key_list);
 }
 
+// Resolves the target server address to connect to for a session key: if its
+// challenge has a "handshakeTransport" decision whose selected method is
+// "TCP" with a host/port, Auth chose that as the transport for the SST
+// handshake with this specific target (this is independent of any physical
+// presence verification check, e.g. CO_LOCATION, even though both may draw
+// on the same capabilities). Otherwise (no such decision, e.g. a session key
+// unrelated to physical presence, or a selected method other than TCP), this
+// falls back to the entity's static per-config address, so existing behavior
+// is unchanged when there is nothing to decide.
+// @param s_key session key struct received by Auth
+// @param ctx config struct obtained from load_config()
+// @param out_host Buffer to receive the resolved host.
+// @param out_host_size Size of out_host.
+// @param out_port Receives the resolved port.
+static void resolve_target_server_address(session_key_t* s_key, SST_ctx_t* ctx,
+                                          char* out_host, size_t out_host_size,
+                                          int* out_port) {
+    char check_obj[512];
+    char method[64] = {0};
+    char port_str[16] = {0};
+    if (extract_json_object_value(s_key->challenge, "handshakeTransport", check_obj,
+                                  sizeof(check_obj)) == 0 &&
+        parse_json_string_value(check_obj, "method", method, sizeof(method)) ==
+            0 &&
+        strcmp(method, "TCP") == 0 &&
+        parse_json_string_value(check_obj, "host", out_host, out_host_size) ==
+            0 &&
+        parse_json_string_value(check_obj, "port", port_str,
+                                sizeof(port_str)) == 0) {
+        *out_port = atoi(port_str);
+        return;
+    }
+    snprintf(out_host, out_host_size, "%s",
+            (const char*)ctx->config.entity_server_ip_addr);
+    *out_port = ctx->config.entity_server_port_num;
+}
+
 SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
                                             SST_ctx_t* ctx) {
+    char ip_addr[INET_ADDRSTRLEN] = {0};
+    int port = 0;
+    resolve_target_server_address(s_key, ctx, ip_addr, sizeof(ip_addr), &port);
+
     int sock;
-    if (connect_as_client((const char*)ctx->config.entity_server_ip_addr,
-                          ctx->config.entity_server_port_num, &sock) < 0) {
+    if (connect_as_client(ip_addr, port, &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }

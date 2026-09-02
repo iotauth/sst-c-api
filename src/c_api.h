@@ -164,6 +164,13 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
 // Connect with other entity such as entity servers using the session key. This
 // function contains the connect() function, and uses the
 // secure_connect_to_server_with_socket() function.
+//
+// The target address is resolved from s_key: if its challenge has a
+// "handshakeTransport" decision whose selected method is "TCP" with a
+// host/port (i.e., Auth chose plain TCP as the transport for the handshake
+// with this request's target), that address is used; otherwise this falls
+// back to the entity's static entity_server_ip_addr/entity_server_port_num
+// from the config file, exactly as before.
 // @param s_key session key struct received by Auth
 // @param ctx config struct obtained from load_config()
 // @return Connected session_ctx.

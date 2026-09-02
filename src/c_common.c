@@ -504,3 +504,68 @@ int parse_json_string_value(const char* json_str, const char* key,
 
     return 0;
 }
+
+int extract_json_object_value(const char* json_str, const char* key,
+                              char* value_buf, size_t value_buf_size) {
+    if (json_str == NULL || key == NULL || value_buf == NULL ||
+        value_buf_size == 0) {
+        return -1;
+    }
+
+    char key_pattern[256];
+    snprintf(key_pattern, sizeof(key_pattern), "\"%s\"", key);
+
+    const char* key_pos = strstr(json_str, key_pattern);
+    if (key_pos == NULL) {
+        return -1;
+    }
+
+    const char* cur = key_pos + strlen(key_pattern);
+    while (*cur != '\0' && (*cur == ' ' || *cur == '\t' || *cur == '\n' ||
+                            *cur == '\r' || *cur == ':')) {
+        cur++;
+    }
+    if (*cur != '{') {
+        return -1;
+    }
+
+    // Scan for the matching closing brace, tracking whether we are inside a
+    // quoted string so that braces in string values are not miscounted.
+    const char* start = cur;
+    int depth = 0;
+    bool in_string = false;
+    while (*cur != '\0') {
+        char c = *cur;
+        if (in_string) {
+            if (c == '\\' && *(cur + 1) != '\0') {
+                cur++;
+            } else if (c == '\"') {
+                in_string = false;
+            }
+        } else {
+            if (c == '\"') {
+                in_string = true;
+            } else if (c == '{') {
+                depth++;
+            } else if (c == '}') {
+                depth--;
+            }
+        }
+        cur++;
+        if (depth == 0) {
+            break;
+        }
+    }
+    if (depth != 0) {
+        return -1;  // Unterminated object.
+    }
+
+    size_t len = (size_t)(cur - start);
+    if (len >= value_buf_size) {
+        len = value_buf_size - 1;
+    }
+    memcpy(value_buf, start, len);
+    value_buf[len] = '\0';
+
+    return 0;
+}

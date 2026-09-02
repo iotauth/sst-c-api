@@ -243,4 +243,16 @@ int check_SECURE_COMM_MSG_type(unsigned char message_type);
 int parse_json_string_value(const char* json_str, const char* key,
                             char* value_buf, size_t value_buf_size);
 
+// Extracts a nested JSON object value for a given key from a JSON object
+// string, e.g. extracts {"method":"TCP","parameters":{...}} for key
+// "CO_LOCATION" from {"verificationPlan":{"CO_LOCATION":{...},...}}.
+// @param json_str The JSON string to parse.
+// @param key The key to look for.
+// @param value_buf Buffer to store the extracted object substring (including
+// its enclosing braces).
+// @param value_buf_size Size of the value buffer.
+// @return 0 for success, -1 for fail (not found or error).
+int extract_json_object_value(const char* json_str, const char* key,
+                              char* value_buf, size_t value_buf_size);
+
 #endif  // C_COMMON_H

@@ -6,39 +6,50 @@
 #include "../../src/c_api.h"
 #include "../../src/c_common.h"
 
-// Executes the verification plan received from Auth for a physical presence
-// check, and reports whether the requester is verified.
+// Executes one named check's selected verification method from the physical
+// presence verification plan received from Auth (e.g. "HUMAN_PRESENCE" or
+// "CO_LOCATION"), and reports whether it passed.
 //
-// This currently only supports the "DUMMY" verification method, which
-// requires no real sensor/actuator interaction and always passes. Real
-// mechanisms (e.g. ultrasonic/IR ranging, camera, thermometer) would be
-// executed here in the same way.
-// @param challenge The physical presence verification plan JSON received
-// from Auth (session_key_t.challenge).
-// @return true if the requester is verified, false otherwise.
-static bool execute_verification_plan(const char* challenge) {
-    if (challenge == NULL || strlen(challenge) == 0) {
-        SST_print_log("No physical presence verification plan specified.");
+// This currently only supports the "DUMMY" method, which requires no real
+// sensor/actuator interaction and always passes. Real physical mechanisms
+// (ultrasonic/IR ranging, camera, thermometer) would be executed here in the
+// same way once implemented; any other selected method is treated as not
+// implemented and fails closed.
+//
+// This is separate from the handshake transport decision (which channel
+// carries the SST handshake with a target entity, e.g. "TCP" for now):
+// secure_connect_to_server() resolves that on its own from the same
+// challenge, independently of the checks executed here.
+// @param challenge The physical presence verification plan JSON (the whole
+// plan, covering every required check).
+// @param check_id The check to execute, e.g. "CO_LOCATION". If the plan has
+// no such check, this is a no-op success (the action didn't require it).
+// @return true if the check passed (or was absent from the plan), false if
+// present but failed or its method is not implemented in this demo.
+static bool execute_check(const char* challenge, const char* check_id) {
+    char check_obj[512];
+    if (extract_json_object_value(challenge, check_id, check_obj,
+                                  sizeof(check_obj)) != 0) {
+        // This check isn't part of the plan; the action didn't require it.
         return true;
     }
-
-    SST_print_log("Received verification plan: %s", challenge);
+    SST_print_log("%s: selected verification method: %s", check_id, check_obj);
 
     char method[64] = {0};
-    if (parse_json_string_value(challenge, "method", method,
-                                sizeof(method)) != 0) {
-        SST_print_error("Verification plan has no selected method.");
+    if (parse_json_string_value(check_obj, "method", method, sizeof(method)) !=
+        0) {
+        SST_print_error("%s: plan has no selected method.", check_id);
         return false;
     }
 
     if (strcmp(method, "DUMMY") == 0) {
-        SST_print_log(
-            "Executing DUMMY verification method (no sensor required): "
-            "PASS.");
+        SST_print_log("%s: executing DUMMY method (no sensor required): PASS.",
+                      check_id);
         return true;
     }
 
-    SST_print_error("Unsupported verification method: %s", method);
+    SST_print_error("%s: verification method %s is not implemented in this demo.",
+                    check_id, method);
     return false;
 }
 
@@ -71,7 +82,7 @@ int main(int argc, char* argv[]) {
     }
     SST_print_log("Received authorization for GRIP_ITEM successfully!");
 
-    if (!execute_verification_plan(grip_s_key_list->s_key[0].challenge)) {
+    if (!execute_check(grip_s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
         SST_print_error_exit("Physical presence verification failed for GRIP_ITEM.");
     }
     SST_print_log("GRIP_ITEM authorized: robot may grip the item.");
@@ -94,9 +105,14 @@ int main(int argc, char* argv[]) {
     }
     SST_print_log("Received session key for RETRIEVE_ITEM successfully!");
 
-    // Execute the physical presence verification plan locally, and proceed
-    // only when verified (fail-closed).
-    if (!execute_verification_plan(s_key_list->s_key[0].challenge)) {
+    // Execute each required check in the physical presence verification plan
+    // locally, and proceed only when all of them pass (fail-closed). Which
+    // handshake transport CO_LOCATION selected (and, for TCP, its connection
+    // info) is resolved internally by secure_connect_to_server() below.
+    const char* challenge = s_key_list->s_key[0].challenge;
+    bool human_presence_ok = execute_check(challenge, "HUMAN_PRESENCE");
+    bool co_location_ok = execute_check(challenge, "CO_LOCATION");
+    if (!human_presence_ok || !co_location_ok) {
         SST_print_error_exit("Physical presence verification failed.");
     }
 
