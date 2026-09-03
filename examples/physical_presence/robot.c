@@ -52,8 +52,9 @@ static bool execute_check(const char* challenge, const char* check_id) {
         return true;
     }
 
-    SST_print_error("%s: verification method %s is not implemented in this demo.",
-                    check_id, method);
+    SST_print_error(
+        "%s: verification method %s is not implemented in this demo.", check_id,
+        method);
     return false;
 }
 
@@ -61,9 +62,7 @@ static bool execute_check(const char* challenge, const char* check_id) {
 // code on the locker). Camera-based scanning is not implemented here; this
 // simply stands in for it and returns as if "net1.locker1" had been scanned.
 // @return The scanned locker's entity name.
-static const char* scan_locker_id_from_qr_code(void) {
-    return "net1.locker1";
-}
+static const char* scan_locker_id_from_qr_code(void) { return "net1.locker1"; }
 
 int main(int argc, char* argv[]) {
     const char* comm_type = "tcp";
@@ -98,14 +97,17 @@ int main(int argc, char* argv[]) {
     // Case 1: solo action, no target entity. Request authorization for
     // gripping an item on the floor (purpose index 0: "action":"GRIP_ITEM").
     // Runs first since it needs no peer entity to be reachable.
-    session_key_list_t* grip_s_key_list = get_session_key_with_index(ctx, 0, NULL);
+    session_key_list_t* grip_s_key_list =
+        get_session_key_with_index(ctx, 0, NULL);
     if (grip_s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key_with_index() for GRIP_ITEM.");
+        SST_print_error_exit(
+            "Failed get_session_key_with_index() for GRIP_ITEM.");
     }
     SST_print_log("Received authorization for GRIP_ITEM successfully!");
 
     if (!execute_check(grip_s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
-        SST_print_error_exit("Physical presence verification failed for GRIP_ITEM.");
+        SST_print_error_exit(
+            "Physical presence verification failed for GRIP_ITEM.");
     }
     SST_print_log("GRIP_ITEM authorized: robot may grip the item.");
     free_session_key_list_t(grip_s_key_list);
@@ -123,7 +125,8 @@ int main(int argc, char* argv[]) {
     session_key_list_t* s_key_list =
         get_session_key_with_purpose(ctx, retrieve_purpose, NULL);
     if (s_key_list == NULL) {
-        SST_print_error_exit("Failed get_session_key_with_purpose() for RETRIEVE_ITEM.");
+        SST_print_error_exit(
+            "Failed get_session_key_with_purpose() for RETRIEVE_ITEM.");
     }
     SST_print_log("Received session key for RETRIEVE_ITEM successfully!");
 
@@ -152,7 +155,8 @@ int main(int argc, char* argv[]) {
         session_ctx = secure_connect_to_server_via_ggwave(
             &s_key_list->s_key[0], mic_device, spk_device);
         if (session_ctx == NULL) {
-            SST_print_error_exit("Failed secure_connect_to_server_via_ggwave().");
+            SST_print_error_exit(
+                "Failed secure_connect_to_server_via_ggwave().");
         }
         SST_print_log(
             "Robot: GGWAVE handshake with Locker succeeded. (Ongoing secure "
@@ -163,8 +167,8 @@ int main(int argc, char* argv[]) {
             "the Raspberry Pi to use --comm_type ultrasound.");
 #endif
     } else {
-        SST_print_error_exit("Unknown --comm_type '%s'. Expected tcp or ultrasound.",
-                             comm_type);
+        SST_print_error_exit(
+            "Unknown --comm_type '%s'. Expected tcp or ultrasound.", comm_type);
     }
 
     if (strcmp(comm_type, "tcp") == 0) {
@@ -174,8 +178,9 @@ int main(int argc, char* argv[]) {
                        (void*)session_ctx);
 
         // Send secure messages to Locker
-        int msg = send_secure_message("Robot: Hello Locker!",
-                                      strlen("Robot: Hello Locker!"), session_ctx);
+        int msg =
+            send_secure_message("Robot: Hello Locker!",
+                                strlen("Robot: Hello Locker!"), session_ctx);
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
