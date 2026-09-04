@@ -215,11 +215,11 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key) {
 
     unsigned char hs2[256];
     int hs2_length = 0;
-    // An 80-byte handshake2 takes on the order of ten seconds to transmit at
-    // this bit rate, and the peer needs at least that long again to receive
-    // it before it can reply -- so this needs generous headroom, not a
+    // At IR_INTER_BIT_GAP_US=50ms/bit, an 80-byte handshake2 (81 bytes with
+    // its length header, 648 bits) takes ~32s to transmit on its own -- so
+    // the wait here needs real headroom on top of that, not just a
     // "network RTT"-scale timeout.
-    const double HS2_TIMEOUT_SEC = 30.0;
+    const double HS2_TIMEOUT_SEC = 60.0;
     const int MAX_RETRIES = 5;
     for (int attempt = 0; attempt < MAX_RETRIES; attempt++) {
         SST_print_log(
@@ -329,7 +329,10 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
     free(hs2);
 
     unsigned char hs3[256];
-    int hs3_length = ir_rx_buf(hs3, sizeof(hs3), 30.0);
+    // Same headroom reasoning as HS2_TIMEOUT_SEC in
+    // secure_connect_to_server_via_ir(): an ~80-byte handshake3 alone takes
+    // ~32s to transmit at this bit rate.
+    int hs3_length = ir_rx_buf(hs3, sizeof(hs3), 60.0);
     if (hs3_length <= 0) {
         SST_print_error("IR handshake: no handshake3 received.");
         ir_deinit();

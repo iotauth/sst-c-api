@@ -31,3 +31,20 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ASOUND_LIB AND EXISTS ${GGWAVE_SRC_DIR
 else()
   message(STATUS "ggwave/ALSA not found (or not on Linux): --comm_type ultrasound will report as unsupported.")
 endif()
+
+# Optional pigpio-based IR handshake transport (Linux only, direct GPIO
+# access, and requires root at runtime). pigpio is not an apt package on
+# current Raspberry Pi OS -- see ../../ir_com/run_ir_test.sh for install
+# steps.
+find_library(PIGPIO_LIB pigpio)
+set(IR_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../ir_com)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PIGPIO_LIB AND EXISTS ${IR_SRC_DIR}/ir_sst_handshake.c)
+  message(STATUS "pigpio found: building --comm_type ir support.")
+  foreach(target robot locker)
+    target_sources(${target} PRIVATE ../../ir_com/ir_sst_handshake.c)
+    target_compile_definitions(${target} PRIVATE HAVE_IR_TRANSPORT)
+    target_link_libraries(${target} ${PIGPIO_LIB} rt)
+  endforeach()
+else()
+  message(STATUS "pigpio not found (or not on Linux): --comm_type ir will report as unsupported.")
+endif()
