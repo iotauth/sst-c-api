@@ -13,7 +13,7 @@
 #include <signal.h>
 #include <time.h>
 
-#define TX_GPIO 17
+#define TX_GPIO 27
 #define RX_GPIO 14
 #define ACTIVE_LEVEL 0
 
