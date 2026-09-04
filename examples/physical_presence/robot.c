@@ -66,8 +66,8 @@ static const char* scan_locker_id_from_qr_code(void) { return "net1.locker1"; }
 
 int main(int argc, char* argv[]) {
     const char* comm_type = "tcp";
-    const char* mic_device = "plughw:3,0";
-    const char* spk_device = "plughw:4,0";
+    const char* mic_device = "plughw:1,0";
+    const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> [--comm_type tcp|ultrasound] "
