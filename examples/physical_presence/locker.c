@@ -10,6 +10,9 @@
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
 #endif
+#ifdef HAVE_IR_TRANSPORT
+#include "../../ir_com/ir_sst_handshake.h"
+#endif
 
 // Listens on the given TCP port and accepts one incoming connection.
 // @param serv_sock Receives the listening socket, so the caller can close it.
@@ -118,9 +121,19 @@ int main(int argc, char* argv[]) {
             "the Raspberry Pi to use --comm_type ultrasound.");
 #endif
     } else if (strcmp(comm_type, "ir") == 0) {
-        // TODO: Listen for and accept a connection over IR once that
-        // transport is implemented.
-        SST_print_error_exit("--comm_type ir is not implemented yet in this demo.");
+#ifdef HAVE_IR_TRANSPORT
+        session_ctx = server_secure_comm_setup_via_ir(ctx, s_key_list);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed server_secure_comm_setup_via_ir().");
+        }
+        SST_print_log(
+            "Locker: IR handshake with Robot succeeded. (Ongoing secure "
+            "messaging over IR is not implemented yet in this demo.)");
+#else
+        SST_print_error_exit(
+            "This build has no pigpio/IR support (Linux only). Rebuild on "
+            "the Raspberry Pi to use --comm_type ir.");
+#endif
     } else {
         SST_print_error_exit(
             "Unknown --comm_type '%s'. Expected tcp, ir, or ultrasound.",

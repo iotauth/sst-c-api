@@ -9,6 +9,9 @@
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
 #endif
+#ifdef HAVE_IR_TRANSPORT
+#include "../../ir_com/ir_sst_handshake.h"
+#endif
 
 // Executes one named check's selected verification method from the physical
 // presence verification plan received from Auth (e.g. "HUMAN_PRESENCE" or
@@ -70,7 +73,7 @@ int main(int argc, char* argv[]) {
     const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
-            "Usage: %s <config_file_path> [--comm_type tcp|ultrasound] "
+            "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
             "[--mic <alsa_device>] [--spk <alsa_device>]",
             argv[0]);
     }
@@ -166,9 +169,24 @@ int main(int argc, char* argv[]) {
             "This build has no ggwave/ALSA support (Linux only). Rebuild on "
             "the Raspberry Pi to use --comm_type ultrasound.");
 #endif
+    } else if (strcmp(comm_type, "ir") == 0) {
+#ifdef HAVE_IR_TRANSPORT
+        session_ctx = secure_connect_to_server_via_ir(&s_key_list->s_key[0]);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed secure_connect_to_server_via_ir().");
+        }
+        SST_print_log(
+            "Robot: IR handshake with Locker succeeded. (Ongoing secure "
+            "messaging over IR is not implemented yet in this demo.)");
+#else
+        SST_print_error_exit(
+            "This build has no pigpio/IR support (Linux only). Rebuild on "
+            "the Raspberry Pi to use --comm_type ir.");
+#endif
     } else {
         SST_print_error_exit(
-            "Unknown --comm_type '%s'. Expected tcp or ultrasound.", comm_type);
+            "Unknown --comm_type '%s'. Expected tcp, ir, or ultrasound.",
+            comm_type);
     }
 
     if (strcmp(comm_type, "tcp") == 0) {
