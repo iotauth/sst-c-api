@@ -1,9 +1,13 @@
 #!/bin/bash
 
 # ==============================================================================
-# Multi-host IR distance-bounding test:
-#   Sender (A / Verifier)   -> pi42@pi42
-#   Receiver (B / Prover)   -> pi43@pi43
+# Multi-host IR distance-bounding test, driven from this Mac over SSH:
+#   Initiator -> pi42@pi42   (sends the sync pulse and challenges)
+#   Responder -> pi43@pi43   (waits for challenges, replies immediately)
+#
+# Both roles are the same ir_test.c binary; only the --role passed to it
+# differs. See ir_com/ir_test.c and ir_com/run_ir_test.sh (the equivalent
+# single-host launcher, for running directly on a Pi without SSH).
 #
 # Usage:
 #   ./test_ir_multihost.sh
@@ -19,7 +23,7 @@
 #     It is not available as an apt package on current Raspberry Pi OS
 #     (Debian trixie only ships the pigpiod client/daemon packages, which
 #     use a different API). This script does not install pigpio itself.
-#   - ir_sender.c/ir_receiver.c (re)built on every run.
+#   - ir_test.c (re)built on every run.
 #
 # SSH sessions to these hosts occasionally hang or drop a backgrounded
 # process when the channel closes, so every remote call here is wrapped with
@@ -29,8 +33,8 @@
 
 set -e
 
-SENDER_HOST="pi42@pi42"
-RECEIVER_HOST="pi43@pi43"
+INITIATOR_HOST="pi42@pi42"
+RESPONDER_HOST="pi43@pi43"
 REMOTE_REPO="project/iotauth"
 IR_DIR="$REMOTE_REPO/entity/c/ir_com"
 TAIL_PID=""
@@ -57,19 +61,25 @@ ssh_to() {
 }
 
 echo "======================================================================"
-echo " Sender (A/Verifier): $SENDER_HOST   Receiver (B/Prover): $RECEIVER_HOST"
+echo " Initiator: $INITIATOR_HOST   Responder: $RESPONDER_HOST"
 echo "======================================================================"
 
 # Always stop both remote processes on exit, whether the script succeeds,
 # fails, or is interrupted.
 cleanup() {
     echo ""
-    echo "[Clean] Stopping Sender ($SENDER_HOST) and Receiver ($RECEIVER_HOST)..."
+    echo "[Clean] Stopping Initiator ($INITIATOR_HOST) and Responder ($RESPONDER_HOST)..."
     [ -n "$TAIL_PID" ] && kill "$TAIL_PID" 2>/dev/null || true
-    ssh_to 15 "$SENDER_HOST" "sudo pkill -f './ir_sender'" 2>/dev/null || true
-    ssh_to 15 "$RECEIVER_HOST" "sudo pkill -f './ir_receiver'" 2>/dev/null || true
+    # The [.] (instead of a plain .) keeps this pattern from matching the
+    # literal text of the pkill/ssh invocation itself over the wire.
+    ssh_to 15 "$INITIATOR_HOST" "sudo pkill -f '[.]/ir_test'" 2>/dev/null || true
+    ssh_to 15 "$RESPONDER_HOST" "sudo pkill -f '[.]/ir_test'" 2>/dev/null || true
 }
 trap cleanup EXIT
+# Explicit INT/TERM traps (not just EXIT) so this fires even when the shell
+# would otherwise ignore SIGINT -- e.g. if this script itself is launched
+# backgrounded (`... &`), bash disables SIGINT for it by default.
+trap 'exit 130' INT TERM
 
 # Starts a background process on a remote host and verifies (via pgrep) that
 # it's still running a few seconds later, retrying a couple of times.
@@ -78,6 +88,8 @@ start_remote_and_verify() {
     for attempt in 1 2 3; do
         ssh_to 15 "$host" "rm -f $log_path; $start_cmd" || true
         sleep 3
+        # pgrep_pattern must be pre-bracketed (e.g. "[.]/ir_test") so it
+        # doesn't match the literal text of this pgrep invocation itself.
         if ssh_to 15 "$host" "pgrep -f '$pgrep_pattern' > /dev/null"; then
             return 0
         fi
@@ -89,33 +101,34 @@ start_remote_and_verify() {
 }
 
 echo ""
-echo "[1/3] Building ir_sender on $SENDER_HOST and ir_receiver on $RECEIVER_HOST..."
-BUILD_CMD="cd $IR_DIR && gcc -O2 -Wall -pthread -o ir_sender ir_sender.c -lpigpio -lrt -lm && gcc -O2 -Wall -pthread -o ir_receiver ir_receiver.c -lpigpio -lrt -lm"
-ssh_to 60 "$SENDER_HOST" "$BUILD_CMD"
-ssh_to 60 "$RECEIVER_HOST" "$BUILD_CMD"
+echo "[1/3] Building ir_test on $INITIATOR_HOST and $RESPONDER_HOST..."
+BUILD_CMD="cd $IR_DIR && gcc -O2 -Wall -pthread -o ir_test ir_test.c -lpigpio -lrt -lm"
+ssh_to 60 "$INITIATOR_HOST" "$BUILD_CMD"
+ssh_to 60 "$RESPONDER_HOST" "$BUILD_CMD"
 
 echo ""
-echo "[2/3] Starting Receiver on $RECEIVER_HOST (B/Prover)..."
-ssh_to 15 "$RECEIVER_HOST" "sudo pkill -f './ir_receiver' 2>/dev/null" || true
-start_remote_and_verify "$RECEIVER_HOST" \
-    "cd $IR_DIR && setsid nohup sudo ./ir_receiver > /tmp/ir_receiver_test.log 2>&1 < /dev/null &" \
-    "./ir_receiver" "/tmp/ir_receiver_test.log" "Receiver" || exit 1
+echo "[2/3] Starting Responder on $RESPONDER_HOST..."
+ssh_to 15 "$RESPONDER_HOST" "sudo pkill -f '[.]/ir_test' 2>/dev/null" || true
+start_remote_and_verify "$RESPONDER_HOST" \
+    "cd $IR_DIR && setsid nohup sudo ./ir_test --role responder > /tmp/ir_test_responder.log 2>&1 < /dev/null &" \
+    "[.]/ir_test" "/tmp/ir_test_responder.log" "Responder" || exit 1
 
-# Stream Receiver's log live in this terminal, prefixed so it's distinguishable
-# from Sender's own output below. Killed in cleanup() on exit.
-ssh -o BatchMode=yes -o ConnectTimeout=8 "$RECEIVER_HOST" "tail -n +1 -f /tmp/ir_receiver_test.log" 2>/dev/null | LC_ALL=C sed -u 's/^/[Receiver] /' &
+# Stream Responder's log live in this terminal, prefixed so it's distinguishable
+# from Initiator's own output below. Killed in cleanup() on exit.
+ssh -o BatchMode=yes -o ConnectTimeout=8 "$RESPONDER_HOST" "tail -n +1 -f /tmp/ir_test_responder.log" 2>/dev/null | LC_ALL=C sed -u 's/^/[Responder] /' &
 TAIL_PID=$!
 
 echo ""
-echo "[3/3] Running Sender on $SENDER_HOST (A/Verifier)..."
+echo "[3/3] Running Initiator on $INITIATOR_HOST..."
 # stdbuf forces line-buffered stdout over the ssh pipe (glibc otherwise fully
-# buffers non-tty output, so Sender's log wouldn't show up until it exits).
-ssh_to 60 "$SENDER_HOST" "cd $IR_DIR && stdbuf -oL -eL sudo ./ir_sender" 2>&1 | LC_ALL=C sed -u 's/^/[Sender] /' || true
+# buffers non-tty output, so Initiator's log wouldn't show up until it exits).
+ssh_to 15 "$INITIATOR_HOST" "sudo pkill -f '[.]/ir_test'" 2>/dev/null || true
+ssh_to 60 "$INITIATOR_HOST" "cd $IR_DIR && stdbuf -oL -eL sudo ./ir_test --role initiator" 2>&1 | LC_ALL=C sed -u 's/^/[Initiator] /' || true
 
 sleep 2
 echo ""
 echo "======================================================================"
-echo " Receiver Log ($RECEIVER_HOST):"
+echo " Responder Log ($RESPONDER_HOST):"
 echo "======================================================================"
-ssh_to 15 "$RECEIVER_HOST" "cat /tmp/ir_receiver_test.log" || true
+ssh_to 15 "$RESPONDER_HOST" "cat /tmp/ir_test_responder.log" || true
 echo "======================================================================"
