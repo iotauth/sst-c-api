@@ -58,8 +58,8 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
-    const char* mic_device = "plughw:3,0";
-    const char* spk_device = "plughw:4,0";
+    const char* mic_device = "plughw:1,0";
+    const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
