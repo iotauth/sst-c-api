@@ -2,7 +2,7 @@
 // IR distance-bounding test (Hancke-Kuhn protocol), combined into a single
 // binary that can play either side, selected with --role at runtime:
 //   --role initiator   Sends the sync pulse and challenges, measures RTT.
-//   --role responder   Waits for challenges, decodes and replies immediately.
+//   --role responder   Waits for challenges, decodes and replies immediately..
 // Compile: gcc -O2 -Wall -pthread -o ir_test ir_test.c -lpigpio -lrt -lm
 // Run:     sudo ./ir_test --role initiator
 //          sudo ./ir_test --role responder
