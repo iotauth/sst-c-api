@@ -83,7 +83,7 @@ static int get_bit(const uint8_t *reg, int bit_idx)
 static void run_initiator_round(int num_rounds, int sync_wave)
 {
     printf("\n=========================================\n");
-    printf("=== Starting %d-Round Test ===\n", num_rounds);
+    printf("==== Starting %d-Round Test ====\n", num_rounds);
     printf("=========================================\n");
     printf("Sending Sync pulse to reset responder...\n");
 
