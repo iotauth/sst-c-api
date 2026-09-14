@@ -12,14 +12,14 @@
 typedef struct {
     unsigned kind, len;
     uint64_t tick;
-    unsigned char data[IR_HK_CONTROL_SIZE];
+    unsigned char data[IR_HK_INIT_SIZE]; /* large enough for either message */
 } packet;
 typedef struct {
     int fd, initiator, rc;
     unsigned bits_sent, controls_sent, flip, delay, corrupt_control, guard;
     unsigned stop_after_bits;
     uint64_t now;
-    unsigned char ready[IR_HK_CONTROL_SIZE];
+    unsigned char ready[IR_HK_READY_SIZE];
     const unsigned char* replay;
     ir_hk_config config;
     session_key_t key;
@@ -54,11 +54,11 @@ static int send_control(void* ctx, const unsigned char* p, unsigned n) {
     endpoint* e = ctx;
     packet v = {.kind = 1, .len = n, .tick = e->now};
     memcpy(v.data, p, n);
-    if (p[4] == 2) {
+    if (p[0] == 2) { /* READY */
         memcpy(e->ready, p, n);
         if (e->replay) memcpy(v.data, e->replay, n);
     }
-    if (++e->controls_sent == e->corrupt_control) v.data[54] ^= 1;
+    if (++e->controls_sent == e->corrupt_control) v.data[n - 1] ^= 1;
     return write_packet(e, &v);
 }
 static int recv_control(void* ctx, unsigned char* p, unsigned n) {
@@ -174,13 +174,13 @@ int main(void) {
     signal(SIGPIPE, SIG_IGN);
     plan_tests();
     endpoint e[2];
-    unsigned char old_ready[IR_HK_CONTROL_SIZE];
+    unsigned char old_ready[IR_HK_READY_SIZE];
     for (unsigned n = 32; n <= 128; n *= 2) {
         init(e, n);
         exchange(e);
         for (int i = 0; i < 2; ++i) {
             assert(e[i].rc == 1 && e[i].result.successes == n);
-            assert(e[i].bits_sent == 2 * n && e[i].controls_sent == 2);
+            assert(e[i].bits_sent == 2 * n && e[i].controls_sent == 1);
         }
         assert(e[0].guard == 1 && e[1].guard == 0);
     }
@@ -189,31 +189,33 @@ int main(void) {
     memcpy(old_ready, e[1].ready, sizeof(old_ready));
     init(e, 32);
     exchange(e);
-    assert(memcmp(old_ready + 22, e[1].ready + 22, 32));
+    /* nonce_B (the only thing READY carries besides type) must be fresh
+     * every run. */
+    assert(memcmp(old_ready + 1, e[1].ready + 1, IR_HK_NONCE_SIZE));
     for (int direction = 0; direction < 2; ++direction) {
         init(e, 32);
         e[direction].flip = 6;
         exchange(e);
         assert(e[0].rc == 1 && e[1].rc == 1 &&
                e[1 - direction].result.successes == 26);
+        /* Each side's rc now reflects only its own measurement of the peer
+         * (no completion exchange coupling the two decisions together
+         * anymore): corrupting e[direction]'s outgoing responses only drags
+         * down e[1-direction]'s tally of e[direction], not the other way
+         * around. */
         init(e, 32);
         e[direction].flip = 7;
         exchange(e);
-        assert(e[0].rc == 0 && e[1].rc == 0 &&
+        assert(e[direction].rc == 1 && e[1 - direction].rc == 0 &&
                e[1 - direction].result.successes == 25);
         init(e, 32);
         e[direction].delay = 7;
         exchange(e);
-        assert(e[0].rc == 0 && e[1].rc == 0 &&
+        assert(e[direction].rc == 1 && e[1 - direction].rc == 0 &&
                e[1 - direction].result.successes == 25);
         assert(e[1 - direction].result.correct[0] &&
                e[1 - direction].result.rtt_us[0] > 1000);
     }
-    init(e, 32);
-    e[1].config.rounds = 64;
-    exchange(e);
-    assert(e[0].rc == -1 && e[1].rc == -1 && !e[0].bits_sent &&
-           !e[1].bits_sent);
     init(e, 32);
     e[1].key.mac_key[0] ^= 1;
     exchange(e);
@@ -231,23 +233,23 @@ int main(void) {
         61; /* Enough successes so far, but not all N rounds. */
     exchange(e);
     assert(e[0].result.successes >= 26 && e[0].rc == -1 && e[1].rc == -1);
-    for (unsigned control = 1; control <= 2; ++control) {
-        init(e, 32);
-        e[0].corrupt_control = control;
-        exchange(e);
-        assert(e[0].rc == -1 && e[1].rc == -1);
-        init(e, 32);
-        e[1].corrupt_control = control;
-        exchange(e);
-        assert(e[0].rc ==
-               -1); /* Sender cannot know its last packet was tampered. */
-    }
+    /* Each side now sends exactly one control message (INIT or READY);
+     * corrupting either one in transit (after its own valid tag was
+     * already computed) must abort both sides. */
+    init(e, 32);
+    e[0].corrupt_control = 1; /* A's INIT */
+    exchange(e);
+    assert(e[0].rc == -1 && e[1].rc == -1);
+    init(e, 32);
+    e[1].corrupt_control = 1; /* B's READY */
+    exchange(e);
+    assert(e[0].rc == -1 && e[1].rc == -1);
     init(e, 32);
     e[1].replay = old_ready;
     exchange(e);
     assert(e[0].rc == -1 && e[1].rc == -1 && !e[0].bits_sent);
     puts(
-        "IR HK: mutual rounds, threshold boundaries, delays, wrap, config/key "
+        "IR HK: mutual rounds, threshold boundaries, delays, wrap, key "
         "mismatch, MAC and replay tests passed.");
     return 0;
 }

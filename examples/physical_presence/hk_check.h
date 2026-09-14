@@ -37,9 +37,9 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
                       result.rtt_us[i] <= config.max_delay_us);
     }
     SST_print_log(
-        "IR HK: successes=%u/%u required=%u local=%s peer=%s result=%s",
+        "IR HK: successes=%u/%u required=%u local=%s result=%s",
         result.successes, config.rounds, result.required,
-        result.local_pass ? "PASS" : "FAIL", result.peer_pass ? "PASS" : "FAIL",
+        result.local_pass ? "PASS" : "FAIL",
         rc == 1   ? "PASS"
         : rc == 0 ? "FAIL"
                   : "ABORT");

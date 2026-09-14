@@ -34,10 +34,15 @@ CO_LOCATION only, not camera verification or physical locker actuation.
 ## Protocol and timing
 
 1. The SST handshake client (Robot A) is the fixed initiator.
-2. A sends authenticated `HK_INIT`: protocol version, session key ID, Auth's
-   settings, and a new 128-bit nonce A.
-3. B checks its own Auth settings/key ID, generates nonce B, derives response
-   registers, and sends authenticated `HK_READY` echoing nonce A and adding B.
+2. A sends authenticated `HK_INIT`: session key ID and a new 64-bit nonce A.
+   Rounds/threshold/max_delay are not sent -- both sides already parsed them,
+   matching by construction, from Auth's persisted plan (see above), so
+   resending them over IR would be pure overhead.
+3. B checks the key ID against its own session key, generates nonce B,
+   derives response registers, and sends authenticated `HK_READY` carrying
+   nonce B. Nonce A is not resent (B already has it from INIT) but the
+   READY tag is still computed over it, so a captured old READY can't be
+   replayed against a new INIT.
 4. A validates READY and precomputes its registers/random challenges. It then
    waits **2 ms** before its first challenge. B listens immediately after READY.
 5. Each side issues N challenges, with the response to a received challenge
@@ -55,17 +60,19 @@ A -> B : rA[N-1]
 The two bits are two serialized pulse-width symbols, response first. The first
 and last messages have one bit. There are 4N bits overall and N scored responses
 per direction. Each prover has separate `R0/R1` registers derived with
-HMAC-SHA256 from the session MAC key, session key ID, both nonces, settings, and
-its direction. Challenges/nonces use OpenSSL `RAND_bytes`; no `rand()` or fixed
-shared test secret is used. Setup/control MACs and register derivation have
-separate domains.
+HMAC-SHA256 from the session MAC key and both nonces, and its direction (not
+from rounds/threshold/max_delay, which don't need to be part of this -- nonce
+freshness alone already makes every run's registers unique). Challenges/nonces
+use OpenSSL `RAND_bytes`; no `rand()` or fixed shared test secret is used.
+Control MACs and register derivation have separate domains.
 
-6. Each side sends a MAC-protected completion decision bound to the same nonce
-   pair/settings, with different message types for each direction and PASS/FAIL.
-   An endpoint returns PASS only after its local check and the peer's reported
-   check pass. A peer report assumes the authenticated endpoint is honest; it is
-   not evidence that a compromised endpoint measured correctly. As with any
-   final message, its sender cannot know whether the receiver accepted it.
+There is no completion exchange: each endpoint's result reflects only its own
+measurement of the peer (successes against the challenges it issued), not a
+mutual, cross-reported verdict. One endpoint can locally pass while the other
+fails (e.g. if only one direction's responses were corrupted or delayed); each
+endpoint gates its own action on its own result only. An application that
+needs a joint, mutually-confirmed outcome would have to add that exchange back
+itself.
 
 A successful round requires **both** the expected bit and
 `complete_rtt_us <= max_delay_us`. RTT runs from the software observation that
@@ -83,13 +90,17 @@ sleep before the rapid response. The existing **50 ms receiver recovery gap**
 is retained between a response and the next challenge, outside the measured
 challenge/response interval. Logs are emitted only after the exchange.
 
-Slow setup/completion controls use the existing IR byte framing and its 50 ms
-per-bit spacing. Each 86-byte control takes approximately 35 seconds; four
-controls take about 140 seconds, plus roughly 3–13 seconds for the alternating
-exchange and the preceding SST handshake. The 2 ms READY guard does not remove
-these framing costs. Completion delivery therefore also adds delay after the
-last physical measurement; a freshness-sensitive actuator must account for
-that age. Optimizing these slow controls is a separate hardware task.
+The slow INIT/READY controls use the existing IR byte framing, whose per-bit
+spacing (`IR_INTER_BIT_GAP_US`) was empirically tuned down on the real
+Robot/Locker pair from the original 50 ms to 25 ms (10/15/20 ms all failed --
+20 ms failed asymmetrically, Locker->Robot only). At 25 ms/bit, INIT (49
+bytes) takes about 10 s and READY (41 bytes) about 8.4 s, roughly 18-19 s for
+both -- down from the original ~140 s for four 86-byte messages at 50 ms/bit,
+from a combination of dropping the completion exchange (4 messages -> 2),
+shrinking each message (86 -> 49/41 bytes), and the halved per-bit spacing.
+The 2 ms READY guard does not remove these framing costs. Optimizing this
+further (e.g. tuning the per-bit spacing per direction, since the 20 ms
+failure was asymmetric) is a separate hardware task.
 
 The old approximately 450 us leading-edge RTT is not directly comparable to
 `complete_rtt_us`. The 1000 us catalog limit is an experimental starting value,
@@ -140,7 +151,9 @@ The script propagates the Robot's failure status.
 
 The portable test runs both protocol roles through a simulated link with
 virtual timestamps. It tests all round counts, threshold boundaries in both
-directions, late-but-correct responses, timer wrap, key/setting mismatches,
-expired keys, tampered setup/completion controls, READY replay, and malformed
+directions (including the case where only one side's tally crosses the
+threshold, since there's no longer a completion exchange to couple the two
+outcomes), late-but-correct responses, timer wrap, key/key-ID mismatches,
+expired keys, tampered INIT/READY controls, READY replay, and malformed
 plans. These tests verify protocol logic; they do not validate GPIO timing or
 real relay resistance.
