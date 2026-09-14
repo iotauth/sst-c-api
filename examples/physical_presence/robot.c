@@ -5,6 +5,7 @@
 
 #include "../../src/c_api.h"
 #include "../../src/c_common.h"
+#include "hk_check.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -69,17 +70,20 @@ static const char* scan_locker_id_from_qr_code(void) { return "net1.locker1"; }
 
 int main(int argc, char* argv[]) {
     const char* comm_type = "tcp";
+    int require_ir_hk = 0;
     const char* mic_device = "plughw:1,0";
     const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
-            "[--mic <alsa_device>] [--spk <alsa_device>]",
+            "[--mic <alsa_device>] [--spk <alsa_device>] [--require-ir-hk]",
             argv[0]);
     }
     char* config_path = argv[1];
     for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--require-ir-hk") == 0) {
+            require_ir_hk = 1;
+        } else if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
             comm_type = argv[i + 1];
             i++;
         } else if (strcmp(argv[i], "--mic") == 0 && i + 1 < argc) {
@@ -133,15 +137,10 @@ int main(int argc, char* argv[]) {
     }
     SST_print_log("Received session key for RETRIEVE_ITEM successfully!");
 
-    // Execute each required check in the physical presence verification plan
-    // locally, and proceed only when all of them pass (fail-closed). Which
-    // handshake transport CO_LOCATION selected (and, for TCP, its connection
-    // info) is resolved internally by secure_connect_to_server() below.
-    const char* challenge = s_key_list->s_key[0].challenge;
-    bool human_presence_ok = execute_check(challenge, "HUMAN_PRESENCE");
-    bool co_location_ok = execute_check(challenge, "CO_LOCATION");
-    if (!human_presence_ok || !co_location_ok) {
-        SST_print_error_exit("Physical presence verification failed.");
+    // Local checks can run before the handshake; mutual IR verification must
+    // wait until both entities have authenticated with the same session key.
+    if (!execute_check(s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
+        SST_print_error_exit("HUMAN_PRESENCE verification failed.");
     }
 
     // Securely connect to target Locker server. --comm_type picks the
@@ -188,6 +187,12 @@ int main(int argc, char* argv[]) {
             "Unknown --comm_type '%s'. Expected tcp, ir, or ultrasound.",
             comm_type);
     }
+
+    if (!verify_co_location(session_ctx, 1, require_ir_hk)) {
+        SST_print_error_exit(
+            "CO_LOCATION verification failed; RETRIEVE_ITEM denied.");
+    }
+    SST_print_log("Robot: required physical checks passed for RETRIEVE_ITEM.");
 
     if (strcmp(comm_type, "tcp") == 0) {
         sleep(1);

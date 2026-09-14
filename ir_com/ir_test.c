@@ -8,31 +8,28 @@
 //          sudo ./ir_test --role responder
 
 #include <pigpio.h>
-#include <stdio.h>
+#include <signal.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <signal.h>
 
 #define TX_GPIO 27
 #define RX_GPIO 14
 #define ACTIVE_LEVEL 0
 
 // Hancke-Kuhn Protocol Parameters
-#define GAP_MS 50 // Settle time between rounds
+#define GAP_MS 50  // Settle time between rounds
 
 // Shared 32-byte secret (256 bits)
 static const uint8_t secret[32] = {
-    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
-    0xfe, 0xdc, 0xba, 0x98, 0x76, 0x54, 0x32, 0x10,
-    0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88,
-    0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00
-};
+    0x01, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef, 0xfe, 0xdc, 0xba,
+    0x98, 0x76, 0x54, 0x32, 0x10, 0x11, 0x22, 0x33, 0x44, 0x55, 0x66,
+    0x77, 0x88, 0x99, 0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0xff, 0x00};
 
 static volatile int running = 1;
 
-static void on_sigint(int sig)
-{
+static void on_sigint(int sig) {
     (void)sig;
     running = 0;
 }
@@ -45,13 +42,12 @@ static int wave_sync_64 = -1;
 static int wave_sync_128 = -1;
 
 // Builds a 38kHz carrier pulse wave of specified duration (us)
-static int build_38khz_burst_wave(int gpio, int burst_us)
-{
-    const int half_period_us = 13; // approx 38.46 kHz
+static int build_38khz_burst_wave(int gpio, int burst_us) {
+    const int half_period_us = 13;  // approx 38.46 kHz
     int cycles = burst_us / (2 * half_period_us);
     int pulse_count = cycles * 2;
 
-    gpioPulse_t *pulses = calloc((size_t)pulse_count, sizeof(gpioPulse_t));
+    gpioPulse_t* pulses = calloc((size_t)pulse_count, sizeof(gpioPulse_t));
     if (!pulses) return -1;
 
     for (int i = 0; i < cycles; i++) {
@@ -71,8 +67,7 @@ static int build_38khz_burst_wave(int gpio, int burst_us)
     return wave_id;
 }
 
-static int get_bit(const uint8_t *reg, int bit_idx)
-{
+static int get_bit(const uint8_t* reg, int bit_idx) {
     int byte_idx = bit_idx / 8;
     int bit_pos = bit_idx % 8;
     return (reg[byte_idx] >> (7 - bit_pos)) & 1;
@@ -80,8 +75,7 @@ static int get_bit(const uint8_t *reg, int bit_idx)
 
 // ---- Initiator: sends the sync pulse and challenges, measures RTT. ----
 
-static void run_initiator_round(int num_rounds, int sync_wave)
-{
+static void run_initiator_round(int num_rounds, int sync_wave) {
     printf("\n=========================================\n");
     printf("==== Starting %d-Round Test ====\n", num_rounds);
     printf("=========================================\n");
@@ -92,11 +86,11 @@ static void run_initiator_round(int num_rounds, int sync_wave)
     while (gpioWaveTxBusy()) {
         gpioDelay(100);
     }
-    gpioDelay(200000); // Wait 200ms for responder to settle
+    gpioDelay(200000);  // Wait 200ms for responder to settle
 
     // Split 32-byte secret into two 16-byte registers
-    const uint8_t *R0 = secret;
-    const uint8_t *R1 = secret + 16;
+    const uint8_t* R0 = secret;
+    const uint8_t* R1 = secret + 16;
 
     printf("Starting fast exchange...\n");
     printf("round,challenge,expected,response,rtt_us,pulse_us,result\n");
@@ -118,7 +112,8 @@ static void run_initiator_round(int num_rounds, int sync_wave)
         int tx_wave = (challenge == 0) ? wave_short : wave_long;
         gpioWaveTxSend(tx_wave, PI_WAVE_MODE_ONE_SHOT);
 
-        // Wait for transmission to end (to start RTT measurement from end of TX)
+        // Wait for transmission to end (to start RTT measurement from end of
+        // TX)
         while (gpioWaveTxBusy()) {
             // tight loop
         }
@@ -130,7 +125,7 @@ static void run_initiator_round(int num_rounds, int sync_wave)
         uint32_t rx_start_tick = 0;
 
         while (gpioRead(RX_GPIO) != ACTIVE_LEVEL) {
-            if ((gpioTick() - wait_start) > 50000) { // 50ms timeout
+            if ((gpioTick() - wait_start) > 50000) {  // 50ms timeout
                 timed_out = 1;
                 break;
             }
@@ -163,9 +158,8 @@ static void run_initiator_round(int num_rounds, int sync_wave)
                 rtt_sum += rtt;
             }
 
-            printf("%d,%d,%d,%d,%u,%u,%s\n",
-                   i, challenge, expected, response, rtt, pulse_width,
-                   matches ? "SUCCESS" : "FAIL");
+            printf("%d,%d,%d,%d,%u,%u,%s\n", i, challenge, expected, response,
+                   rtt, pulse_width, matches ? "SUCCESS" : "FAIL");
             fflush(stdout);
         }
 
@@ -178,20 +172,21 @@ static void run_initiator_round(int num_rounds, int sync_wave)
 
     printf("\n--- %d-Round Summary ---\n", num_rounds);
     printf("Successful Rounds:  %d/%d\n", successful_rounds, num_rounds);
-    printf("Total Elapsed Time: %u us (%.2f ms)\n", total_time_us, (double)total_time_us / 1000.0);
+    printf("Total Elapsed Time: %u us (%.2f ms)\n", total_time_us,
+           (double)total_time_us / 1000.0);
     if (successful_rounds > 0) {
-        printf("Average RTT:        %.2f us\n", (double)rtt_sum / successful_rounds);
+        printf("Average RTT:        %.2f us\n",
+               (double)rtt_sum / successful_rounds);
     }
 }
 
-static void run_initiator(void)
-{
+static void run_initiator(void) {
     run_initiator_round(32, wave_sync_32);
-    gpioDelay(2000000); // Wait 2 seconds before next test
+    gpioDelay(2000000);  // Wait 2 seconds before next test
 
     if (running) {
         run_initiator_round(64, wave_sync_64);
-        gpioDelay(2000000); // Wait 2 seconds before next test
+        gpioDelay(2000000);  // Wait 2 seconds before next test
     }
 
     if (running) {
@@ -201,11 +196,10 @@ static void run_initiator(void)
 
 // ---- Responder: waits for challenges, decodes and replies immediately. ----
 
-static void run_responder(void)
-{
+static void run_responder(void) {
     // Split 32-byte secret into two 16-byte registers
-    const uint8_t *R0 = secret;
-    const uint8_t *R1 = secret + 16;
+    const uint8_t* R0 = secret;
+    const uint8_t* R1 = secret + 16;
 
     printf("Waiting for Sync pulse or fast challenges...\n");
 
@@ -216,7 +210,7 @@ static void run_responder(void)
     while (running) {
         // Wait for RX pin to go LOW (start of pulse)
         while (running && gpioRead(RX_GPIO) != ACTIVE_LEVEL) {
-            gpioDelay(100); // 100us sleep to save CPU when idle
+            gpioDelay(100);  // 100us sleep to save CPU when idle
         }
 
         if (!running) break;
@@ -243,7 +237,10 @@ static void run_responder(void)
             }
 
             printf("\n--- New Session Started ---\n");
-            printf("Sync pulse detected (width: %u us). Set expected rounds to %d.\n", pulse_width, num_rounds);
+            printf(
+                "Sync pulse detected (width: %u us). Set expected rounds to "
+                "%d.\n",
+                pulse_width, num_rounds);
             fflush(stdout);
 
             round_idx = 0;
@@ -274,16 +271,17 @@ static void run_responder(void)
 
         round_idx++;
         if (round_idx >= expected_rounds) {
-            printf("Completed %d rounds of fast exchange. Going back to idle.\n", expected_rounds);
+            printf(
+                "Completed %d rounds of fast exchange. Going back to idle.\n",
+                expected_rounds);
             fflush(stdout);
             fast_phase = 0;
         }
     }
 }
 
-int main(int argc, char *argv[])
-{
-    const char *role = NULL;
+int main(int argc, char* argv[]) {
+    const char* role = NULL;
     for (int i = 1; i < argc; i++) {
         if (strcmp(argv[i], "--role") == 0 && i + 1 < argc) {
             role = argv[i + 1];
@@ -318,19 +316,24 @@ int main(int argc, char *argv[])
     gpioWaveClear();
 
     // Pre-build waves
-    wave_short = build_38khz_burst_wave(TX_GPIO, 300); // 300us (Bit 0)
-    wave_long  = build_38khz_burst_wave(TX_GPIO, 600); // 600us (Bit 1)
-    wave_sync_32  = build_38khz_burst_wave(TX_GPIO, 2000); // 2000us (Sync 32 rounds)
-    wave_sync_64  = build_38khz_burst_wave(TX_GPIO, 3000); // 3000us (Sync 64 rounds)
-    wave_sync_128 = build_38khz_burst_wave(TX_GPIO, 4000); // 4000us (Sync 128 rounds)
+    wave_short = build_38khz_burst_wave(TX_GPIO, 300);  // 300us (Bit 0)
+    wave_long = build_38khz_burst_wave(TX_GPIO, 600);   // 600us (Bit 1)
+    wave_sync_32 =
+        build_38khz_burst_wave(TX_GPIO, 2000);  // 2000us (Sync 32 rounds)
+    wave_sync_64 =
+        build_38khz_burst_wave(TX_GPIO, 3000);  // 3000us (Sync 64 rounds)
+    wave_sync_128 =
+        build_38khz_burst_wave(TX_GPIO, 4000);  // 4000us (Sync 128 rounds)
 
-    if (wave_short < 0 || wave_long < 0 || wave_sync_32 < 0 || wave_sync_64 < 0 || wave_sync_128 < 0) {
+    if (wave_short < 0 || wave_long < 0 || wave_sync_32 < 0 ||
+        wave_sync_64 < 0 || wave_sync_128 < 0) {
         fprintf(stderr, "Failed to create waves\n");
         gpioTerminate();
         return 1;
     }
 
-    printf("%s started. TX GPIO=%d, RX GPIO=%d\n", is_initiator ? "Initiator" : "Responder", TX_GPIO, RX_GPIO);
+    printf("%s started. TX GPIO=%d, RX GPIO=%d\n",
+           is_initiator ? "Initiator" : "Responder", TX_GPIO, RX_GPIO);
 
     if (is_initiator) {
         run_initiator();

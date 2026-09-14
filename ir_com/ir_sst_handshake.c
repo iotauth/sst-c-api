@@ -19,11 +19,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/time.h>
 
 #include "../src/c_common.h"
 #include "../src/c_crypto.h"
 #include "../src/c_secure_comm.h"
+#include "ir_hk.h"
 
 #define IR_TX_GPIO 27
 #define IR_RX_GPIO 14
@@ -89,23 +89,26 @@ static int ir_init(void) {
 }
 
 static void ir_deinit(void) {
+    gpioWaveTxStop();
     gpioWrite(IR_TX_GPIO, 0);
     gpioTerminate();
 }
 
-static void ir_tx_pulse(int wave) {
-    gpioDelay(IR_INTER_BIT_GAP_US);
-    gpioWaveTxSend(wave, PI_WAVE_MODE_ONE_SHOT);
+static int ir_send_wave(int wave) {
+    uint32_t start = gpioTick();
+    if (gpioWaveTxSend(wave, PI_WAVE_MODE_ONE_SHOT) < 0) return -1;
     while (gpioWaveTxBusy()) {
-        // tight loop
+        if ((uint32_t)(gpioTick() - start) > 10000) return -1;
     }
+    return 0;
 }
 
-static void ir_tx_byte(unsigned char b) {
+static int ir_tx_byte(unsigned char b) {
     for (int bit = 7; bit >= 0; bit--) {
-        int v = (b >> bit) & 1;
-        ir_tx_pulse(v ? wave_long : wave_short);
+        gpioDelay(IR_INTER_BIT_GAP_US);
+        if (ir_send_wave((b >> bit) & 1 ? wave_long : wave_short)) return -1;
     }
+    return 0;
 }
 
 // Sends buf over IR: a sync marker, then a 1-byte length header, then the
@@ -118,13 +121,9 @@ static int ir_tx_buf(const unsigned char* buf, int len) {
             IR_MAX_PAYLOAD);
         return -1;
     }
-    gpioWaveTxSend(wave_sync, PI_WAVE_MODE_ONE_SHOT);
-    while (gpioWaveTxBusy()) {
-        // tight loop
-    }
-    ir_tx_byte((unsigned char)len);
+    if (ir_send_wave(wave_sync) || ir_tx_byte((unsigned char)len)) return -1;
     for (int i = 0; i < len; i++) {
-        ir_tx_byte(buf[i]);
+        if (ir_tx_byte(buf[i])) return -1;
     }
     return 0;
 }
@@ -135,17 +134,14 @@ static int ir_tx_buf(const unsigned char* buf, int len) {
 // framing error.
 static int ir_rx_buf(unsigned char* out_buf, int out_buf_size,
                      double timeout_sec) {
-    struct timeval loop_start, now;
-    gettimeofday(&loop_start, NULL);
+    uint32_t loop_start = gpioTick();
 
     int have_sync = 0;
     int byte_val = 0, bit_count = 0;
     int expected_len = -1, received_bytes = 0;
 
     while (1) {
-        gettimeofday(&now, NULL);
-        double elapsed = (now.tv_sec - loop_start.tv_sec) +
-                         (now.tv_usec - loop_start.tv_usec) / 1000000.0;
+        double elapsed = (uint32_t)(gpioTick() - loop_start) / 1000000.0;
         if (timeout_sec > 0 && elapsed > timeout_sec) {
             return 0;
         }
@@ -157,7 +153,7 @@ static int ir_rx_buf(unsigned char* out_buf, int out_buf_size,
 
         uint32_t rx_start_tick = gpioTick();
         while (gpioRead(IR_RX_GPIO) == IR_ACTIVE_LEVEL) {
-            // tight loop for high timing precision during the pulse
+            if ((uint32_t)(gpioTick() - rx_start_tick) > 10000) return -1;
         }
         uint32_t pulse_width = gpioTick() - rx_start_tick;
 
@@ -239,12 +235,14 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key) {
             ir_deinit();
             return NULL;
         }
-        SST_print_log("IR handshake: timed out waiting for handshake2, retrying...");
+        SST_print_log(
+            "IR handshake: timed out waiting for handshake2, retrying...");
     }
     free(hs1);
     if (hs2_length <= 0) {
-        SST_print_error("IR handshake: no handshake2 received after %d attempts.",
-                        MAX_RETRIES);
+        SST_print_error(
+            "IR handshake: no handshake2 received after %d attempts.",
+            MAX_RETRIES);
         ir_deinit();
         return NULL;
     }
@@ -258,7 +256,8 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key) {
         ir_deinit();
         return NULL;
     }
-    SST_print_log("IR handshake: broadcasting handshake3 (%u bytes)...", hs3_length);
+    SST_print_log("IR handshake: broadcasting handshake3 (%u bytes)...",
+                  hs3_length);
     if (ir_tx_buf(hs3, hs3_length) < 0) {
         free(hs3);
         ir_deinit();
@@ -296,7 +295,8 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
     SST_print_log("IR handshake: received handshake1 (%d bytes).", hs1_length);
 
     if (hs1_length <= SESSION_KEY_ID_SIZE) {
-        SST_print_error("IR handshake: handshake1 too short (%d bytes).", hs1_length);
+        SST_print_error("IR handshake: handshake1 too short (%d bytes).",
+                        hs1_length);
         ir_deinit();
         return NULL;
     }
@@ -320,7 +320,8 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
         ir_deinit();
         return NULL;
     }
-    SST_print_log("IR handshake: broadcasting handshake2 (%u bytes)...", hs2_length);
+    SST_print_log("IR handshake: broadcasting handshake2 (%u bytes)...",
+                  hs2_length);
     if (ir_tx_buf(hs2, hs2_length) < 0) {
         free(hs2);
         ir_deinit();
@@ -348,16 +349,20 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
     if (symmetric_decrypt_authenticate(
             hs3, (unsigned int)hs3_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, s_key->no_hmac, &decrypted, &decrypted_length) < 0) {
-        SST_print_error("Failed symmetric_decrypt_authenticate() on handshake3.");
+            s_key->enc_mode, s_key->no_hmac, &decrypted,
+            &decrypted_length) < 0) {
+        SST_print_error(
+            "Failed symmetric_decrypt_authenticate() on handshake3.");
         ir_deinit();
         return NULL;
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
     free(decrypted);
-    if (strncmp((const char*)hs.reply_nonce, (const char*)server_nonce, HS_NONCE_SIZE) != 0) {
-        SST_print_error("IR handshake: peer NOT verified, nonce did NOT match.");
+    if (strncmp((const char*)hs.reply_nonce, (const char*)server_nonce,
+                HS_NONCE_SIZE) != 0) {
+        SST_print_error(
+            "IR handshake: peer NOT verified, nonce did NOT match.");
         ir_deinit();
         return NULL;
     }
@@ -372,4 +377,60 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
 
     ir_deinit();
     return session_ctx;
+}
+
+/* The HK adapter shares the handshake's wiring and prebuilt pulse waves.
+ * Slow controls use byte framing; rapid response bits deliberately bypass
+ * the byte encoder's 50 ms settle delay. No logging/allocation/crypto in a
+ * round. */
+static int hk_send_control(void* ctx, const unsigned char* p, unsigned n) {
+    (void)ctx;
+    gpioDelay(IR_INTER_BIT_GAP_US); /* Give peer time to enter frame RX. */
+    return ir_tx_buf(p, (int)n);
+}
+static int hk_recv_control(void* ctx, unsigned char* p, unsigned n) {
+    (void)ctx;
+    return ir_rx_buf(p, (int)n, 120.0) == (int)n ? 0 : -1;
+}
+static int hk_send_bit(void* ctx, unsigned char bit, uint32_t* end) {
+    (void)ctx;
+    if (gpioWaveTxSend(bit ? wave_long : wave_short, PI_WAVE_MODE_ONE_SHOT) < 0)
+        return -1;
+    uint32_t start = gpioTick();
+    while (gpioWaveTxBusy()) {
+        if ((uint32_t)(gpioTick() - start) > 10000) return -1;
+    }
+    *end = gpioTick();
+    return 0;
+}
+static int hk_recv_bit(void* ctx, unsigned char* bit, uint32_t* end) {
+    (void)ctx;
+    uint32_t start = gpioTick();
+    while (gpioRead(IR_RX_GPIO) != IR_ACTIVE_LEVEL) {
+        if ((uint32_t)(gpioTick() - start) > 1100000) return -1;
+    }
+    uint32_t pulse = gpioTick();
+    while (gpioRead(IR_RX_GPIO) == IR_ACTIVE_LEVEL) {
+        if ((uint32_t)(gpioTick() - pulse) > 1200) return -1;
+    }
+    *end = gpioTick();
+    uint32_t width = *end - pulse;
+    /* Reject glitches/overlong symbols, rather than treating every pulse as a
+     * bit. */
+    if (width < 150 || width > 900) return -1;
+    *bit = width < IR_BIT_THRESHOLD_US ? 0 : 1;
+    return 0;
+}
+static void hk_pause(void* ctx, unsigned us) {
+    (void)ctx;
+    gpioDelay(us);
+}
+int ir_hk_run_gpio(const session_key_t* key, const ir_hk_config* config,
+                   int initiator, ir_hk_result* result) {
+    if (ir_init()) return -1;
+    ir_hk_io io = {NULL,        hk_send_control, hk_recv_control,
+                   hk_send_bit, hk_recv_bit,     hk_pause};
+    int rc = ir_hk_run(key, config, initiator, &io, result);
+    ir_deinit();
+    return rc;
 }

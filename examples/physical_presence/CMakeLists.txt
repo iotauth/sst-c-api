@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.19)
 project(SST-Physical-Presence-Example VERSION 1.0.0 LANGUAGES C)
 
+enable_testing()
+
 # Include main SST library
 add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 

@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include "../../src/c_api.h"
+#include "hk_check.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -61,17 +62,20 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
+    int require_ir_hk = 0;
     const char* mic_device = "plughw:1,0";
     const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
-            "[--mic <alsa_device>] [--spk <alsa_device>]",
+            "[--mic <alsa_device>] [--spk <alsa_device>] [--require-ir-hk]",
             argv[0]);
     }
     char* config_path = argv[1];
     for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
+        if (strcmp(argv[i], "--require-ir-hk") == 0) {
+            require_ir_hk = 1;
+        } else if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
             comm_type = argv[i + 1];
             i++;
         } else if (strcmp(argv[i], "--mic") == 0 && i + 1 < argc) {
@@ -110,7 +114,8 @@ int main(int argc, char* argv[]) {
         session_ctx = server_secure_comm_setup_via_ggwave(
             ctx, mic_device, spk_device, s_key_list);
         if (session_ctx == NULL) {
-            SST_print_error_exit("Failed server_secure_comm_setup_via_ggwave().");
+            SST_print_error_exit(
+                "Failed server_secure_comm_setup_via_ggwave().");
         }
         SST_print_log(
             "Locker: GGWAVE handshake with Robot succeeded. (Ongoing secure "
@@ -140,14 +145,21 @@ int main(int argc, char* argv[]) {
             comm_type);
     }
 
+    if (!verify_co_location(session_ctx, 0, require_ir_hk)) {
+        SST_print_error_exit(
+            "CO_LOCATION verification failed; locker access denied.");
+    }
+    SST_print_log("Locker: CO_LOCATION check passed.");
+
     if (session_ctx != NULL && strcmp(comm_type, "tcp") == 0) {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void*)session_ctx);
         sleep(1);
 
-        int msg = send_secure_message("Locker: Hello Robot!",
-                                      strlen("Locker: Hello Robot!"), session_ctx);
+        int msg =
+            send_secure_message("Locker: Hello Robot!",
+                                strlen("Locker: Hello Robot!"), session_ctx);
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
