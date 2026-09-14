@@ -13,7 +13,9 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/c_crypto.c
   ${CMAKE_CURRENT_LIST_DIR}/src/c_secure_comm.c
   ${CMAKE_CURRENT_LIST_DIR}/src/load_config.c
-  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c)
+  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c
+  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk.c
+  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk_plan.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -86,3 +88,8 @@ enable_testing()
 add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
 target_link_libraries(crypto_test PRIVATE sst-c-api)
 add_test(NAME crypto_test COMMAND crypto_test)
+
+add_executable(ir_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ir_hk_test.c)
+target_link_libraries(ir_hk_test PRIVATE sst-c-api)
+target_compile_options(ir_hk_test PRIVATE -UNDEBUG)
+add_test(NAME ir_hk_test COMMAND ir_hk_test)
