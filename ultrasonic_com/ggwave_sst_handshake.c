@@ -12,20 +12,21 @@
 #include <string.h>
 #include <sys/time.h>
 
-#include "ggwave/ggwave.h"
-
 #include "../src/c_common.h"
 #include "../src/c_crypto.h"
 #include "../src/c_secure_comm.h"
+#include "ggwave/ggwave.h"
 
 #define GGWAVE_SAMPLE_RATE 48000
 #define GGWAVE_CHANNELS 1
-#define GGWAVE_TARGET_BIN 224  // centered at 10.5KHz, same as echo_protocol.c
+#define GGWAVE_TARGET_BIN 224   // centered at 10.5KHz, same as echo_protocol.c
 #define GGWAVE_MAX_PAYLOAD 140  // hard cap of GGWAVE_PROTOCOL_ULTRASOUND_FAST
 
 static void setup_ggwave_freq(void) {
-    ggwave_txProtocolSetFreqStart(GGWAVE_PROTOCOL_ULTRASOUND_FAST, GGWAVE_TARGET_BIN);
-    ggwave_rxProtocolSetFreqStart(GGWAVE_PROTOCOL_ULTRASOUND_FAST, GGWAVE_TARGET_BIN);
+    ggwave_txProtocolSetFreqStart(GGWAVE_PROTOCOL_ULTRASOUND_FAST,
+                                  GGWAVE_TARGET_BIN);
+    ggwave_rxProtocolSetFreqStart(GGWAVE_PROTOCOL_ULTRASOUND_FAST,
+                                  GGWAVE_TARGET_BIN);
 }
 
 static snd_pcm_t* open_playback(const char* device) {
@@ -35,8 +36,8 @@ static snd_pcm_t* open_playback(const char* device) {
         return NULL;
     }
     snd_pcm_set_params(pcm_handle, SND_PCM_FORMAT_S16_LE,
-                      SND_PCM_ACCESS_RW_INTERLEAVED, GGWAVE_CHANNELS,
-                      GGWAVE_SAMPLE_RATE, 1, 500000);
+                       SND_PCM_ACCESS_RW_INTERLEAVED, GGWAVE_CHANNELS,
+                       GGWAVE_SAMPLE_RATE, 1, 500000);
     return pcm_handle;
 }
 
@@ -47,8 +48,8 @@ static snd_pcm_t* open_capture(const char* device) {
         return NULL;
     }
     snd_pcm_set_params(pcm_handle, SND_PCM_FORMAT_S16_LE,
-                      SND_PCM_ACCESS_RW_INTERLEAVED, GGWAVE_CHANNELS,
-                      GGWAVE_SAMPLE_RATE, 1, 500000);
+                       SND_PCM_ACCESS_RW_INTERLEAVED, GGWAVE_CHANNELS,
+                       GGWAVE_SAMPLE_RATE, 1, 500000);
     return pcm_handle;
 }
 
@@ -63,16 +64,16 @@ static int ggwave_tx_buf(ggwave_Instance instance, snd_pcm_t* spk,
             len, GGWAVE_MAX_PAYLOAD);
         return -1;
     }
-    int buffer_size_bytes = ggwave_encode(instance, (const char*)buf, len,
-                                          GGWAVE_PROTOCOL_ULTRASOUND_FAST, 100,
-                                          NULL, 1);
+    int buffer_size_bytes =
+        ggwave_encode(instance, (const char*)buf, len,
+                      GGWAVE_PROTOCOL_ULTRASOUND_FAST, 100, NULL, 1);
     if (buffer_size_bytes <= 0) {
         SST_print_error("ggwave_encode() size query failed.");
         return -1;
     }
     char* waveform = (char*)malloc(buffer_size_bytes);
     ggwave_encode(instance, (const char*)buf, len,
-                 GGWAVE_PROTOCOL_ULTRASOUND_FAST, 100, waveform, 0);
+                  GGWAVE_PROTOCOL_ULTRASOUND_FAST, 100, waveform, 0);
 
     int total_frames = buffer_size_bytes / 2;
     int frames_written_total = 0;
@@ -84,7 +85,8 @@ static int ggwave_tx_buf(ggwave_Instance instance, snd_pcm_t* spk,
         int frames_to_write = total_frames - frames_written_total;
         if (frames_to_write > chunk_size) frames_to_write = chunk_size;
 
-        snd_pcm_sframes_t frames = snd_pcm_writei(spk, audio_ptr, frames_to_write);
+        snd_pcm_sframes_t frames =
+            snd_pcm_writei(spk, audio_ptr, frames_to_write);
         if (frames == -EPIPE) {
             snd_pcm_prepare(spk);
         } else if (frames < 0) {
@@ -125,7 +127,8 @@ static int ggwave_rx_buf(ggwave_Instance instance, snd_pcm_t* mic,
             break;
         }
 
-        snd_pcm_sframes_t frames_read = snd_pcm_readi(mic, buffer, frames_to_read);
+        snd_pcm_sframes_t frames_read =
+            snd_pcm_readi(mic, buffer, frames_to_read);
         if (frames_read == -EPIPE) {
             snd_pcm_prepare(mic);
             continue;
@@ -136,7 +139,8 @@ static int ggwave_rx_buf(ggwave_Instance instance, snd_pcm_t* mic,
         }
 
         char decoded[256];
-        int decoded_bytes = ggwave_decode(instance, buffer, frames_read * 2, decoded);
+        int decoded_bytes =
+            ggwave_decode(instance, buffer, frames_read * 2, decoded);
         if (decoded_bytes > 0) {
             if (decoded_bytes > out_buf_size) {
                 SST_print_error(
@@ -155,8 +159,9 @@ static int ggwave_rx_buf(ggwave_Instance instance, snd_pcm_t* mic,
     return result;
 }
 
-SST_session_ctx_t* secure_connect_to_server_via_ggwave(
-    session_key_t* s_key, const char* mic_device, const char* spk_device) {
+SST_session_ctx_t* secure_connect_to_server_via_ggwave(session_key_t* s_key,
+                                                       const char* mic_device,
+                                                       const char* spk_device) {
     ggwave_Parameters parameters = ggwave_getDefaultParameters();
     parameters.sampleRate = GGWAVE_SAMPLE_RATE;
     parameters.sampleFormatInp = GGWAVE_SAMPLE_FORMAT_I16;
@@ -195,22 +200,26 @@ SST_session_ctx_t* secure_connect_to_server_via_ggwave(
             free(hs1);
             return NULL;
         }
-        hs2_length = ggwave_rx_buf(instance, mic, hs2, sizeof(hs2), HS2_TIMEOUT_SEC);
+        hs2_length =
+            ggwave_rx_buf(instance, mic, hs2, sizeof(hs2), HS2_TIMEOUT_SEC);
         if (hs2_length > 0) {
             break;
         } else if (hs2_length < 0) {
             free(hs1);
             return NULL;
         }
-        SST_print_log("GGWAVE handshake: timed out waiting for handshake2, retrying...");
+        SST_print_log(
+            "GGWAVE handshake: timed out waiting for handshake2, retrying...");
     }
     free(hs1);
     if (hs2_length <= 0) {
-        SST_print_error("GGWAVE handshake: no handshake2 received after %d attempts.",
-                        MAX_RETRIES);
+        SST_print_error(
+            "GGWAVE handshake: no handshake2 received after %d attempts.",
+            MAX_RETRIES);
         return NULL;
     }
-    SST_print_log("GGWAVE handshake: received handshake2 (%d bytes).", hs2_length);
+    SST_print_log("GGWAVE handshake: received handshake2 (%d bytes).",
+                  hs2_length);
 
     unsigned int hs3_length;
     unsigned char* hs3 = check_handshake_2_send_handshake_3(
@@ -219,7 +228,8 @@ SST_session_ctx_t* secure_connect_to_server_via_ggwave(
         SST_print_error("Failed check_handshake_2_send_handshake_3().");
         return NULL;
     }
-    SST_print_log("GGWAVE handshake: broadcasting handshake3 (%u bytes)...", hs3_length);
+    SST_print_log("GGWAVE handshake: broadcasting handshake3 (%u bytes)...",
+                  hs3_length);
     if (ggwave_tx_buf(instance, spk, mic, hs3, hs3_length) < 0) {
         free(hs3);
         return NULL;
@@ -257,17 +267,20 @@ SST_session_ctx_t* server_secure_comm_setup_via_ggwave(
 
     unsigned char hs1[256];
     int hs1_length = 0;
-    SST_print_log("GGWAVE handshake: listening for handshake1 (Ctrl+C to stop)...");
+    SST_print_log(
+        "GGWAVE handshake: listening for handshake1 (Ctrl+C to stop)...");
     while (hs1_length <= 0) {
         hs1_length = ggwave_rx_buf(instance, mic, hs1, sizeof(hs1), 0);
         if (hs1_length < 0) {
             return NULL;
         }
     }
-    SST_print_log("GGWAVE handshake: received handshake1 (%d bytes).", hs1_length);
+    SST_print_log("GGWAVE handshake: received handshake1 (%d bytes).",
+                  hs1_length);
 
     if (hs1_length <= SESSION_KEY_ID_SIZE) {
-        SST_print_error("GGWAVE handshake: handshake1 too short (%d bytes).", hs1_length);
+        SST_print_error("GGWAVE handshake: handshake1 too short (%d bytes).",
+                        hs1_length);
         return NULL;
     }
     unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
@@ -288,7 +301,8 @@ SST_session_ctx_t* server_secure_comm_setup_via_ggwave(
         SST_print_error("Failed check_handshake1_send_handshake2().");
         return NULL;
     }
-    SST_print_log("GGWAVE handshake: broadcasting handshake2 (%u bytes)...", hs2_length);
+    SST_print_log("GGWAVE handshake: broadcasting handshake2 (%u bytes)...",
+                  hs2_length);
     if (ggwave_tx_buf(instance, spk, mic, hs2, hs2_length) < 0) {
         free(hs2);
         return NULL;
@@ -301,7 +315,8 @@ SST_session_ctx_t* server_secure_comm_setup_via_ggwave(
         SST_print_error("GGWAVE handshake: no handshake3 received.");
         return NULL;
     }
-    SST_print_log("GGWAVE handshake: received handshake3 (%d bytes).", hs3_length);
+    SST_print_log("GGWAVE handshake: received handshake3 (%d bytes).",
+                  hs3_length);
 
     // Verify handshake3: decrypt and check the reply nonce matches server_nonce
     // (mirrors the inline check in server_secure_comm_setup()'s socket path).
@@ -310,15 +325,19 @@ SST_session_ctx_t* server_secure_comm_setup_via_ggwave(
     if (symmetric_decrypt_authenticate(
             hs3, (unsigned int)hs3_length, s_key->mac_key, MAC_KEY_SIZE,
             s_key->cipher_key, CIPHER_KEY_SIZE, AES_128_CBC_IV_SIZE,
-            s_key->enc_mode, s_key->no_hmac, &decrypted, &decrypted_length) < 0) {
-        SST_print_error("Failed symmetric_decrypt_authenticate() on handshake3.");
+            s_key->enc_mode, s_key->no_hmac, &decrypted,
+            &decrypted_length) < 0) {
+        SST_print_error(
+            "Failed symmetric_decrypt_authenticate() on handshake3.");
         return NULL;
     }
     HS_nonce_t hs;
     parse_handshake(decrypted, &hs);
     free(decrypted);
-    if (strncmp((const char*)hs.reply_nonce, (const char*)server_nonce, HS_NONCE_SIZE) != 0) {
-        SST_print_error("GGWAVE handshake: peer NOT verified, nonce did NOT match.");
+    if (strncmp((const char*)hs.reply_nonce, (const char*)server_nonce,
+                HS_NONCE_SIZE) != 0) {
+        SST_print_error(
+            "GGWAVE handshake: peer NOT verified, nonce did NOT match.");
         return NULL;
     }
     SST_print_log("GGWAVE handshake: peer authenticated, nonce matched!");

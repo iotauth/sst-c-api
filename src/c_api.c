@@ -148,8 +148,8 @@ static void resolve_target_server_address(session_key_t* s_key, SST_ctx_t* ctx,
     char check_obj[512];
     char method[64] = {0};
     char port_str[16] = {0};
-    if (extract_json_object_value(s_key->challenge, "handshakeTransport", check_obj,
-                                  sizeof(check_obj)) == 0 &&
+    if (extract_json_object_value(s_key->challenge, "handshakeTransport",
+                                  check_obj, sizeof(check_obj)) == 0 &&
         parse_json_string_value(check_obj, "method", method, sizeof(method)) ==
             0 &&
         strcmp(method, "TCP") == 0 &&
@@ -161,7 +161,7 @@ static void resolve_target_server_address(session_key_t* s_key, SST_ctx_t* ctx,
         return;
     }
     snprintf(out_host, out_host_size, "%s",
-            (const char*)ctx->config.entity_server_ip_addr);
+             (const char*)ctx->config.entity_server_ip_addr);
     *out_port = ctx->config.entity_server_port_num;
 }
 
