@@ -338,9 +338,11 @@ int decrypt_AES(const unsigned char* encrypted, unsigned int encrypted_length,
     return 0;
 }
 
-unsigned int get_expected_encrypted_total_length(
-    unsigned int buf_length, unsigned int iv_size, unsigned int mac_key_size,
-    AES_encryption_mode_t enc_mode, bool no_hmac) {
+unsigned int get_expected_encrypted_total_length(unsigned int buf_length,
+                                                 unsigned int iv_size,
+                                                 unsigned int mac_key_size,
+                                                 AES_encryption_mode_t enc_mode,
+                                                 bool no_hmac) {
     unsigned int encrypted_total_length = 0;
     if (enc_mode == AES_128_CBC) {
         // This requires, paddings, making the encrypted length multiples of the

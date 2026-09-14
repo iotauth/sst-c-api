@@ -49,8 +49,7 @@ int main(int argc, char* argv[]) {
         (const unsigned char*)plaintext, strlen(plaintext),
         s_key_list->s_key->mac_key, MAC_KEY_SHA256_SIZE,
         s_key_list->s_key->cipher_key, AES_128_KEY_SIZE_IN_BYTES,
-        AES_128_CBC_IV_SIZE, AES_128_CTR, false, &encrypted,
-        &encrypted_length);
+        AES_128_CBC_IV_SIZE, AES_128_CTR, false, &encrypted, &encrypted_length);
     assert(ret == 0);
     printf("Cipher Length: %d, Cipher Text: ", encrypted_length);
     print_buf_log(encrypted, encrypted_length);

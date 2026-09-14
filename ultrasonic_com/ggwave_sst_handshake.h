@@ -19,8 +19,9 @@
 // @param mic_device ALSA capture device, e.g. "plughw:3,0".
 // @param spk_device ALSA playback device, e.g. "plughw:4,0".
 // @return Connected session_ctx, or NULL on failure.
-SST_session_ctx_t* secure_connect_to_server_via_ggwave(
-    session_key_t* s_key, const char* mic_device, const char* spk_device);
+SST_session_ctx_t* secure_connect_to_server_via_ggwave(session_key_t* s_key,
+                                                       const char* mic_device,
+                                                       const char* spk_device);
 
 // Performs the server/target side of the SST secure-session handshake over
 // ultrasound via ggwave/ALSA, mirroring server_secure_comm_setup(). Waits
@@ -34,7 +35,8 @@ SST_session_ctx_t* secure_connect_to_server_via_ggwave(
 // @param ctx SST context, used to fetch the session key by ID from Auth.
 // @param mic_device ALSA capture device.
 // @param spk_device ALSA playback device.
-// @param existing_s_key_list Session key cache, as in server_secure_comm_setup().
+// @param existing_s_key_list Session key cache, as in
+// server_secure_comm_setup().
 // @return Connected session_ctx, or NULL on failure.
 SST_session_ctx_t* server_secure_comm_setup_via_ggwave(
     SST_ctx_t* ctx, const char* mic_device, const char* spk_device,
