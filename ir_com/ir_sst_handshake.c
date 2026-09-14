@@ -32,8 +32,13 @@
 #define IR_SYNC_THRESHOLD_US 1500  // pulse width > this = start-of-frame marker
 // Settle time before each pulse. Cheap 38kHz IR receiver modules have an
 // AGC/hold-time after a burst ends, so back-to-back pulses without this gap
-// would be missed or merged.
-#define IR_INTER_BIT_GAP_US 50000
+// would be missed or merged. Trying a smaller value than the original 50000
+// to see how low it can go on the real receivers before bits start getting
+// dropped/merged. Empirically tested on the real Robot/Locker pair: 10000
+// and 15000 failed outright (receiver never locked onto a frame), 20000
+// failed asymmetrically (Locker->Robot only), 25000 completed a full
+// handshake round trip reliably. Settled on 25000, half the original value.
+#define IR_INTER_BIT_GAP_US 25000
 #define IR_MAX_PAYLOAD 255  // fits in the 1-byte length header
 
 static int wave_short = -1;  // bit 0 (300us burst)
