@@ -459,7 +459,7 @@ static int get_symmetric_decrypt_authenticate_buffer(
         if (memcmp(reproduced_tag, buf + iv_size + encrypted_length,
                    mac_key_size) != 0) {
             SST_print_debug("Received tag: ");
-            print_buf_debug(buf + encrypted_length, mac_key_size);
+            print_buf_debug(buf + iv_size + encrypted_length, mac_key_size);
             SST_print_debug("Hmac tag: ");
             print_buf_debug(reproduced_tag, mac_key_size);
             return -1;
@@ -580,6 +580,51 @@ int create_salted_password_to_32bytes(const char* password,
                                &md_len) < 0) {
         print_crypto_error("Failed digest_message_SHA_256().");
         return -1;
+    }
+    return 0;
+}
+
+int load_permanent_distribution_key(SST_ctx_t* ctx) {
+    if (strlen(ctx->config.dist_cipher_key_path) > 0) {
+        FILE* fp = fopen(ctx->config.dist_cipher_key_path, "rb");
+        if (fp != NULL) {
+            if (fread(ctx->dist_key.cipher_key, 1, CIPHER_KEY_SIZE, fp) !=
+                CIPHER_KEY_SIZE) {
+                SST_print_error(
+                    "Failed to read CIPHER_KEY_SIZE bytes from "
+                    "dist_cipher_key_path: %s",
+                    ctx->config.dist_cipher_key_path);
+                fclose(fp);
+                return -1;
+            }
+            ctx->dist_key.cipher_key_size = CIPHER_KEY_SIZE;
+            fclose(fp);
+        } else {
+            SST_print_error("Failed to open dist_cipher_key_path: %s",
+                            ctx->config.dist_cipher_key_path);
+            return -1;
+        }
+    }
+
+    if (strlen(ctx->config.dist_mac_key_path) > 0) {
+        FILE* fp = fopen(ctx->config.dist_mac_key_path, "rb");
+        if (fp != NULL) {
+            if (fread(ctx->dist_key.mac_key, 1, MAC_KEY_SIZE, fp) !=
+                MAC_KEY_SIZE) {
+                SST_print_error(
+                    "Failed to read MAC_KEY_SIZE bytes from dist_mac_key_path: "
+                    "%s",
+                    ctx->config.dist_mac_key_path);
+                fclose(fp);
+                return -1;
+            }
+            ctx->dist_key.mac_key_size = MAC_KEY_SIZE;
+            fclose(fp);
+        } else {
+            SST_print_error("Failed to open dist_mac_key_path: %s",
+                            ctx->config.dist_mac_key_path);
+            return -1;
+        }
     }
     return 0;
 }

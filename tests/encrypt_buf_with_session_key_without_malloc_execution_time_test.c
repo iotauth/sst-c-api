@@ -21,7 +21,7 @@
 #include <string.h>
 #include <time.h>
 
-#include "../c_api.h"
+#include "../src/c_api.h"
 #define FILE_ITERATION 100
 #define BLOCK_ITERATION 16384
 #define BLOCK_SIZE 4096

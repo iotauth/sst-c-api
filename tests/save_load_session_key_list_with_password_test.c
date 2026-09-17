@@ -8,9 +8,9 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../c_api.h"
-#include "../c_common.h"
-#include "../c_crypto.h"
+#include "../src/c_api.h"
+#include "../src/c_common.h"
+#include "../src/c_crypto.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

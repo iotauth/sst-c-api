@@ -30,7 +30,7 @@ void metrics_open_new_file(const std::string& base) {
     std::string name = base;
     if (file_exists(name)) {
         for (int i = 1;; ++i) {
-            std::string cand = base;
+            std::string cand = name;
             auto dot = cand.rfind('.');
             if (dot == std::string::npos) {
                 cand += std::to_string(i);
@@ -52,7 +52,7 @@ void metrics_write_header_if_empty() {
     std::lock_guard<std::mutex> lk(g_mu);
     if (!g_open || g_header) return;
     if (g_f.tellp() == 0) {
-        g_f << "exp_id,ts_start_us,ts_end_us,successes,failures,"
+        g_f << "exp_id,malicious_number,ts_start_us,ts_end_us,successes,failures,"
                "avg_us,min_us,max_us,duration_us,attempt_rate_per_s,success_"
                "rate_per_s\n";
     }
@@ -90,8 +90,8 @@ void metrics_end_row_and_write(MetricsRow& r) {
 
     std::lock_guard<std::mutex> lk(g_mu);
     if (!g_open) return;
-    g_f << r.exp_id << ',' << r.ts_start_us << ',' << r.ts_end_us << ','
-        << r.successes << ',' << r.failures << ',' << avg_us_ll << ','
+    g_f << r.exp_id << ',' << r.malicious_number << ',' << r.ts_start_us << ','
+        << r.ts_end_us << ',' << r.successes << ',' << r.failures << ',' << avg_us_ll << ','
         << static_cast<long long>(r.min_us) << ','
         << static_cast<long long>(r.max_us) << ',' << duration_us_ll << ','
         << std::fixed << std::setprecision(3) << attempt_rate << ','

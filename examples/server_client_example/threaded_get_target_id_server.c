@@ -11,7 +11,7 @@
 #include <pthread.h>
 #include <stdio.h>
 
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 
 // Define a struct to hold the thread arguments
 typedef struct {

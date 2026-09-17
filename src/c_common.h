@@ -3,6 +3,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 // Message Type //
 #define AUTH_HELLO 0
@@ -61,6 +62,21 @@ typedef struct {
 #else
 #define ATTRIBUTE_FORMAT_PRINTF(f, s)
 #endif
+
+#if defined(__GNUC__) || defined(__clang__)
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_NORETURN __declspec(noreturn)
+#elif __STDC_VERSION__ >= 201112L
+#define ATTRIBUTE_NORETURN _Noreturn
+#else
+#define ATTRIBUTE_NORETURN
+#endif
+
+void SST_print_warning(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
+void SST_print_error_exit(const char* fmt, ...)
+    ATTRIBUTE_FORMAT_PRINTF(1, 2) ATTRIBUTE_NORETURN;
 
 // Debug logging (only enabled in DEBUG mode)
 #ifdef DEBUG
@@ -163,7 +179,7 @@ void make_sender_buf(unsigned char* payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-int connect_as_client(const char* ip_addr, int port_num, int* sock);
+int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself
@@ -187,6 +203,12 @@ void parse_handshake(unsigned char* buf, HS_nonce_t* ret);
 // @param b The divisor (modulus).
 // @return The positive remainder when a is divided by b.
 int mod(int a, int b);
+
+// Gets the socket type (SOCK_STREAM or SOCK_DGRAM) of the given socket.
+// @param sock socket to check
+// @param type_out output socket type
+// @return 0 for success, -1 for fail
+int get_socket_type(int sock, int *type_out);
 
 // Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into

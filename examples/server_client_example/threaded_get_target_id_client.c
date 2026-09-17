@@ -9,7 +9,7 @@
  */
 #include <stdio.h>
 
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 
 void write_session_key_to_file(session_key_t* s_key, const char* file_path) {
     FILE* fp = fopen(file_path, "wb");

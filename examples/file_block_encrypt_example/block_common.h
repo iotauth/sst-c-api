@@ -3,7 +3,7 @@
 #include <string.h>
 #include <strings.h>  // bzero()
 
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 
 #define MAX_SIZE 1000
 #define IV_SIZE AES_128_CBC_IV_SIZE

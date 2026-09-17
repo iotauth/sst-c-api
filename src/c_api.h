@@ -35,6 +35,11 @@ typedef enum {
     NO_HMAC,
 } hmac_mode_t;
 
+typedef enum {
+    USE_PERMANENT_DIST_KEY,
+    NO_PERMANENT_DIST_KEY,
+} perm_dist_key_mode_t;
+
 typedef struct {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
     uint64_t abs_validity;
@@ -45,6 +50,7 @@ typedef struct {
     unsigned int cipher_key_size;
     AES_encryption_mode_t enc_mode;
     hmac_mode_t hmac_mode;
+    perm_dist_key_mode_t perm_dist_key_mode;
 } session_key_t;
 
 typedef struct {
@@ -62,8 +68,10 @@ typedef struct {
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
-    AES_encryption_mode_t encryption_mode;
+    AES_encryption_mode_t session_key_enc_mode;
+    AES_encryption_mode_t dist_key_enc_mode;
     hmac_mode_t hmac_mode;
+    perm_dist_key_mode_t perm_dist_key_mode;
     int auth_id;
     char auth_pubkey_path[MAX_PATH_LEN];
     char entity_privkey_path[MAX_PATH_LEN];
@@ -74,6 +82,8 @@ typedef struct {
     char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
     char file_system_manager_ip_addr[INET_ADDRSTRLEN];
     int file_system_manager_port_num;
+    char dist_cipher_key_path[MAX_PATH_LEN];
+    char dist_mac_key_path[MAX_PATH_LEN];
 } config_t;
 
 // This struct is used in receive_thread_read_one_each()
@@ -102,6 +112,7 @@ typedef struct {
     void* pub_key;
     void* priv_key;
     pthread_mutex_t mutex;
+    char purpose_for_requesting_key[MAX_PURPOSE_LENGTH + 1];
 } SST_ctx_t;
 
 // Load config file from path and save the information in ctx struct.
@@ -124,6 +135,9 @@ session_key_list_t* init_empty_session_key_list(void);
 // @return secure session key list.
 session_key_list_t* get_session_key(SST_ctx_t* ctx,
                                     session_key_list_t* existing_s_key_list);
+
+session_key_list_t* get_session_key_with_index(
+    SST_ctx_t* ctx, int purpose_index, session_key_list_t* existing_s_key_list);
 
 // Connect to entity_server using the session key. This function can be called
 // after the connect() function, and uses the user's socket.
@@ -344,6 +358,16 @@ int secure_rand(int min, int max);
 #define ATTRIBUTE_FORMAT_PRINTF(f, s)
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define ATTRIBUTE_NORETURN __attribute__((noreturn))
+#elif defined(_MSC_VER)
+#define ATTRIBUTE_NORETURN __declspec(noreturn)
+#elif __STDC_VERSION__ >= 201112L
+#define ATTRIBUTE_NORETURN _Noreturn
+#else
+#define ATTRIBUTE_NORETURN
+#endif
+
 // Print out debug messages. This will be printed only when the
 // cmake -DCMAKE_BUILD_TYPE=DEBUG is on.
 // Uses printf-style formatting.
@@ -367,6 +391,7 @@ void SST_print_error(const char* fmt, ...) ATTRIBUTE_FORMAT_PRINTF(1, 2);
 // Uses printf-style formatting.
 // @param fmt Format string for the debug message.
 // @param ... Additional arguments for formatting.
-void SST_print_error_exit(const char* fmt, ...);
+void SST_print_error_exit(const char* fmt, ...)
+    ATTRIBUTE_FORMAT_PRINTF(1, 2) ATTRIBUTE_NORETURN;
 
 #endif  // C_API_H

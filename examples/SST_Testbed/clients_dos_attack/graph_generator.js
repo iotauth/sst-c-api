@@ -32,27 +32,41 @@ try {
   process.exit(1);
 }
 
+const clientTypes = [
+  {
+    baseKey: 'net1.client',
+    credentialPrefix: 'Net1.Client'
+  },
+  {
+    baseKey: 'net1.udpClient',
+    credentialPrefix: 'Net1.UdpClient'
+  }
+];
+
 // Change the assignments
-const base_key = 'net1.client';
-const authId  = data.assignments[base_key];
-if (authId === undefined) {
-  console.error(`Key "${base_key}" not found in assignments.`);
-  process.exit(1);
-}
-delete data.assignments[base_key];
-for (let i = 0; i < count; i++) {
-  data.assignments[`${base_key}${i}`] = authId;
+for (const clientType of clientTypes) {
+  const authId = data.assignments[clientType.baseKey];
+  if (authId === undefined) {
+    console.error(`Key "${clientType.baseKey}" not found in assignments.`);
+    process.exit(1);
+  }
+
+  delete data.assignments[clientType.baseKey];
+  for (let i = 0; i < count; i++) {
+    data.assignments[`${clientType.baseKey}${i}`] = authId;
+  }
 }
 
 // Change the entityList
 const new_entities = [];
 for (const ent of data.entityList) {
-  if (ent.name === base_key) {
+  const clientType = clientTypes.find(type => type.baseKey === ent.name);
+  if (clientType) {
     for (let i = 0; i < count; i++) {
       const copy = JSON.parse(JSON.stringify(ent));
-      copy.name = `${base_key}${i}`;
+      copy.name = `${clientType.baseKey}${i}`;
       if (copy.credentialPrefix) {
-        copy.credentialPrefix = `Net1.Client${i}`;
+        copy.credentialPrefix = `${clientType.credentialPrefix}${i}`;
       }
       new_entities.push(copy);
     }
@@ -63,4 +77,4 @@ for (const ent of data.entityList) {
 data.entityList = new_entities;
 
 fs.writeFileSync(output, JSON.stringify(data, null, 4), 'utf8');
-console.log(`Generated the new graph file with ${count} client entries.`);
+console.log(`Generated the new graph file with ${count} TCP and ${count} UDP client entries.`);

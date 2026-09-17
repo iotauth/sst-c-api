@@ -278,4 +278,9 @@ int create_salted_password_to_32bytes(const char* password,
                                       const char* salt, unsigned int salt_len,
                                       unsigned char* ret);
 
+// Load permanent distribution key cipher key and mac key from key files.
+// @param ctx SST context where distribution key is stored.
+// @return 0 for success, -1 for error.
+int load_permanent_distribution_key(SST_ctx_t* ctx);
+
 #endif  // C_CRYPTO_H

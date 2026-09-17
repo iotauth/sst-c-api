@@ -6,6 +6,7 @@
 
 struct MetricsRow {
     std::string exp_id;
+    std::string malicious_number;
     long long ts_start_us = 0;
     long long ts_end_us = 0;
 
@@ -36,5 +37,5 @@ inline void metrics_add_sample(MetricsRow& r, long long dur_us, bool ok) {
 }
 
 // Writes a CSV row with:
-// exp_id,ts_start,ts_end,successes,failures,avg_us,min_us,max_us,attempt_qps,success_qps
+// exp_id,malicious_number,ts_start,ts_end,successes,failures,avg_us,min_us,max_us,duration_us,attempt_rate_per_s,success_rate_per_s
 void metrics_end_row_and_write(MetricsRow& r);
