@@ -51,18 +51,14 @@ fs.readdirSync(out_dir).forEach(file => {
 });
 
 function makeConfigLines(lines, i) {
-  const client_name = `net1.client${i}`;
-  const key_filename = `Net1.Client${i}Key.pem`;
   return lines.map(line => {
     if (line.startsWith('entityInfo.name=')) {
       // add the client # to the client name
-      return `entityInfo.name=${client_name}`;
+      return `${line}${i}`;
     }
     if (line.startsWith('entityInfo.privkey.path=')) {
       // add the client # to the key path
-      const original = line.split('=')[1];
-      const prefix = original.substring(0, original.lastIndexOf('/') + 1);
-      return `entityInfo.privkey.path=${prefix}${key_filename}`;
+      return line.replace(/Key\.pem$/, `${i}Key.pem`);
     }
     return line;
   });
