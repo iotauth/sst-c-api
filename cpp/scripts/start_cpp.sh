@@ -320,94 +320,14 @@ log "Config generated: $CONFIG_FILE"
 
 log "Step 7: Running API integration test (connecting to Auth)..."
 
-# Create a small test program that exercises the Auth handshake
+# Compile the Auth connection test program (cpp/auth_connect_test.cpp).
 TEST_APP="$BUILD_DIR/auth_connect_test"
-cat > "$BUILD_DIR/auth_connect_test.cpp" <<'CPPEOF'
-/**
- * @file auth_connect_test.cpp
- * @brief Integration test: connects to Auth server via sst-cpp-api
- *
- * Tests:
- * 1. SST_API initialization with valid config
- * 2. Auth hello handshake
- * 3. Session key retrieval
- * 4. Connection cleanup
- */
-
-#include "../src/api.hpp"
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
-
-using sst::SST_API;
-using sst::SST_Exception;
-
-int main(int argc, char* argv[]) {
-    if (argc < 2) {
-        std::cerr << "Usage: " << argv[0] << " <config_file>" << std::endl;
-        return 1;
-    }
-
-    std::string config_path = argv[1];
-    std::cout << "=== SST C++ API Auth Connection Test ===" << std::endl;
-    std::cout << "Config: " << config_path << std::endl;
-    std::cout << std::endl;
-
-    try {
-        // Step 1: Initialize SST_API
-        std::cout << "[1/4] Initializing SST_API..." << std::endl;
-        SST_API api(config_path);
-        std::cout << "  SST_API initialized successfully." << std::endl;
-
-        // Step 2: Perform AUTH_HELLO
-        std::cout << "[2/4] Performing AUTH_HELLO handshake..." << std::endl;
-        api.auth_hello();
-        std::cout << "  AUTH_HELLO completed successfully." << std::endl;
-
-        // Step 3: Retrieve session keys
-        std::cout << "[3/4] Requesting session keys..." << std::endl;
-        auto keys = api.get_session_keys("default");
-        std::cout << "  Retrieved " << keys.size() << " session key(s)." << std::endl;
-
-        for (size_t i = 0; i < keys.size(); ++i) {
-            std::cout << "    Key " << i << " ID: [";
-            for (size_t j = 0; j < keys[i].id.size() && j < 8; ++j) {
-                printf("%02x", keys[i].id[j]);
-            }
-            std::cout << "]" << std::endl;
-        }
-
-        // Step 4: Cleanup
-        std::cout << "[4/4] Cleaning up..." << std::endl;
-        // SST_API destructor handles cleanup
-
-        std::cout << std::endl;
-        std::cout << "=== Auth connection test PASSED ===" << std::endl;
-        return 0;
-
-    } catch (const SST_Exception& e) {
-        std::cerr << std::endl;
-        std::cerr << "=== Auth connection test FAILED ===" << std::endl;
-        std::cerr << "SST_Exception: " << e.what() << std::endl;
-        return 1;
-    } catch (const std::exception& e) {
-        std::cerr << std::endl;
-        std::cerr << "=== Auth connection test FAILED ===" << std::endl;
-        std::cerr << "Exception: " << e.what() << std::endl;
-        return 1;
-    }
-}
-CPPEOF
-
-cmake -S "$BUILD_DIR" -B "$BUILD_DIR/test_build" \
-    -DCMAKE_CXX_STANDARD=17 2>/dev/null || true
-
 (
     cd "$BUILD_DIR"
-    g++ -std=c++17 -I"$CPP_ROOT/src" \
-        auth_connect_test.cpp \
+    g++ -std=c++17 -I"$CPP_ROOT" -I"$CPP_ROOT/src" \
+        "$CPP_ROOT/auth_connect_test.cpp" \
         -L. -lsst-cpp-api \
+        ./_deps/spdlog-build/libspdlog.a \
         -lcrypto \
         -lpthread \
         -o auth_connect_test 2>&1

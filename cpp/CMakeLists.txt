@@ -1,7 +1,7 @@
 # SST C++ cryptography API.
 #
-# Builds the crypto library (cpp/src/crypto.{hpp,cpp}) and its unit test
-# (cpp/tests/crypto_test.cpp).
+# Builds the SST C++ library (crypto, sockets, logging, session API and
+# IPFS helpers) and its unit tests.
 #
 # To build and run the tests:
 #   cd cpp
@@ -44,6 +44,9 @@ add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/api.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/api.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/api_internal.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.cpp
   )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
