@@ -56,20 +56,24 @@ int main(int argc, char* argv[]) {
         auto session = api.secure_connect_to_server(s_key_list.s_key[0]);
         ::sleep(1);
         std::thread receiver([&session] { session->receive_loop(); });
-        if (session->send_secure_message("Hello") < 0) {
-            std::fprintf(stderr, "Failed send_secure_message().\n");
-            return 1;
+        // The receiver must be shut down and joined on every path, so
+        // remember failures instead of returning early.
+        bool sent = session->send_secure_message("Hello") >= 0;
+        if (sent) {
+            ::sleep(1);
+            sent = session->send_secure_message(
+                       upload_req.data(),
+                       static_cast<unsigned int>(upload_req.size())) >= 0;
         }
-        ::sleep(1);
-        if (session->send_secure_message(
-                upload_req.data(),
-                static_cast<unsigned int>(upload_req.size())) < 0) {
-            std::fprintf(stderr, "Failed send_secure_message().\n");
-            return 1;
+        if (sent) {
+            ::sleep(1);
         }
-        ::sleep(1);
         session->shutdown();
         receiver.join();
+        if (!sent) {
+            std::fprintf(stderr, "Failed send_secure_message().\n");
+            return 1;
+        }
     } catch (const sst::SST_Exception& e) {
         std::fprintf(stderr, "SST error: %s\n", e.what());
         return 1;

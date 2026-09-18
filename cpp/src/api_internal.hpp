@@ -18,6 +18,11 @@ int connect_as_client(const char* ip_addr, int port_num);
 // @return bytes read, 0 on EOF, -1 on error.
 int sst_read_from_socket(int sock, unsigned char* buf, unsigned int buf_length);
 
+// Reads exactly `length` bytes.
+// @return `length` on success, 0 on EOF before any byte was read, -1 on
+// error or on a truncated read.
+int read_exact(int sock, unsigned char* buf, unsigned int length);
+
 // Writes the whole buffer, retrying partial writes.
 // @return bytes written, or -1 on error.
 int sst_write_to_socket(int sock, const unsigned char* buf,

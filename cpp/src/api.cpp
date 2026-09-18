@@ -140,7 +140,10 @@ void var_length_int_to_num(const unsigned char* buf, unsigned int buf_length,
                            unsigned int* num, int* var_len_int_buf_size) {
     *num = 0;
     *var_len_int_buf_size = 0;
-    for (unsigned int i = 0; i < buf_length; i++) {
+    // A variable length integer never spans more than MAX_PAYLOAD_BUF_SIZE
+    // bytes; anything longer is malformed and leaves the size at 0.
+    unsigned int limit = std::min(buf_length, MAX_PAYLOAD_BUF_SIZE);
+    for (unsigned int i = 0; i < limit; i++) {
         *num |= static_cast<unsigned int>(buf[i] & 127) << (7 * i);
         if ((buf[i] & 128) == 0) {
             *var_len_int_buf_size = static_cast<int>(i + 1);
@@ -213,10 +216,21 @@ int sst_write_to_socket(int sock, const unsigned char* buf,
         errno = EBADF;
         return -1;
     }
+    // Never raise SIGPIPE when the peer has gone away: report -1 instead.
+#ifdef MSG_NOSIGNAL
+    const int send_flags = MSG_NOSIGNAL;
+#else
+    const int send_flags = 0;
+#ifdef SO_NOSIGPIPE
+    int no_sigpipe = 1;
+    ::setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe,
+                 sizeof(no_sigpipe));
+#endif
+#endif
     unsigned int total_written = 0;
     while (total_written < buf_length) {
-        ssize_t length_written =
-            ::write(sock, buf + total_written, buf_length - total_written);
+        ssize_t length_written = ::send(sock, buf + total_written,
+                                        buf_length - total_written, send_flags);
         if (length_written < 0 &&
             (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
             continue;
@@ -233,6 +247,25 @@ int sst_write_to_socket(int sock, const unsigned char* buf,
         total_written += static_cast<unsigned int>(length_written);
     }
     return static_cast<int>(total_written);
+}
+
+// Reads exactly `length` bytes.
+// @return `length` on success, 0 on EOF before any byte was read, -1 on
+// error or on a truncated read.
+int read_exact(int sock, unsigned char* buf, unsigned int length) {
+    unsigned int total_read = 0;
+    while (total_read < length) {
+        int bytes_read =
+            sst_read_from_socket(sock, buf + total_read, length - total_read);
+        if (bytes_read < 0) {
+            return -1;
+        }
+        if (bytes_read == 0) {
+            return total_read == 0 ? 0 : -1;
+        }
+        total_read += static_cast<unsigned int>(bytes_read);
+    }
+    return static_cast<int>(total_read);
 }
 
 // Connects to ip_addr:port_num with retries, like the C API.
@@ -291,6 +324,7 @@ int connect_as_client(const char* ip_addr, int port_num) {
 }  // namespace internal
 
 using internal::connect_as_client;
+using internal::read_exact;
 using internal::sst_read_from_socket;
 using internal::sst_write_to_socket;
 
@@ -300,25 +334,6 @@ namespace {
 int write_bytes_to_socket(int sock, const Bytes& buf) {
     return sst_write_to_socket(sock, buf.data(),
                                static_cast<unsigned int>(buf.size()));
-}
-
-// Reads exactly `length` bytes.
-// @return `length` on success, 0 on EOF before any byte was read, -1 on
-// error or on a truncated read.
-int read_exact(int sock, unsigned char* buf, unsigned int length) {
-    unsigned int total_read = 0;
-    while (total_read < length) {
-        int bytes_read =
-            sst_read_from_socket(sock, buf + total_read, length - total_read);
-        if (bytes_read < 0) {
-            return -1;
-        }
-        if (bytes_read == 0) {
-            return total_read == 0 ? 0 : -1;
-        }
-        total_read += static_cast<unsigned int>(bytes_read);
-    }
-    return static_cast<int>(total_read);
 }
 
 // Reads the SST header one byte at a time, then the whole payload into `buf`.
@@ -452,18 +467,42 @@ int symmetric_encrypt_authenticate(
     return 0;
 }
 
+// Rejects encrypted buffers that cannot hold the IV, the optional HMAC, the
+// GCM tag and (for CBC) at least one whole ciphertext block, so that the
+// crypto layer's length arithmetic never underflows on truncated input.
+bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
+                            AES_encryption_mode_t enc_mode,
+                            hmac_mode_t hmac_mode) {
+    unsigned int overhead = AES_128_CBC_IV_SIZE;
+    if (hmac_mode == USE_HMAC) {
+        overhead += mac_key_size;
+    }
+    if (enc_mode == AES_128_GCM) {
+        overhead += AES_GCM_TAG_SIZE;
+    }
+    if (buf_length < overhead) {
+        LOG_ERR << "Encrypted buffer too short: " << buf_length;
+        return false;
+    }
+    unsigned int ciphertext_length = buf_length - overhead;
+    if (enc_mode == AES_128_CBC &&
+        (ciphertext_length == 0 ||
+         ciphertext_length % AES_128_CBC_IV_SIZE != 0)) {
+        LOG_ERR << "CBC ciphertext length is not a whole number of blocks: "
+                << ciphertext_length;
+        return false;
+    }
+    return true;
+}
+
 // Verify-then-decrypt into a vector sized from the expected maximum length.
 int symmetric_decrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
     const unsigned char* cipher_key, unsigned int cipher_key_size,
     AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, Bytes& ret) {
-    unsigned int overhead = AES_128_CBC_IV_SIZE;
-    if (hmac_mode == USE_HMAC) {
-        overhead += mac_key_size;
-    }
-    if (buf_length < overhead) {
-        LOG_ERR << "Encrypted buffer too short: " << buf_length;
+    if (!check_encrypted_length(buf_length, mac_key_size, enc_mode,
+                                hmac_mode)) {
         return -1;
     }
     unsigned int expected = Crypto::get_expected_decrypted_maximum_length(
@@ -861,8 +900,12 @@ void load_config(config_t& c, const std::string& path) {
             copy_config_value(c.purpose[idx], sizeof(c.purpose[idx]), value,
                               key);
         } else if (key == "purpose_index") {
-            c.purpose_index =
-                static_cast<unsigned short>(parse_int(value, key));
+            int idx = parse_int(value, key);
+            if (idx < 0 || idx > 1) {
+                throw SST_Exception("purpose_index must be 0 or 1, got " +
+                                    value);
+            }
+            c.purpose_index = static_cast<unsigned short>(idx);
         } else if (key == "entityInfo.number_key" || key == "numkey") {
             LOG_DBG << "Numkey: " << value;
             c.numkey = parse_int(value, key);
@@ -962,7 +1005,12 @@ bool is_session_key_valid(const session_key_t& session_key) {
 // ---------------------------------------------------------------------------
 
 int SessionKeyList::find(uint64_t key_id) const {
-    for (int idx = 0; idx < num_key; idx++) {
+    // Walk the ring from the oldest key so that slots left behind by dropped
+    // or overwritten keys are never matched.
+    const int max = static_cast<int>(MAX_SESSION_KEY);
+    for (int i = 0; i < num_key; i++) {
+        int idx = (i + rear_idx - num_key) % max;
+        if (idx < 0) idx += max;
         if (convert_skid_buf_to_int(s_key[static_cast<size_t>(idx)].key_id,
                                     SESSION_KEY_ID_SIZE) == key_id) {
             return idx;
@@ -1001,21 +1049,24 @@ void SessionKeyList::append(const SessionKeyList& src) {
 
 bool SessionKeyList::addable(int requested_num_key) {
     const int max = static_cast<int>(MAX_SESSION_KEY);
-    if (max - num_key < requested_num_key) {
-        // Checks (requested_num_key) number from the oldest session keys.
-        bool ret = true;
-        for (int i = 0; i < requested_num_key; i++) {
-            int idx = (i + rear_idx - num_key) % max;
-            if (idx < 0) idx += max;
-            bool expired =
-                !is_session_key_valid(s_key[static_cast<size_t>(idx)]);
-            if (expired) {
-                num_key -= 1;
-            }
-            ret = ret && expired;
-        }
-        return ret;
+    int deficit = requested_num_key - (max - num_key);
+    if (deficit <= 0) {
+        return true;
     }
+    if (deficit > num_key) {
+        return false;
+    }
+    // Only the oldest keys can be dropped without disturbing the ring order,
+    // so exactly `deficit` of them must all be expired. Nothing is modified
+    // unless the request can be satisfied.
+    for (int i = 0; i < deficit; i++) {
+        int idx = (i + rear_idx - num_key) % max;
+        if (idx < 0) idx += max;
+        if (is_session_key_valid(s_key[static_cast<size_t>(idx)])) {
+            return false;
+        }
+    }
+    num_key -= deficit;
     return true;
 }
 
@@ -1202,7 +1253,13 @@ SST_API::SST_API(const std::string& config_path)
 }
 
 void SST_API::load_permanent_distribution_key() {
-    if (std::strlen(config_.dist_cipher_key_path) > 0) {
+    if (std::strlen(config_.dist_cipher_key_path) == 0 ||
+        std::strlen(config_.dist_mac_key_path) == 0) {
+        throw SST_Exception(
+            "PermanentDistKeyMode is on, so both distKey.cipherkey.path and "
+            "distkey.mackey.path must be set.");
+    }
+    {
         std::ifstream fp(config_.dist_cipher_key_path, std::ios::binary);
         if (!fp.is_open()) {
             throw SST_Exception(
@@ -1219,7 +1276,7 @@ void SST_API::load_permanent_distribution_key() {
         }
         dist_key_.cipher_key_size = CIPHER_KEY_SIZE;
     }
-    if (std::strlen(config_.dist_mac_key_path) > 0) {
+    {
         std::ifstream fp(config_.dist_mac_key_path, std::ios::binary);
         if (!fp.is_open()) {
             throw SST_Exception(
@@ -1346,11 +1403,15 @@ void SST_API::parse_session_key_response(const unsigned char* buf,
         throw SST_Exception(
             "Buffer size of the variable length integer cannot be 0.");
     }
-    buf_idx +=
-        static_cast<unsigned int>(var_len_int_buf_size) + crypto_spec_len;
-    if (buf_idx + 4 > buf_length) {
+    unsigned int prefix_len = static_cast<unsigned int>(var_len_int_buf_size);
+    // Both subtractions are safe: prefix_len <= buf_length - buf_idx by
+    // construction, and the comparison rejects an oversized spec length
+    // before it can move buf_idx past the end of the response.
+    if (crypto_spec_len > buf_length - buf_idx - prefix_len ||
+        buf_length - buf_idx - prefix_len - crypto_spec_len < 4) {
         throw SST_Exception("Session key response truncated.");
     }
+    buf_idx += prefix_len + crypto_spec_len;
     unsigned int session_key_list_length =
         read_unsigned_int_BE(buf + buf_idx, 4);
     buf_idx += 4;
@@ -1824,6 +1885,10 @@ int SST_API::decrypt_buf_with_session_key(const session_key_t& s_key,
                                           unsigned int* decrypted_length) {
     if (!is_session_key_valid(s_key)) {
         LOG_ERR << "Session key is expired.";
+        return -1;
+    }
+    if (!check_encrypted_length(encrypted_length, s_key.mac_key_size,
+                                s_key.enc_mode, s_key.hmac_mode)) {
         return -1;
     }
     if (Crypto::symmetric_decrypt_authenticate(

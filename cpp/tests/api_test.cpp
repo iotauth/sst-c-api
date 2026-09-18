@@ -161,6 +161,50 @@ void test_api_init_unknown_config_key() {
     std::printf("**** PASSED: test_api_init_unknown_config_key.\n");
 }
 
+void test_api_init_invalid_purpose_index() {
+    std::printf("**** STARTING test_api_init_invalid_purpose_index.\n");
+    std::string cert = (kTmpDir / "auth_cert.pem").string();
+    std::string key = (kTmpDir / "entity_key.pem").string();
+    std::string config = write_config((kTmpDir / "bad_index.config").string(),
+                                      cert, key, "purpose_index=2\n");
+    bool caught = false;
+    try {
+        SST_API api(config);
+    } catch (const SST_Exception& e) {
+        caught = true;
+        std::printf("  Caught expected SST_Exception: %s\n", e.what());
+    }
+    CHECK(caught);
+    std::printf("**** PASSED: test_api_init_invalid_purpose_index.\n");
+}
+
+void test_api_init_permanent_dist_key_requires_both_paths() {
+    std::printf(
+        "**** STARTING "
+        "test_api_init_permanent_dist_key_requires_both_paths.\n");
+    std::string cert = (kTmpDir / "auth_cert.pem").string();
+    std::string key = (kTmpDir / "entity_key.pem").string();
+    std::string cipher_key_path = (kTmpDir / "dist_cipher.key").string();
+    {
+        std::ofstream ofs(cipher_key_path, std::ios::binary);
+        ofs << std::string(sst::CIPHER_KEY_SIZE, 'k');
+    }
+    std::string config = write_config(
+        (kTmpDir / "perm_dist.config").string(), cert, key,
+        "PermanentDistKeyMode=on\ndistKey.cipherkey.path=" + cipher_key_path +
+            "\n");
+    bool caught = false;
+    try {
+        SST_API api(config);
+    } catch (const SST_Exception& e) {
+        caught = true;
+        std::printf("  Caught expected SST_Exception: %s\n", e.what());
+    }
+    CHECK(caught);
+    std::printf(
+        "**** PASSED: test_api_init_permanent_dist_key_requires_both_paths.\n");
+}
+
 void test_api_init_missing_key_files() {
     std::printf("**** STARTING test_api_init_missing_key_files.\n");
     std::string config =
@@ -288,6 +332,21 @@ void test_session_key_list_addable() {
         expired.add(make_session_key(id, /*abs_validity_ms=*/1));
     }
     CHECK(expired.addable(3));
+    CHECK(expired.size() == static_cast<int>(sst::MAX_SESSION_KEY) - 3);
+
+    // Only the single oldest key is expired: room for one more key, but a
+    // request for two must fail without touching the list.
+    SessionKeyList mixed;
+    mixed.add(make_session_key(0, /*abs_validity_ms=*/1));
+    for (uint64_t id = 1; id < sst::MAX_SESSION_KEY; id++) {
+        mixed.add(make_session_key(id, far_future));
+    }
+    CHECK(!mixed.addable(2));
+    CHECK(mixed.size() == static_cast<int>(sst::MAX_SESSION_KEY));
+    CHECK(mixed.addable(1));
+    CHECK(mixed.size() == static_cast<int>(sst::MAX_SESSION_KEY) - 1);
+    CHECK(mixed.find(0) == -1);
+    CHECK(mixed.find(1) >= 0);
     std::printf("**** PASSED: test_session_key_list_addable.\n");
 }
 
@@ -322,6 +381,21 @@ void test_encrypt_decrypt_buf_with_session_key() {
     encrypted[sst::AES_128_IV_SIZE] ^= 0x01;
     CHECK(SST_API::decrypt_buf_with_session_key(
               key, encrypted.data(), enc_len, decrypted.data(), &dec_len) < 0);
+
+    // Truncated input (shorter than IV + HMAC + tag) must be rejected before
+    // reaching the crypto layer, for every mode.
+    unsigned char short_buf[sst::AES_128_IV_SIZE + sst::MAC_KEY_SIZE] = {0};
+    for (sst::AES_encryption_mode_t mode :
+         {sst::AES_128_CBC, sst::AES_128_CTR, sst::AES_128_GCM}) {
+        session_key_t k = make_session_key(44, UINT64_MAX);
+        k.enc_mode = mode;
+        CHECK(SST_API::decrypt_buf_with_session_key(
+                  k, short_buf, sizeof(short_buf), decrypted.data(), &dec_len) <
+              0);
+        CHECK(SST_API::decrypt_buf_with_session_key(
+                  k, short_buf, sst::AES_128_IV_SIZE, decrypted.data(),
+                  &dec_len) < 0);
+    }
 
     // An expired key must be rejected.
     session_key_t expired = make_session_key(43, /*abs_validity_ms=*/1);
@@ -367,6 +441,8 @@ int main() {
     test_api_init_nonexistent_path();
     test_api_init_unknown_config_key();
     test_api_init_missing_key_files();
+    test_api_init_invalid_purpose_index();
+    test_api_init_permanent_dist_key_requires_both_paths();
     test_api_init_success();
     test_api_init_two_purposes();
     test_session_key_list_add_find();

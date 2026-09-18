@@ -5,8 +5,11 @@
 
 #include "ipfs.hpp"
 
+#include <fcntl.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include <cctype>
 #include <chrono>
 #include <cstdio>
 #include <cstring>
@@ -21,7 +24,6 @@ namespace ipfs {
 
 namespace {
 
-const char IPFS_ADD_COMMAND[] = "ipfs add --quiet ";
 const char TXT_FILE_EXTENSION[] = ".txt";
 const char ENCRYPTED_FILE_NAME[] = "encrypted";
 const char RESULT_FILE_NAME[] = "result";
@@ -60,25 +62,101 @@ void write_file(const std::string& path, const unsigned char* data,
     }
 }
 
-// Runs a shell command and returns its first output line without the
-// trailing newline.
-std::string run_command_first_line(const std::string& command) {
-    LOG_INF << "Command: " << command;
-    FILE* fp = popen(command.c_str(), "r");
-    if (fp == nullptr) {
-        throw SST_Exception("popen() failed for: " + command);
+// Runs `argv` directly (no shell). When `stdout_file` is empty the first
+// line of the command's output is returned; otherwise stdout is written to
+// that file, which is created or truncated.
+// @throws SST_Exception when the command cannot be started or exits with a
+// non-zero status.
+std::string run_process(const std::vector<std::string>& argv,
+                        const std::string& stdout_file) {
+    std::string display;
+    for (const std::string& arg : argv) {
+        display += (display.empty() ? "" : " ") + arg;
     }
-    char buff[BUFF_SIZE];
-    std::string line;
-    if (std::fgets(buff, sizeof(buff), fp) != nullptr) {
-        line = buff;
+    if (!stdout_file.empty()) {
+        display += " > " + stdout_file;
     }
-    pclose(fp);
-    size_t end = line.find_first_of("\r\n");
+    LOG_INF << "Command: " << display;
+
+    int pipefd[2] = {-1, -1};
+    if (stdout_file.empty() && ::pipe(pipefd) < 0) {
+        throw SST_Exception("pipe() failed: " +
+                            std::string(std::strerror(errno)));
+    }
+    pid_t pid = ::fork();
+    if (pid < 0) {
+        throw SST_Exception("fork() failed: " +
+                            std::string(std::strerror(errno)));
+    }
+    if (pid == 0) {
+        // Child: route stdout, then exec. Only async-signal-safe calls here.
+        if (stdout_file.empty()) {
+            ::dup2(pipefd[1], STDOUT_FILENO);
+            ::close(pipefd[0]);
+            ::close(pipefd[1]);
+        } else {
+            int fd =
+                ::open(stdout_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if (fd < 0) {
+                ::_exit(127);
+            }
+            ::dup2(fd, STDOUT_FILENO);
+            ::close(fd);
+        }
+        std::vector<char*> args;
+        args.reserve(argv.size() + 1);
+        for (const std::string& arg : argv) {
+            args.push_back(const_cast<char*>(arg.c_str()));
+        }
+        args.push_back(nullptr);
+        ::execvp(args[0], args.data());
+        ::_exit(127);
+    }
+
+    std::string output;
+    if (stdout_file.empty()) {
+        ::close(pipefd[1]);
+        char buff[BUFF_SIZE];
+        ssize_t n;
+        while ((n = ::read(pipefd[0], buff, sizeof(buff))) > 0) {
+            output.append(buff, static_cast<size_t>(n));
+        }
+        ::close(pipefd[0]);
+    }
+    int status = 0;
+    if (::waitpid(pid, &status, 0) < 0) {
+        throw SST_Exception("waitpid() failed: " +
+                            std::string(std::strerror(errno)));
+    }
+    if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+        throw SST_Exception("Command failed: " + display);
+    }
+    size_t end = output.find_first_of("\r\n");
     if (end != std::string::npos) {
-        line.erase(end);
+        output.erase(end);
     }
-    return line;
+    return output;
+}
+
+// The file system manager describes the download as the text
+// "ipfs cat <CID> > ". Only the CID is taken from it, and it must be a
+// plain alphanumeric token; the text itself is never handed to a shell.
+std::string extract_cid(const std::string& command) {
+    const std::string prefix = "ipfs cat ";
+    if (command.compare(0, prefix.size(), prefix) != 0) {
+        throw SST_Exception(
+            "Unexpected download command from the file system manager.");
+    }
+    size_t start = prefix.size();
+    size_t end = start;
+    while (end < command.size() &&
+           std::isalnum(static_cast<unsigned char>(command[end]))) {
+        end++;
+    }
+    if (end == start) {
+        throw SST_Exception("Missing CID in the download command.");
+    }
+    return command.substr(start, end - start);
 }
 
 void append_name_field(std::vector<unsigned char>& buf, const SST_API& api) {
@@ -109,7 +187,7 @@ std::string file_duplication_check(const std::string& file_name,
 std::string execute_command_and_save_result(const std::string& file_name,
                                             estimate_time_t& estimate_time) {
     auto start = Clock::now();
-    std::string cid = run_command_first_line(IPFS_ADD_COMMAND + file_name);
+    std::string cid = run_process({"ipfs", "add", "--quiet", file_name}, "");
     if (cid.empty()) {
         throw SST_Exception("Failed to read CID from ipfs output.");
     }
@@ -239,18 +317,24 @@ std::string download_file(const unsigned char* received_buf,
     if (received_buf_length < 3 + SESSION_KEY_ID_SIZE) {
         throw SST_Exception("Download response too short.");
     }
+    if (received_buf[0] != DOWNLOAD_RESP) {
+        throw SST_Exception("Not a download response.");
+    }
+    if (received_buf[1] != SESSION_KEY_ID_SIZE) {
+        throw SST_Exception("Unexpected session key ID size in response.");
+    }
     unsigned int command_size = received_buf[2 + SESSION_KEY_ID_SIZE];
     if (received_buf_length < 3 + SESSION_KEY_ID_SIZE + command_size) {
         throw SST_Exception("Download response truncated.");
     }
     std::memcpy(skey_id_out, received_buf + 2, SESSION_KEY_ID_SIZE);
     // reinterpret_cast: the command is ASCII text.
-    std::string base_command(
+    std::string cid = extract_cid(std::string(
         reinterpret_cast<const char*>(received_buf + 3 + SESSION_KEY_ID_SIZE),
-        command_size);
+        command_size));
     std::string file_name =
         file_duplication_check(DOWNLOAD_FILE_NAME, TXT_FILE_EXTENSION);
-    run_command_first_line(base_command + file_name);
+    run_process({"ipfs", "cat", cid}, file_name);
     LOG_INF << "Downloaded the file: " << file_name;
     return file_name;
 }
@@ -271,11 +355,29 @@ std::string receive_data_and_download_file(unsigned char* skey_id_out,
         ::close(sock);
         throw SST_Exception("Failed to send to the file system manager.");
     }
-    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    int received_buf_length = internal::sst_read_from_socket(
-        sock, received_buf, sizeof(received_buf));
+    // The response is length-prefixed field by field, so read each field
+    // exactly rather than trusting a single read() to return it all:
+    // [type][key_id_size][key_id][command_size][command].
+    std::vector<unsigned char> received_buf(2);
+    bool ok = internal::read_exact(sock, received_buf.data(), 2) == 2;
+    if (ok) {
+        unsigned int key_id_size = received_buf[1];
+        received_buf.resize(2 + key_id_size + 1);
+        ok = internal::read_exact(sock, received_buf.data() + 2,
+                                  key_id_size + 1) ==
+             static_cast<int>(key_id_size + 1);
+        if (ok) {
+            unsigned int command_size = received_buf[2 + key_id_size];
+            size_t offset = received_buf.size();
+            received_buf.resize(offset + command_size);
+            ok = command_size == 0 ||
+                 internal::read_exact(sock, received_buf.data() + offset,
+                                      command_size) ==
+                     static_cast<int>(command_size);
+        }
+    }
     ::close(sock);
-    if (received_buf_length <= 0) {
+    if (!ok) {
         throw SST_Exception("Failed to read from the file system manager.");
     }
     LOG_INF << "Received the information for file.";
@@ -283,7 +385,7 @@ std::string receive_data_and_download_file(unsigned char* skey_id_out,
 
     auto download_start = Clock::now();
     std::string file_name = download_file(
-        received_buf, static_cast<unsigned int>(received_buf_length),
+        received_buf.data(), static_cast<unsigned int>(received_buf.size()),
         skey_id_out);
     estimate_time.up_download_time = seconds_since(download_start);
     return file_name;

@@ -187,8 +187,9 @@ class SessionKeyList {
 
     /**
      * @brief Checks whether `requested_num_key` more keys can be added. When
-     * the list is full, the oldest keys are checked for expiration and
-     * expired ones are dropped from the count.
+     * there is not enough room, the request is granted only if the oldest
+     * keys that would have to make way have all expired; they are then
+     * dropped. Otherwise the list is left untouched.
      * @return true when addable, false otherwise.
      */
     bool addable(int requested_num_key);
