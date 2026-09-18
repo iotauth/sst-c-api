@@ -338,6 +338,14 @@ class SST_API {
         SessionKeyList& existing_s_key_list);
 
     /**
+     * @brief Asks Auth to add a reader for this entity's shared files
+     * (ADD_READER_REQ). `add_reader` is the request string, e.g.
+     * {"AddReader":"net1.Bob"}.
+     * @throws SST_Exception on failure.
+     */
+    void send_add_reader_req_via_TCP(const std::string& add_reader);
+
+    /**
      * @brief Connects to the entity server from the config and runs the
      * session key handshake as the client.
      * The key's validity is refreshed on success (like the C API).

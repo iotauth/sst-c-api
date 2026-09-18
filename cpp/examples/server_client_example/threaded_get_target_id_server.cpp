@@ -45,10 +45,10 @@ void call_get_session_key_by_ID(sst::SST_API& api, const char* file_path,
     try {
         sst::session_key_t* session_key =
             api.get_session_key_by_ID(target_session_key_id, s_key_list);
-        std::printf("Retrieved Session Key ID: %llu\n",
-                    static_cast<unsigned long long>(
-                        sst::convert_skid_buf_to_int(
-                            session_key->key_id, sst::SESSION_KEY_ID_SIZE)));
+        std::printf(
+            "Retrieved Session Key ID: %llu\n",
+            static_cast<unsigned long long>(sst::convert_skid_buf_to_int(
+                session_key->key_id, sst::SESSION_KEY_ID_SIZE)));
     } catch (const sst::SST_Exception& e) {
         std::fprintf(stderr,
                      "Error: Failed to retrieve session key for %s: %s\n",

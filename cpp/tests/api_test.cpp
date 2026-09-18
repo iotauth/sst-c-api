@@ -16,6 +16,8 @@
  * integration test workflow.
  */
 
+#include "../src/api.hpp"
+
 #include <openssl/evp.h>
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
@@ -29,21 +31,19 @@
 #include <string>
 #include <vector>
 
-#include "../src/api.hpp"
-
 // CHECK() is compiled out in Release builds (NDEBUG), so use a check that is
 // always active.
-#define CHECK(cond)                                                       \
-    do {                                                                  \
-        if (!(cond)) {                                                    \
-            std::fprintf(stderr, "CHECK failed: %s at %s:%d\n", #cond,    \
-                         __FILE__, __LINE__);                             \
-            std::abort();                                                 \
-        }                                                                 \
+#define CHECK(cond)                                                    \
+    do {                                                               \
+        if (!(cond)) {                                                 \
+            std::fprintf(stderr, "CHECK failed: %s at %s:%d\n", #cond, \
+                         __FILE__, __LINE__);                          \
+            std::abort();                                              \
+        }                                                              \
     } while (0)
 
-using sst::SessionKeyList;
 using sst::session_key_t;
+using sst::SessionKeyList;
 using sst::SST_API;
 using sst::SST_Exception;
 
@@ -80,7 +80,7 @@ void generate_test_credentials(const std::string& cert_path,
     FILE* key_fp = std::fopen(key_path.c_str(), "wb");
     CHECK(key_fp != nullptr);
     CHECK(PEM_write_PrivateKey(key_fp, pkey, nullptr, nullptr, 0, nullptr,
-                                nullptr) == 1);
+                               nullptr) == 1);
     std::fclose(key_fp);
 
     X509_free(cert);
@@ -163,10 +163,10 @@ void test_api_init_unknown_config_key() {
 
 void test_api_init_missing_key_files() {
     std::printf("**** STARTING test_api_init_missing_key_files.\n");
-    std::string config = write_config(
-        (kTmpDir / "missing_keys.config").string(),
-        (kTmpDir / "missing_cert.pem").string(),
-        (kTmpDir / "missing_key.pem").string());
+    std::string config =
+        write_config((kTmpDir / "missing_keys.config").string(),
+                     (kTmpDir / "missing_cert.pem").string(),
+                     (kTmpDir / "missing_key.pem").string());
     bool caught = false;
     try {
         SST_API api(config);
@@ -240,7 +240,7 @@ void test_session_key_list_add_find() {
     CHECK(list.find(7) == 0);
     CHECK(list.find(8) == -1);
     CHECK(sst::convert_skid_buf_to_int(list.s_key[0].key_id,
-                                        sst::SESSION_KEY_ID_SIZE) == 7);
+                                       sst::SESSION_KEY_ID_SIZE) == 7);
 
     // Fill the list past its capacity: the oldest key is overwritten.
     for (uint64_t id = 100; id < 100 + sst::MAX_SESSION_KEY; id++) {
@@ -307,29 +307,27 @@ void test_encrypt_decrypt_buf_with_session_key() {
     std::vector<unsigned char> encrypted(enc_cap);
     unsigned int enc_len = 0;
     CHECK(SST_API::encrypt_buf_with_session_key(
-               key, reinterpret_cast<const unsigned char*>(msg), msg_len,
-               encrypted.data(), &enc_len) == 0);
+              key, reinterpret_cast<const unsigned char*>(msg), msg_len,
+              encrypted.data(), &enc_len) == 0);
     CHECK(enc_len == enc_cap);
 
     std::vector<unsigned char> decrypted(enc_len);
     unsigned int dec_len = 0;
-    CHECK(SST_API::decrypt_buf_with_session_key(key, encrypted.data(),
-                                                 enc_len, decrypted.data(),
-                                                 &dec_len) == 0);
+    CHECK(SST_API::decrypt_buf_with_session_key(
+              key, encrypted.data(), enc_len, decrypted.data(), &dec_len) == 0);
     CHECK(dec_len == msg_len);
     CHECK(std::memcmp(decrypted.data(), msg, msg_len) == 0);
 
     // Tampering with the ciphertext must fail HMAC verification.
     encrypted[sst::AES_128_IV_SIZE] ^= 0x01;
-    CHECK(SST_API::decrypt_buf_with_session_key(key, encrypted.data(),
-                                                 enc_len, decrypted.data(),
-                                                 &dec_len) < 0);
+    CHECK(SST_API::decrypt_buf_with_session_key(
+              key, encrypted.data(), enc_len, decrypted.data(), &dec_len) < 0);
 
     // An expired key must be rejected.
     session_key_t expired = make_session_key(43, /*abs_validity_ms=*/1);
     CHECK(SST_API::encrypt_buf_with_session_key(
-               expired, reinterpret_cast<const unsigned char*>(msg), msg_len,
-               encrypted.data(), &enc_len) < 0);
+              expired, reinterpret_cast<const unsigned char*>(msg), msg_len,
+              encrypted.data(), &enc_len) < 0);
     std::printf("**** PASSED: test_encrypt_decrypt_buf_with_session_key.\n");
 }
 
@@ -340,11 +338,10 @@ void test_encrypt_decrypt_buf_with_session_key() {
 void test_convert_skid_buf_to_int() {
     std::printf("**** STARTING test_convert_skid_buf_to_int.\n");
     unsigned char id[sst::SESSION_KEY_ID_SIZE] = {0, 0, 0, 0, 0, 0, 0x01, 0x02};
-    CHECK(sst::convert_skid_buf_to_int(id, sst::SESSION_KEY_ID_SIZE) ==
-           0x0102);
+    CHECK(sst::convert_skid_buf_to_int(id, sst::SESSION_KEY_ID_SIZE) == 0x0102);
     unsigned char big[sst::SESSION_KEY_ID_SIZE] = {0x01, 0, 0, 0, 0, 0, 0, 0};
     CHECK(sst::convert_skid_buf_to_int(big, sst::SESSION_KEY_ID_SIZE) ==
-           (1ULL << 56));
+          (1ULL << 56));
     std::printf("**** PASSED: test_convert_skid_buf_to_int.\n");
 }
 

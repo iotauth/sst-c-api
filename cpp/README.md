@@ -65,6 +65,8 @@ entities unchanged. The C concepts map to classes as follows:
 | `send_secure_message()` / `read_secure_message()` | `SST_Session::send_secure_message()` / `read_secure_message()` |
 | `receive_thread_read_one_each()` | `SST_Session::receive_loop()` |
 | `encrypt/decrypt_buf_with_session_key_without_malloc()` | `SST_API::encrypt/decrypt_buf_with_session_key()` |
+| `send_add_reader_req_via_TCP()` | `SST_API::send_add_reader_req_via_TCP()` |
+| `ipfs.h` file helpers | `sst::ipfs` functions in `src/ipfs.hpp` |
 
 Setup operations (construction, key requests, handshakes) throw
 `sst::SST_Exception` on failure; the data-plane calls return status codes like
@@ -85,9 +87,10 @@ cpp/
 ├── examples/
 │   ├── file_block_encrypt_example/   # block encrypt/decrypt via sst::Crypto
 │   ├── server_client_example/        # secure server/client via sst::SST_API
-│   └── ipfs_examples/    # secure IPFS server (C++ sockets + C session API)
+│   └── ipfs_examples/    # IPFS file sharing via sst::SST_API + sst::ipfs
 ├── src/
 │   ├── api.hpp/cpp       # high-level SST_API, SessionKeyList, SST_Session
+│   ├── ipfs.hpp/cpp      # IPFS file sharing helpers (sst::ipfs)
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
 │   ├── net/
 │   │   └── sockets.hpp/cpp       # RAII TCP sockets
