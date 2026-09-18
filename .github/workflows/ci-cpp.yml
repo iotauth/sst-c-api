@@ -81,13 +81,15 @@ jobs:
         ./block_reader encrypted.bin block.key decrypted.txt plain.txt
     - name: Run the C++ server_client_example examples
       working-directory: entity/c/cpp/examples/server_client_example
+      # Reuses the C example configs. Their key paths are relative to the
+      # working directory, so the binaries run from the example directory.
       run: |
-        mkdir build && cd build && cmake ../ && make
-        ./entity_server ../c_server.config &
+        mkdir build && cd build && cmake ../ && make && cd ..
+        ./build/entity_server ../../../examples/server_client_example/c_server.config &
         sleep 2
-        ./entity_client ../c_client.config
-        ./threaded_get_target_id_client ../c_client.config
-        ./threaded_get_target_id_server ../c_server.config
+        ./build/entity_client ../../../examples/server_client_example/c_client.config
+        ./build/threaded_get_target_id_client ../../../examples/server_client_example/c_client.config
+        ./build/threaded_get_target_id_server ../../../examples/server_client_example/c_server.config
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |

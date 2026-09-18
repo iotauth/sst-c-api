@@ -1,51 +1,69 @@
 # SST C++ server/client example
 
-C++ counterpart of [`examples/server_client_example`](../../../examples/server_client_example)
+C++ counterpart of the C example in
+[`examples/server_client_example`](../../../examples/server_client_example),
 built on the SST C++ API (`cpp/src/api.hpp`). The programs speak the same
-protocol as the C examples, so a C++ client can talk to a C server and vice
+protocol as the C programs, so a C++ client can talk to a C server and vice
 versa.
 
-We use `$SST_ROOT` for the root directory of
-[SST's main repository](https://github.com/iotauth/iotauth/).
+The example reuses the C example's config files (`c_server.config` and
+`c_client.config`). The key paths in those files are relative to the current
+working directory, so run the binaries from this directory (not from `build/`)
+as shown below.
 
-# Compile
+Below, `$SST_ROOT` is the root directory of
+[SST's main repository](https://github.com/iotauth/iotauth/). Generate the
+example credentials first (`examples/generateAll.sh`) and build the Auth
+server (`auth/README.md`).
+
+## Build
 
 ```
 $ cd $SST_ROOT/entity/c/cpp/examples/server_client_example
 $ mkdir build && cd build
 $ cmake ../
 $ make
+$ cd ..
 ```
 
-# Example 1: secure server/client communication
+## Start Auth
 
-- Turn on an Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a server terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example/build`
-- Turn on a client terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example/build`
+In a terminal at `$SST_ROOT/auth/auth-server`:
 
-Auth terminal
-`$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
+```
+$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+```
 
-Server terminal
-`$ ./entity_server ../c_server.config`
+Keep it running for both examples below.
 
-Client terminal
-`$ ./entity_client ../c_client.config`
+## Example 1: secure server/client communication
 
 The client requests session keys from Auth, connects to the server twice
 (once per session key) and both sides exchange encrypted messages.
 
-# Example 2: session keys by ID from multiple threads
+In a terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example`:
 
-Gets multiple session keys, saves their IDs to metadata files, then requests
-the keys by ID from three threads sharing one `sst::SST_API` instance.
+```
+$ ./build/entity_server ../../../examples/server_client_example/c_server.config
+```
 
-- Turn on an Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example/build`
+In another terminal at the same directory:
 
-Auth terminal
-`$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
+```
+$ ./build/entity_client ../../../examples/server_client_example/c_client.config
+```
 
-Other terminal
-`$ ./threaded_get_target_id_client ../c_client.config`
-`$ ./threaded_get_target_id_server ../c_server.config`
+Both programs print the messages they receive and exit when done.
+
+## Example 2: session keys by ID from multiple threads
+
+The client gets three session keys and saves their IDs to `s_key_id0.dat`,
+`s_key_id1.dat` and `s_key_id2.dat`. The server then requests the keys by ID
+from three threads sharing one `sst::SST_API` instance.
+
+In a terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example`:
+
+```
+$ ./build/threaded_get_target_id_client ../../../examples/server_client_example/c_client.config
+$ ./build/threaded_get_target_id_server ../../../examples/server_client_example/c_server.config
+```
