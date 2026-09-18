@@ -47,6 +47,35 @@ are not used anywhere in the module):
 - `EVP_PKEY*` key objects returned by the loaders are managed by OpenSSL's own
   internal allocator; the caller frees them with `EVP_PKEY_free`.
 
+## API Design
+
+`src/api.hpp` is a C++ port of the SST C API (`src/c_api.h`). It speaks the
+same wire protocol, so a C++ entity interoperates with Auth and with C
+entities unchanged. The C concepts map to classes as follows:
+
+| C API | C++ API |
+|-------|---------|
+| `SST_ctx_t`, `init_SST()` | `sst::SST_API` (constructor loads the config and keys) |
+| `get_session_key()` / `get_session_key_with_index()` | `SST_API::get_session_key()` / `get_session_key_with_index()` |
+| `get_session_key_by_ID()` | `SST_API::get_session_key_by_ID()` |
+| `secure_connect_to_server()` / `..._with_socket()` | `SST_API::secure_connect_to_server()` / `..._with_socket()` |
+| `server_secure_comm_setup()` | `SST_API::server_secure_comm_setup()` |
+| `session_key_list_t` | `sst::SessionKeyList` (fixed-size circular list) |
+| `SST_session_ctx_t` | `sst::SST_Session` (owns the socket, RAII) |
+| `send_secure_message()` / `read_secure_message()` | `SST_Session::send_secure_message()` / `read_secure_message()` |
+| `receive_thread_read_one_each()` | `SST_Session::receive_loop()` |
+| `encrypt/decrypt_buf_with_session_key_without_malloc()` | `SST_API::encrypt/decrypt_buf_with_session_key()` |
+
+Setup operations (construction, key requests, handshakes) throw
+`sst::SST_Exception` on failure; the data-plane calls return status codes like
+the C API so a closed connection can be handled without exceptions. All Auth
+communication of one `SST_API` is serialized by an internal mutex, so one
+instance can be shared between threads. A receiver thread blocked in
+`read_secure_message()` is released with `SST_Session::shutdown()`.
+
+The config file format is the C API format (`entityInfo.name=...`); the
+earlier C++ key names (`name = ...`) are still accepted.
+
 ## Layout
 
 ```
@@ -55,17 +84,19 @@ cpp/
 ├── README.md             # this file
 ├── examples/
 │   ├── file_block_encrypt_example/   # block encrypt/decrypt via sst::Crypto
+│   ├── server_client_example/        # secure server/client via sst::SST_API
 │   └── ipfs_examples/    # secure IPFS server (C++ sockets + C session API)
 ├── src/
-│   ├── api.hpp/cpp       # high-level SST_API
+│   ├── api.hpp/cpp       # high-level SST_API, SessionKeyList, SST_Session
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
 │   ├── net/
 │   │   └── sockets.hpp/cpp       # RAII TCP sockets
 │   └── log/
 │       └── log_manager.hpp/cpp   # spdlog-based logging
 └── tests/
-    ├── api_test.cpp      # API integration tests
-    └── crypto_test.cpp   # crypto unit tests
+    ├── api_test.cpp      # API unit tests (config, key lists, encryption)
+    ├── crypto_test.cpp   # crypto unit tests
+    └── socket_test.cpp   # socket unit tests
 ```
 
 ## Requirements
@@ -112,9 +143,13 @@ All C++ crypto tests passed.
   encrypt-then-authenticate with and without HMAC, SHA-256 digest
   determinism, and SHA-256 sign/verify with an in-memory RSA key pair.
 
-- `tests/api_test.cpp` exercises the high-level **API** layer end-to-end
-  against a real server: config-file parsing, Auth handshake, key
-  distribution, session setup, and encrypted message exchange.
+- `tests/api_test.cpp` exercises the high-level **API** layer without a
+  server: config-file parsing (including error cases), session key list
+  bookkeeping, and session key encryption/decryption round trips.
+
+- `examples/server_client_example` covers the Auth handshake, key
+  distribution, session setup and encrypted message exchange end-to-end
+  against a running Auth; it runs in the C++ integration test workflow.
 
 Full docs: [C API reference](https://iotauth.github.io/docs/c-api-reference/).
 

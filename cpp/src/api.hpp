@@ -1,18 +1,34 @@
 /**
-
-* @file api.hpp
- * @brief High-level C++ API for SST (Secure Session Transport).
+ * @file api.hpp
+ * @brief High-level C++ API for SST (Secure Swarm Toolkit).
  *
- * Provides the main class:
- *   - SST_API  : session management, Auth handshake orchestration, key
- * retrieval.
+ * This is a C++ port of the SST C API (src/c_api.h). It speaks the same wire
+ * protocol as the C API, so a C++ entity can talk to Auth and to C entities
+ * without any change on the other side.
  *
- * Protocol flow (client side):
- *   1. AUTH_HELLO       Entity ↔ Auth     Auth → Entity
- *   2. SESSION_KEY_REQ_IN_PUB_ENC  Entity → Auth
- *   3. SESSION_KEY_RESP_WITH_DIST_KEY  Auth → Entity
- *   4. SKEY_HANDSHAKE_1/2/3    Initiator ↔ Responder (entity-to-entity)
- *   5. AUTH_ALERT        Auth → Entity (error notification)
+ * Main classes:
+ *   - SST_API         : entity context (config, keys, distribution key) and
+ *                       the Auth handshake orchestration. Equivalent to
+ *                       SST_ctx_t plus init_SST(), get_session_key(),
+ *                       get_session_key_by_ID(), secure_connect_to_server()
+ *                       and server_secure_comm_setup().
+ *   - SessionKeyList  : circular list of session keys. Equivalent to
+ *                       session_key_list_t.
+ *   - SST_Session     : an established secure session over a TCP socket.
+ *                       Equivalent to SST_session_ctx_t plus
+ *                       send_secure_message() / read_secure_message().
+ *
+ * Protocol flow:
+ *   1. AUTH_HELLO                       Auth -> Entity
+ *   2. SESSION_KEY_REQ(_IN_PUB_ENC)     Entity -> Auth
+ *   3. SESSION_KEY_RESP(_WITH_DIST_KEY) Auth -> Entity
+ *   4. SKEY_HANDSHAKE_1/2/3             Client <-> Server (entity-to-entity)
+ *   5. SECURE_COMM_MSG                  Client <-> Server
+ *
+ * Error handling: operations that set up state (construction, session key
+ * requests, handshakes) throw SST_Exception on failure. Data-plane calls
+ * (send_secure_message / read_secure_message) return status codes like the C
+ * API so that a closed connection can be handled without exceptions.
  */
 
 #ifndef SST_API_HPP
@@ -20,23 +36,21 @@
 
 #include <arpa/inet.h>
 #include <openssl/evp.h>
-#include <pthread.h>
 
+#include <array>
+#include <cstddef>
 #include <cstdint>
-#include <cstring>
 #include <memory>
-#include <mutex>  // recursive_mutex for re-entrant lock in auth handshake
-#include <optional>
+#include <mutex>
 #include <stdexcept>
 #include <string>
-#include <vector>
 
-#include "crypto.hpp"  // for AES_encryption_mode_t, hmac_mode_t
+#include "crypto.hpp"  // AES_encryption_mode_t, hmac_mode_t, Crypto
 
 namespace sst {
 
 // ---------------------------------------------------------------------------
-// Constants (mirrors the C API)
+// Constants (mirror src/c_api.h)
 // ---------------------------------------------------------------------------
 constexpr unsigned int DIST_KEY_EXPIRATION_TIME_SIZE = 6;
 constexpr unsigned int KEY_EXPIRATION_TIME_SIZE = 6;
@@ -53,19 +67,18 @@ constexpr unsigned int AES_IV_SIZE = 16;
 constexpr unsigned int SEQ_NUM_SIZE = 8;
 constexpr unsigned int MAX_PAYLOAD_LENGTH = 1024;
 
-#define ROUND_UP_TO_Y(X, Y) ((((X) / (Y)) + 1) * (Y))
+// Largest SECURE_COMM_MSG payload: IV + CBC-padded (seq num + payload) + HMAC,
+// plus the message header. Same value as the C API (1091).
 constexpr unsigned int MAX_SECURE_COMM_MSG_LENGTH =
     1 + 2 + AES_IV_SIZE +
-    ROUND_UP_TO_Y(SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH, AES_IV_SIZE) +
+    (((SEQ_NUM_SIZE + MAX_PAYLOAD_LENGTH) / AES_IV_SIZE) + 1) * AES_IV_SIZE +
     MAC_KEY_SIZE;
 
 // ---------------------------------------------------------------------------
 // Exception
 // ---------------------------------------------------------------------------
 
-/**
- * @brief Exception class for SST API errors.
- */
+/** @brief Exception thrown by the SST API on failure. */
 class SST_Exception : public std::runtime_error {
    public:
     explicit SST_Exception(const std::string& message)
@@ -73,10 +86,10 @@ class SST_Exception : public std::runtime_error {
 };
 
 // ---------------------------------------------------------------------------
-// C-level types (opaque to the high-level API but needed internally)
+// Plain data types (binary compatible with the C API structs)
 // ---------------------------------------------------------------------------
 
-/** @brief Permanent distribution key mode. */
+/** @brief Whether a permanent (pre-shared) distribution key is used. */
 enum perm_dist_key_mode_t {
     USE_PERMANENT_DIST_KEY,
     NO_PERMANENT_DIST_KEY,
@@ -96,7 +109,7 @@ struct session_key_t {
     perm_dist_key_mode_t perm_dist_key_mode;
 };
 
-/** @brief Distribution key with cryptographic parameters. */
+/** @brief Distribution key shared with Auth. */
 struct distribution_key_t {
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
@@ -106,9 +119,10 @@ struct distribution_key_t {
     AES_encryption_mode_t enc_mode;
 };
 
-/** @brief Entity configuration parameters. */
+/** @brief Entity configuration loaded from the config file. */
 struct config_t {
     char name[MAX_ENTITY_NAME_LENGTH + 1];
+    // The config can hold up to two purposes; purpose_index selects one.
     unsigned short purpose_index;
     char purpose[2][MAX_PURPOSE_LENGTH + 1];
     int numkey;
@@ -123,156 +137,321 @@ struct config_t {
     int auth_port_num;
     char entity_server_ip_addr[INET_ADDRSTRLEN];
     int entity_server_port_num;
-};
-
-/** @brief List of session keys (circular buffer). */
-struct session_key_list_t {
-    int num_key;
-    int rear_idx;
-    std::unique_ptr<session_key_t[]> s_key;
-};
-
-/** @brief Full SST context: config, keys, distribution key. */
-struct SST_ctx_t {
-    distribution_key_t dist_key;
-    config_t config;
-    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key;
-    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key;
-    pthread_mutex_t mutex;
-
-    SST_ctx_t()
-        : dist_key{},
-          pub_key(nullptr, &EVP_PKEY_free),
-          priv_key(nullptr, &EVP_PKEY_free) {
-        pthread_mutex_init(&mutex, nullptr);
-    }
-
-    ~SST_ctx_t() { pthread_mutex_destroy(&mutex); }
-
-    // Non-copyable
-    SST_ctx_t(const SST_ctx_t&) = delete;
-    SST_ctx_t& operator=(const SST_ctx_t&) = delete;
-};
-
-/** @brief Active secure communication session. */
-struct SST_session_ctx_t {
-    int sock;
-    session_key_t s_key;
-    unsigned int sent_seq_num;
-    unsigned int received_seq_num;
+    char network_protocol[NETWORK_PROTOCOL_NAME_LENGTH];
+    char file_system_manager_ip_addr[INET_ADDRSTRLEN];
+    int file_system_manager_port_num;
+    char dist_cipher_key_path[MAX_PATH_LEN];
+    char dist_mac_key_path[MAX_PATH_LEN];
 };
 
 // ---------------------------------------------------------------------------
-// Forward declarations for internal free functions (used as unique_ptr
-// deleters)
-// ---------------------------------------------------------------------------
-void free_SST_ctx_t(SST_ctx_t* ctx);
-void free_session_key_list_t(session_key_list_t* list);
-void free_session_ctx(SST_session_ctx_t* session_ctx);
-
-// ---------------------------------------------------------------------------
-// High-level SessionKey wrapper
+// SessionKeyList
 // ---------------------------------------------------------------------------
 
 /**
- * @brief Represents a session key retrieved from the Auth server.
- */
-struct SessionKey {
-    std::vector<uint8_t> id;
-    uint64_t abs_validity = 0;
-    uint64_t rel_validity = 0;
-};
-
-// ---------------------------------------------------------------------------
-// SST_API — session management & Auth handshake orchestration
-// ---------------------------------------------------------------------------
-
-/**
- * @brief High-level API for managing SST context and orchestration.
+ * @brief Circular list of session keys (equivalent to session_key_list_t).
  *
- * Implements RAII management of the SST_ctx_t and provides high-level
- * endpoints for key retrieval and authentication.
+ * `num_key` is the number of keys in the list and `rear_idx` points to the
+ * slot the next key is written to. The storage is a fixed-size array, so the
+ * list never allocates.
+ */
+class SessionKeyList {
+   public:
+    SessionKeyList() = default;
+
+    int num_key = 0;
+    int rear_idx = 0;
+    std::array<session_key_t, MAX_SESSION_KEY> s_key{};
+
+    /** @brief Number of keys currently stored. */
+    int size() const { return num_key; }
+
+    /** @brief True when the list holds no keys. */
+    bool empty() const { return num_key == 0; }
+
+    /**
+     * @brief Finds a key by its numeric ID.
+     * @return Index of the key, or -1 if not found.
+     */
+    int find(uint64_t key_id) const;
+
+    /**
+     * @brief Appends a key at rear_idx. When the list is full the oldest key
+     * is overwritten.
+     * @return Index the key was stored at.
+     */
+    int add(const session_key_t& key);
+
+    /** @brief Appends all keys of `src` (oldest first) to this list. */
+    void append(const SessionKeyList& src);
+
+    /**
+     * @brief Checks whether `requested_num_key` more keys can be added. When
+     * the list is full, the oldest keys are checked for expiration and
+     * expired ones are dropped from the count.
+     * @return true when addable, false otherwise.
+     */
+    bool addable(int requested_num_key);
+};
+
+// ---------------------------------------------------------------------------
+// SST_Session
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief An established secure session (equivalent to SST_session_ctx_t).
+ *
+ * Owns the TCP socket: it is closed when the session is destroyed. Sending
+ * and receiving are each guarded by a mutex, so one thread can send while
+ * another one receives.
+ */
+class SST_Session {
+   public:
+    /**
+     * @brief Wraps an already-handshaked socket. Normally created by
+     * SST_API::secure_connect_to_server() or
+     * SST_API::server_secure_comm_setup() rather than directly.
+     * @param sock  Connected socket; the session takes ownership.
+     * @param s_key Session key negotiated for this connection.
+     */
+    SST_Session(int sock, const session_key_t& s_key);
+
+    /** @brief Closes the socket. */
+    ~SST_Session();
+
+    SST_Session(const SST_Session&) = delete;
+    SST_Session& operator=(const SST_Session&) = delete;
+    SST_Session(SST_Session&&) = delete;
+    SST_Session& operator=(SST_Session&&) = delete;
+
+    /**
+     * @brief Encrypts `msg` with the session key and sends it as a
+     * SECURE_COMM_MSG.
+     * @param msg        Plaintext to send.
+     * @param msg_length Length of the plaintext (at most MAX_PAYLOAD_LENGTH).
+     * @return Number of bytes written to the socket, or -1 on failure.
+     */
+    int send_secure_message(const unsigned char* msg, unsigned int msg_length);
+
+    /** @brief Convenience overload for string messages. */
+    int send_secure_message(const std::string& msg);
+
+    /**
+     * @brief Reads one SECURE_COMM_MSG from the socket and decrypts it.
+     * @param plaintext          Caller-provided buffer for the plaintext.
+     * @param plaintext_capacity Size of `plaintext` in bytes
+     *                           (MAX_SECURE_COMM_MSG_LENGTH always suffices).
+     * @return Plaintext length, 0 when the peer closed the connection, or -1
+     *         on failure.
+     */
+    int read_secure_message(unsigned char* plaintext,
+                            unsigned int plaintext_capacity);
+
+    /**
+     * @brief Reads and logs messages until the peer closes the connection or
+     * an error occurs (equivalent to receive_thread_read_one_each()).
+     */
+    void receive_loop();
+
+    /**
+     * @brief Shuts down the socket for reading and writing. A thread blocked
+     * in read_secure_message() then returns 0, which lets a receiver thread
+     * be joined cleanly.
+     */
+    void shutdown();
+
+    int get_sock() const { return sock_; }
+    const session_key_t& get_session_key() const { return s_key_; }
+    unsigned int get_sent_seq_num() const { return sent_seq_num_; }
+    unsigned int get_received_seq_num() const { return received_seq_num_; }
+
+   private:
+    int sock_;
+    session_key_t s_key_;
+    unsigned int sent_seq_num_ = 0;
+    unsigned int received_seq_num_ = 0;
+    std::mutex send_mutex_;
+    std::mutex recv_mutex_;
+};
+
+// ---------------------------------------------------------------------------
+// SST_API
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Entity context and Auth handshake orchestration (equivalent to
+ * SST_ctx_t and the top-level functions of c_api.h).
+ *
+ * All methods that talk to Auth are serialized with an internal mutex, so an
+ * SST_API instance can be shared between threads (see the
+ * threaded_get_target_id_server example).
  */
 class SST_API {
    public:
     /**
-     * @brief Initializes the SST context from a configuration file.
-     * Loads entity private key, Auth public key, and distribution key.
-     * @param config_path Path to the configuration file.
-     * @throws SST_Exception if initialization fails.
+     * @brief Loads the config file, the entity private key, the Auth public
+     * key (or the permanent distribution key). Equivalent to init_SST().
+     * @throws SST_Exception if anything fails to load.
      */
     explicit SST_API(const std::string& config_path);
 
-    /**
-     * @brief Cleans up the SST context (frees keys, closes mutex).
-     */
-    ~SST_API();
+    ~SST_API() = default;
 
-    // Non-copyable, non-movable (owns unique_ptr resources)
     SST_API(const SST_API&) = delete;
     SST_API& operator=(const SST_API&) = delete;
     SST_API(SST_API&&) = delete;
     SST_API& operator=(SST_API&&) = delete;
 
     /**
-     * @brief Performs the AUTH_HELLO exchange with the Auth server.
-     * Establishes a TCP connection, receives AUTH_ID and AUTH_nonce,
-     * verifies them against the Auth public key signature.
+     * @brief Requests `numkey` session keys from Auth for the configured
+     * purpose and returns them as a new list.
+     * Equivalent to get_session_key(ctx, NULL).
+     * @throws SST_Exception on failure (including AUTH_ALERT).
+     */
+    SessionKeyList get_session_key();
+
+    /**
+     * @brief Requests session keys from Auth and appends them to
+     * `existing_s_key_list`. Skips the request (with a warning) when the
+     * list cannot take `numkey` more keys.
+     * Equivalent to get_session_key(ctx, existing_s_key_list).
      * @throws SST_Exception on failure.
      */
-    void auth_hello();
+    void get_session_key(SessionKeyList& existing_s_key_list);
+
+    /** @brief Like get_session_key() for the purpose at `purpose_index`. */
+    SessionKeyList get_session_key_with_index(int purpose_index);
+
+    /** @brief Like get_session_key(list) for the purpose at `purpose_index`. */
+    void get_session_key_with_index(int purpose_index,
+                                    SessionKeyList& existing_s_key_list);
 
     /**
-     * @brief Requests session keys from the Auth server using the
-     * SESSION_KEY_REQ_IN_PUB_ENC protocol.
-     * @param purpose The purpose string for which keys are requested.
-     * @return A vector of retrieved SessionKeys.
-     * @throws SST_Exception on failure (e.g., AUTH_ALERT received).
+     * @brief Returns the session key with the given 8-byte ID. If the key is
+     * not in `existing_s_key_list`, it is requested from Auth by ID and added
+     * to the list.
+     * @return Pointer to the key inside `existing_s_key_list`.
+     * @throws SST_Exception on failure.
      */
-    std::vector<SessionKey> get_session_keys(const std::string& purpose);
+    session_key_t* get_session_key_by_ID(
+        const unsigned char* target_session_key_id,
+        SessionKeyList& existing_s_key_list);
 
     /**
-     * @brief Retrieves a specific session key by its 8-byte ID from the
-     * locally cached list.
-     * @param session_key_id The 8-byte identifier of the key.
-     * @return The SessionKey if found, or std::nullopt if not found.
+     * @brief Connects to the entity server from the config and runs the
+     * session key handshake as the client.
+     * The key's validity is refreshed on success (like the C API).
+     * @throws SST_Exception on failure.
      */
-    std::optional<SessionKey> get_session_key_by_id(
-        const std::vector<uint8_t>& session_key_id) const;
+    std::unique_ptr<SST_Session> secure_connect_to_server(session_key_t& s_key);
 
     /**
-     * @brief Returns a reference to the underlying SST context.
+     * @brief Runs the client side of the session key handshake over an
+     * already-connected socket. The socket is owned by the returned session,
+     * and is closed if the handshake fails.
+     * @throws SST_Exception on failure.
      */
-    SST_ctx_t& get_ctx() { return *ctx_; }
+    static std::unique_ptr<SST_Session> secure_connect_to_server_with_socket(
+        session_key_t& s_key, int sock);
+
+    /**
+     * @brief Runs the server side of the session key handshake on an accepted
+     * client socket. The session key is looked up in
+     * `existing_s_key_list` or fetched from Auth by ID. The socket is owned
+     * by the returned session, and is closed if the handshake fails.
+     * @throws SST_Exception on failure.
+     */
+    std::unique_ptr<SST_Session> server_secure_comm_setup(
+        int clnt_sock, SessionKeyList& existing_s_key_list);
+
+    /**
+     * @brief Encrypts (and HMACs) a buffer with a session key. `encrypted`
+     * must hold at least
+     * Crypto::get_expected_encrypted_total_length(plaintext_length, ...)
+     * bytes.
+     * @return 0 on success, -1 if the key is expired or encryption fails.
+     */
+    static int encrypt_buf_with_session_key(const session_key_t& s_key,
+                                            const unsigned char* plaintext,
+                                            unsigned int plaintext_length,
+                                            unsigned char* encrypted,
+                                            unsigned int* encrypted_length);
+
+    /**
+     * @brief Verifies and decrypts a buffer with a session key. `decrypted`
+     * must hold at least
+     * Crypto::get_expected_decrypted_maximum_length(encrypted_length, ...)
+     * bytes.
+     * @return 0 on success, -1 if the key is expired or decryption fails.
+     */
+    static int decrypt_buf_with_session_key(const session_key_t& s_key,
+                                            const unsigned char* encrypted,
+                                            unsigned int encrypted_length,
+                                            unsigned char* decrypted,
+                                            unsigned int* decrypted_length);
+
+    const config_t& get_config() const { return config_; }
+    const distribution_key_t& get_dist_key() const { return dist_key_; }
+
+    /** @brief Mutex serializing all Auth communication of this context. */
+    std::mutex& get_mutex() { return mutex_; }
 
    private:
-    /**
-     * @brief Connects to the Auth server and performs the full handshake:
-     * AUTH_HELLO → SESSION_KEY_REQ_IN_PUB_ENC → SESSION_KEY_RESP_WITH_DIST_KEY.
-     * On success, populates session_key_list_ with received keys and
-     * dist_key_.
-     */
-    void perform_auth_handshake(const std::string& purpose);
+    // Auth session key request state machine (send_session_key_req_via_TCP).
+    SessionKeyList send_session_key_req_via_TCP();
+    // Requests a key by ID and checks the returned ID
+    // (send_session_key_request_check_protocol).
+    SessionKeyList send_session_key_request_check_protocol(
+        const unsigned char* target_key_id);
+    // Handles AUTH_HELLO and sends the session key request.
+    void handle_AUTH_HELLO(const unsigned char* data_buf,
+                           unsigned char* entity_nonce, int sock, int num_key,
+                           const std::string& purpose, bool request_index);
+    // Encrypts the serialized request (with dist key, or public key when the
+    // dist key is expired) and writes it to the socket.
+    void send_auth_request_message(const unsigned char* serialized,
+                                   unsigned int serialized_length, int sock,
+                                   bool request_index);
+    // Verifies, decrypts and stores the distribution key from a
+    // SESSION_KEY_RESP_WITH_DIST_KEY payload.
+    void save_distribution_key(const unsigned char* data_buf, size_t key_size);
+    // Parses the decrypted session key response into `list` and returns the
+    // reply nonce.
+    void parse_session_key_response(const unsigned char* buf,
+                                    unsigned int buf_length,
+                                    unsigned char* reply_nonce,
+                                    SessionKeyList& list) const;
+    // Loads the permanent distribution key files named in the config.
+    void load_permanent_distribution_key();
+    // Requests keys for the purpose at `purpose_index`; mutex_ must be held.
+    SessionKeyList request_session_keys_locked(int purpose_index);
 
-    /**
-     * @brief Sends data to the Auth server over an established socket.
-     * @return Number of bytes sent on success.
-     * @throws SST_Exception on failure.
-     */
-    static int send_to_auth(int sock, const unsigned char* data, size_t len);
-
-    /**
-     * @brief Receives data from the Auth server over an established socket.
-     * @return Number of bytes received on success.
-     * @throws SST_Exception on failure.
-     */
-    static int recv_from_auth(int sock, unsigned char* buf, size_t len);
-
-    std::unique_ptr<SST_ctx_t, decltype(&free_SST_ctx_t)> ctx_;
-    session_key_list_t* session_key_list_ = nullptr;
-
-    mutable std::recursive_mutex key_list_mutex_;
+    config_t config_{};
+    distribution_key_t dist_key_{};
+    std::string purpose_for_requesting_key_;
+    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key_;
+    std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key_;
+    std::mutex mutex_;
 };
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+/**
+ * @brief Converts a big-endian session key ID buffer to an integer.
+ * Equivalent to convert_skid_buf_to_int().
+ */
+uint64_t convert_skid_buf_to_int(const unsigned char* buf, int byte_length);
+
+/**
+ * @brief Refreshes abs_validity to now + rel_validity. Equivalent to
+ * update_validity().
+ */
+void update_validity(session_key_t& session_key);
+
+/** @brief True when the key's absolute validity has not passed yet. */
+bool is_session_key_valid(const session_key_t& session_key);
 
 }  // namespace sst
 

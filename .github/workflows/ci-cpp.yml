@@ -79,13 +79,15 @@ jobs:
         seq 1 2000 > plain.txt
         ./block_writer plain.txt encrypted.bin block.key
         ./block_reader encrypted.bin block.key decrypted.txt plain.txt
-    - name: Run the server_client_example examples
-      working-directory: entity/c/examples/server_client_example
+    - name: Run the C++ server_client_example examples
+      working-directory: entity/c/cpp/examples/server_client_example
       run: |
         mkdir build && cd build && cmake ../ && make
         ./entity_server ../c_server.config &
         sleep 2
         ./entity_client ../c_client.config
+        ./threaded_get_target_id_client ../c_client.config
+        ./threaded_get_target_id_server ../c_server.config
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |

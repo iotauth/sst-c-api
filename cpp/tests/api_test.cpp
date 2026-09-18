@@ -1,231 +1,360 @@
 /**
  * @file api_test.cpp
- * @brief Integration tests for the SST C++ API (src/api.{hpp,cpp}).
+ * @brief Unit tests for the SST C++ API (src/api.{hpp,cpp}) that do not need
+ * a running Auth server.
  *
  * Tests cover:
- * 1. SST_API lifecycle (init with valid/invalid config paths)
- * 2. Session key storage and lookup via get_session_key_by_id
- * 3. SST_Exception error handling paths
+ * 1. SST_API construction: invalid paths, unknown config keys, missing key
+ *    files, and a successful load from a generated config with generated keys.
+ * 2. SessionKeyList: add/find/append/circular overwrite and expiration
+ *    handling.
+ * 3. Session key buffer encryption/decryption round trips.
+ * 4. Key ID conversion.
  *
- * Note: Full Auth handshake and TLS session tests require a running
- * Auth server and entity server. Those are covered by end-to-end
- * integration tests outside this unit-test scope.
+ * The full Auth handshake and entity-to-entity sessions are covered by the
+ * examples in cpp/examples/server_client_example, which run in the
+ * integration test workflow.
  */
 
-#include "../src/api.hpp"
+#include <openssl/evp.h>
+#include <openssl/pem.h>
+#include <openssl/rsa.h>
+#include <openssl/x509.h>
 
-#include <array>
-#include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
-#include <optional>
-#include <sstream>
 #include <string>
 #include <vector>
 
+#include "../src/api.hpp"
+
+// CHECK() is compiled out in Release builds (NDEBUG), so use a check that is
+// always active.
+#define CHECK(cond)                                                       \
+    do {                                                                  \
+        if (!(cond)) {                                                    \
+            std::fprintf(stderr, "CHECK failed: %s at %s:%d\n", #cond,    \
+                         __FILE__, __LINE__);                             \
+            std::abort();                                                 \
+        }                                                                 \
+    } while (0)
+
+using sst::SessionKeyList;
+using sst::session_key_t;
 using sst::SST_API;
 using sst::SST_Exception;
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
 namespace {
 
-std::string make_test_config(const std::string& path) {
+const std::filesystem::path kTmpDir =
+    std::filesystem::temp_directory_path() / "sst_cpp_api_test";
+
+// Writes a self-signed X.509 certificate (for the "Auth public key") and a
+// private key, both PEM, so that SST_API can be constructed offline.
+void generate_test_credentials(const std::string& cert_path,
+                               const std::string& key_path) {
+    EVP_PKEY* pkey = EVP_RSA_gen(2048);
+    CHECK(pkey != nullptr);
+
+    X509* cert = X509_new();
+    CHECK(cert != nullptr);
+    ASN1_INTEGER_set(X509_get_serialNumber(cert), 1);
+    X509_gmtime_adj(X509_getm_notBefore(cert), 0);
+    X509_gmtime_adj(X509_getm_notAfter(cert), 3600);
+    X509_set_pubkey(cert, pkey);
+    X509_NAME* name = X509_get_subject_name(cert);
+    X509_NAME_add_entry_by_txt(
+        name, "CN", MBSTRING_ASC,
+        reinterpret_cast<const unsigned char*>("SST test"), -1, -1, 0);
+    X509_set_issuer_name(cert, name);
+    CHECK(X509_sign(cert, pkey, EVP_sha256()) > 0);
+
+    FILE* cert_fp = std::fopen(cert_path.c_str(), "wb");
+    CHECK(cert_fp != nullptr);
+    CHECK(PEM_write_X509(cert_fp, cert) == 1);
+    std::fclose(cert_fp);
+
+    FILE* key_fp = std::fopen(key_path.c_str(), "wb");
+    CHECK(key_fp != nullptr);
+    CHECK(PEM_write_PrivateKey(key_fp, pkey, nullptr, nullptr, 0, nullptr,
+                                nullptr) == 1);
+    std::fclose(key_fp);
+
+    X509_free(cert);
+    EVP_PKEY_free(pkey);
+}
+
+std::string write_config(const std::string& path, const std::string& cert_path,
+                         const std::string& key_path,
+                         const std::string& extra_lines = "") {
     std::ofstream ofs(path);
-    ofs << "name = test_entity\n";
-    ofs << "auth_id = 1\n";
-    ofs << "auth_pubkey_path = /nonexistent/auth_pub.pem\n";
-    ofs << "entity_privkey_path = /nonexistent/entity_priv.pem\n";
-    ofs << "auth_ip_addr = 127.0.0.1\n";
-    ofs << "auth_port_num = 9999\n";
-    ofs << "entity_server_ip_addr = 127.0.0.1\n";
-    ofs << "entity_server_port_num = 9998\n";
-    ofs << "session_key_enc_mode = 0\n";
-    ofs << "dist_key_enc_mode = 0\n";
-    ofs << "hmac_mode = 0\n";
-    ofs << "perm_dist_key_mode = 0\n";
-    ofs << "numkey = 5\n";
-    ofs << "purpose_index = 0\n";
-    ofs << "purpose[0] = default\n";
-    ofs << "purpose[1] = secure\n";
-    ofs.close();
+    ofs << "entityInfo.name=net1.client\n";
+    ofs << "entityInfo.purpose={\"group\":\"Servers\"}\n";
+    ofs << "entityInfo.number_key=3\n";
+    ofs << "authInfo.id=101\n";
+    ofs << "sessionKey.encryptionMode=AES_128_CBC\n";
+    ofs << "authInfo.pubkey.path=" << cert_path << "\n";
+    ofs << "entityInfo.privkey.path=" << key_path << "\n";
+    ofs << "auth.ip.address=127.0.0.1\n";
+    ofs << "auth.port.number=21900\n";
+    ofs << "entity.server.ip.address=127.0.0.1\n";
+    ofs << "entity.server.port.number=21100\n";
+    ofs << "network.protocol=TCP\n";
+    ofs << extra_lines;
     return path;
 }
 
-void cleanup_test_config(const std::string& path) {
-    std::filesystem::remove(std::filesystem::path(path));
+session_key_t make_session_key(uint64_t id, uint64_t abs_validity_ms) {
+    session_key_t key{};
+    for (unsigned int i = 0; i < sst::SESSION_KEY_ID_SIZE; i++) {
+        key.key_id[i] = static_cast<unsigned char>(
+            id >> (8 * (sst::SESSION_KEY_ID_SIZE - 1 - i)));
+    }
+    key.abs_validity = abs_validity_ms;
+    key.rel_validity = 60000;
+    key.mac_key_size = sst::MAC_KEY_SIZE;
+    key.cipher_key_size = sst::CIPHER_KEY_SIZE;
+    sst::Crypto::generate_nonce(sst::MAC_KEY_SIZE, key.mac_key);
+    sst::Crypto::generate_nonce(sst::CIPHER_KEY_SIZE, key.cipher_key);
+    key.enc_mode = sst::AES_128_CBC;
+    key.hmac_mode = sst::USE_HMAC;
+    key.perm_dist_key_mode = sst::NO_PERMANENT_DIST_KEY;
+    return key;
 }
 
 }  // namespace
 
 // ---------------------------------------------------------------------------
-// Test: API lifecycle
+// SST_API construction
 // ---------------------------------------------------------------------------
-
-void test_api_init_invalid_config() {
-    std::printf("**** STARTING test_api_init_invalid_config.\n");
-
-    // Provide a path to a non-existent config file. Constructor should throw.
-    bool caught = false;
-    try {
-        SST_API api("/nonexistent/config/path.ini");
-    } catch (const SST_Exception& e) {
-        caught = true;
-        std::printf("  Caught expected SST_Exception: %s\n", e.what());
-    }
-
-    assert(caught);
-    std::printf("**** PASSED: test_api_init_invalid_config.\n");
-}
 
 void test_api_init_nonexistent_path() {
     std::printf("**** STARTING test_api_init_nonexistent_path.\n");
-
     bool caught = false;
     try {
-        SST_API api("/tmp/does_not_exist_12345.ini");
+        SST_API api((kTmpDir / "does_not_exist.config").string());
     } catch (const SST_Exception& e) {
         caught = true;
         std::printf("  Caught expected SST_Exception: %s\n", e.what());
     }
-
-    assert(caught);
+    CHECK(caught);
     std::printf("**** PASSED: test_api_init_nonexistent_path.\n");
 }
 
-// ---------------------------------------------------------------------------
-// Test: Session key lookup with no keys loaded
-// ---------------------------------------------------------------------------
-
-void test_get_session_key_by_id_empty_list() {
-    std::printf("**** STARTING test_get_session_key_by_id_empty_list.\n");
-
-    // Create a minimal config file so parsing succeeds, but load keys will fail
-    // because auth_pubkey_path points to a non-existent file.
-    std::string config_path = "/tmp/sst_test_api_config.ini";
-    make_test_config(config_path);
-
-    // Since the config references non-existent key files, the constructor
-    // should throw SST_Exception. This is fine — we're testing that the API
-    // rejects invalid configs gracefully.
+void test_api_init_unknown_config_key() {
+    std::printf("**** STARTING test_api_init_unknown_config_key.\n");
+    std::string cert = (kTmpDir / "auth_cert.pem").string();
+    std::string key = (kTmpDir / "entity_key.pem").string();
+    std::string config = write_config((kTmpDir / "unknown.config").string(),
+                                      cert, key, "no.such.key=1\n");
     bool caught = false;
     try {
-        SST_API api(config_path);
+        SST_API api(config);
     } catch (const SST_Exception& e) {
         caught = true;
-        std::printf("  Caught expected SST_Exception during init: %s\n",
-                    e.what());
+        std::printf("  Caught expected SST_Exception: %s\n", e.what());
     }
+    CHECK(caught);
+    std::printf("**** PASSED: test_api_init_unknown_config_key.\n");
+}
 
-    cleanup_test_config(config_path);
-
-    // If we got here, the constructor succeeded (which would mean the key files
-    // existed or the validation was bypassed). In that case, we can test
-    // get_session_key_by_id with an empty list.
-    if (!caught) {
-        // This branch would only be reached if the constructor doesn't
-        // validate key file existence — which is a bug. But for test
-        // purposes, we'll assume it's possible and test the lookup.
-        // SST_API api(config_path);  // Uncomment if constructor allows this
-        std::printf("  (Skipped: constructor should have thrown)\n");
+void test_api_init_missing_key_files() {
+    std::printf("**** STARTING test_api_init_missing_key_files.\n");
+    std::string config = write_config(
+        (kTmpDir / "missing_keys.config").string(),
+        (kTmpDir / "missing_cert.pem").string(),
+        (kTmpDir / "missing_key.pem").string());
+    bool caught = false;
+    try {
+        SST_API api(config);
+    } catch (const SST_Exception& e) {
+        caught = true;
+        std::printf("  Caught expected SST_Exception: %s\n", e.what());
     }
+    CHECK(caught);
+    std::printf("**** PASSED: test_api_init_missing_key_files.\n");
+}
 
-    std::printf("**** PASSED: test_get_session_key_by_id_empty_list.\n");
+void test_api_init_success() {
+    std::printf("**** STARTING test_api_init_success.\n");
+    std::string cert = (kTmpDir / "auth_cert.pem").string();
+    std::string key = (kTmpDir / "entity_key.pem").string();
+    std::string config =
+        write_config((kTmpDir / "valid.config").string(), cert, key);
+
+    SST_API api(config);
+    const sst::config_t& c = api.get_config();
+    CHECK(std::strcmp(c.name, "net1.client") == 0);
+    CHECK(std::strcmp(c.purpose[0], "{\"group\":\"Servers\"}") == 0);
+    CHECK(c.purpose_index == 0);
+    CHECK(c.numkey == 3);
+    CHECK(c.auth_id == 101);
+    CHECK(c.session_key_enc_mode == sst::AES_128_CBC);
+    CHECK(c.hmac_mode == sst::USE_HMAC);
+    CHECK(c.perm_dist_key_mode == sst::NO_PERMANENT_DIST_KEY);
+    CHECK(std::strcmp(c.auth_ip_addr, "127.0.0.1") == 0);
+    CHECK(c.auth_port_num == 21900);
+    CHECK(std::strcmp(c.entity_server_ip_addr, "127.0.0.1") == 0);
+    CHECK(c.entity_server_port_num == 21100);
+    CHECK(std::strcmp(c.network_protocol, "TCP") == 0);
+    // No distribution key yet: abs_validity 0 means "expired", so the first
+    // request to Auth goes out with public key encryption.
+    CHECK(api.get_dist_key().abs_validity == 0);
+    std::printf("**** PASSED: test_api_init_success.\n");
+}
+
+void test_api_init_two_purposes() {
+    std::printf("**** STARTING test_api_init_two_purposes.\n");
+    std::string cert = (kTmpDir / "auth_cert.pem").string();
+    std::string key = (kTmpDir / "entity_key.pem").string();
+    std::string config = write_config(
+        (kTmpDir / "two_purposes.config").string(), cert, key,
+        "entityInfo.purpose={\"group\":\"Readers\"}\nHmacMode=off\n");
+    SST_API api(config);
+    const sst::config_t& c = api.get_config();
+    CHECK(std::strcmp(c.purpose[0], "{\"group\":\"Servers\"}") == 0);
+    CHECK(std::strcmp(c.purpose[1], "{\"group\":\"Readers\"}") == 0);
+    CHECK(c.purpose_index == 1);
+    CHECK(c.hmac_mode == sst::NO_HMAC);
+    std::printf("**** PASSED: test_api_init_two_purposes.\n");
 }
 
 // ---------------------------------------------------------------------------
-// Test: get_session_key_by_id returns nullopt for missing key
+// SessionKeyList
 // ---------------------------------------------------------------------------
 
-void test_get_session_key_by_id_not_found() {
-    std::printf("**** STARTING test_get_session_key_by_id_not_found.\n");
+void test_session_key_list_add_find() {
+    std::printf("**** STARTING test_session_key_list_add_find.\n");
+    const uint64_t far_future = UINT64_MAX;
+    SessionKeyList list;
+    CHECK(list.empty());
+    CHECK(list.find(7) == -1);
 
-    // This test verifies that get_session_key_by_id returns std::nullopt
-    // when the key is not in the list. We can't easily construct an SST_API
-    // with a populated key list without a real Auth server, so we'll
-    // document the expected behavior.
-    std::printf("  (Expected: get_session_key_by_id returns std::nullopt\n");
-    std::printf("   when key is not in session_key_list_)\n");
-    std::printf("**** PASSED: test_get_session_key_by_id_not_found.\n");
-}
+    int idx = list.add(make_session_key(7, far_future));
+    CHECK(idx == 0);
+    CHECK(list.size() == 1);
+    CHECK(list.rear_idx == 1);
+    CHECK(list.find(7) == 0);
+    CHECK(list.find(8) == -1);
+    CHECK(sst::convert_skid_buf_to_int(list.s_key[0].key_id,
+                                        sst::SESSION_KEY_ID_SIZE) == 7);
 
-// ---------------------------------------------------------------------------
-// Test: Exception propagation from auth_hello
-// ---------------------------------------------------------------------------
-
-void test_auth_hello_connection_failure() {
-    std::printf("**** STARTING test_auth_hello_connection_failure.\n");
-
-    std::printf("  (Expected: auth_hello throws SST_Exception when\n");
-    std::printf("   unable to connect to Auth server at invalid address)\n");
-    std::printf("**** PASSED: test_auth_hello_connection_failure.\n");
-}
-
-// ---------------------------------------------------------------------------
-// Test: Exception propagation from get_session_keys
-// ---------------------------------------------------------------------------
-
-void test_get_session_keys_no_keys() {
-    std::printf("**** STARTING test_get_session_keys_no_keys.\n");
-
-    std::printf("  (Expected: get_session_keys returns empty vector\n");
-    std::printf("   when no keys were received from Auth server)\n");
-    std::printf("**** PASSED: test_get_session_keys_no_keys.\n");
-}
-
-// ---------------------------------------------------------------------------
-// Test: Session key ID format validation
-// ---------------------------------------------------------------------------
-
-void test_session_key_id_format() {
-    std::printf("**** STARTING test_session_key_id_format.\n");
-
-    // SESSION_KEY_ID_SIZE is 8 bytes. We test with valid and invalid IDs.
-    std::vector<uint8_t> valid_id(8, 0xAB);
-    std::vector<uint8_t> too_short(7, 0xAB);
-    std::vector<uint8_t> too_long(9, 0xAB);
-
-    // These are just format checks — the actual lookup logic is tested
-    // in get_session_key_by_id_not_found above.
-    assert(valid_id.size() == 8);
-    assert(too_short.size() == 7);
-    assert(too_long.size() == 9);
-
-    std::printf("**** PASSED: test_session_key_id_format.\n");
-}
-
-// ---------------------------------------------------------------------------
-// Test: Configuration parsing edge cases
-// ---------------------------------------------------------------------------
-
-void test_config_parsing_minimal() {
-    std::printf("**** STARTING test_config_parsing_minimal.\n");
-
-    // Test that a minimal config file can be parsed without crashing.
-    std::string config_path = "/tmp/sst_test_minimal.ini";
-    std::ofstream ofs(config_path);
-    ofs << "name = minimal\n";
-    ofs << "auth_id = 0\n";
-    ofs.close();
-
-    // We don't construct SST_API here (it would throw on missing keys),
-    // but we verify the file was written correctly.
-    std::ifstream ifs(config_path);
-    assert(ifs.is_open());
-    std::string line;
-    int line_count = 0;
-    while (std::getline(ifs, line)) {
-        line_count++;
+    // Fill the list past its capacity: the oldest key is overwritten.
+    for (uint64_t id = 100; id < 100 + sst::MAX_SESSION_KEY; id++) {
+        list.add(make_session_key(id, far_future));
     }
-    assert(line_count == 2);
+    CHECK(list.size() == static_cast<int>(sst::MAX_SESSION_KEY));
+    CHECK(list.find(7) == -1);
+    CHECK(list.find(100) >= 0);
+    CHECK(list.find(100 + sst::MAX_SESSION_KEY - 1) >= 0);
+    std::printf("**** PASSED: test_session_key_list_add_find.\n");
+}
 
-    cleanup_test_config(config_path);
-    std::printf("**** PASSED: test_config_parsing_minimal.\n");
+void test_session_key_list_append() {
+    std::printf("**** STARTING test_session_key_list_append.\n");
+    const uint64_t far_future = UINT64_MAX;
+    SessionKeyList src;
+    src.add(make_session_key(1, far_future));
+    src.add(make_session_key(2, far_future));
+
+    SessionKeyList dest;
+    dest.add(make_session_key(10, far_future));
+    dest.append(src);
+    CHECK(dest.size() == 3);
+    CHECK(dest.find(10) == 0);
+    CHECK(dest.find(1) == 1);
+    CHECK(dest.find(2) == 2);
+    std::printf("**** PASSED: test_session_key_list_append.\n");
+}
+
+void test_session_key_list_addable() {
+    std::printf("**** STARTING test_session_key_list_addable.\n");
+    const uint64_t far_future = UINT64_MAX;
+    SessionKeyList list;
+    CHECK(list.addable(3));
+
+    // Fill with valid keys: no room for 3 more, and none are expired.
+    for (uint64_t id = 0; id < sst::MAX_SESSION_KEY; id++) {
+        list.add(make_session_key(id, far_future));
+    }
+    CHECK(!list.addable(3));
+
+    // Fill with expired keys: the oldest ones can be dropped.
+    SessionKeyList expired;
+    for (uint64_t id = 0; id < sst::MAX_SESSION_KEY; id++) {
+        expired.add(make_session_key(id, /*abs_validity_ms=*/1));
+    }
+    CHECK(expired.addable(3));
+    std::printf("**** PASSED: test_session_key_list_addable.\n");
+}
+
+// ---------------------------------------------------------------------------
+// Buffer encryption with a session key
+// ---------------------------------------------------------------------------
+
+void test_encrypt_decrypt_buf_with_session_key() {
+    std::printf("**** STARTING test_encrypt_decrypt_buf_with_session_key.\n");
+    session_key_t key = make_session_key(42, UINT64_MAX);
+    const char msg[] = "Hello from the SST C++ API";
+    const unsigned int msg_len = static_cast<unsigned int>(std::strlen(msg));
+
+    unsigned int enc_cap = sst::Crypto::get_expected_encrypted_total_length(
+        msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE, key.enc_mode,
+        key.hmac_mode);
+    std::vector<unsigned char> encrypted(enc_cap);
+    unsigned int enc_len = 0;
+    CHECK(SST_API::encrypt_buf_with_session_key(
+               key, reinterpret_cast<const unsigned char*>(msg), msg_len,
+               encrypted.data(), &enc_len) == 0);
+    CHECK(enc_len == enc_cap);
+
+    std::vector<unsigned char> decrypted(enc_len);
+    unsigned int dec_len = 0;
+    CHECK(SST_API::decrypt_buf_with_session_key(key, encrypted.data(),
+                                                 enc_len, decrypted.data(),
+                                                 &dec_len) == 0);
+    CHECK(dec_len == msg_len);
+    CHECK(std::memcmp(decrypted.data(), msg, msg_len) == 0);
+
+    // Tampering with the ciphertext must fail HMAC verification.
+    encrypted[sst::AES_128_IV_SIZE] ^= 0x01;
+    CHECK(SST_API::decrypt_buf_with_session_key(key, encrypted.data(),
+                                                 enc_len, decrypted.data(),
+                                                 &dec_len) < 0);
+
+    // An expired key must be rejected.
+    session_key_t expired = make_session_key(43, /*abs_validity_ms=*/1);
+    CHECK(SST_API::encrypt_buf_with_session_key(
+               expired, reinterpret_cast<const unsigned char*>(msg), msg_len,
+               encrypted.data(), &enc_len) < 0);
+    std::printf("**** PASSED: test_encrypt_decrypt_buf_with_session_key.\n");
+}
+
+// ---------------------------------------------------------------------------
+// Utilities
+// ---------------------------------------------------------------------------
+
+void test_convert_skid_buf_to_int() {
+    std::printf("**** STARTING test_convert_skid_buf_to_int.\n");
+    unsigned char id[sst::SESSION_KEY_ID_SIZE] = {0, 0, 0, 0, 0, 0, 0x01, 0x02};
+    CHECK(sst::convert_skid_buf_to_int(id, sst::SESSION_KEY_ID_SIZE) ==
+           0x0102);
+    unsigned char big[sst::SESSION_KEY_ID_SIZE] = {0x01, 0, 0, 0, 0, 0, 0, 0};
+    CHECK(sst::convert_skid_buf_to_int(big, sst::SESSION_KEY_ID_SIZE) ==
+           (1ULL << 56));
+    std::printf("**** PASSED: test_convert_skid_buf_to_int.\n");
+}
+
+void test_update_validity() {
+    std::printf("**** STARTING test_update_validity.\n");
+    session_key_t key = make_session_key(1, /*abs_validity_ms=*/1);
+    CHECK(!sst::is_session_key_valid(key));
+    sst::update_validity(key);
+    CHECK(sst::is_session_key_valid(key));
+    std::printf("**** PASSED: test_update_validity.\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -233,17 +362,24 @@ void test_config_parsing_minimal() {
 // ---------------------------------------------------------------------------
 
 int main() {
-    std::printf("===== Running SST API Integration Tests =====\n\n");
+    std::printf("===== Running SST C++ API tests =====\n\n");
+    std::filesystem::create_directories(kTmpDir);
+    generate_test_credentials((kTmpDir / "auth_cert.pem").string(),
+                              (kTmpDir / "entity_key.pem").string());
 
-    test_api_init_invalid_config();
     test_api_init_nonexistent_path();
-    test_get_session_key_by_id_empty_list();
-    test_get_session_key_by_id_not_found();
-    test_auth_hello_connection_failure();
-    test_get_session_keys_no_keys();
-    test_session_key_id_format();
-    test_config_parsing_minimal();
+    test_api_init_unknown_config_key();
+    test_api_init_missing_key_files();
+    test_api_init_success();
+    test_api_init_two_purposes();
+    test_session_key_list_add_find();
+    test_session_key_list_append();
+    test_session_key_list_addable();
+    test_encrypt_decrypt_buf_with_session_key();
+    test_convert_skid_buf_to_int();
+    test_update_validity();
 
-    std::printf("\n===== All SST API tests passed. =====\n");
+    std::filesystem::remove_all(kTmpDir);
+    std::printf("\n===== All SST C++ API tests passed. =====\n");
     return 0;
 }
