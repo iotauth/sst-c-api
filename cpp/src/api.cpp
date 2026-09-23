@@ -78,6 +78,28 @@ enum auth_alert_code {
     UNKNOWN_INTERNAL_ERROR,
 };
 
+// Throws for an AUTH_ALERT received from Auth. The alert payload is a single
+// auth_alert_code byte (see AuthAlertMessage in the Auth server).
+[[noreturn]] void throw_auth_alert(unsigned char alert_code) {
+    std::string reason;
+    switch (alert_code) {
+        case INVALID_DISTRIBUTION_KEY:
+            reason = "Invalid Distribution Key.";
+            break;
+        case INVALID_SESSION_KEY_REQ:
+            reason = "Invalid Session Key Request.";
+            break;
+        case UNKNOWN_INTERNAL_ERROR:
+            reason = "Unknown Internal Error.";
+            break;
+        default:
+            reason = "Unknown Code.";
+            break;
+    }
+    throw SST_Exception("AUTH_ALERT received from Auth: " + reason +
+                        " (code " + std::to_string(alert_code) + ")");
+}
+
 // Handshake nonces (HS_nonce_t).
 struct HS_nonce_t {
     unsigned char nonce[HS_NONCE_SIZE];
@@ -1600,22 +1622,7 @@ SessionKeyList SST_API::send_session_key_req_via_TCP() {
             LOG_DBG << "Auth nonce verified!";
             return session_key_list;
         } else if (message_type == AUTH_ALERT) {
-            std::string reason;
-            switch (received_buf[0]) {
-                case INVALID_DISTRIBUTION_KEY:
-                    reason = "Invalid Distribution Key.";
-                    break;
-                case INVALID_SESSION_KEY_REQ:
-                    reason = "Invalid Session Key Request.";
-                    break;
-                case UNKNOWN_INTERNAL_ERROR:
-                    reason = "Unknown Internal Error.";
-                    break;
-                default:
-                    reason = "Unknown Code.";
-                    break;
-            }
-            throw SST_Exception("AUTH_ALERT received from Auth: " + reason);
+            throw_auth_alert(received_buf[0]);
         } else {
             throw SST_Exception("Unexpected message type " +
                                 std::to_string(message_type) + " from Auth.");
@@ -1705,8 +1712,7 @@ void SST_API::send_add_reader_req_via_TCP(const std::string& add_reader) {
             LOG_INF << "Add a file reader to the database.";
             return;
         } else if (message_type == AUTH_ALERT) {
-            throw SST_Exception("AUTH_ALERT received from Auth: code " +
-                                std::to_string(received_buf[0]));
+            throw_auth_alert(received_buf[0]);
         } else {
             throw SST_Exception("Unexpected message type " +
                                 std::to_string(message_type) + " from Auth.");
