@@ -47,6 +47,27 @@ add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/api_internal.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.cpp
+  # Auth/entity messages, mirroring org.iot.auth.message in the Auth server.
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/message_type.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/iotsp_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/iotsp_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_hello_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_hello_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_code.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_req_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_req_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_req_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_req_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_req_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_req_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_resp_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_resp_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_resp_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_resp_message.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_resp_message.hpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_resp_message.cpp
   )
 
 set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
@@ -79,3 +100,7 @@ add_test(NAME socket_test COMMAND socket_test)
 add_executable(api_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_test.cpp)
 target_link_libraries(api_test PRIVATE ${PROJECT_NAME})
 add_test(NAME api_test COMMAND api_test)
+
+add_executable(message_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/message_test.cpp)
+target_link_libraries(message_test PRIVATE ${PROJECT_NAME})
+add_test(NAME message_test COMMAND message_test)

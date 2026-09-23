@@ -44,10 +44,15 @@
 #include <mutex>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include "crypto.hpp"  // AES_encryption_mode_t, hmac_mode_t, Crypto
 
 namespace sst {
+
+namespace message {
+class EntityRespMessage;
+}  // namespace message
 
 // ---------------------------------------------------------------------------
 // Constants (mirror src/c_api.h)
@@ -412,24 +417,16 @@ class SST_API {
     // (send_session_key_request_check_protocol).
     SessionKeyList send_session_key_request_check_protocol(
         const unsigned char* target_key_id);
-    // Handles AUTH_HELLO and sends the session key request.
-    void handle_AUTH_HELLO(const unsigned char* data_buf,
-                           unsigned char* entity_nonce, int sock, int num_key,
-                           const std::string& purpose, bool request_index);
-    // Encrypts the serialized request (with dist key, or public key when the
-    // dist key is expired) and writes it to the socket.
-    void send_auth_request_message(const unsigned char* serialized,
-                                   unsigned int serialized_length, int sock,
-                                   bool request_index);
-    // Verifies, decrypts and stores the distribution key from a
-    // SESSION_KEY_RESP_WITH_DIST_KEY payload.
-    void save_distribution_key(const unsigned char* data_buf, size_t key_size);
-    // Parses the decrypted session key response into `list` and returns the
-    // reply nonce.
-    void parse_session_key_response(const unsigned char* buf,
-                                    unsigned int buf_length,
-                                    unsigned char* reply_nonce,
-                                    SessionKeyList& list) const;
+    // Verifies Auth's signature over the encrypted distribution key from a
+    // response, decrypts it with the entity's private key and stores it.
+    void save_distribution_key(
+        const std::vector<unsigned char>& encrypted_dist_key);
+    // Stores the response's new distribution key (if any), decrypts the
+    // response with the distribution key and checks the entity nonce.
+    void decrypt_auth_response(message::EntityRespMessage& resp,
+                               const unsigned char* entity_nonce);
+    // Size of the entity's RSA key, or 0 when none is loaded.
+    size_t entity_rsa_key_size() const;
     // Loads the permanent distribution key files named in the config.
     void load_permanent_distribution_key();
     // Requests keys for the purpose at `purpose_index`; mutex_ must be held.

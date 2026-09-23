@@ -24,81 +24,40 @@
 #include <fstream>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 #include <vector>
 
 #include "api_internal.hpp"
 #include "log/log_manager.hpp"
+#include "message/add_reader_req_message.hpp"
+#include "message/add_reader_resp_message.hpp"
+#include "message/auth_alert_message.hpp"
+#include "message/auth_hello_message.hpp"
+#include "message/iotsp_message.hpp"
+#include "message/session_key_req_message.hpp"
+#include "message/session_key_resp_message.hpp"
 
 namespace sst {
 
-namespace {
+using internal::Bytes;
+using message::IoTSPMessage;
+using message::MessageType;
 
-using Bytes = std::vector<unsigned char>;
+namespace {
 
 // ---------------------------------------------------------------------------
 // Protocol constants (mirror src/c_common.h and src/c_secure_comm.h)
 // ---------------------------------------------------------------------------
 
-// Message types.
-constexpr unsigned char AUTH_HELLO = 0;
-constexpr unsigned char SESSION_KEY_REQ_IN_PUB_ENC = 20;
-constexpr unsigned char SESSION_KEY_RESP_WITH_DIST_KEY = 21;
-constexpr unsigned char SESSION_KEY_REQ = 22;
-constexpr unsigned char SESSION_KEY_RESP = 23;
-constexpr unsigned char SKEY_HANDSHAKE_1 = 30;
-constexpr unsigned char SKEY_HANDSHAKE_2 = 31;
-constexpr unsigned char SKEY_HANDSHAKE_3 = 32;
-constexpr unsigned char SECURE_COMM_MSG = 33;
-constexpr unsigned char ADD_READER_REQ_IN_PUB_ENC = 60;
-constexpr unsigned char ADD_READER_RESP_WITH_DIST_KEY = 61;
-constexpr unsigned char ADD_READER_REQ = 62;
-constexpr unsigned char ADD_READER_RESP = 63;
-constexpr unsigned char AUTH_ALERT = 100;
-
 // Sizes.
-constexpr unsigned int MESSAGE_TYPE_SIZE = 1;
-constexpr unsigned int MAX_PAYLOAD_BUF_SIZE = 5;
 constexpr unsigned int HS_NONCE_SIZE = 8;
 constexpr unsigned int HS_INDICATOR_SIZE = 1 + HS_NONCE_SIZE * 2;
 constexpr unsigned int MAX_HS_BUF_LENGTH = 256;
-constexpr unsigned int AUTH_ID_LEN = 4;
-constexpr unsigned int NUMKEY_SIZE = 4;
 constexpr unsigned int NONCE_SIZE = 8;
 constexpr unsigned int KEY_ID_SIZE = 8;
-constexpr unsigned int ABS_VALIDITY_SIZE = 6;
-constexpr unsigned int REL_VALIDITY_SIZE = 6;
 // The C API uses 1024 here; a larger buffer also fits responses carrying
 // MAX_SESSION_KEY keys together with a distribution key.
 constexpr unsigned int MAX_AUTH_COMM_LENGTH = 4096;
-
-// Auth alert codes.
-enum auth_alert_code {
-    INVALID_DISTRIBUTION_KEY,
-    INVALID_SESSION_KEY_REQ,
-    UNKNOWN_INTERNAL_ERROR,
-};
-
-// Throws for an AUTH_ALERT received from Auth. The alert payload is a single
-// auth_alert_code byte (see AuthAlertMessage in the Auth server).
-[[noreturn]] void throw_auth_alert(unsigned char alert_code) {
-    std::string reason;
-    switch (alert_code) {
-        case INVALID_DISTRIBUTION_KEY:
-            reason = "Invalid Distribution Key.";
-            break;
-        case INVALID_SESSION_KEY_REQ:
-            reason = "Invalid Session Key Request.";
-            break;
-        case UNKNOWN_INTERNAL_ERROR:
-            reason = "Unknown Internal Error.";
-            break;
-        default:
-            reason = "Unknown Code.";
-            break;
-    }
-    throw SST_Exception("AUTH_ALERT received from Auth: " + reason +
-                        " (code " + std::to_string(alert_code) + ")");
-}
 
 // Handshake nonces (HS_nonce_t).
 struct HS_nonce_t {
@@ -115,6 +74,7 @@ class FdGuard {
     }
     FdGuard(const FdGuard&) = delete;
     FdGuard& operator=(const FdGuard&) = delete;
+    int get() const { return fd_; }
     int release() {
         int fd = fd_;
         fd_ = -1;
@@ -137,6 +97,14 @@ std::string to_hex(const unsigned char* buf, size_t size) {
     }
     return oss.str();
 }
+
+}  // namespace
+
+// ---------------------------------------------------------------------------
+// Byte and socket helpers (c_common.c), shared via api_internal.hpp
+// ---------------------------------------------------------------------------
+
+namespace internal {
 
 void write_in_n_bytes(uint64_t num, int n, unsigned char* buf) {
     for (int i = 0; i < n; i++) {
@@ -187,34 +155,6 @@ void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
     var_len_int_buf[*var_len_int_buf_size - 1] =
         static_cast<unsigned char>(num);
 }
-
-// Prepends the SST header (message type + variable length payload size).
-Bytes make_sender_buf(const unsigned char* payload, unsigned int payload_length,
-                      unsigned char message_type) {
-    unsigned char payload_buf[MAX_PAYLOAD_BUF_SIZE];
-    unsigned int payload_buf_len;
-    num_to_var_length_int(payload_length, payload_buf, &payload_buf_len);
-    Bytes sender;
-    sender.reserve(MESSAGE_TYPE_SIZE + payload_buf_len + payload_length);
-    sender.push_back(message_type);
-    sender.insert(sender.end(), payload_buf, payload_buf + payload_buf_len);
-    sender.insert(sender.end(), payload, payload + payload_length);
-    return sender;
-}
-
-Bytes make_sender_buf(const Bytes& payload, unsigned char message_type) {
-    return make_sender_buf(payload.data(),
-                           static_cast<unsigned int>(payload.size()),
-                           message_type);
-}
-
-}  // namespace
-
-// ---------------------------------------------------------------------------
-// Socket helpers (c_common.c), shared with ipfs.cpp via api_internal.hpp
-// ---------------------------------------------------------------------------
-
-namespace internal {
 
 int sst_read_from_socket(int sock, unsigned char* buf,
                          unsigned int buf_length) {
@@ -346,9 +286,10 @@ int connect_as_client(const char* ip_addr, int port_num) {
 }  // namespace internal
 
 using internal::connect_as_client;
-using internal::read_exact;
-using internal::sst_read_from_socket;
+using internal::read_unsigned_int_BE;
+using internal::read_unsigned_long_int_BE;
 using internal::sst_write_to_socket;
+using internal::write_in_n_bytes;
 
 namespace {
 
@@ -356,62 +297,6 @@ namespace {
 int write_bytes_to_socket(int sock, const Bytes& buf) {
     return sst_write_to_socket(sock, buf.data(),
                                static_cast<unsigned int>(buf.size()));
-}
-
-// Reads the SST header one byte at a time, then the whole payload into `buf`.
-// @return payload length, 0 when the socket was closed, -1 on error.
-int read_header_return_data_buf_pointer(int sock, unsigned char* message_type,
-                                        unsigned char* buf,
-                                        unsigned int buf_length) {
-    unsigned char header[MESSAGE_TYPE_SIZE + MAX_PAYLOAD_BUF_SIZE];
-    int ret = read_exact(sock, header, MESSAGE_TYPE_SIZE);
-    if (ret < 0) {
-        LOG_ERR
-            << "Socket read error in read_header_return_data_buf_pointer().";
-        return -1;
-    } else if (ret == 0) {
-        LOG_INF << "End of file. Disconnected from socket " << sock;
-        return 0;
-    }
-    *message_type = header[0];
-
-    // Variable length payload size: continue while the high bit is set.
-    unsigned int var_length_buf_size = 0;
-    while (var_length_buf_size < MAX_PAYLOAD_BUF_SIZE) {
-        ret = read_exact(sock, header + MESSAGE_TYPE_SIZE + var_length_buf_size,
-                         1);
-        if (ret <= 0) {
-            LOG_ERR << "Failed to read variable length header.";
-            return -1;
-        }
-        var_length_buf_size++;
-        if ((header[MESSAGE_TYPE_SIZE + var_length_buf_size - 1] & 128) == 0) {
-            break;
-        }
-    }
-    unsigned int payload_length;
-    int var_length_buf_size_checked;
-    var_length_int_to_num(header + MESSAGE_TYPE_SIZE, var_length_buf_size,
-                          &payload_length, &var_length_buf_size_checked);
-    if (static_cast<unsigned int>(var_length_buf_size_checked) !=
-        var_length_buf_size) {
-        LOG_ERR << "Wrong header calculation.";
-        return -1;
-    }
-    if (payload_length > buf_length) {
-        LOG_ERR << "Larger buffer size required. Payload: " << payload_length
-                << ", buffer: " << buf_length;
-        return -1;
-    }
-    if (payload_length == 0) {
-        return 0;
-    }
-    ret = read_exact(sock, buf, payload_length);
-    if (ret <= 0) {
-        LOG_ERR << "Failed to read from socket while reading the payload.";
-        return -1;
-    }
-    return static_cast<int>(payload_length);
 }
 
 // ---------------------------------------------------------------------------
@@ -461,15 +346,14 @@ bool check_validity(uint64_t abs_validity_ms) {
     return current_time_ms() < abs_validity_ms;
 }
 
-bool check_distribution_key_validity(const distribution_key_t& dist_key) {
-    bool valid = check_validity(dist_key.abs_validity);
-    if (!valid) {
-        LOG_DBG << "Distribution key expired!";
-    }
-    return valid;
+}  // namespace
+
+namespace internal {
+
+bool is_distribution_key_valid(const distribution_key_t& dist_key) {
+    return check_validity(dist_key.abs_validity);
 }
 
-// Encrypt-then-MAC into a vector sized from the expected length.
 int symmetric_encrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
@@ -489,9 +373,6 @@ int symmetric_encrypt_authenticate(
     return 0;
 }
 
-// Rejects encrypted buffers that cannot hold the IV, the optional HMAC, the
-// GCM tag and (for CBC) at least one whole ciphertext block, so that the
-// crypto layer's length arithmetic never underflows on truncated input.
 bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
                             AES_encryption_mode_t enc_mode,
                             hmac_mode_t hmac_mode) {
@@ -517,7 +398,6 @@ bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
     return true;
 }
 
-// Verify-then-decrypt into a vector sized from the expected maximum length.
 int symmetric_decrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,
     const unsigned char* mac_key, unsigned int mac_key_size,
@@ -542,6 +422,14 @@ int symmetric_decrypt_authenticate(
     ret.resize(ret_length);
     return 0;
 }
+
+}  // namespace internal
+
+using internal::check_encrypted_length;
+using internal::symmetric_decrypt_authenticate;
+using internal::symmetric_encrypt_authenticate;
+
+namespace {
 
 // Session key handshake messages are always encrypted with CBC-sized IV and
 // HMAC (hmac_mode 0 == USE_HMAC in the C API).
@@ -652,89 +540,8 @@ Bytes check_handshake1_send_handshake2(const unsigned char* received_buf,
 }
 
 // ---------------------------------------------------------------------------
-// Auth request serialization (c_secure_comm.c)
+// Distribution key parsing (c_secure_comm.c)
 // ---------------------------------------------------------------------------
-
-// entity_nonce (8) + auth_nonce (8) + [num_key (4)] + varlen(sender) + sender
-// + varlen(purpose) + purpose.
-Bytes serialize_message_for_auth(const unsigned char* entity_nonce,
-                                 const unsigned char* auth_nonce, int num_key,
-                                 const std::string& sender,
-                                 const std::string& purpose) {
-    Bytes ret;
-    ret.insert(ret.end(), entity_nonce, entity_nonce + NONCE_SIZE);
-    ret.insert(ret.end(), auth_nonce, auth_nonce + NONCE_SIZE);
-    if (num_key != 0) {
-        unsigned char num_key_buf[NUMKEY_SIZE];
-        write_in_n_bytes(static_cast<uint64_t>(num_key), NUMKEY_SIZE,
-                         num_key_buf);
-        ret.insert(ret.end(), num_key_buf, num_key_buf + NUMKEY_SIZE);
-    }
-    unsigned char var_length_int_buf[MAX_PAYLOAD_BUF_SIZE];
-    unsigned int var_length_int_len;
-
-    num_to_var_length_int(static_cast<unsigned int>(sender.size()),
-                          var_length_int_buf, &var_length_int_len);
-    ret.insert(ret.end(), var_length_int_buf,
-               var_length_int_buf + var_length_int_len);
-    ret.insert(ret.end(), sender.begin(), sender.end());
-
-    num_to_var_length_int(static_cast<unsigned int>(purpose.size()),
-                          var_length_int_buf, &var_length_int_len);
-    ret.insert(ret.end(), var_length_int_buf,
-               var_length_int_buf + var_length_int_len);
-    ret.insert(ret.end(), purpose.begin(), purpose.end());
-    return ret;
-}
-
-// RSA-OAEP encrypts `buf` with Auth's public key and appends the entity's
-// SHA-256 RSA signature over the ciphertext.
-Bytes encrypt_and_sign(const unsigned char* buf, unsigned int buf_len,
-                       EVP_PKEY* pub_key, EVP_PKEY* priv_key) {
-    Bytes encrypted(static_cast<size_t>(EVP_PKEY_size(pub_key)));
-    size_t encrypted_length = encrypted.size();
-    if (Crypto::public_encrypt(buf, buf_len, RSA_PKCS1_OAEP_PADDING, pub_key,
-                               encrypted.data(), &encrypted_length) < 0) {
-        throw SST_Exception("Failed public_encrypt().");
-    }
-    encrypted.resize(encrypted_length);
-
-    Bytes signature(static_cast<size_t>(EVP_PKEY_size(priv_key)));
-    size_t sig_length = signature.size();
-    if (Crypto::sha256_sign(encrypted.data(),
-                            static_cast<unsigned int>(encrypted.size()),
-                            priv_key, signature.data(), &sig_length) < 0) {
-        throw SST_Exception("Failed sha256_sign().");
-    }
-    signature.resize(sig_length);
-
-    Bytes message;
-    message.reserve(encrypted.size() + signature.size());
-    message.insert(message.end(), encrypted.begin(), encrypted.end());
-    message.insert(message.end(), signature.begin(), signature.end());
-    return message;
-}
-
-// name_length (1) + name + Enc_dist_key(serialized).
-Bytes serialize_session_key_req_with_distribution_key(
-    const unsigned char* serialized, unsigned int serialized_length,
-    const distribution_key_t& dist_key, const std::string& name) {
-    Bytes encrypted;
-    if (symmetric_encrypt_authenticate(
-            serialized, serialized_length, dist_key.mac_key,
-            dist_key.mac_key_size, dist_key.cipher_key,
-            dist_key.cipher_key_size, dist_key.enc_mode, USE_HMAC,
-            encrypted) < 0) {
-        throw SST_Exception(
-            "Error during encryption while symmetric_encrypt_authenticate().");
-    }
-    Bytes ret;
-    ret.reserve(1 + name.size() + encrypted.size());
-    ret.push_back(static_cast<unsigned char>(name.size()));
-    ret.insert(ret.end(), name.begin(), name.end());
-    ret.insert(ret.end(), encrypted.begin(), encrypted.end());
-    return ret;
-}
 
 // abs_validity (6) + cipher_key_size (1) + cipher_key + mac_key_size (1) +
 // mac_key.
@@ -767,43 +574,45 @@ void parse_distribution_key(distribution_key_t& parsed,
     std::memcpy(parsed.mac_key, buf + cur_index, mac_key_size);
 }
 
-// key_id (8) + abs_validity (6) + rel_validity (6) + cipher_key_size (1) +
-// cipher_key + mac_key_size (1) + mac_key.
-// @return number of bytes consumed.
-unsigned int parse_session_key(session_key_t& ret, const unsigned char* buf,
-                               unsigned int buf_length) {
-    if (buf_length <
-        SESSION_KEY_ID_SIZE + ABS_VALIDITY_SIZE + REL_VALIDITY_SIZE + 1) {
-        throw SST_Exception("Session key buffer too short.");
-    }
-    std::memcpy(ret.key_id, buf, SESSION_KEY_ID_SIZE);
-    unsigned int cur_idx = SESSION_KEY_ID_SIZE;
+// ---------------------------------------------------------------------------
+// Auth connection helpers
+// ---------------------------------------------------------------------------
 
-    ret.abs_validity =
-        read_unsigned_long_int_BE(buf + cur_idx, ABS_VALIDITY_SIZE);
-    cur_idx += ABS_VALIDITY_SIZE;
-    ret.rel_validity =
-        read_unsigned_long_int_BE(buf + cur_idx, REL_VALIDITY_SIZE);
-    cur_idx += REL_VALIDITY_SIZE;
-
-    ret.cipher_key_size = buf[cur_idx];
-    cur_idx += 1;
-    if (ret.cipher_key_size > MAX_CIPHER_KEY_SIZE ||
-        cur_idx + ret.cipher_key_size + 1 > buf_length) {
-        throw SST_Exception("Invalid session cipher key size.");
+int connect_to_auth(const config_t& config) {
+    int sock = connect_as_client(config.auth_ip_addr, config.auth_port_num);
+    if (sock < 0) {
+        throw SST_Exception(std::string("Failed to connect to Auth at ") +
+                            config.auth_ip_addr + ":" +
+                            std::to_string(config.auth_port_num));
     }
-    std::memcpy(ret.cipher_key, buf + cur_idx, ret.cipher_key_size);
-    cur_idx += ret.cipher_key_size;
+    return sock;
+}
 
-    ret.mac_key_size = buf[cur_idx];
-    cur_idx += 1;
-    if (ret.mac_key_size > MAC_KEY_SIZE ||
-        cur_idx + ret.mac_key_size > buf_length) {
-        throw SST_Exception("Invalid session MAC key size.");
+// Reads the next message from Auth. An AUTH_ALERT is turned into an
+// SST_Exception here, so every request flow handles alerts the same way.
+IoTSPMessage receive_from_auth(int sock) {
+    IoTSPMessage msg = IoTSPMessage::receive(sock, MAX_AUTH_COMM_LENGTH);
+    if (msg.get_type() == MessageType::AUTH_ALERT) {
+        throw SST_Exception(message::AuthAlertMessage(msg).describe());
     }
-    std::memcpy(ret.mac_key, buf + cur_idx, ret.mac_key_size);
-    cur_idx += ret.mac_key_size;
-    return cur_idx;
+    return msg;
+}
+
+// Reads AUTH_HELLO and checks that it comes from the configured Auth.
+message::AuthHelloMessage receive_auth_hello(int sock, int expected_auth_id) {
+    message::AuthHelloMessage hello(receive_from_auth(sock));
+    if (hello.get_auth_id() != static_cast<uint32_t>(expected_auth_id)) {
+        throw SST_Exception("Auth ID NOT matched. Received " +
+                            std::to_string(hello.get_auth_id()) +
+                            ", expected " + std::to_string(expected_auth_id));
+    }
+    return hello;
+}
+
+void send_to_auth(int sock, const Bytes& wire) {
+    if (write_bytes_to_socket(sock, wire) < 0) {
+        throw SST_Exception("Failed to send request to Auth.");
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1147,8 +956,10 @@ int SST_Session::send_secure_message(const unsigned char* msg,
         return -1;
     }
     sent_seq_num_++;
+    encrypted.resize(encrypted_length);
     Bytes sender =
-        make_sender_buf(encrypted.data(), encrypted_length, SECURE_COMM_MSG);
+        IoTSPMessage(MessageType::SECURE_COMM_MSG, std::move(encrypted))
+            .serialize();
     int bytes_written = write_bytes_to_socket(sock_, sender);
     if (bytes_written < 0) {
         LOG_ERR << "Failed sst_write_to_socket().";
@@ -1160,27 +971,27 @@ int SST_Session::send_secure_message(const unsigned char* msg,
 int SST_Session::read_secure_message(unsigned char* plaintext,
                                      unsigned int plaintext_capacity) {
     std::lock_guard<std::mutex> lock(recv_mutex_);
-    unsigned char message_type;
-    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    int bytes_read = read_header_return_data_buf_pointer(
-        sock_, &message_type, received_buf, MAX_SECURE_COMM_MSG_LENGTH);
+    MessageType message_type;
+    Bytes received;
+    int bytes_read = IoTSPMessage::read(sock_, MAX_SECURE_COMM_MSG_LENGTH,
+                                        message_type, received);
     if (bytes_read == 0) {
         LOG_DBG << "Socket was disconnected while reading secure message.";
         return 0;
     } else if (bytes_read < 0) {
-        LOG_ERR << "Failed to read_header_return_data_buf_pointer().";
+        LOG_ERR << "Failed to read a secure message.";
         return -1;
     }
-    if (message_type != SECURE_COMM_MSG) {
-        LOG_ERR << "Wrong message type " << static_cast<int>(message_type)
+    if (message_type != MessageType::SECURE_COMM_MSG) {
+        LOG_ERR << "Wrong message type " << message::to_string(message_type)
                 << ", expected SECURE_COMM_MSG.";
         return -1;
     }
     Bytes decrypted;
     if (symmetric_decrypt_authenticate(
-            received_buf, static_cast<unsigned int>(bytes_read), s_key_.mac_key,
-            MAC_KEY_SIZE, s_key_.cipher_key, CIPHER_KEY_SIZE, s_key_.enc_mode,
-            s_key_.hmac_mode, decrypted) < 0) {
+            received.data(), static_cast<unsigned int>(received.size()),
+            s_key_.mac_key, MAC_KEY_SIZE, s_key_.cipher_key, CIPHER_KEY_SIZE,
+            s_key_.enc_mode, s_key_.hmac_mode, decrypted) < 0) {
         LOG_ERR << "Failed to decrypt received message.";
         return -1;
     }
@@ -1406,56 +1217,11 @@ SessionKeyList SST_API::send_session_key_request_check_protocol(
     return s_key_list;
 }
 
-void SST_API::parse_session_key_response(const unsigned char* buf,
-                                         unsigned int buf_length,
-                                         unsigned char* reply_nonce,
-                                         SessionKeyList& list) const {
-    if (buf_length < NONCE_SIZE + 1) {
-        throw SST_Exception("Session key response too short.");
-    }
-    std::memcpy(reply_nonce, buf, NONCE_SIZE);
-    unsigned int buf_idx = NONCE_SIZE;
-
-    // Crypto spec string: varlen + bytes. Currently unused, skip it.
-    unsigned int crypto_spec_len;
-    int var_len_int_buf_size;
-    var_length_int_to_num(buf + buf_idx, buf_length - buf_idx, &crypto_spec_len,
-                          &var_len_int_buf_size);
-    if (var_len_int_buf_size == 0) {
-        throw SST_Exception(
-            "Buffer size of the variable length integer cannot be 0.");
-    }
-    unsigned int prefix_len = static_cast<unsigned int>(var_len_int_buf_size);
-    // Both subtractions are safe: prefix_len <= buf_length - buf_idx by
-    // construction, and the comparison rejects an oversized spec length
-    // before it can move buf_idx past the end of the response.
-    if (crypto_spec_len > buf_length - buf_idx - prefix_len ||
-        buf_length - buf_idx - prefix_len - crypto_spec_len < 4) {
-        throw SST_Exception("Session key response truncated.");
-    }
-    buf_idx += prefix_len + crypto_spec_len;
-    unsigned int session_key_list_length =
-        read_unsigned_int_BE(buf + buf_idx, 4);
-    buf_idx += 4;
-    if (session_key_list_length > MAX_SESSION_KEY) {
-        throw SST_Exception("Too many session keys in response: " +
-                            std::to_string(session_key_list_length));
-    }
-    for (unsigned int i = 0; i < session_key_list_length; i++) {
-        buf_idx += parse_session_key(list.s_key[i], buf + buf_idx,
-                                     buf_length - buf_idx);
-        list.s_key[i].enc_mode = config_.session_key_enc_mode;
-        list.s_key[i].hmac_mode = config_.hmac_mode;
-        list.s_key[i].perm_dist_key_mode = config_.perm_dist_key_mode;
-    }
-    list.num_key = static_cast<int>(session_key_list_length);
-    list.rear_idx = list.num_key % static_cast<int>(MAX_SESSION_KEY);
-}
-
-void SST_API::save_distribution_key(const unsigned char* data_buf,
-                                    size_t key_size) {
-    // data_buf = Enc_pub(dist key) (key_size) + Sign(Enc_pub(dist key))
+void SST_API::save_distribution_key(const Bytes& encrypted_dist_key) {
+    // Enc_entityPubKey(dist key) (key_size) + Sign_authPrivKey(...)
     // (key_size).
+    size_t key_size = encrypted_dist_key.size() / 2;
+    const unsigned char* data_buf = encrypted_dist_key.data();
     if (Crypto::sha256_verify(data_buf, static_cast<unsigned int>(key_size),
                               data_buf + key_size, key_size,
                               pub_key_.get()) < 0) {
@@ -1474,250 +1240,74 @@ void SST_API::save_distribution_key(const unsigned char* data_buf,
     dist_key_.enc_mode = config_.dist_key_enc_mode;
 }
 
-void SST_API::send_auth_request_message(const unsigned char* serialized,
-                                        unsigned int serialized_length,
-                                        int sock, bool request_index) {
-    Bytes message;
-    if (!check_distribution_key_validity(dist_key_)) {
-        LOG_DBG << "Current distribution key expired, requesting new "
-                   "distribution key as well...";
-        if (!pub_key_ || !priv_key_) {
-            throw SST_Exception(
-                "Distribution key expired but no public/private key loaded.");
-        }
-        Bytes enc = encrypt_and_sign(serialized, serialized_length,
-                                     pub_key_.get(), priv_key_.get());
-        message =
-            make_sender_buf(enc, request_index ? SESSION_KEY_REQ_IN_PUB_ENC
-                                               : ADD_READER_REQ_IN_PUB_ENC);
-    } else {
-        Bytes enc = serialize_session_key_req_with_distribution_key(
-            serialized, serialized_length, dist_key_, config_.name);
-        message = make_sender_buf(
-            enc, request_index ? SESSION_KEY_REQ : ADD_READER_REQ);
-    }
-    if (write_bytes_to_socket(sock, message) < 0) {
-        throw SST_Exception("Failed to send request to Auth.");
-    }
+size_t SST_API::entity_rsa_key_size() const {
+    return priv_key_ ? static_cast<size_t>(EVP_PKEY_size(priv_key_.get())) : 0;
 }
 
-void SST_API::handle_AUTH_HELLO(const unsigned char* data_buf,
-                                unsigned char* entity_nonce, int sock,
-                                int num_key, const std::string& purpose,
-                                bool request_index) {
-    unsigned int auth_id = read_unsigned_int_BE(data_buf, AUTH_ID_LEN);
-    if (auth_id != static_cast<unsigned int>(config_.auth_id)) {
-        throw SST_Exception("Auth ID NOT matched. Received " +
-                            std::to_string(auth_id) + ", expected " +
-                            std::to_string(config_.auth_id));
+void SST_API::decrypt_auth_response(message::EntityRespMessage& resp,
+                                    const unsigned char* entity_nonce) {
+    if (resp.has_distribution_key()) {
+        save_distribution_key(resp.get_encrypted_distribution_key());
     }
-    unsigned char auth_nonce[NONCE_SIZE];
-    std::memcpy(auth_nonce, data_buf + AUTH_ID_LEN, NONCE_SIZE);
-    if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
-        throw SST_Exception("Failed to generate entity nonce.");
+    resp.decrypt_and_parse(dist_key_, config_.session_key_enc_mode);
+    LOG_DBG << "Reply nonce in response:"
+            << to_hex(resp.get_entity_nonce().data(), NONCE_SIZE);
+    if (std::memcmp(resp.get_entity_nonce().data(), entity_nonce, NONCE_SIZE) !=
+        0) {
+        throw SST_Exception("Auth nonce NOT verified.");
     }
-    Bytes serialized = serialize_message_for_auth(
-        entity_nonce, auth_nonce, num_key, config_.name, purpose);
-    send_auth_request_message(serialized.data(),
-                              static_cast<unsigned int>(serialized.size()),
-                              sock, request_index);
+    LOG_DBG << "Auth nonce verified!";
 }
 
 SessionKeyList SST_API::send_session_key_req_via_TCP() {
-    int sock = connect_as_client(config_.auth_ip_addr, config_.auth_port_num);
-    if (sock < 0) {
-        throw SST_Exception(std::string("Failed to connect to Auth at ") +
-                            config_.auth_ip_addr + ":" +
-                            std::to_string(config_.auth_port_num));
-    }
-    FdGuard guard(sock);
+    FdGuard guard(connect_to_auth(config_));
+    int sock = guard.get();
 
-    enum send_state {
-        INIT,
-        AUTH_HELLO_RECEIVED,
-    };
-    send_state state = INIT;
+    message::AuthHelloMessage hello = receive_auth_hello(sock, config_.auth_id);
     unsigned char entity_nonce[NONCE_SIZE];
-    SessionKeyList session_key_list;
-
-    while (true) {
-        unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        unsigned char message_type;
-        int data_buf_length = read_header_return_data_buf_pointer(
-            sock, &message_type, received_buf, sizeof(received_buf));
-        if (data_buf_length < 0) {
-            throw SST_Exception("Failed to read from Auth.");
-        } else if (data_buf_length == 0) {
-            throw SST_Exception("Auth closed the connection.");
-        }
-        unsigned int data_len = static_cast<unsigned int>(data_buf_length);
-
-        if (state == INIT && message_type == AUTH_HELLO) {
-            if (data_len < AUTH_ID_LEN + NONCE_SIZE) {
-                throw SST_Exception("AUTH_HELLO too short.");
-            }
-            state = AUTH_HELLO_RECEIVED;
-            handle_AUTH_HELLO(received_buf, entity_nonce, sock, config_.numkey,
-                              purpose_for_requesting_key_, true);
-        } else if (state == AUTH_HELLO_RECEIVED &&
-                   message_type == SESSION_KEY_RESP) {
-            LOG_DBG << "Received session key response encrypted with "
-                       "distribution key.";
-            Bytes decrypted;
-            if (symmetric_decrypt_authenticate(
-                    received_buf, data_len, dist_key_.mac_key,
-                    dist_key_.mac_key_size, dist_key_.cipher_key,
-                    dist_key_.cipher_key_size, config_.session_key_enc_mode,
-                    USE_HMAC, decrypted) < 0) {
-                throw SST_Exception(
-                    "Failed to decrypt SESSION_KEY_RESP with the "
-                    "distribution key.");
-            }
-            unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(
-                decrypted.data(), static_cast<unsigned int>(decrypted.size()),
-                reply_nonce, session_key_list);
-            LOG_DBG << "Reply_nonce in sessionKeyResp:"
-                    << to_hex(reply_nonce, NONCE_SIZE);
-            if (std::memcmp(reply_nonce, entity_nonce, NONCE_SIZE) != 0) {
-                throw SST_Exception("Auth nonce NOT verified.");
-            }
-            LOG_DBG << "Auth nonce verified!";
-            return session_key_list;
-        } else if (state == AUTH_HELLO_RECEIVED &&
-                   message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
-            if (!priv_key_) {
-                throw SST_Exception(
-                    "Received SESSION_KEY_RESP_WITH_DIST_KEY without a "
-                    "private key.");
-            }
-            size_t key_size =
-                static_cast<size_t>(EVP_PKEY_size(priv_key_.get()));
-            if (data_len <= key_size * 2) {
-                throw SST_Exception(
-                    "SESSION_KEY_RESP_WITH_DIST_KEY too short.");
-            }
-            save_distribution_key(received_buf, key_size);
-
-            // Decrypt the session keys with the fresh distribution key.
-            Bytes decrypted;
-            if (symmetric_decrypt_authenticate(
-                    received_buf + key_size * 2,
-                    data_len - static_cast<unsigned int>(key_size * 2),
-                    dist_key_.mac_key, dist_key_.mac_key_size,
-                    dist_key_.cipher_key, dist_key_.cipher_key_size,
-                    config_.session_key_enc_mode, USE_HMAC, decrypted) < 0) {
-                throw SST_Exception(
-                    "Failed to decrypt SESSION_KEY_RESP_WITH_DIST_KEY.");
-            }
-            unsigned char reply_nonce[NONCE_SIZE];
-            parse_session_key_response(
-                decrypted.data(), static_cast<unsigned int>(decrypted.size()),
-                reply_nonce, session_key_list);
-            LOG_DBG << "Reply_nonce in sessionKeyResp:"
-                    << to_hex(reply_nonce, NONCE_SIZE);
-            if (std::memcmp(reply_nonce, entity_nonce, NONCE_SIZE) != 0) {
-                throw SST_Exception("Auth nonce NOT verified.");
-            }
-            LOG_DBG << "Auth nonce verified!";
-            return session_key_list;
-        } else if (message_type == AUTH_ALERT) {
-            throw_auth_alert(received_buf[0]);
-        } else {
-            throw SST_Exception("Unexpected message type " +
-                                std::to_string(message_type) + " from Auth.");
-        }
+    if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
+        throw SST_Exception("Failed to generate entity nonce.");
     }
+    message::SessionKeyReqMessage req(
+        entity_nonce, hello.get_auth_nonce().data(), config_.numkey,
+        config_.name, purpose_for_requesting_key_);
+    send_to_auth(sock, req.serialize_and_encrypt(dist_key_, pub_key_.get(),
+                                                 priv_key_.get()));
+
+    message::SessionKeyRespMessage resp(receive_from_auth(sock),
+                                        entity_rsa_key_size());
+    decrypt_auth_response(resp, entity_nonce);
+
+    SessionKeyList session_key_list = resp.get_session_keys();
+    // The key modes are not on the wire; they come from the config.
+    for (int i = 0; i < session_key_list.num_key; i++) {
+        session_key_t& key = session_key_list.s_key[static_cast<size_t>(i)];
+        key.enc_mode = config_.session_key_enc_mode;
+        key.hmac_mode = config_.hmac_mode;
+        key.perm_dist_key_mode = config_.perm_dist_key_mode;
+    }
+    return session_key_list;
 }
 
 void SST_API::send_add_reader_req_via_TCP(const std::string& add_reader) {
     std::lock_guard<std::mutex> lock(mutex_);
-    int sock = connect_as_client(config_.auth_ip_addr, config_.auth_port_num);
-    if (sock < 0) {
-        throw SST_Exception(std::string("Failed to connect to Auth at ") +
-                            config_.auth_ip_addr + ":" +
-                            std::to_string(config_.auth_port_num));
-    }
-    FdGuard guard(sock);
+    FdGuard guard(connect_to_auth(config_));
+    int sock = guard.get();
+
+    message::AuthHelloMessage hello = receive_auth_hello(sock, config_.auth_id);
     unsigned char entity_nonce[NONCE_SIZE];
-    bool hello_received = false;
-
-    while (true) {
-        unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        unsigned char message_type;
-        int data_buf_length = read_header_return_data_buf_pointer(
-            sock, &message_type, received_buf, sizeof(received_buf));
-        if (data_buf_length < 0) {
-            throw SST_Exception("Failed to read from Auth.");
-        } else if (data_buf_length == 0) {
-            throw SST_Exception("Auth closed the connection.");
-        }
-        unsigned int data_len = static_cast<unsigned int>(data_buf_length);
-
-        if (!hello_received && message_type == AUTH_HELLO) {
-            if (data_len < AUTH_ID_LEN + NONCE_SIZE) {
-                throw SST_Exception("AUTH_HELLO too short.");
-            }
-            hello_received = true;
-            // num_key 0: the add reader request carries no key count.
-            handle_AUTH_HELLO(received_buf, entity_nonce, sock, 0, add_reader,
-                              false);
-        } else if (hello_received &&
-                   message_type == ADD_READER_RESP_WITH_DIST_KEY) {
-            if (!priv_key_) {
-                throw SST_Exception(
-                    "Received ADD_READER_RESP_WITH_DIST_KEY without a "
-                    "private key.");
-            }
-            size_t key_size =
-                static_cast<size_t>(EVP_PKEY_size(priv_key_.get()));
-            if (data_len <= key_size * 2) {
-                throw SST_Exception("ADD_READER_RESP_WITH_DIST_KEY too short.");
-            }
-            save_distribution_key(received_buf, key_size);
-            Bytes decrypted;
-            if (symmetric_decrypt_authenticate(
-                    received_buf + key_size * 2,
-                    data_len - static_cast<unsigned int>(key_size * 2),
-                    dist_key_.mac_key, dist_key_.mac_key_size,
-                    dist_key_.cipher_key, dist_key_.cipher_key_size,
-                    config_.session_key_enc_mode, USE_HMAC, decrypted) < 0 ||
-                decrypted.size() < NONCE_SIZE) {
-                throw SST_Exception(
-                    "Error during decryption after receiving "
-                    "ADD_READER_RESP_WITH_DIST_KEY.");
-            }
-            if (std::memcmp(decrypted.data(), entity_nonce, NONCE_SIZE) != 0) {
-                throw SST_Exception("Auth nonce NOT verified.");
-            }
-            LOG_DBG << "Auth nonce verified!";
-            LOG_INF << "Add a file reader to the database.";
-            return;
-        } else if (hello_received && message_type == ADD_READER_RESP) {
-            Bytes decrypted;
-            if (symmetric_decrypt_authenticate(
-                    received_buf, data_len, dist_key_.mac_key,
-                    dist_key_.mac_key_size, dist_key_.cipher_key,
-                    dist_key_.cipher_key_size, config_.session_key_enc_mode,
-                    USE_HMAC, decrypted) < 0 ||
-                decrypted.size() < NONCE_SIZE) {
-                throw SST_Exception(
-                    "Error during decryption after receiving "
-                    "ADD_READER_RESP.");
-            }
-            if (std::memcmp(decrypted.data(), entity_nonce, NONCE_SIZE) != 0) {
-                throw SST_Exception("Auth nonce NOT verified.");
-            }
-            LOG_DBG << "Auth nonce verified!";
-            LOG_INF << "Add a file reader to the database.";
-            return;
-        } else if (message_type == AUTH_ALERT) {
-            throw_auth_alert(received_buf[0]);
-        } else {
-            throw SST_Exception("Unexpected message type " +
-                                std::to_string(message_type) + " from Auth.");
-        }
+    if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
+        throw SST_Exception("Failed to generate entity nonce.");
     }
+    message::AddReaderReqMessage req(
+        entity_nonce, hello.get_auth_nonce().data(), config_.name, add_reader);
+    send_to_auth(sock, req.serialize_and_encrypt(dist_key_, pub_key_.get(),
+                                                 priv_key_.get()));
+
+    message::AddReaderRespMessage resp(receive_from_auth(sock),
+                                       entity_rsa_key_size());
+    decrypt_auth_response(resp, entity_nonce);
+    LOG_INF << "Add a file reader to the database.";
 }
 
 // ---------------------------------------------------------------------------
@@ -1744,16 +1334,18 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     // Send handshake 1.
     unsigned char entity_nonce[HS_NONCE_SIZE];
     Bytes parsed = parse_handshake_1(s_key, entity_nonce);
-    Bytes sender_HS_1 = make_sender_buf(parsed, SKEY_HANDSHAKE_1);
+    Bytes sender_HS_1 =
+        IoTSPMessage(MessageType::SKEY_HANDSHAKE_1, std::move(parsed))
+            .serialize();
     if (write_bytes_to_socket(sock, sender_HS_1) < 0) {
         throw SST_Exception("Failed to send handshake 1.");
     }
 
     // Receive handshake 2.
-    unsigned char received_buf[MAX_HS_BUF_LENGTH];
-    unsigned char message_type;
-    int data_buf_length = read_header_return_data_buf_pointer(
-        sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+    MessageType message_type;
+    Bytes received;
+    int data_buf_length =
+        IoTSPMessage::read(sock, MAX_HS_BUF_LENGTH, message_type, received);
     if (data_buf_length < 0) {
         throw SST_Exception(
             "Socket read error in secure_connect_to_server_with_socket().");
@@ -1762,17 +1354,18 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
             "Socket disconnected during handshake2 in "
             "secure_connect_to_server_with_socket().");
     }
-    if (message_type != SKEY_HANDSHAKE_2) {
+    if (message_type != MessageType::SKEY_HANDSHAKE_2) {
         throw SST_Exception(
             "Comm init failed: expected SKEY_HANDSHAKE_2, got " +
-            std::to_string(message_type));
+            message::to_string(message_type));
     }
 
     // Send handshake 3.
     Bytes hs3 = check_handshake_2_send_handshake_3(
-        received_buf, static_cast<unsigned int>(data_buf_length), entity_nonce,
-        s_key);
-    Bytes sender_HS_3 = make_sender_buf(hs3, SKEY_HANDSHAKE_3);
+        received.data(), static_cast<unsigned int>(received.size()),
+        entity_nonce, s_key);
+    Bytes sender_HS_3 =
+        IoTSPMessage(MessageType::SKEY_HANDSHAKE_3, std::move(hs3)).serialize();
     if (write_bytes_to_socket(sock, sender_HS_3) < 0) {
         throw SST_Exception("Failed to send handshake 3.");
     }
@@ -1786,10 +1379,10 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     FdGuard guard(clnt_sock);
 
     // Receive handshake 1.
-    unsigned char received_buf[MAX_HS_BUF_LENGTH];
-    unsigned char message_type;
-    int data_buf_length = read_header_return_data_buf_pointer(
-        clnt_sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+    MessageType message_type;
+    Bytes received;
+    int data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
+                                             message_type, received);
     if (data_buf_length < 0) {
         throw SST_Exception("Socket read error in server_secure_comm_setup().");
     } else if (data_buf_length == 0) {
@@ -1797,35 +1390,36 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
             "Socket disconnected during handshake1 in "
             "server_secure_comm_setup().");
     }
-    if (message_type != SKEY_HANDSHAKE_1) {
+    if (message_type != MessageType::SKEY_HANDSHAKE_1) {
         throw SST_Exception(
             "Error during comm init: expected SKEY_HANDSHAKE_1, got " +
-            std::to_string(message_type));
+            message::to_string(message_type));
     }
-    if (static_cast<unsigned int>(data_buf_length) < SESSION_KEY_ID_SIZE) {
+    if (received.size() < SESSION_KEY_ID_SIZE) {
         throw SST_Exception("Handshake 1 too short.");
     }
     LOG_DBG << "Received session key handshake1.";
 
     unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    std::memcpy(target_session_key_id, received_buf, SESSION_KEY_ID_SIZE);
+    std::memcpy(target_session_key_id, received.data(), SESSION_KEY_ID_SIZE);
     session_key_t* s_key =
         get_session_key_by_ID(target_session_key_id, existing_s_key_list);
 
     // Send handshake 2.
     unsigned char server_nonce[HS_NONCE_SIZE];
     Bytes hs2 = check_handshake1_send_handshake2(
-        received_buf, static_cast<unsigned int>(data_buf_length), server_nonce,
-        *s_key);
-    Bytes sender = make_sender_buf(hs2, SKEY_HANDSHAKE_2);
+        received.data(), static_cast<unsigned int>(received.size()),
+        server_nonce, *s_key);
+    Bytes sender =
+        IoTSPMessage(MessageType::SKEY_HANDSHAKE_2, std::move(hs2)).serialize();
     if (write_bytes_to_socket(clnt_sock, sender) < 0) {
         throw SST_Exception("Failed to send handshake 2.");
     }
     LOG_DBG << "Switching to HANDSHAKE_2_SENT.";
 
     // Receive handshake 3.
-    data_buf_length = read_header_return_data_buf_pointer(
-        clnt_sock, &message_type, received_buf, MAX_HS_BUF_LENGTH);
+    data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
+                                         message_type, received);
     if (data_buf_length < 0) {
         throw SST_Exception("Socket read error in server_secure_comm_setup().");
     } else if (data_buf_length == 0) {
@@ -1833,15 +1427,15 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
             "Socket disconnected during handshake3 in "
             "server_secure_comm_setup().");
     }
-    if (message_type != SKEY_HANDSHAKE_3) {
+    if (message_type != MessageType::SKEY_HANDSHAKE_3) {
         throw SST_Exception(
             "Error during comm init: expected SKEY_HANDSHAKE_3, got " +
-            std::to_string(message_type));
+            message::to_string(message_type));
     }
     LOG_DBG << "Received session key handshake3!";
     Bytes decrypted;
-    if (handshake_decrypt(received_buf,
-                          static_cast<unsigned int>(data_buf_length), *s_key,
+    if (handshake_decrypt(received.data(),
+                          static_cast<unsigned int>(received.size()), *s_key,
                           decrypted) < 0 ||
         decrypted.size() < HS_INDICATOR_SIZE) {
         throw SST_Exception(

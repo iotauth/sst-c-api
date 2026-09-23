@@ -75,6 +75,32 @@ communication of one `SST_API` is serialized by an internal mutex, so one
 instance can be shared between threads. A receiver thread blocked in
 `read_secure_message()` is released with `SST_Session::shutdown()`.
 
+## Message Classes
+
+`src/message/` mirrors the Java message package of the Auth server
+(`auth/library/src/main/java/org/iot/auth/message/`), one class per file in
+namespace `sst::message`. The entity runs each message in the opposite
+direction from Auth: it builds and encrypts requests, and decrypts and parses
+responses.
+
+| Java (Auth server) | C++ (entity) | Entity side |
+|--------------------|--------------|-------------|
+| `MessageType` | `message_type.hpp` | enum of message type bytes |
+| `IoTSPMessage` | `iotsp_message.hpp/cpp` | framing: `serialize()`, `read()`, `receive()` |
+| `AuthHelloMessage` | `auth_hello_message.hpp/cpp` | parses Auth ID and nonce |
+| `AuthAlertCode`, `AuthAlertMessage` | `auth_alert_code.hpp`, `auth_alert_message.hpp/cpp` | parses the alert code |
+| `SessionKeyReqMessage` | `session_key_req_message.hpp/cpp` | builds and encrypts |
+| `AddReaderReqMessage` | `add_reader_req_message.hpp/cpp` | builds and encrypts |
+| `SessionKeyRespMessage` | `session_key_resp_message.hpp/cpp` | decrypts and parses session keys |
+| `AddReaderRespMessage` | `add_reader_resp_message.hpp/cpp` | decrypts and parses |
+
+Two base classes have no Java counterpart. `EntityReqMessage` holds the
+encryption shared by both requests (distribution key, or public key plus
+signature when the distribution key has expired). `EntityRespMessage` holds
+the handling shared by both responses (the optional encrypted distribution
+key and decryption with the distribution key). The messages are internal:
+`api.hpp` does not expose them.
+
 The config file format is the C API format (`entityInfo.name=...`); the
 earlier C++ key names (`name = ...`) are still accepted.
 
@@ -91,6 +117,9 @@ cpp/
 ├── src/
 │   ├── api.hpp/cpp       # high-level SST_API, SessionKeyList, SST_Session
 │   ├── ipfs.hpp/cpp      # IPFS file sharing helpers (sst::ipfs)
+│   ├── api_internal.hpp  # helpers shared by the modules (not public)
+│   ├── message/          # Auth/entity messages (sst::message), one class
+│   │                     # per file, mirroring org.iot.auth.message
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
 │   ├── net/
 │   │   └── sockets.hpp/cpp       # RAII TCP sockets
@@ -99,6 +128,7 @@ cpp/
 └── tests/
     ├── api_test.cpp      # API unit tests (config, key lists, encryption)
     ├── crypto_test.cpp   # crypto unit tests
+    ├── message_test.cpp  # message classes vs. the Auth wire formats
     └── socket_test.cpp   # socket unit tests
 ```
 
@@ -149,6 +179,12 @@ All C++ crypto tests passed.
 - `tests/api_test.cpp` exercises the high-level **API** layer without a
   server: config-file parsing (including error cases), session key list
   bookkeeping, and session key encryption/decryption round trips.
+
+- `tests/message_test.cpp` checks each message class against the wire
+  format of its Java counterpart in the Auth server: framing, AUTH_HELLO and
+  AUTH_ALERT parsing, request payloads under both distribution key and public
+  key encryption, and response decryption with and without a new
+  distribution key.
 
 - `examples/server_client_example` covers the Auth handshake, key
   distribution, session setup and encrypted message exchange end-to-end
