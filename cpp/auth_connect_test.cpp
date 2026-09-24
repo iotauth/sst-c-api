@@ -1,9 +1,18 @@
-#include <fstream>
+/**
+ * @file auth_connect_test.cpp
+ * @brief Integration test: requests session keys from Auth via sst-cpp-api.
+ *
+ * Tests:
+ * 1. SST_API initialization with a valid config
+ * 2. Session key request (AUTH_HELLO / SESSION_KEY_REQ / SESSION_KEY_RESP)
+ * 3. Connection cleanup
+ */
+
+#include <cstdio>
 #include <iostream>
 #include <string>
-#include <vector>
 
-#include "../src/api.hpp"
+#include "src/api.hpp"
 
 using sst::SST_API;
 using sst::SST_Exception;
@@ -20,28 +29,23 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
 
     try {
-        std::cout << "[1/4] Initializing SST_API..." << std::endl;
+        std::cout << "[1/3] Initializing SST_API..." << std::endl;
         SST_API api(config_path);
         std::cout << "  SST_API initialized successfully." << std::endl;
 
-        std::cout << "[2/4] Performing AUTH_HELLO handshake..." << std::endl;
-        api.auth_hello();
-        std::cout << "  AUTH_HELLO completed successfully." << std::endl;
-
-        std::cout << "[3/4] Requesting session keys..." << std::endl;
-        auto keys = api.get_session_keys("default");
+        std::cout << "[2/3] Requesting session keys from Auth..." << std::endl;
+        sst::SessionKeyList keys = api.get_session_key();
         std::cout << "  Retrieved " << keys.size() << " session key(s)."
                   << std::endl;
-
-        for (size_t i = 0; i < keys.size(); ++i) {
+        for (int i = 0; i < keys.size(); ++i) {
             std::cout << "    Key " << i << " ID: [";
-            for (size_t j = 0; j < keys[i].id.size() && j < 8; ++j) {
-                printf("%02x", keys[i].id[j]);
+            for (unsigned int j = 0; j < sst::SESSION_KEY_ID_SIZE; ++j) {
+                std::printf("%02x", keys.s_key[i].key_id[j]);
             }
             std::cout << "]" << std::endl;
         }
 
-        std::cout << "[4/4] Cleaning up..." << std::endl;
+        std::cout << "[3/3] Cleaning up..." << std::endl;
         std::cout << std::endl;
         std::cout << "=== Auth connection test PASSED ===" << std::endl;
         return 0;

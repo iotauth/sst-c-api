@@ -369,6 +369,15 @@ int sst::ServerSocket::SocketServerOpen(SST_SocketInfo** socket_info,
         return -1;
     }
 
+    // Allow the listening port to be reused right after a restart, otherwise
+    // bind() fails while the previous connection is still in TIME_WAIT.
+    int on = 1;
+    if (setsockopt(new_info->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) ==
+        -1) {
+        std::cerr << "Failed to set SO_REUSEADDR for ServerSocket" << std::endl;
+        return -1;
+    }
+
     if (bind(new_info->sock, new_info->addr.get(), new_info->len) == -1) {
         std::cerr << "Failed to bind socket for ServerSocket" << std::endl;
         return -1;

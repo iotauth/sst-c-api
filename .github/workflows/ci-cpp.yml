@@ -79,13 +79,17 @@ jobs:
         seq 1 2000 > plain.txt
         ./block_writer plain.txt encrypted.bin block.key
         ./block_reader encrypted.bin block.key decrypted.txt plain.txt
-    - name: Run the server_client_example examples
-      working-directory: entity/c/examples/server_client_example
+    - name: Run the C++ server_client_example examples
+      working-directory: entity/c/cpp/examples/server_client_example
+      # Reuses the C example configs. Their key paths are relative to the
+      # working directory, so the binaries run from the example directory.
       run: |
-        mkdir build && cd build && cmake ../ && make
-        ./entity_server ../c_server.config &
+        mkdir build && cd build && cmake ../ && make && cd ..
+        ./build/entity_server ../../../examples/server_client_example/c_server.config &
         sleep 2
-        ./entity_client ../c_client.config
+        ./build/entity_client ../../../examples/server_client_example/c_client.config
+        ./build/threaded_get_target_id_client ../../../examples/server_client_example/c_client.config
+        ./build/threaded_get_target_id_server ../../../examples/server_client_example/c_server.config
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |
@@ -118,14 +122,15 @@ jobs:
       run: |
         python3 file_sharing/file_system_manager.py -p ../properties/exampleFileSystemManager.properties --password=asdf &
         echo $! > fsMgr.pid
-    - name: Run the ipfs examples
-      working-directory: entity/c/examples/ipfs_examples
+    - name: Run the C++ ipfs examples
+      working-directory: entity/c/cpp/examples/ipfs_examples
+      # Reuses the C example configs and inputs. Their key paths are relative
+      # to the working directory, so the binaries run from build/.
       run: |
-        touch plain_text
-        cd c
+        touch ../../../examples/ipfs_examples/plain_text
         mkdir build && cd build && cmake ../ && make
-        ./entity_uploader ../../uploader.config ../../plain_text ../../addReader.txt
-        ./entity_downloader ../../downloader.config
+        ./entity_uploader ../../../../examples/ipfs_examples/uploader.config ../../../../examples/ipfs_examples/plain_text ../../../../examples/ipfs_examples/addReader.txt
+        ./entity_downloader ../../../../examples/ipfs_examples/downloader.config
     - name: Stop python file system manager.
       working-directory: examples
       run: |
@@ -145,28 +150,12 @@ jobs:
         python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > fsMgr.pid
         sleep 5  # Wait for the server to start and bind to port 22100
-    - name: Start secure IPFS server
-      working-directory: entity/c/cpp/examples/ipfs_examples
+    - name: Run the C++ secure ipfs examples
+      working-directory: entity/c/cpp/examples/ipfs_examples/build
       run: |
-        mkdir build && cd build && cmake ../ && make
-        cd ..
-        ./build/secure_ipfs_server ../../../examples/server_client_example/c_server.config &
-        echo $! > secureServer.pid
-        sleep 1
-    - name: Run the secure ipfs examples
-      working-directory: entity/c/examples/ipfs_examples/c/build
-      run: |
-        ./secure_entity_uploader ../../secure_uploader.config ../../plain_text ../../addReader.txt
+        ./secure_entity_uploader ../../../../examples/ipfs_examples/secure_uploader.config ../../../../examples/ipfs_examples/plain_text ../../../../examples/ipfs_examples/addReader.txt
         sleep 3
-        ./secure_entity_downloader ../../secure_downloader.config
-    - name: Stop secure IPFS server
-      working-directory: entity/c/cpp/examples/ipfs_examples
-      run: |
-        if [ -f secureServer.pid ]; then
-          kill $(cat secureServer.pid) || echo "Secure server already stopped."
-        else
-          echo "No secureServer.pid file found"
-        fi
+        ./secure_entity_downloader ../../../../examples/ipfs_examples/secure_downloader.config
     - name: Stop python file system manager.
       working-directory: examples/file_sharing
       run: |

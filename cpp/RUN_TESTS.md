@@ -26,8 +26,8 @@ the standard CMake target. Rebuild it manually after any code change:
 
 ```bash
 cd /home/lsmon/dev/crypto/sst-c-api/cpp/build
-g++ -std=c++17 -I../src \
-    auth_connect_test.cpp \
+g++ -std=c++17 -I.. -I../src \
+    ../auth_connect_test.cpp \
     -L. -lsst-cpp-api \
     ./_deps/spdlog-build/libspdlog.a \
     -lcrypto -lpthread \
