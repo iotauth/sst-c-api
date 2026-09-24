@@ -1,7 +1,8 @@
 # SST C++ API
 
 A C++ API for SST
-([docs](https://iotauth.github.io/docs/c-api-reference/)), built on OpenSSL.
+([guide](https://iotauth.github.io/docs/cpp-guide/),
+[API reference](https://iotauth.github.io/docs/cpp-api-reference/)), built on OpenSSL.
 
 It provides cryptographic primitives, RAII socket wrappers, and a high-level
 session API for SST communication. The project is organized into four layers:
@@ -27,10 +28,10 @@ All entry points are grouped into the `sst::Crypto` class:
 The routines are stateless, so the public methods are `static` — `Crypto` acts
 as a strongly-typed namespace rather than something to instantiate.
 
-### No dynamic allocation
+### Caller-provided crypto buffers
 
-The **Crypto** module performs **no dynamic allocation** (`new` / `malloc` / `std::vector`
-are not used anywhere in the module):
+The **Crypto** module uses caller-provided output buffers and fixed-size byte
+arrays for temporary data:
 
 - Every routine writes its result into a **caller-provided buffer**, which at
   the call site is typically a stack `std::array` sized via the
@@ -44,8 +45,9 @@ are not used anywhere in the module):
   `create_salted_password_to_32bytes()` digests `password || salt`
   **incrementally** (two `EVP_DigestUpdate` calls) instead of building a
   concatenation buffer.
-- `EVP_PKEY*` key objects returned by the loaders are managed by OpenSSL's own
-  internal allocator; the caller frees them with `EVP_PKEY_free`.
+- OpenSSL allocates key objects and operation contexts internally (including
+  `EVP_PKEY_CTX` and `EVP_CIPHER_CTX`), so these routines are not allocation-free.
+  The caller frees `EVP_PKEY*` objects returned by the loaders with `EVP_PKEY_free`.
 
 ## API Design
 
@@ -69,11 +71,14 @@ entities unchanged. The C concepts map to classes as follows:
 | `ipfs.h` file helpers | `sst::ipfs` functions in `src/ipfs.hpp` |
 
 Setup operations (construction, key requests, handshakes) throw
-`sst::SST_Exception` on failure; the data-plane calls return status codes like
-the C API so a closed connection can be handled without exceptions. All Auth
+`sst::SST_Exception` on failure; message and buffer operations return status codes. C++ sends return the number
+of framed bytes written (C sends return 0); receives return the plaintext length,
+0 on peer closure, or -1 on failure. All Auth
 communication of one `SST_API` is serialized by an internal mutex, so one
 instance can be shared between threads. A receiver thread blocked in
-`read_secure_message()` is released with `SST_Session::shutdown()`.
+`read_secure_message()` is released with `SST_Session::shutdown()`. Join that
+thread before destroying the session, whose destructor closes the socket. The
+C++ API currently has no session-key save/load methods equivalent to the C API.
 
 ## Message Classes
 
@@ -102,7 +107,8 @@ key and decryption with the distribution key). The messages are internal:
 `api.hpp` does not expose them.
 
 The config file format is the C API format (`entityInfo.name=...`); the
-earlier C++ key names (`name = ...`) are still accepted.
+earlier C++ key names (`name = ...`) are still accepted. Relative credential
+paths are resolved from the process working directory, not the config directory.
 
 ## Layout
 
@@ -136,7 +142,9 @@ cpp/
 
 - A C++17 compiler (clang or gcc)
 - CMake >= 3.19
-- OpenSSL (development headers)
+- OpenSSL 3 development headers
+- A POSIX environment (Linux or macOS)
+- Git and network access for CMake to fetch the pinned spdlog dependency
 
 On macOS with Homebrew, point CMake at the Homebrew OpenSSL if needed:
 
@@ -161,6 +169,7 @@ Or run the test executables directly:
 ./build/crypto_test
 ./build/socket_test
 ./build/api_test
+./build/message_test
 ```
 
 A successful crypto test run ends with:
@@ -190,7 +199,10 @@ All C++ crypto tests passed.
   distribution, session setup and encrypted message exchange end-to-end
   against a running Auth; it runs in the C++ integration test workflow.
 
-Full docs: [C API reference](https://iotauth.github.io/docs/c-api-reference/).
+Full docs: [C++ Guide](https://iotauth.github.io/docs/cpp-guide/) and
+[C++ API Reference](https://iotauth.github.io/docs/cpp-api-reference/).
+The CMake project builds a static `sst-cpp-api` target; it currently has no
+install/package-export rules. Build examples from their own CMake directories.
 
 ## Usage example
 
@@ -200,27 +212,28 @@ Full docs: [C API reference](https://iotauth.github.io/docs/c-api-reference/).
 #include <array>
 #include <cstring>
 
-using sst::Crypto;
+int main() {
+    using sst::Crypto;
 
-// Encrypt-then-authenticate "Hello World!" with AES-128-CBC + HMAC-SHA256.
-unsigned char cipher_key[sst::AES_128_KEY_SIZE_IN_BYTES];
-unsigned char mac_key[sst::MAC_KEY_SHA256_SIZE];
-Crypto::generate_nonce(sizeof(cipher_key), cipher_key);
-Crypto::generate_nonce(sizeof(mac_key), mac_key);
-
-const char msg[] = "Hello World!";
-unsigned int msg_len = std::strlen(msg);
-
-unsigned int cap = Crypto::get_expected_encrypted_total_length(
-    msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE,
-    sst::AES_128_CBC, sst::USE_HMAC);
-
-std::array<unsigned char, 128> out{};  // cap <= 128 for this payload
-unsigned int out_len = 0;
-Crypto::symmetric_encrypt_authenticate(
-    reinterpret_cast<const unsigned char*>(msg), msg_len,
-    mac_key, sst::MAC_KEY_SHA256_SIZE,
-    cipher_key, sst::AES_128_KEY_SIZE_IN_BYTES,
-    sst::AES_128_IV_SIZE, sst::AES_128_CBC, sst::USE_HMAC,
-    out.data(), &out_len);
+    // Encrypt "Hello World!" with AES-128-CBC + HMAC-SHA256.
+    unsigned char cipher_key[sst::AES_128_KEY_SIZE_IN_BYTES];
+    unsigned char mac_key[sst::MAC_KEY_SHA256_SIZE];
+    if (Crypto::generate_nonce(sizeof(cipher_key), cipher_key) != 0 ||
+        Crypto::generate_nonce(sizeof(mac_key), mac_key) != 0) {
+        return 1;
+    }
+    const char msg[] = "Hello World!";
+    unsigned int msg_len = std::strlen(msg);
+    unsigned int capacity = Crypto::get_expected_encrypted_total_length(
+        msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE,
+        sst::AES_128_CBC, sst::USE_HMAC);
+    std::array<unsigned char, 128> out{};
+    if (capacity > out.size()) return 1;
+    unsigned int out_len = 0;
+    return Crypto::symmetric_encrypt_authenticate(
+        reinterpret_cast<const unsigned char*>(msg), msg_len,
+        mac_key, sizeof(mac_key), cipher_key, sizeof(cipher_key),
+        sst::AES_128_IV_SIZE, sst::AES_128_CBC, sst::USE_HMAC,
+        out.data(), &out_len) < 0 ? 1 : 0;
+}
 ```

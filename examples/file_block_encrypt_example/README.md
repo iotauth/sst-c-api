@@ -1,57 +1,49 @@
-# File block encrypt example
+# File block encryption example
 
-This is a simple example for RocksDB block encryption.
+This example models a block-oriented storage workload using Auth-issued session keys. The writer generates random byte buffers representing key-value entries, packs them into 32 KiB blocks, and pads unused space with zeros. It writes three encrypted files with ten blocks each, using one session key per file.
 
-It randomly creates key_values (implemented as random buffers), append the created random key_values into a block with a maximum size 32kbytes.
-The leftover space is filled with zero padding.
-Then the entire buffer is encrypted into a single block. Append the `TOTAL_BLOCK_NUM`(10) blocks, and save them as a single file.
+The reader loads the metadata, requests each file's session key by ID from Auth, decrypts the blocks, and compares them with the saved plaintext.
 
-The detailed logic is as below.
+## Build and prepare
 
-### Encrypting part. `block_writer.c`
+Set `$SST_ROOT` to the main [SST repository](https://github.com/iotauth/iotauth). Generate credentials with `./generateAll.sh` in `$SST_ROOT/examples`, then build Auth with `mvn clean install` in `$SST_ROOT/auth/auth-server`.
 
-1. Create random key_values, with a size between 56~144 bytes.
-2. The key_values are appended until the total size is 32 kbytes.
-3. When the next key_value does not fit to the maximum block size(32kybtes), the leftover size is filled with zero-paddings. The leftover buffer will be used in the next block.
-4. The block is now 32kbytes, and it is encrypted with a session key.
-5. 1~5 is repeated, appending 10 blocks, making a single file.
-6. 5 is repeated, making three separate files, `encrypted'i'.txt`. Each file uses different session keys.
-7. To test if the encryption decryption worked prorperly, we save `plaintext'i'.txt`, which is the blocks not encrypted.
-8. The metadata is saved inside `encrypted_file_metadata.dat`. Same with `plaintext_file_metadata.dat`. It saves the used session key id for the file.
-
-### Decrypt and Comparing part. `block_reader.c`
-
-7. Loads the metadata saved.
-8. Requests the session key corresponding to the session key id.
-9. Read the `encrypted'i'.txt` and decrypt it with the requested session key.
-10. Compare it with the read `plaintext'i'.txt`, and check if it's decrypted properly.
-
-# Compile
-
-For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
-
-```
-$cd $SST_ROOT/entity/c/examples/file_block_encrypt_example
-$mkdir build && cd build
-$cmake ../
-$make
+```sh
+cd "$SST_ROOT/entity/c/examples/file_block_encrypt_example"
+cmake -S . -B build
+cmake --build build
 ```
 
-# Example
+In a separate terminal, leave Auth running:
 
-- Turn on a Auth terminal at `$SST_ROOT/auth/auth-server`
-- Turn on a client1 terminal at `$SST_ROOT/entity/c/examples/file_block_encrypt_example/build`
-- Turn on a client2 terminal at `$SST_ROOT/entity/c/examples/file_block_encrypt_example/build`
+```sh
+cd "$SST_ROOT/auth/auth-server"
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+```
 
-Execute
+## Write, then read
 
-Auth Terminal 
-`$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
+Run both programs from the same `build/` directory so the credential paths and generated files resolve correctly:
 
-Client Terminal
-`$ ./block_writer ../block_writer.config`
-`$ ./block_reader ../block_reader.config`
+```sh
+cd "$SST_ROOT/entity/c/examples/file_block_encrypt_example/build"
+./block_writer ../block_writer.config
+./block_reader ../block_reader.config
+```
 
-### Example 2
-Loading the saved key is also possible. `block_writer.c` saves the session key in `s_key_list.bin`. The next example does not request the session key by id, but loads the saved session key, and decrypts the file.
-`$ ./block_reader_load_s_key_list`
+The writer produces:
+
+- `encrypted0.txt` through `encrypted2.txt`: encrypted blocks.
+- `plaintext0.txt` through `plaintext2.txt`: originals for comparison.
+- `encrypted_file_metadata.dat` and `plaintext_file_metadata.dat`: file/block offsets, lengths, and key information.
+- `s_key_list.bin`: the session key list used by the writer.
+
+Run the alternative reader to load the saved keys without requesting them from Auth:
+
+```sh
+./block_reader_load_s_key_list
+```
+
+Run it while the saved session keys are still valid. This variant expects the files produced by the writer in its current directory.
+
+The [C++ block example](../../cpp/examples/file_block_encrypt_example/) is a separate standalone crypto demonstration: it encrypts an input file in 1 KiB blocks using a locally generated AES key, without Auth. It does not implement this C example's key-request and persistence workflow.

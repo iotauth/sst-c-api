@@ -3,7 +3,7 @@
 This is a repository for the C and C++ APIs of **[SST (Secure Swarm Toolkit)](https://github.com/iotauth/iotauth)** as a submodule.
 
 - The **C API** (`src/`) is the reference implementation of the SST entity protocol.
-- The **C++ API** (`cpp/`) is a port of the C API to modern C++ (RAII, exceptions, zero-allocation crypto). It speaks the same wire protocol, so C and C++ entities interoperate with each other and with Auth. See [C++ API](#c-api-1) below.
+- The **C++ API** (`cpp/`) is a port of the C API to modern C++ (RAII, exceptions, caller-provided crypto buffers). It speaks the same wire protocol, so C and C++ entities interoperate with each other and with Auth. See [C++ API](#c-api-1) below.
 
 # Prerequisites
 
@@ -45,7 +45,7 @@ c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 
 ## Functions
 
-The public header is [`src/c_api.h`](./src/c_api.h). Unless noted otherwise, functions that return a pointer return `NULL` on failure, and functions that return `int` return 0 on success and -1 on failure.
+The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](https://iotauth.github.io/docs/c-guide) and [C API Reference](https://iotauth.github.io/docs/c-api-reference) for configuration and usage. Unless noted otherwise, functions that return a pointer return `NULL` on failure, and functions that return `int` return 0 on success and -1 on failure.
 
 ### Context and session keys
 
@@ -168,15 +168,14 @@ $make
 
 Build with `cmake -DCMAKE_BUILD_TYPE=Debug ../` to enable `SST_print_debug()` output.
 
-## Compile as Shared Library
+## Install the Static Library
 
-The command below will install the library under `/usr/local/lib/`, and `c_api.h` will be installed as `/usr/local/include/sst-c-api/c_api.h`.
+The current CMake target is a static library. The commands below install `libsst-c-api.a` under `/usr/local/lib/` and `c_api.h` as `/usr/local/include/sst-c-api/c_api.h`. The install rules currently copy only the public header; lower-level headers such as `c_crypto.h` remain in `src/`. The repository examples build directly against the source tree. Run from `entity/c/`:
 
 ```
-$mkdir build && cd build
-$cmake ../
-$make
-$sudo make install
+cmake -S . -B build
+cmake --build build
+sudo cmake --install build
 ```
 
 ## Examples and Tests
@@ -190,12 +189,12 @@ The C++ API lives in [`cpp/`](./cpp/) and is documented in [`cpp/README.md`](./c
 
 | Layer | Location | Purpose |
 |-------|----------|---------|
-| **Crypto** | `cpp/src/crypto.hpp/cpp` | Stateless primitives (`sst::Crypto`): RSA, AES, SHA-256, HMAC, with no dynamic allocation |
+| **Crypto** | `cpp/src/crypto.hpp/cpp` | Stateless primitives (`sst::Crypto`): RSA, AES, SHA-256, HMAC, with caller-provided output buffers |
 | **Network** | `cpp/src/net/sockets.hpp/cpp` | RAII POSIX socket wrappers |
 | **API** | `cpp/src/api.hpp/cpp`, `cpp/src/ipfs.hpp/cpp` | `sst::SST_API`, `sst::SessionKeyList`, `sst::SST_Session` and the `sst::ipfs` file sharing helpers |
 | **Logging** | `cpp/src/log/log_manager.hpp/cpp` | spdlog-based logger |
 
-The C concepts map to C++ classes as follows. Setup operations (construction, key requests, handshakes) throw `sst::SST_Exception` on failure; data-plane calls return status codes like the C API.
+The C concepts map to C++ classes as follows. Setup operations (construction, key requests, handshakes) throw `sst::SST_Exception` on failure; message and buffer operations return status codes. C sends return 0 on success; C++ sends return the number of framed bytes written. Both return -1 on failure.
 
 | C API | C++ API |
 |-------|---------|
@@ -206,14 +205,15 @@ The C concepts map to C++ classes as follows. Setup operations (construction, ke
 | `SST_session_ctx_t`, `send_secure_message()`, `read_secure_message()` | `sst::SST_Session` (owns the socket) with `send_secure_message()`, `read_secure_message()` |
 | `ipfs.h` | `sst::ipfs` in `cpp/src/ipfs.hpp` |
 
-The same config files drive both APIs, so a C++ entity can be dropped in wherever a C entity runs.
+Both APIs accept the C properties format and resolve relative credential paths from the process working directory. Follow the example-specific working directories below. C++ sessions close their socket automatically; C callers must close the socket before freeing the session context.
 
 C++ documentation:
 
+-   [C++ Guide](https://iotauth.github.io/docs/cpp-guide) and [C++ API Reference](https://iotauth.github.io/docs/cpp-api-reference).
 -   [`cpp/README.md`](./cpp/README.md): design, layout, build and test instructions, full C-to-C++ mapping.
 -   [`cpp/examples/server_client_example/README.md`](./cpp/examples/server_client_example/README.md): secure server/client example and session keys by ID.
 -   [`cpp/examples/ipfs_examples/README.md`](./cpp/examples/ipfs_examples/README.md): IPFS file sharing with the plain and secure file system managers.
--   [`cpp/RUN_TESTS.md`](./cpp/RUN_TESTS.md): running the C++ unit tests and the Auth connection test.
+-   [`cpp/README.md#build-and-run-the-tests`](./cpp/README.md#build-and-run-the-tests): current C++ unit-test commands. Use the server/client example above for an end-to-end Auth handshake.
 
 To build the C++ library and run its unit tests:
 
@@ -246,4 +246,4 @@ $ctest --test-dir build --output-on-failure
 
 -   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the same integration tests with the C++ API.
 
-*Last updated on September 17, 2026*
+*Last updated on September 24, 2026*

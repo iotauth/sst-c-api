@@ -73,11 +73,11 @@ LOG_ERR << "Failed to connect: " << strerror(errno);
 
 ## Build-time Behavior
 
-When `GIT_VERSION` is defined at compile time (typically for production builds), **all logging becomes a no-op**. The `Log` constructor and destructor bodies are empty, so the compiler can optimize away the entire statement. This eliminates runtime overhead in release builds while keeping the same source code.
+When `GIT_VERSION` is defined at compile time (typically for production builds), **`Log` message dispatch and file-logger setup are disabled**. The `Log` constructor and destructor bodies are empty, but `operator<<` remains active. The stream insertion operator still builds strings and evaluates its arguments, so this does not guarantee zero runtime overhead. A release build alone does not define `GIT_VERSION`.
 
 ## Pitfalls
 
 1. **Always initialize before use**: Call `LogManager::Initialize()` early (e.g., at program startup). If you don't, `GetLogger()` returns a default stdout logger — logs will still appear but won't be written to your configured file.
-2. **`GIT_VERSION` strips logging**: In production builds with this macro defined, log statements compile to nothing. Don't rely on logging for critical error handling or side effects — use proper return values and exceptions instead.
+2. **`GIT_VERSION` strips logging**: In production builds with this macro defined, the `Log` destructor does not dispatch messages. Don't rely on logging for critical error handling or side effects — use proper return values and exceptions instead.
 3. **Thread safety**: The `LogManager` logger is thread-safe (`rotating_logger_mt`). However, the `_log_mutex` in the `Log` destructor serializes all log dispatches globally — this is intentional but can be a bottleneck under extreme concurrency.
-4. **File path directory creation**: Both `Initialize()` and `SetLogFilePath()` create parent directories automatically, so you don't need to pre-create them. But if the process lacks write permissions on the target directory, initialization will silently fail (no error returned).
+4. **File path directory creation**: Both `Initialize()` and `SetLogFilePath()` create parent directories automatically, so you don't need to pre-create them. But if the process lacks write permissions on the target directory, filesystem or spdlog setup can throw an exception; these setup functions do not catch it. `SetLogFilePath()` only reconfigures an already initialized logger.

@@ -1,4 +1,8 @@
-# How to Run Example
+# C++ IPFS example using the C API
+
+These older C++ programs link `sst-c-api`. For the separate C++17 API based on `sst::SST_API` and `sst::ipfs`, use the [C++ API IPFS examples](../../../cpp/examples/ipfs_examples/README.md).
+
+Here `$ROOT` means the main `iotauth` repository root.
 
 ## Prerequisites
 
@@ -9,8 +13,9 @@ $ cd iotauth
 $ git submodule update --init
 ```
 
-## Installation of SST as Shared Library
-Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=readme-ov-file#compile-as-shared-library).
+## Build requirements
+
+Use CMake 3.19 or newer, a C++ compiler, and OpenSSL 3 development headers. This example builds the static C library directly from the source tree; no system-wide installation is needed.
 
 ### Create Example Auth Databases
 
@@ -47,8 +52,7 @@ Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=read
 
 2. Run `cd cpp`.
 
-3. Run `mkdir build && cd build`.
-    - If you get `mkdir: build: File exists` then run `rm -rf build`.
+3. Run `mkdir -p build && cd build`.
 
 4. Run `cmake ..`.
     - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.

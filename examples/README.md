@@ -4,7 +4,7 @@ This directory contains several example programs that demonstrate how to use the
 
 For the rest of this document, we use `$SST_ROOT` for the root directory of SST’s main repository (`iotauth`), and this repository (`sst-c-api`) is assumed to be checked out as a submodule under `$SST_ROOT/entity/c`.
 
-Each subdirectory here has its own `README.md` with detailed build and run instructions. This file gives a high-level overview and links into those examples.
+The links below point to the build and run instructions for each example. This file gives a high-level overview and links into those examples.
 
 ---
 
@@ -28,14 +28,15 @@ Examples that integrate SST with [IPFS](https://ipfs.tech/) to realize a secure 
 
 - `entity_uploader` encrypts a file with an SST session key and uploads it to IPFS.
 - `entity_downloader` obtains the file hash and session key information from a file system manager, retrieves the encrypted file from IPFS, and decrypts it using SST.
-- Includes both C and C++ entity implementations.
+- Includes C entities and older C++ examples that call the C API.
+- The separate C++17 API examples live under [`../cpp/examples/ipfs_examples/`](../cpp/examples/ipfs_examples/README.md).
 
 For compilation and step-by-step run instructions, see:
 
 - Higher-level description in the main SST repo:  
   [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/main/examples/file_sharing)
 - C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
-- C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
+- C++ example using the C API: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)
 
 ---
 
@@ -45,7 +46,7 @@ An example focused on **block-based file encryption**, inspired by RocksDB-style
 
 - Random key–value pairs are packed into fixed-size (32 KB) blocks.
 - Remaining space in a block is zero-padded.
-- Each block is encrypted with a session key obtained via SST.
+- Each file uses a session key obtained via SST; all ten blocks in that file share the key.
 - Multiple encrypted blocks are written into files, along with metadata describing the session keys used.
 - A separate reader:
   - Loads metadata.
