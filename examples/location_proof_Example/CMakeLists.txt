@@ -1,18 +1,24 @@
 cmake_minimum_required(VERSION 3.19)
-project(SST-Examples VERSION 1.0.0 LANGUAGES C)
+project(SST-Location-Proof VERSION 1.0.0 LANGUAGES C)
 
-# Include the main SST library (assuming the root directory is two levels up)
+# Include the main SST library
 add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 
 find_package(Threads REQUIRED)
 
-add_executable(entity_client entity_client.c)
-add_executable(entity_server entity_server.c)
-add_executable(threaded_get_target_id_client threaded_get_target_id_client.c)
-add_executable(threaded_get_target_id_server threaded_get_target_id_server.c)
+# Prover executable
+add_executable(
+    prover
+    prover.c
+)
 
-# Link against the freshly built SST library
-target_link_libraries(entity_client sst-c-api)
-target_link_libraries(entity_server sst-c-api)
-target_link_libraries(threaded_get_target_id_client sst-c-api)
-target_link_libraries(threaded_get_target_id_server sst-c-api)
+# Robot arm / resource executable
+add_executable(
+    robot_arm
+    robot_arm.c
+    location_verifier.c
+)
+
+# Link against SST
+target_link_libraries(prover sst-c-api)
+target_link_libraries(robot_arm sst-c-api)
