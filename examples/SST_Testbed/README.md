@@ -24,7 +24,7 @@ The testbed workflow is organized into five stages:
 
 1. **Setup** — The user specifies the number of clients and attack type via an input CSV file, then runs `clients_dos_setup.sh` to initialize the environment.
 2. **Generate Testbed** — `graph_generator.js` produces the network topology; `config_generator.js` creates per-entity configuration files (credential paths, Auth IP/port, Auth ID, entity name).
-3. **Execution** — `run_clients.sh` launches the specified number of clients and the server, each loading its configuration file.
+3. **Execution** — Start the server manually, then `run_clients.sh` launches the specified number of clients, each loading its configuration file.
 4. **Network Attack Simulation** — Clients carry out attack scenarios defined in the CSV (replay, excessive key requests, message flooding, repeated connections).
 5. **Deployment** — The generated artifacts can run in simulation (ns-3) or be deployed directly to embedded devices such as Raspberry Pi boards without modifying attack logic.
 
@@ -362,7 +362,12 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 4. If password is not provided, insert a password when prompted.
 
-5. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip]`
+5. Start the server in a separate terminal before launching clients:
+    - TCP: `../build/server ../config/server.config`
+    - UDP: `../build/server ../config/server_udp.config`
+        - UDP uses workers to accept multiple clients. Server launches 16 workers by default but `--workers` can be used to specify the number of workers. It accepts values from 1 through 105 (i.e. `--workers 63`).
+
+6. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip]`
     - `<number_of_clients>` is the number of clients that should be created during this execution.
     - `<input_file>` is the input CSV file that the program should read for this execution.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
@@ -372,4 +377,4 @@ So, also make sure that the ***Auth*** executed before is terminated.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics`
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics 192.168.1.10`
 
-Each client will be launched in a unique terminal window, along with a terminal window for the server, and will simultaneously perform the attack specified in the input CSV file.
+Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file. Stop the manually launched UDP server with `Ctrl+C` when the experiment finishes.

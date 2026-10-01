@@ -90,10 +90,9 @@ for arg in "${@:3}"; do
   fi
 done
 
-SERVER_BIN="../build/server"
 CLIENT_BIN="../build/client"
 
-for bin in "$SERVER_BIN" "$CLIENT_BIN"; do
+for bin in "$CLIENT_BIN"; do
   if [[ ! -x "$bin" ]]; then
     echo "Executable not found or not runnable at $bin"
     exit 1
@@ -104,24 +103,11 @@ done
 # If filename contains "udp" (case-insensitive), use UDP configs.
 CSV_BASENAME="$(basename "$CSV")"
 CSV_BASENAME_LC="$(echo "$CSV_BASENAME" | tr '[:upper:]' '[:lower:]')"
-SERVER_CFG="../config/server.config"
 CLIENT_CFG_SUFFIX=""
 PROTOCOL_PROFILE="TCP"
 if [[ "$CSV_BASENAME_LC" == *"udp"* ]]; then
-  SERVER_CFG="../config/server_udp.config"
   CLIENT_CFG_SUFFIX="_udp"
   PROTOCOL_PROFILE="UDP"
-fi
-
-UDP_WORKERS=""
-if [[ "$PROTOCOL_PROFILE" == "UDP" ]]; then
-  UDP_WORKERS=$((COUNT + 3))
-  if (( UDP_WORKERS > 512 )); then
-    UDP_WORKERS=512
-  fi
-  if (( UDP_WORKERS < 1 )); then
-    UDP_WORKERS=1
-  fi
 fi
 
 # In UDP profile, stagger client launches to reduce handshake stampede.
@@ -144,19 +130,6 @@ if [[ "$USE_SUDO" == "yes" ]]; then
   start_sudo_session
   trap stop_sudo_session EXIT
 fi
-
-# Launch server
-if [[ "$PROTOCOL_PROFILE" == "UDP" ]]; then
-  SHCMD="cd '$(pwd)' && SST_UDP_WORKERS='$UDP_WORKERS' $SERVER_BIN '$SERVER_CFG'"
-else
-  SHCMD="cd '$(pwd)' && $SERVER_BIN '$SERVER_CFG'"
-fi
-launch_terminal "$SHCMD" "no"
-
-# Give the server process time to start before clients begin connecting.
-# UDP server creates a worker pool and binds sockets at startup, so it needs more time before clients can connect.
-SERVER_STARTUP_DELAY_SEC=2
-sleep "$SERVER_STARTUP_DELAY_SEC"
 
 # Launch clients
 for (( i=0; i<COUNT; i++ )); do
@@ -182,4 +155,4 @@ for (( i=0; i<COUNT; i++ )); do
   fi
 done
 
-echo "Launched $COUNT clients using $PROTOCOL_PROFILE profile ($SERVER_CFG, client*${CLIENT_CFG_SUFFIX}.config)."
+echo "Launched $COUNT clients using $PROTOCOL_PROFILE profile (client*${CLIENT_CFG_SUFFIX}.config)."

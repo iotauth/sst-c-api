@@ -14,35 +14,23 @@ volatile int active_clients = 0;
 volatile sig_atomic_t stop_server = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 const int UDP_IDLE_TIMEOUT_SEC = 10;
-const int UDP_WORKER_COUNT = 16;
+const int UDP_DEFAULT_WORKER_COUNT = 16;
+const int UDP_MAX_WORKER_COUNT = 105;
 
 static void handle_shutdown_signal(int) {
     stop_server = 1;
 }
 
-// Returns the number of UDP worker threads to start
-// based on the SST_UDP_WORKERS environment variable (default: UDP_WORKER_COUNT).
-// This is because UDP does not have an accept() loop to handle multiple clients
-// so we need a pool of worker threads each with their own socket to handle concurrent clients.
-static int get_udp_worker_count() {
-    const char* env = std::getenv("SST_UDP_WORKERS");
-    if (env == NULL || env[0] == '\0') {
-        return UDP_WORKER_COUNT;
-    }
-
+static bool parse_udp_worker_count(const char* value, int* worker_count) {
     char* endptr = NULL;
-    long parsed = std::strtol(env, &endptr, 10);
-    if (endptr == env || *endptr != '\0' || parsed < 1) {
-        errno = 0;
-        SST_print_error("Invalid SST_UDP_WORKERS='%s'. Using default %d.", env,
-                        UDP_WORKER_COUNT);
-        return UDP_WORKER_COUNT;
+    errno = 0;
+    long parsed = std::strtol(value, &endptr, 10);
+    if (errno != 0 || endptr == value || *endptr != '\0' || parsed < 1 ||
+        parsed > UDP_MAX_WORKER_COUNT) {
+        return false;
     }
-
-    if (parsed > UDP_WORKER_COUNT) {
-        return UDP_WORKER_COUNT;
-    }
-    return static_cast<int>(parsed);
+    *worker_count = static_cast<int>(parsed);
+    return true;
 }
 
 // Struct for arguments for each thread
@@ -160,9 +148,22 @@ void* receive_and_print_messages(void* thread_args) {
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        SST_print_error("Usage: %s <config_path>", argv[0]);
+    if (argc != 2 && argc != 4) {
+        SST_print_error("Usage: %s <config_path> [--workers 1-%d]", argv[0],
+                        UDP_MAX_WORKER_COUNT);
         return EXIT_FAILURE;
+    }
+
+    int udp_worker_count = UDP_DEFAULT_WORKER_COUNT;
+    bool workers_requested = false;
+    if (argc == 4) {
+        if (std::strcmp(argv[2], "--workers") != 0 ||
+            !parse_udp_worker_count(argv[3], &udp_worker_count)) {
+            SST_print_error("Usage: %s <config_path> [--workers 1-%d]", argv[0],
+                            UDP_MAX_WORKER_COUNT);
+            return EXIT_FAILURE;
+        }
+        workers_requested = true;
     }
 
     // Do not terminate process on write() to a disconnected socket.
@@ -176,6 +177,12 @@ int main(int argc, char* argv[]) {
     }
 
     bool use_tcp = std::strcmp((const char*)ctx->config.network_protocol, "TCP") == 0;
+    
+    if (use_tcp && workers_requested) {
+        SST_print_error("--workers is only valid with a UDP server config.");
+        free_SST_ctx_t(ctx);
+        return EXIT_FAILURE;
+    }
     int sock_type = use_tcp ? SOCK_STREAM : SOCK_DGRAM;
     int port_num = ctx->config.entity_server_port_num;
     if (port_num <= 0 || port_num > 65535) {
@@ -308,7 +315,7 @@ int main(int argc, char* argv[]) {
         // UDP server: create a worker pool.
         // Each worker has its own UDP socket bound to the same port with
         // SO_REUSEPORT, allowing concurrent sessions without changing session_ctx.
-        int worker_count = get_udp_worker_count();
+        int worker_count = udp_worker_count;
         if (close(serv_sock) < 0) {
             SST_print_error("close() error");
             free_SST_ctx_t(ctx);
