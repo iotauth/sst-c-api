@@ -7,7 +7,7 @@ This directory includes unit tests and integration tests for the SST C API.
 
 ## Integration Tests with Auth
 
-- `save_load_session_key_list_with_password_test.c`: Tests `save_session_key_list_with_password_test()` and `load_session_key_list_with_password_test()`.
+- `save_load_session_key_list_with_password_test.c`: Tests `save_session_key_list_with_password()` and `load_session_key_list_with_password()`.
 
 - `encrypt_buf_with_session_key_without_malloc_execution_time_test.c` : Tests the time taken from `encrypt_buf_with_session_key_without_malloc()` and `decrypt_buf_with_session_key_without_malloc()`.
 
@@ -29,7 +29,7 @@ $ ./generateAll.sh
 ```
 $ cd $IOTAUTH/auth/auth-server
 ```
-Run `make` if you have not built Auth jar before.
+Run `mvn clean install` if you have not built the Auth JAR before.
 ```
 $ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
 ```
@@ -41,6 +41,8 @@ $ mkdir build && cd build
 $ cmake ../
 $ make
 ```
+
+When building from `entity/c/` instead of `tests/`, the unit-test executable is named `crypto_test`; run it with `ctest --test-dir build --output-on-failure`. The commands below refer to the separate `tests/build/` project.
 
 ## Execute Unit Tests
 ```

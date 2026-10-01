@@ -139,7 +139,7 @@ $ git submodule update --init
 
 ### Compilation of Auth
 
-1. Go to directory `iotauth/examples`
+Generate example credentials by running `./generateAll.sh` from `iotauth/examples`, then run `mvn clean install` from `iotauth/auth/auth-server`.
 
 ### Compile the SST_Testbed code
 
@@ -245,7 +245,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 5. Run the client in another terminal with `./client ../../server_client_example/c_client.config ../csv_files/dos_attack_key.csv`
 
-## 2.2.2 DoS attack to Server via session key requests (DoSM)
+## 2.2.2 DoS attack to Server via message flooding (DoSM)
 
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
@@ -271,10 +271,10 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
 
-2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
+2. *[Optional]* Customize `csv_files/dos_attack_connect.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
         - First and second are same as above.
-        - Third is "DoSM".
+        - Third is "DoSC".
         - Fourth, is the number of times the client should connect to the server using Auth.
     ```
     <sleep_time1>,<message1>,DoSC,10000
@@ -299,10 +299,10 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
-3. Run `./client_dos_setup.sh <number-of-clients> -p <password>`
+3. Run `./clients_dos_setup.sh <number-of-clients> -p <password>`
     - `<number-of-clients>` is the maximum amount of clients that Auth should be able to recognize and is defined by the parameter.
     - *[Optional]* `<password>` is the password of the generated Auth.
-    - e.g., `./client_dos_setup.sh 3 -p asdf`
+    - e.g., `./clients_dos_setup.sh 3 -p asdf`
 
 4. Insert a password when prompted.
 
