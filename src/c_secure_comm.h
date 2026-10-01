@@ -15,8 +15,6 @@
 #define HANDSHAKE_2_SENT 22
 #define IN_COMM 30
 #define SESSION_KEY_EXPIRATION_TIME_SIZE 6
-#define HANDSHAKE_1_LENGTH 74
-#define HANDSHAKE_3_LENGTH 82
 
 #define MAX_SESSION_KEY 10
 
@@ -108,18 +106,15 @@ int decrypt_received_message(unsigned char* encrypted_data,
 session_key_list_t* send_session_key_request_check_protocol(
     SST_ctx_t* ctx, unsigned char* target_key_id);
 
-// Request the session key to Auth according to session key id via TCP
+// Returns true if the config's network protocol is TCP
+// Otherwise, returns false (UDP).
+bool get_network_protocol_type(const char* network_protocol_str);
+
+// Request the session key to Auth according to session key id via TCP or UDP
 // connection
 // @param config_info config struct for the entity information
 // @return session_key_t struct according to key id
-session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx);
-
-// TODO:(Dongha Kim): Implement session key request via UDP.
-// Request the session key to Auth according to session key id via UDP
-// connection.
-// @param
-// @return session key struct according to key id
-// session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx);
+session_key_list_t* send_session_key_req(SST_ctx_t* ctx);
 
 // Check the nonce obtained in decryption with own nonce and
 // make the encrypted message with other entity's nonce.

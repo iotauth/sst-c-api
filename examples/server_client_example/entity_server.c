@@ -5,7 +5,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../../c_api.h"
+#include "../../src/c_api.h"
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {

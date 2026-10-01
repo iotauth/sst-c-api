@@ -10,12 +10,12 @@
  *    Checks with CBC, CTR, GCM encryption modes, and with HMAC / no HMAC.
  */
 
-#include "../c_crypto.h"
+#include "../src/c_crypto.h"
 
 #include <assert.h>
 
-#include "../c_api.h"
-#include "../c_common.h"
+#include "../src/c_api.h"
+#include "../src/c_common.h"
 
 #define _unused(x) ((void)(x))  // To avoid unused-but-set-variable error.
 
