@@ -50,3 +50,17 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PIGPIO_LIB AND EXISTS ${IR_SRC_DIR}/ir
 else()
   message(STATUS "pigpio not found (or not on Linux): --comm_type ir will report as unsupported.")
 endif()
+
+# Optional pigpio-based LiFi (LED + phototransistor) handshake transport and
+# HK adapter. Same pigpio/root requirements as IR; see ../../lifi_com/README.md.
+set(LIFI_SRC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../lifi_com)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PIGPIO_LIB AND EXISTS ${LIFI_SRC_DIR}/lifi_sst_handshake.c)
+  message(STATUS "pigpio found: building --comm_type lifi support.")
+  foreach(target robot locker)
+    target_sources(${target} PRIVATE ../../lifi_com/lifi_sst_handshake.c)
+    target_compile_definitions(${target} PRIVATE HAVE_LIFI_TRANSPORT)
+    target_link_libraries(${target} ${PIGPIO_LIB} rt)
+  endforeach()
+else()
+  message(STATUS "pigpio not found (or not on Linux): --comm_type lifi will report as unsupported.")
+endif()

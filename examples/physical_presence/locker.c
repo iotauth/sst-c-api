@@ -14,6 +14,9 @@
 #ifdef HAVE_IR_TRANSPORT
 #include "../../ir_com/ir_sst_handshake.h"
 #endif
+#ifdef HAVE_LIFI_TRANSPORT
+#include "../../lifi_com/lifi_sst_handshake.h"
+#endif
 
 // Listens on the given TCP port and accepts one incoming connection.
 // @param serv_sock Receives the listening socket, so the caller can close it.
@@ -62,19 +65,32 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
-    int require_ir_hk = 0;
+    const char* require_hk = NULL; /* NULL, "IR" or "LIFI" */
+    int lifi_tx_gpio = 23, lifi_rx_gpio = 22, lifi_led_active_low = 0;
     const char* mic_device = "plughw:1,0";
     const char* spk_device = "plughw:2,0";
     if (argc < 2) {
         SST_print_error_exit(
-            "Usage: %s <config_file_path> [--comm_type tcp|ir|ultrasound] "
-            "[--mic <alsa_device>] [--spk <alsa_device>] [--require-ir-hk]",
+            "Usage: %s <config_file_path> "
+            "[--comm_type tcp|ir|lifi|ultrasound] [--mic <alsa_device>] "
+            "[--spk <alsa_device>] [--require-ir-hk | --require-lifi-hk] "
+            "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
             argv[0]);
     }
     char* config_path = argv[1];
     for (int i = 2; i < argc; i++) {
         if (strcmp(argv[i], "--require-ir-hk") == 0) {
-            require_ir_hk = 1;
+            require_hk = "IR";
+        } else if (strcmp(argv[i], "--require-lifi-hk") == 0) {
+            require_hk = "LIFI";
+        } else if (strcmp(argv[i], "--lifi-tx-gpio") == 0 && i + 1 < argc) {
+            lifi_tx_gpio = atoi(argv[i + 1]);
+            i++;
+        } else if (strcmp(argv[i], "--lifi-rx-gpio") == 0 && i + 1 < argc) {
+            lifi_rx_gpio = atoi(argv[i + 1]);
+            i++;
+        } else if (strcmp(argv[i], "--lifi-led-active-low") == 0) {
+            lifi_led_active_low = 1;
         } else if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
             comm_type = argv[i + 1];
             i++;
@@ -86,6 +102,15 @@ int main(int argc, char* argv[]) {
             i++;
         }
     }
+#ifdef HAVE_LIFI_TRANSPORT
+    /* Applies to both the LiFi handshake and a LiFi HK check after any
+     * handshake transport. */
+    lifi_configure(lifi_tx_gpio, lifi_rx_gpio, lifi_led_active_low);
+#else
+    (void)lifi_tx_gpio;
+    (void)lifi_rx_gpio;
+    (void)lifi_led_active_low;
+#endif
 
     // Initialize SST context for Locker. This is used to talk to Auth over
     // TCP regardless of --comm_type: only the handshake/communication with
@@ -139,13 +164,27 @@ int main(int argc, char* argv[]) {
             "This build has no pigpio/IR support (Linux only). Rebuild on "
             "the Raspberry Pi to use --comm_type ir.");
 #endif
+    } else if (strcmp(comm_type, "lifi") == 0) {
+#ifdef HAVE_LIFI_TRANSPORT
+        session_ctx = server_secure_comm_setup_via_lifi(ctx, s_key_list);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed server_secure_comm_setup_via_lifi().");
+        }
+        SST_print_log(
+            "Locker: LiFi handshake with Robot succeeded. (Ongoing secure "
+            "messaging over LiFi is not implemented yet in this demo.)");
+#else
+        SST_print_error_exit(
+            "This build has no pigpio/LiFi support (Linux only). Rebuild on "
+            "the Raspberry Pi to use --comm_type lifi.");
+#endif
     } else {
         SST_print_error_exit(
-            "Unknown --comm_type '%s'. Expected tcp, ir, or ultrasound.",
+            "Unknown --comm_type '%s'. Expected tcp, ir, lifi, or ultrasound.",
             comm_type);
     }
 
-    if (!verify_co_location(session_ctx, 0, require_ir_hk)) {
+    if (!verify_co_location(session_ctx, 0, require_hk)) {
         SST_print_error_exit(
             "CO_LOCATION verification failed; locker access denied.");
     }

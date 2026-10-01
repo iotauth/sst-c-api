@@ -15,7 +15,9 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/load_config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c
   ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk.c
-  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk_plan.c)
+  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk_plan.c
+  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk.c
+  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk_plan.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -93,3 +95,8 @@ add_executable(ir_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ir_hk_test.c)
 target_link_libraries(ir_hk_test PRIVATE sst-c-api)
 target_compile_options(ir_hk_test PRIVATE -UNDEBUG)
 add_test(NAME ir_hk_test COMMAND ir_hk_test)
+
+add_executable(lifi_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/lifi_hk_test.c)
+target_link_libraries(lifi_hk_test PRIVATE sst-c-api)
+target_compile_options(lifi_hk_test PRIVATE -UNDEBUG)
+add_test(NAME lifi_hk_test COMMAND lifi_hk_test)
