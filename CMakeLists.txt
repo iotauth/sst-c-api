@@ -17,7 +17,9 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk.c
   ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk_plan.c
   ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk.c
-  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk_plan.c)
+  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk_plan.c
+  ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo.c
+  ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo_plan.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -100,3 +102,8 @@ add_executable(lifi_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/lifi_hk_test.c)
 target_link_libraries(lifi_hk_test PRIVATE sst-c-api)
 target_compile_options(lifi_hk_test PRIVATE -UNDEBUG)
 add_test(NAME lifi_hk_test COMMAND lifi_hk_test)
+
+add_executable(ultrasonic_echo_test ${CMAKE_CURRENT_SOURCE_DIR}/ultrasonic_com/ultrasonic_echo_test.c)
+target_link_libraries(ultrasonic_echo_test PRIVATE sst-c-api)
+target_compile_options(ultrasonic_echo_test PRIVATE -UNDEBUG)
+add_test(NAME ultrasonic_echo_test COMMAND ultrasonic_echo_test)

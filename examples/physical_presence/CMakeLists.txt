@@ -26,7 +26,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ASOUND_LIB AND EXISTS ${GGWAVE_SRC_DIR
   message(STATUS "ggwave/ALSA found: building --comm_type ultrasound support.")
   add_subdirectory(${GGWAVE_SRC_DIR} ${CMAKE_BINARY_DIR}/ggwave-build)
   foreach(target robot locker)
-    target_sources(${target} PRIVATE ../../ultrasonic_com/ggwave_sst_handshake.c)
+    # The handshake transport, plus the acoustic I/O for the CO_LOCATION
+    # keyed echo (whose protocol logic lives in sst-c-api).
+    target_sources(${target} PRIVATE ../../ultrasonic_com/ggwave_sst_handshake.c
+                                     ../../ultrasonic_com/ultrasonic_audio.c)
     target_compile_definitions(${target} PRIVATE HAVE_GGWAVE_TRANSPORT)
     target_link_libraries(${target} ${ASOUND_LIB} ggwave)
   endforeach()
