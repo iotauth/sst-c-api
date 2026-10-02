@@ -25,7 +25,6 @@ typedef struct {
 typedef struct {
     SST_session_ctx_t session;
     ultrasonic_echo_config config;
-    ultrasonic_echo_identity identity;
     mock_audio audio;
     int initiator, rc;
     unsigned delay_ms;
@@ -76,8 +75,8 @@ static int rx_until_e(void* ctx, unsigned char* buf, unsigned capacity,
 static void* run_endpoint(void* ctx) {
     endpoint* e = ctx;
     ultrasonic_echo_audio io = {e, rx_begin_e, rx_until_e, tx};
-    e->rc = ultrasonic_echo_run(&e->session, &e->config, &e->identity,
-                                e->initiator, &io, e->delay_ms, &e->result);
+    e->rc = ultrasonic_echo_run(&e->session, &e->config, e->initiator, &io,
+                                e->delay_ms, &e->result);
     /* An aborting side must not leave its peer waiting on TCP. */
     if (e->rc < 0) shutdown(e->session.sock, SHUT_RDWR);
     return NULL;
@@ -101,8 +100,6 @@ static void init(endpoint e[2]) {
         e[i].audio.air = air[i];
         e[i].initiator = i == 0;
         e[i].config = (ultrasonic_echo_config){200000, 500};
-        strcpy(e[i].identity.requester, "net1.robot1");
-        strcpy(e[i].identity.target, "net1.locker1");
     }
 }
 static void finish(endpoint e[2]) {
@@ -212,25 +209,15 @@ static void tag_tests(void) {
     unsigned char nonce[ULTRASONIC_ECHO_NONCE_SIZE] = {1, 2, 3};
     unsigned char a[16], b[16];
     const session_key_t* k = &e[0].session.s_key;
-    ultrasonic_echo_identity id = e[0].identity;
-    assert(!ultrasonic_echo_tag(k, &id, 1, nonce, a));
-    assert(!ultrasonic_echo_tag(k, &id, 2, nonce, b) && memcmp(a, b, 16));
-    ultrasonic_echo_identity swapped;
-    strcpy(swapped.requester, id.target);
-    strcpy(swapped.target, id.requester);
-    assert(!ultrasonic_echo_tag(k, &swapped, 1, nonce, b) && memcmp(a, b, 16));
-    /* Length prefixes keep a name boundary shift from colliding. */
-    ultrasonic_echo_identity shifted;
-    strcpy(shifted.requester, "net1.robot1n");
-    strcpy(shifted.target, "et1.locker1");
-    assert(!ultrasonic_echo_tag(k, &shifted, 1, nonce, b) && memcmp(a, b, 16));
+    assert(!ultrasonic_echo_tag(k, 1, nonce, a));
+    assert(!ultrasonic_echo_tag(k, 1, nonce, b) && !memcmp(a, b, 16));
+    assert(!ultrasonic_echo_tag(k, 2, nonce, b) && memcmp(a, b, 16));
+    unsigned char other_nonce[ULTRASONIC_ECHO_NONCE_SIZE] = {1, 2, 4};
+    assert(!ultrasonic_echo_tag(k, 1, other_nonce, b) && memcmp(a, b, 16));
     session_key_t other = *k;
-    other.key_id[0] ^= 1;
-    assert(!ultrasonic_echo_tag(&other, &id, 1, nonce, b) && memcmp(a, b, 16));
-    other = *k;
     other.mac_key[0] ^= 1;
-    assert(!ultrasonic_echo_tag(&other, &id, 1, nonce, b) && memcmp(a, b, 16));
-    assert(ultrasonic_echo_tag(k, &id, 3, nonce, b) == -1);
+    assert(!ultrasonic_echo_tag(&other, 1, nonce, b) && memcmp(a, b, 16));
+    assert(ultrasonic_echo_tag(k, 3, nonce, b) == -1);
     finish(e);
 }
 
@@ -297,14 +284,6 @@ int main(void) {
     exchange(e);
     assert(e[1].rc == 0 && e[1].result.failure == ULTRASONIC_ECHO_BAD_PAYLOAD);
     assert_pass(&e[0], 1);
-    finish(e);
-
-    /* Mismatched identity: neither side's MAC matches the other's. */
-    init(e);
-    strcpy(e[1].identity.target, "net1.locker2");
-    exchange(e);
-    assert(e[0].rc == 0 && e[0].result.failure == ULTRASONIC_ECHO_BAD_MAC);
-    assert(e[1].rc == 0 && e[1].result.failure == ULTRASONIC_ECHO_BAD_MAC);
     finish(e);
 
     /* A valid but late answer: response_valid, not timing_accepted. */
@@ -379,7 +358,7 @@ int main(void) {
 
     puts(
         "Ultrasound echo: plan, tag binding, mutual pass, replay, forgery, "
-        "direction, identity, late, no-response, audio/TCP failure, "
+        "direction, late, no-response, audio/TCP failure, "
         "mismatch and post-echo messaging tests passed.");
     return 0;
 }

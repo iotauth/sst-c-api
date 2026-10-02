@@ -67,7 +67,7 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
     ultrasonic_echo_audio io;
     ultrasonic_audio_bind(audio, &io);
     ultrasonic_echo_result r;
-    int rc = ultrasonic_echo_run(session, c, id, initiator, &io,
+    int rc = ultrasonic_echo_run(session, c, initiator, &io,
                                  o->echo_test_delay_ms, &r);
     ultrasonic_audio_close(audio);
     /* Print only after the complete exchange, never inside timed windows. */

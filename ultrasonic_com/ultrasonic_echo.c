@@ -31,9 +31,6 @@
  * playback and room reverberation die away. Outside any timed window. */
 #define TURNAROUND_MS 300u
 
-static const char kKeyLabel[] = "IoTAuth acoustic keyed echo v1";
-static const char kCheck[] = "CO_LOCATION";
-
 uint64_t ultrasonic_echo_now_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -81,64 +78,22 @@ static int key_fresh(const session_key_t* key) {
     return now >= 0 && (uint64_t)now * 1000 < key->abs_validity;
 }
 
-/* HKDF-SHA256 (RFC 5869), salt = session key ID, one 32-byte output block,
- * so the echo key is separate from the session's message MAC key. */
-static int derive_echo_key(const session_key_t* key, unsigned char out[32]) {
-    unsigned char prk[32], info[sizeof(kKeyLabel)];
-    unsigned n = 0;
-    int ok = HMAC(EVP_sha256(), key->key_id, SESSION_KEY_ID_SIZE, key->mac_key,
-                  key->mac_key_size, prk, &n) != NULL &&
-             n == sizeof(prk);
-    memcpy(info, kKeyLabel, sizeof(kKeyLabel) - 1);
-    info[sizeof(kKeyLabel) - 1] = 1; /* HKDF block counter */
-    n = 0;
-    ok = ok &&
-         HMAC(EVP_sha256(), prk, sizeof(prk), info, sizeof(info), out, &n) !=
-             NULL &&
-         n == 32;
-    OPENSSL_cleanse(prk, sizeof(prk));
-    return ok ? 0 : -1;
-}
-
-int ultrasonic_echo_tag(const session_key_t* key,
-                        const ultrasonic_echo_identity* id, unsigned direction,
+/* HMAC-SHA256 with the session's MAC key over direction | nonce, truncated. */
+int ultrasonic_echo_tag(const session_key_t* key, unsigned direction,
                         const unsigned char nonce[ULTRASONIC_ECHO_NONCE_SIZE],
                         unsigned char tag[ULTRASONIC_ECHO_TAG_SIZE]) {
-    /* Length-prefixed, so field boundaries can't shift between inputs. */
-    unsigned char input[1 + SESSION_KEY_ID_SIZE +
-                        2 * (1 + MAX_ENTITY_NAME_LENGTH) + 1 + sizeof(kCheck) -
-                        1 + 1 + ULTRASONIC_ECHO_NONCE_SIZE];
-    unsigned char k[32], digest[32];
-    if (!key || !id || !nonce || !tag ||
+    unsigned char input[1 + ULTRASONIC_ECHO_NONCE_SIZE], digest[32];
+    if (!key || !nonce || !tag ||
         (direction != ULTRASONIC_ECHO_DIR_REQUESTER_VERIFIES &&
          direction != ULTRASONIC_ECHO_DIR_TARGET_VERIFIES))
         return -1;
-    size_t rl = strnlen(id->requester, sizeof(id->requester));
-    size_t tl = strnlen(id->target, sizeof(id->target));
-    if (!rl || !tl || rl > MAX_ENTITY_NAME_LENGTH ||
-        tl > MAX_ENTITY_NAME_LENGTH || derive_echo_key(key, k))
-        return -1;
-    size_t n = 0;
-    input[n++] = ULTRASONIC_ECHO_VERSION;
-    memcpy(input + n, key->key_id, SESSION_KEY_ID_SIZE);
-    n += SESSION_KEY_ID_SIZE;
-    input[n++] = (unsigned char)rl;
-    memcpy(input + n, id->requester, rl);
-    n += rl;
-    input[n++] = (unsigned char)tl;
-    memcpy(input + n, id->target, tl);
-    n += tl;
-    input[n++] = (unsigned char)(sizeof(kCheck) - 1);
-    memcpy(input + n, kCheck, sizeof(kCheck) - 1);
-    n += sizeof(kCheck) - 1;
-    input[n++] = (unsigned char)direction;
-    memcpy(input + n, nonce, ULTRASONIC_ECHO_NONCE_SIZE);
-    n += ULTRASONIC_ECHO_NONCE_SIZE;
+    input[0] = (unsigned char)direction;
+    memcpy(input + 1, nonce, ULTRASONIC_ECHO_NONCE_SIZE);
     unsigned dl = 0;
-    int ok = HMAC(EVP_sha256(), k, sizeof(k), input, n, digest, &dl) != NULL &&
+    int ok = HMAC(EVP_sha256(), key->mac_key, key->mac_key_size, input,
+                  sizeof(input), digest, &dl) != NULL &&
              dl == sizeof(digest);
     if (ok) memcpy(tag, digest, ULTRASONIC_ECHO_TAG_SIZE);
-    OPENSSL_cleanse(k, sizeof(k));
     OPENSSL_cleanse(digest, sizeof(digest));
     return ok ? 0 : -1;
 }
@@ -202,7 +157,6 @@ static void params_msg(unsigned char* m, unsigned char type,
  * late or missing answer is a completed (failed) direction; only TCP or
  * audio-device failures abort. */
 static int run_verifier(SST_session_ctx_t* s, const ultrasonic_echo_config* c,
-                        const ultrasonic_echo_identity* id,
                         const ultrasonic_echo_audio* a, unsigned dir,
                         ultrasonic_echo_result* r) {
     unsigned char nonce[ULTRASONIC_ECHO_NONCE_SIZE], msg[MSG_CHALLENGE_SIZE];
@@ -236,7 +190,7 @@ static int run_verifier(SST_session_ctx_t* s, const ultrasonic_echo_config* c,
         if (n != ULTRASONIC_ECHO_PAYLOAD_SIZE ||
             heard[0] != ULTRASONIC_ECHO_VERSION || heard[1] != dir) {
             r->failure = ULTRASONIC_ECHO_BAD_PAYLOAD;
-        } else if (ultrasonic_echo_tag(&s->s_key, id, dir, nonce, expected) ||
+        } else if (ultrasonic_echo_tag(&s->s_key, dir, nonce, expected) ||
                    CRYPTO_memcmp(expected, heard + 2,
                                  ULTRASONIC_ECHO_TAG_SIZE)) {
             r->failure = ULTRASONIC_ECHO_BAD_MAC;
@@ -256,8 +210,8 @@ static int run_verifier(SST_session_ctx_t* s, const ultrasonic_echo_config* c,
     return send_msg(s, done, sizeof(done));
 }
 
-static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_identity* id,
-                      const ultrasonic_echo_audio* a, unsigned dir,
+static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_audio* a,
+                      unsigned dir,
                       unsigned delay_ms, ultrasonic_echo_result* r) {
     unsigned char msg[MSG_CHALLENGE_SIZE], done[MSG_DONE_SIZE];
     unsigned char payload[ULTRASONIC_ECHO_PAYLOAD_SIZE];
@@ -265,8 +219,7 @@ static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_identity* id,
         return -1;
     payload[0] = ULTRASONIC_ECHO_VERSION;
     payload[1] = (unsigned char)dir;
-    if (ultrasonic_echo_tag(&s->s_key, id, dir, msg + MSG_HEADER + 1,
-                            payload + 2))
+    if (ultrasonic_echo_tag(&s->s_key, dir, msg + MSG_HEADER + 1, payload + 2))
         return -1;
     if (delay_ms) sleep_ms(delay_ms);
     if (a->tx(a->ctx, payload, sizeof(payload))) {
@@ -282,8 +235,7 @@ static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_identity* id,
 
 int ultrasonic_echo_run(SST_session_ctx_t* session,
                         const ultrasonic_echo_config* config,
-                        const ultrasonic_echo_identity* identity, int initiator,
-                        const ultrasonic_echo_audio* audio,
+                        int initiator, const ultrasonic_echo_audio* audio,
                         unsigned prover_delay_ms, ultrasonic_echo_result* r) {
     unsigned char mine[MSG_PARAMS_SIZE], theirs[MSG_PARAMS_SIZE];
     struct timeval saved;
@@ -293,7 +245,7 @@ int ultrasonic_echo_run(SST_session_ctx_t* session,
     memset(r, 0, sizeof(*r));
     r->failure = ULTRASONIC_ECHO_NOT_RUN;
     if (!session || session->sock < 0 ||
-        !ultrasonic_echo_config_valid(config) || !identity || !audio ||
+        !ultrasonic_echo_config_valid(config) || !audio ||
         !audio->rx_begin || !audio->rx_until || !audio->tx ||
         session->s_key.mac_key_size != MAC_KEY_SIZE)
         return -1;
@@ -334,9 +286,9 @@ int ultrasonic_echo_run(SST_session_ctx_t* session,
         if (verifier) {
             if (dir == ULTRASONIC_ECHO_DIR_TARGET_VERIFIES)
                 sleep_ms(TURNAROUND_MS);
-            if (run_verifier(session, config, identity, audio, dir, r))
+            if (run_verifier(session, config, audio, dir, r))
                 goto done;
-        } else if (run_prover(session, identity, audio, dir, prover_delay_ms,
+        } else if (run_prover(session, audio, dir, prover_delay_ms,
                               r)) {
             goto done;
         }

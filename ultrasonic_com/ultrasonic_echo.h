@@ -26,8 +26,8 @@ typedef struct {
     unsigned response_timeout_ms; /* when the verifier stops listening */
 } ultrasonic_echo_config;
 
-/* Both names come from Auth's plan, already cross-checked by the caller
- * against what it knows locally; never from a peer's TCP message. */
+/* Both names come from Auth's plan, for the caller to cross-check against
+ * what it knows locally; never from a peer's TCP message. */
 typedef struct {
     char requester[MAX_ENTITY_NAME_LENGTH + 1];
     char target[MAX_ENTITY_NAME_LENGTH + 1];
@@ -81,9 +81,7 @@ int ultrasonic_echo_plan_config(const char* plan,
                                 ultrasonic_echo_config* config,
                                 ultrasonic_echo_identity* identity);
 /* Session-bound response tag for one direction's challenge nonce. */
-int ultrasonic_echo_tag(const session_key_t* key,
-                        const ultrasonic_echo_identity* identity,
-                        unsigned direction,
+int ultrasonic_echo_tag(const session_key_t* key, unsigned direction,
                         const unsigned char nonce[ULTRASONIC_ECHO_NONCE_SIZE],
                         unsigned char tag[ULTRASONIC_ECHO_TAG_SIZE]);
 /* Runs both directions over session->sock (a TCP SST session) and audio.
@@ -93,8 +91,7 @@ int ultrasonic_echo_tag(const session_key_t* key,
  * without passing, -1 when the exchange aborted (TCP/audio/protocol). */
 int ultrasonic_echo_run(SST_session_ctx_t* session,
                         const ultrasonic_echo_config* config,
-                        const ultrasonic_echo_identity* identity, int initiator,
-                        const ultrasonic_echo_audio* audio,
+                        int initiator, const ultrasonic_echo_audio* audio,
                         unsigned prover_delay_ms,
                         ultrasonic_echo_result* result);
 #endif
