@@ -2,9 +2,13 @@
 #define PHYSICAL_PRESENCE_HK_CHECK_H
 #include <string.h>
 
+#include "../../bluetooth_com/bt_rssi.h"
 #include "../../ir_com/ir_hk.h"
 #include "../../lifi_com/lifi_hk.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
+#ifdef HAVE_BT_TRANSPORT
+#include "../../bluetooth_com/bt_link.h"
+#endif
 #ifdef HAVE_LIFI_TRANSPORT
 #include "../../lifi_com/lifi_sst_handshake.h"
 #endif
@@ -13,9 +17,10 @@
 #endif
 
 typedef struct {
-    /* NULL, "IR", "LIFI" or "ULTRASOUND": when set, a plan that selects
-     * anything else (including DUMMY) fails, so a stale catalog cannot make
-     * an intended hardware test appear successful. Never overrides Auth. */
+    /* NULL, "IR", "LIFI", "ULTRASOUND" or "BLE_RSSI": when set, a plan that
+     * selects anything else (including DUMMY) fails, so a stale catalog
+     * cannot make an intended hardware test appear successful. Never
+     * overrides Auth. */
     const char* require_method;
     const char* mic_device; /* ALSA devices for the ultrasound echo */
     const char* spk_device;
@@ -102,8 +107,55 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
 #endif
 }
 
+#ifdef HAVE_BT_TRANSPORT
+static int read_link_rssi(void* sock, int8_t* rssi) {
+    return bt_link_read_rssi(*(const int*)sock, rssi);
+}
+#endif
+
+/* Samples the RSSI of the Bluetooth link that carries this session. */
+static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
+                           const bt_rssi_config* c) {
+    SST_print_log("BLE RSSI: role=%s min_rssi_dbm=%d samples=%u interval_ms=%u",
+                  initiator ? "initiator" : "responder", c->min_rssi_dbm,
+                  c->samples, c->interval_ms);
+#ifdef HAVE_BT_TRANSPORT
+    if (!bt_link_is_bluetooth(session->sock)) {
+        SST_print_error(
+            "BLE RSSI needs the Bluetooth SST session; use --comm_type "
+            "bluetooth.");
+        return 0;
+    }
+    bt_rssi_result r;
+    int rc =
+        bt_rssi_run(session, c, initiator, read_link_rssi, &session->sock, &r);
+    SST_print_log(
+        "BLE RSSI: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d "
+        "local=%s",
+        r.samples, r.median_rssi_dbm, c->min_rssi_dbm,
+        r.local_pass ? "PASS" : "FAIL");
+    SST_print_log(
+        "BLE RSSI: peer_median_rssi_dbm=%d peer_reported=%s "
+        "result=%s",
+        r.peer_median_rssi_dbm,
+        !r.peer_reported       ? "NONE"
+        : r.peer_reported_pass ? "PASS"
+                               : "FAIL",
+        rc == 1   ? "PASS"
+        : rc == 0 ? "FAIL"
+                  : "ABORT");
+    return rc == 1;
+#else
+    (void)session;
+    SST_print_error(
+        "Auth requires the BLE RSSI check, but this build has no BlueZ "
+        "support.");
+    return 0;
+#endif
+}
+
 /* Called after handshake for every transport; Auth's verificationPlan alone
- * decides whether to run IR/LiFi HK or the ultrasound echo. Never
+ * decides whether to run IR/LiFi HK, the ultrasound echo or BLE RSSI. Never
  * substitute DUMMY when the selected medium is unavailable. */
 static int verify_co_location(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts) {
@@ -112,17 +164,20 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     lifi_hk_config lifi = {0};
     ultrasonic_echo_config echo = {0};
     ultrasonic_echo_identity echo_id = {{0}, {0}};
+    bt_rssi_config ble = {0};
     /* Each parser returns -1 for the others' methods, 0 for absent/DUMMY. */
     int ir_selected = ir_hk_plan_config(session->s_key.challenge, &ir);
     int lifi_selected = lifi_hk_plan_config(session->s_key.challenge, &lifi);
     int echo_selected =
         ultrasonic_echo_plan_config(session->s_key.challenge, &echo, &echo_id);
+    int ble_selected = bt_rssi_plan_config(session->s_key.challenge, &ble);
     const char* selected = ir_selected == 1     ? "IR"
                            : lifi_selected == 1 ? "LIFI"
                            : echo_selected == 1 ? "ULTRASOUND"
+                           : ble_selected == 1  ? "BLE_RSSI"
                                                 : NULL;
-    if (!selected &&
-        (ir_selected < 0 || lifi_selected < 0 || echo_selected < 0)) {
+    if (!selected && (ir_selected < 0 || lifi_selected < 0 ||
+                      echo_selected < 0 || ble_selected < 0)) {
         SST_print_error("Invalid or unsupported Auth CO_LOCATION plan.");
         return 0;
     }
@@ -134,13 +189,14 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     }
     if (!selected) {
         SST_print_log(
-            "CO_LOCATION: no IR/LiFi/ultrasound check selected (absent or "
-            "demo DUMMY).");
+            "CO_LOCATION: no IR/LiFi/ultrasound/BLE check selected (absent "
+            "or demo DUMMY).");
         return 1;
     }
     if (echo_selected == 1)
         return verify_ultrasound_echo(session, initiator, opts, &echo,
                                       &echo_id);
+    if (ble_selected == 1) return verify_ble_rssi(session, initiator, &ble);
     unsigned rounds = ir_selected == 1 ? ir.rounds : lifi.rounds;
     unsigned required =
         ir_selected == 1 ? ir_hk_required(&ir) : lifi_hk_required(&lifi);
