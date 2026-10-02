@@ -68,19 +68,21 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
-    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI" */
+    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI", "UWB" */
     const char* require_hk = NULL;
     unsigned echo_test_delay_ms = 0;
     int lifi_tx_gpio = 23, lifi_rx_gpio = 22, lifi_led_active_low = 0;
     const char* mic_device = "plughw:1,0";
     const char* spk_device = "plughw:2,0";
+    const char* uwb_device = NULL; /* auto-detect the DWM3001CDK */
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> "
             "[--comm_type tcp|ir|lifi|ultrasound|bluetooth] "
             "[--mic <alsa_device>] [--spk <alsa_device>] "
             "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
-            "| --require-ble-rssi] [--ultrasound-echo-test-delay-ms N] "
+            "| --require-ble-rssi | --require-uwb] [--uwb-dev <serial_port>] "
+            "[--ultrasound-echo-test-delay-ms N] "
             "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
             argv[0]);
     }
@@ -94,6 +96,11 @@ int main(int argc, char* argv[]) {
             require_hk = "ULTRASOUND";
         } else if (strcmp(argv[i], "--require-ble-rssi") == 0) {
             require_hk = "BLE_RSSI";
+        } else if (strcmp(argv[i], "--require-uwb") == 0) {
+            require_hk = "UWB";
+        } else if (strcmp(argv[i], "--uwb-dev") == 0 && i + 1 < argc) {
+            uwb_device = argv[i + 1];
+            i++;
         } else if (strcmp(argv[i], "--ultrasound-echo-test-delay-ms") == 0 &&
                    i + 1 < argc) {
             echo_test_delay_ms = (unsigned)atoi(argv[i + 1]);
@@ -211,9 +218,9 @@ int main(int argc, char* argv[]) {
             comm_type);
     }
 
-    co_location_options co_opts = {require_hk, mic_device,
-                                   spk_device, ctx->config.name,
-                                   NULL,       echo_test_delay_ms};
+    co_location_options co_opts = {
+        require_hk, mic_device,         spk_device, ctx->config.name,
+        NULL,       echo_test_delay_ms, uwb_device};
     if (!verify_co_location(session_ctx, 0, &co_opts)) {
         SST_print_error_exit(
             "CO_LOCATION verification failed; locker access denied.");
