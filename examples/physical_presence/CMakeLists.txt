@@ -67,3 +67,21 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND PIGPIO_LIB AND EXISTS ${LIFI_SRC_DIR}/
 else()
   message(STATUS "pigpio not found (or not on Linux): --comm_type lifi will report as unsupported.")
 endif()
+
+# Optional BlueZ-based Bluetooth LE handshake transport and the BLE RSSI
+# CO_LOCATION check over it (Linux only, libbluetooth-dev installed, and
+# requires root at runtime for advertising and raw HCI commands). The RSSI
+# check's protocol logic lives in sst-c-api; this adds the radio side.
+find_library(BLUETOOTH_LIB bluetooth)
+find_path(BLUETOOTH_INCLUDE bluetooth/l2cap.h)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BLUETOOTH_LIB AND BLUETOOTH_INCLUDE)
+  message(STATUS "BlueZ found: building --comm_type bluetooth support.")
+  foreach(target robot locker)
+    target_sources(${target} PRIVATE ../../bluetooth_com/bt_link.c
+                                     ../../bluetooth_com/bt_sst_handshake.c)
+    target_compile_definitions(${target} PRIVATE HAVE_BT_TRANSPORT)
+    target_link_libraries(${target} ${BLUETOOTH_LIB})
+  endforeach()
+else()
+  message(STATUS "BlueZ not found (or not on Linux): --comm_type bluetooth will report as unsupported.")
+endif()

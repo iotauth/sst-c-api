@@ -17,6 +17,9 @@
 #ifdef HAVE_LIFI_TRANSPORT
 #include "../../lifi_com/lifi_sst_handshake.h"
 #endif
+#ifdef HAVE_BT_TRANSPORT
+#include "../../bluetooth_com/bt_sst_handshake.h"
+#endif
 
 // Listens on the given TCP port and accepts one incoming connection.
 // @param serv_sock Receives the listening socket, so the caller can close it.
@@ -65,7 +68,8 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     const char* comm_type = "tcp";
-    const char* require_hk = NULL; /* NULL, "IR", "LIFI", "ULTRASOUND" */
+    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI" */
+    const char* require_hk = NULL;
     unsigned echo_test_delay_ms = 0;
     int lifi_tx_gpio = 23, lifi_rx_gpio = 22, lifi_led_active_low = 0;
     const char* mic_device = "plughw:1,0";
@@ -73,9 +77,10 @@ int main(int argc, char* argv[]) {
     if (argc < 2) {
         SST_print_error_exit(
             "Usage: %s <config_file_path> "
-            "[--comm_type tcp|ir|lifi|ultrasound] [--mic <alsa_device>] "
-            "[--spk <alsa_device>] [--require-ir-hk | --require-lifi-hk | "
-            "--require-ultrasound-echo] [--ultrasound-echo-test-delay-ms N] "
+            "[--comm_type tcp|ir|lifi|ultrasound|bluetooth] "
+            "[--mic <alsa_device>] [--spk <alsa_device>] "
+            "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
+            "| --require-ble-rssi] [--ultrasound-echo-test-delay-ms N] "
             "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
             argv[0]);
     }
@@ -87,6 +92,8 @@ int main(int argc, char* argv[]) {
             require_hk = "LIFI";
         } else if (strcmp(argv[i], "--require-ultrasound-echo") == 0) {
             require_hk = "ULTRASOUND";
+        } else if (strcmp(argv[i], "--require-ble-rssi") == 0) {
+            require_hk = "BLE_RSSI";
         } else if (strcmp(argv[i], "--ultrasound-echo-test-delay-ms") == 0 &&
                    i + 1 < argc) {
             echo_test_delay_ms = (unsigned)atoi(argv[i + 1]);
@@ -186,9 +193,21 @@ int main(int argc, char* argv[]) {
             "This build has no pigpio/LiFi support (Linux only). Rebuild on "
             "the Raspberry Pi to use --comm_type lifi.");
 #endif
+    } else if (strcmp(comm_type, "bluetooth") == 0) {
+#ifdef HAVE_BT_TRANSPORT
+        session_ctx = server_secure_comm_setup_via_bt(ctx, s_key_list);
+        if (session_ctx == NULL) {
+            SST_print_error_exit("Failed server_secure_comm_setup_via_bt().");
+        }
+#else
+        SST_print_error_exit(
+            "This build has no BlueZ/Bluetooth support (Linux only). Rebuild "
+            "on the Raspberry Pi to use --comm_type bluetooth.");
+#endif
     } else {
         SST_print_error_exit(
-            "Unknown --comm_type '%s'. Expected tcp, ir, lifi, or ultrasound.",
+            "Unknown --comm_type '%s'. Expected tcp, ir, lifi, ultrasound, "
+            "or bluetooth.",
             comm_type);
     }
 
@@ -201,7 +220,9 @@ int main(int argc, char* argv[]) {
     }
     SST_print_log("Locker: CO_LOCATION check passed.");
 
-    if (session_ctx != NULL && strcmp(comm_type, "tcp") == 0) {
+    /* Bluetooth, like TCP, leaves a real socket for secure messaging. */
+    if (session_ctx != NULL && (strcmp(comm_type, "tcp") == 0 ||
+                                strcmp(comm_type, "bluetooth") == 0)) {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void*)session_ctx);
