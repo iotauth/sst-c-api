@@ -14,6 +14,13 @@ add_executable(locker locker.c)
 target_link_libraries(robot sst-c-api)
 target_link_libraries(locker sst-c-api)
 
+# UWB ranging's radio: a DWM3001CDK's serial CLI (POSIX termios only, so
+# always built; it reports an error at run time if no board is attached).
+foreach(target robot locker)
+  target_sources(${target} PRIVATE ../../uwb_com/uwb_cli_dev.c)
+  target_link_libraries(${target} Threads::Threads)
+endforeach()
+
 # Optional ggwave/ALSA-based ultrasound handshake transport (Linux only, and
 # only when ALSA's dev package is installed and the ggwave submodule has been
 # checked out at ../../ultrasonic_com/ggwave -- e.g. on the Raspberry Pi

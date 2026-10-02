@@ -6,6 +6,7 @@
 #include "../../ir_com/ir_hk.h"
 #include "../../lifi_com/lifi_hk.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
+#include "../../uwb_com/uwb_cli_dev.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_link.h"
 #endif
@@ -17,9 +18,9 @@
 #endif
 
 typedef struct {
-    /* NULL, "IR", "LIFI", "ULTRASOUND" or "BLE_RSSI": when set, a plan that
-     * selects anything else (including DUMMY) fails, so a stale catalog
-     * cannot make an intended hardware test appear successful. Never
+    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI" or "UWB": when set, a
+     * plan that selects anything else (including DUMMY) fails, so a stale
+     * catalog cannot make an intended hardware test appear successful. Never
      * overrides Auth. */
     const char* require_method;
     const char* mic_device; /* ALSA devices for the ultrasound echo */
@@ -27,6 +28,7 @@ typedef struct {
     const char* local_name;      /* this entity's own name */
     const char* expected_peer;   /* initiator: the target it asked Auth for */
     unsigned echo_test_delay_ms; /* timing tests only: delays our answers */
+    const char* uwb_device;      /* UWB board's serial port, NULL: auto */
 } co_location_options;
 
 /* Auth's plan names both parties; each side checks that against what it
@@ -154,8 +156,43 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
 #endif
 }
 
+/* Ranges with the peer's UWB board over this session's TCP socket. */
+static int verify_uwb(SST_session_ctx_t* session, int initiator,
+                      const co_location_options* o, const uwb_range_config* c) {
+    SST_print_log(
+        "UWB RANGE: role=%s max_distance_cm=%u samples=%u timeout_ms=%u",
+        initiator ? "initiator" : "responder", c->max_distance_cm, c->samples,
+        c->timeout_ms);
+    if (session->sock < 0) {
+        SST_print_error(
+            "UWB ranging needs the TCP SST session; use --comm_type tcp.");
+        return 0;
+    }
+    uwb_cli* cli = uwb_cli_open(o->uwb_device);
+    if (!cli) return 0;
+    uwb_range_radio radio;
+    uwb_cli_bind(cli, &radio);
+    uwb_range_result r;
+    int rc = uwb_range_run(session, c, initiator, &radio, &r);
+    uwb_cli_close(cli);
+    SST_print_log(
+        "UWB RANGE: samples=%u/%u median_cm=%d max_distance_cm=%u local=%s",
+        r.samples, c->samples, r.median_cm, c->max_distance_cm,
+        r.local_pass ? "PASS" : "FAIL");
+    SST_print_log("UWB RANGE: peer_median_cm=%d peer_reported=%s result=%s",
+                  r.peer_median_cm,
+                  !r.peer_reported       ? "NONE"
+                  : r.peer_reported_pass ? "PASS"
+                                         : "FAIL",
+                  rc == 1   ? "PASS"
+                  : rc == 0 ? "FAIL"
+                            : "ABORT");
+    return rc == 1;
+}
+
 /* Called after handshake for every transport; Auth's verificationPlan alone
- * decides whether to run IR/LiFi HK, the ultrasound echo or BLE RSSI. Never
+ * decides whether to run IR/LiFi HK, the ultrasound echo, BLE RSSI or UWB
+ * ranging. Never
  * substitute DUMMY when the selected medium is unavailable. */
 static int verify_co_location(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts) {
@@ -165,19 +202,23 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     ultrasonic_echo_config echo = {0};
     ultrasonic_echo_identity echo_id = {{0}, {0}};
     bt_rssi_config ble = {0};
+    uwb_range_config uwb = {0};
     /* Each parser returns -1 for the others' methods, 0 for absent/DUMMY. */
     int ir_selected = ir_hk_plan_config(session->s_key.challenge, &ir);
     int lifi_selected = lifi_hk_plan_config(session->s_key.challenge, &lifi);
     int echo_selected =
         ultrasonic_echo_plan_config(session->s_key.challenge, &echo, &echo_id);
     int ble_selected = bt_rssi_plan_config(session->s_key.challenge, &ble);
+    int uwb_selected = uwb_range_plan_config(session->s_key.challenge, &uwb);
     const char* selected = ir_selected == 1     ? "IR"
                            : lifi_selected == 1 ? "LIFI"
                            : echo_selected == 1 ? "ULTRASOUND"
                            : ble_selected == 1  ? "BLE_RSSI"
+                           : uwb_selected == 1  ? "UWB"
                                                 : NULL;
-    if (!selected && (ir_selected < 0 || lifi_selected < 0 ||
-                      echo_selected < 0 || ble_selected < 0)) {
+    if (!selected &&
+        (ir_selected < 0 || lifi_selected < 0 || echo_selected < 0 ||
+         ble_selected < 0 || uwb_selected < 0)) {
         SST_print_error("Invalid or unsupported Auth CO_LOCATION plan.");
         return 0;
     }
@@ -189,14 +230,15 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     }
     if (!selected) {
         SST_print_log(
-            "CO_LOCATION: no IR/LiFi/ultrasound/BLE check selected (absent "
-            "or demo DUMMY).");
+            "CO_LOCATION: no IR/LiFi/ultrasound/BLE/UWB check selected "
+            "(absent or demo DUMMY).");
         return 1;
     }
     if (echo_selected == 1)
         return verify_ultrasound_echo(session, initiator, opts, &echo,
                                       &echo_id);
     if (ble_selected == 1) return verify_ble_rssi(session, initiator, &ble);
+    if (uwb_selected == 1) return verify_uwb(session, initiator, opts, &uwb);
     unsigned rounds = ir_selected == 1 ? ir.rounds : lifi.rounds;
     unsigned required =
         ir_selected == 1 ? ir_hk_required(&ir) : lifi_hk_required(&lifi);
