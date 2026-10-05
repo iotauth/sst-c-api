@@ -20,10 +20,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../physical_com/hk.h"
 #include "../src/c_common.h"
 #include "../src/c_crypto.h"
 #include "../src/c_secure_comm.h"
-#include "ir_hk.h"
 
 #define IR_TX_GPIO 27
 #define IR_RX_GPIO 14
@@ -430,12 +430,12 @@ static void hk_pause(void* ctx, unsigned us) {
     (void)ctx;
     gpioDelay(us);
 }
-int ir_hk_run_gpio(const session_key_t* key, const ir_hk_config* config,
-                   int initiator, ir_hk_result* result) {
+int ir_hk_run_gpio(const session_key_t* key, const hk_config* config,
+                   int initiator, hk_result* result) {
     if (ir_init()) return -1;
-    ir_hk_io io = {NULL,        hk_send_control, hk_recv_control,
-                   hk_send_bit, hk_recv_bit,     hk_pause};
-    int rc = ir_hk_run(key, config, initiator, &io, result);
+    hk_io io = {NULL,        hk_send_control, hk_recv_control,
+                hk_send_bit, hk_recv_bit,     hk_pause};
+    int rc = hk_run(key, &HK_IR, config, initiator, &io, result);
     ir_deinit();
     return rc;
 }

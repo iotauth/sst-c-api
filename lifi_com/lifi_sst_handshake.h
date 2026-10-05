@@ -1,6 +1,7 @@
 #ifndef LIFI_SST_HANDSHAKE_H
 #define LIFI_SST_HANDSHAKE_H
 
+#include "../physical_com/hk.h"
 #include "../src/c_api.h"
 
 // Wiring for both the LiFi handshake and lifi_hk_run_gpio(). Unlike the IR
@@ -40,5 +41,11 @@ SST_session_ctx_t* secure_connect_to_server_via_lifi(session_key_t* s_key);
 // @return Connected session_ctx, or NULL on failure.
 SST_session_ctx_t* server_secure_comm_setup_via_lifi(
     SST_ctx_t* ctx, session_key_list_t* existing_s_key_list);
+
+// Runs the LiFi CO_LOCATION check (physical_com/hk.h) over the GPIO wiring
+// above. Invoke only after the authenticated SST handshake; initiator = the
+// handshake client. Requires root. @return as hk_run().
+int lifi_hk_run_gpio(const session_key_t* key, const hk_config* config,
+                     int initiator, hk_result* result);
 
 #endif  // LIFI_SST_HANDSHAKE_H
