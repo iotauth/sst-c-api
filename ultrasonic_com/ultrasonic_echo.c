@@ -9,6 +9,7 @@
 #include <sys/time.h>
 #include <time.h>
 
+#include "../physical_com/session_ctl.h"
 #include "../src/c_common.h"
 
 /* TCP control messages (inside SST secure messages):
@@ -35,12 +36,6 @@ uint64_t ultrasonic_echo_now_us(void) {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
     return (uint64_t)ts.tv_sec * 1000000u + (uint64_t)ts.tv_nsec / 1000u;
-}
-
-static void sleep_ms(unsigned ms) {
-    struct timespec ts = {(time_t)(ms / 1000), (long)(ms % 1000) * 1000000L};
-    while (nanosleep(&ts, &ts) != 0 && errno == EINTR) {
-    }
 }
 
 const char* ultrasonic_echo_failure_name(ultrasonic_echo_failure f) {
@@ -71,11 +66,6 @@ int ultrasonic_echo_config_valid(const ultrasonic_echo_config* c) {
            c->response_timeout_ms >= 1 &&
            c->response_timeout_ms <= ULTRASONIC_ECHO_TIMEOUT_MS_LIMIT &&
            (uint64_t)c->response_timeout_ms * 1000u >= c->max_response_us;
-}
-
-static int key_fresh(const session_key_t* key) {
-    time_t now = time(NULL);
-    return now >= 0 && (uint64_t)now * 1000 < key->abs_validity;
 }
 
 /* HMAC-SHA256 with the session's MAC key over direction | nonce, truncated. */
@@ -113,35 +103,17 @@ static void header(unsigned char* m, unsigned char type) {
 }
 
 static int send_msg(SST_session_ctx_t* s, unsigned char* m, unsigned len) {
-    return send_secure_message((char*)m, len, s) < 0 ? -1 : 0;
+    return session_ctl_send(s, m, len);
 }
 
 /* Reads exactly one secure message, which must be `len` bytes of `type`;
  * anything else (timeout, EOF, wrong type/size/order) aborts the run. */
 static int recv_msg(SST_session_ctx_t* s, unsigned char type,
                     unsigned char* out, unsigned len) {
-    unsigned char buf[MAX_SECURE_COMM_MSG_LENGTH];
-    int n = read_secure_message(buf, s);
-    if (n <= 0) {
-        SST_print_error(
-            "Ultrasound echo: TCP control message not received (timeout, "
-            "disconnect or error).");
-        return -1;
-    }
-    if ((unsigned)n != len || buf[0] != 'U' || buf[1] != 'E' ||
-        buf[2] != ULTRASONIC_ECHO_VERSION || buf[3] != type) {
-        SST_print_error("Ultrasound echo: unexpected TCP control message.");
-        return -1;
-    }
-    memcpy(out, buf, len);
-    return 0;
-}
-
-static int set_rcvtimeo(int sock, unsigned ms) {
-    struct timeval tv;
-    tv.tv_sec = (time_t)(ms / 1000);
-    tv.tv_usec = (suseconds_t)((ms % 1000) * 1000);
-    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+    unsigned char prefix[MSG_HEADER];
+    header(prefix, type);
+    return session_ctl_recv(s, prefix, sizeof(prefix), out, len,
+                            "Ultrasound echo");
 }
 
 static void params_msg(unsigned char* m, unsigned char type,
@@ -211,8 +183,8 @@ static int run_verifier(SST_session_ctx_t* s, const ultrasonic_echo_config* c,
 }
 
 static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_audio* a,
-                      unsigned dir,
-                      unsigned delay_ms, ultrasonic_echo_result* r) {
+                      unsigned dir, unsigned delay_ms,
+                      ultrasonic_echo_result* r) {
     unsigned char msg[MSG_CHALLENGE_SIZE], done[MSG_DONE_SIZE];
     unsigned char payload[ULTRASONIC_ECHO_PAYLOAD_SIZE];
     if (recv_msg(s, MSG_CHALLENGE, msg, sizeof(msg)) || msg[MSG_HEADER] != dir)
@@ -221,7 +193,7 @@ static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_audio* a,
     payload[1] = (unsigned char)dir;
     if (ultrasonic_echo_tag(&s->s_key, dir, msg + MSG_HEADER + 1, payload + 2))
         return -1;
-    if (delay_ms) sleep_ms(delay_ms);
+    if (delay_ms) session_ctl_sleep_ms(delay_ms);
     if (a->tx(a->ctx, payload, sizeof(payload))) {
         SST_print_error("Ultrasound echo: audio playback failed.");
         return -1;
@@ -234,29 +206,27 @@ static int run_prover(SST_session_ctx_t* s, const ultrasonic_echo_audio* a,
 }
 
 int ultrasonic_echo_run(SST_session_ctx_t* session,
-                        const ultrasonic_echo_config* config,
-                        int initiator, const ultrasonic_echo_audio* audio,
+                        const ultrasonic_echo_config* config, int initiator,
+                        const ultrasonic_echo_audio* audio,
                         unsigned prover_delay_ms, ultrasonic_echo_result* r) {
     unsigned char mine[MSG_PARAMS_SIZE], theirs[MSG_PARAMS_SIZE];
-    struct timeval saved;
-    socklen_t saved_len = sizeof(saved);
-    int restore = 0, status = -1;
+    session_ctl_timeout saved = {0};
+    int status = -1;
     if (!r) return -1;
     memset(r, 0, sizeof(*r));
     r->failure = ULTRASONIC_ECHO_NOT_RUN;
     if (!session || session->sock < 0 ||
-        !ultrasonic_echo_config_valid(config) || !audio ||
-        !audio->rx_begin || !audio->rx_until || !audio->tx ||
+        !ultrasonic_echo_config_valid(config) || !audio || !audio->rx_begin ||
+        !audio->rx_until || !audio->tx ||
         session->s_key.mac_key_size != MAC_KEY_SIZE)
         return -1;
-    if (!key_fresh(&session->s_key)) {
+    if (!session_key_fresh(&session->s_key)) {
         r->failure = ULTRASONIC_ECHO_KEY_EXPIRED;
         return -1;
     }
-    restore = getsockopt(session->sock, SOL_SOCKET, SO_RCVTIMEO, &saved,
-                         &saved_len) == 0;
-    if (set_rcvtimeo(session->sock,
-                     config->response_timeout_ms + CONTROL_SLACK_MS))
+    if (session_ctl_timeout_set(session->sock,
+                                config->response_timeout_ms + CONTROL_SLACK_MS,
+                                &saved))
         goto done;
 
     /* Both sides opened their audio before getting here, so READY also
@@ -285,16 +255,14 @@ int ultrasonic_echo_run(SST_session_ctx_t* session,
             (dir == ULTRASONIC_ECHO_DIR_REQUESTER_VERIFIES) == (initiator != 0);
         if (verifier) {
             if (dir == ULTRASONIC_ECHO_DIR_TARGET_VERIFIES)
-                sleep_ms(TURNAROUND_MS);
-            if (run_verifier(session, config, audio, dir, r))
-                goto done;
-        } else if (run_prover(session, audio, dir, prover_delay_ms,
-                              r)) {
+                session_ctl_sleep_ms(TURNAROUND_MS);
+            if (run_verifier(session, config, audio, dir, r)) goto done;
+        } else if (run_prover(session, audio, dir, prover_delay_ms, r)) {
             goto done;
         }
     }
-    r->local_pass =
-        r->response_valid && r->timing_accepted && key_fresh(&session->s_key);
+    r->local_pass = r->response_valid && r->timing_accepted &&
+                    session_key_fresh(&session->s_key);
     if (r->response_valid && r->timing_accepted && !r->local_pass)
         r->failure = ULTRASONIC_ECHO_KEY_EXPIRED;
     status = r->local_pass;
@@ -305,8 +273,6 @@ done:
             r->failure == ULTRASONIC_ECHO_NOT_RUN)
             r->failure = ULTRASONIC_ECHO_ABORTED;
     }
-    if (restore)
-        setsockopt(session->sock, SOL_SOCKET, SO_RCVTIMEO, &saved,
-                   sizeof(saved));
+    session_ctl_timeout_restore(session->sock, &saved);
     return status;
 }
