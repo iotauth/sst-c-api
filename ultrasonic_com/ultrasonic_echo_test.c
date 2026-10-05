@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include "../ir_com/ir_hk.h"
+#include "../physical_com/hk.h"
 
 typedef struct {
     int air; /* this endpoint's end of the simulated acoustic link */
@@ -133,8 +133,8 @@ static void plan_tests(void) {
            !strcmp(id.target, "net1.locker1"));
     /* The IR/LiFi parsers reject this plan, so the dispatcher must accept
      * an ULTRASOUND selection in spite of their -1. */
-    ir_hk_config ir;
-    assert(ir_hk_plan_config(plan, &ir) == -1);
+    hk_config ir;
+    assert(hk_plan_config(plan, &HK_IR, &ir) == -1);
     for (size_t i = 0; i < strlen(plan); ++i) {
         char saved = plan[i];
         plan[i] = 0;
