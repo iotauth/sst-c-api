@@ -2,10 +2,11 @@
 #define PHYSICAL_PRESENCE_HK_CHECK_H
 #include <string.h>
 
-#include "../../bluetooth_com/bt_rssi.h"
 #include "../../physical_com/hk.h"
+#include "../../physical_com/rssi_check.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
 #include "../../uwb_com/uwb_cli_dev.h"
+#include "../../wifi_com/wifi_rssi.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_link.h"
 #endif
@@ -20,7 +21,8 @@
 #endif
 
 typedef struct {
-    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI" or "UWB": when set, a
+    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI", "WIFI_RSSI" or "UWB":
+     * when set, a
      * plan that selects anything else (including DUMMY) fails, so a stale
      * catalog cannot make an intended hardware test appear successful. Never
      * overrides Auth. */
@@ -31,6 +33,7 @@ typedef struct {
     const char* expected_peer;   /* initiator: the target it asked Auth for */
     unsigned echo_test_delay_ms; /* timing tests only: delays our answers */
     const char* uwb_device;      /* UWB board's serial port, NULL: auto */
+    const char* wifi_iface;      /* the Wi-Fi dongle's direct link */
 } co_location_options;
 
 /* One CO_LOCATION method's settings, as read from Auth's plan. */
@@ -40,7 +43,7 @@ typedef union {
         ultrasonic_echo_config config;
         ultrasonic_echo_identity identity;
     } echo;
-    bt_rssi_config ble;
+    rssi_config rssi; /* BLE_RSSI and WIFI_RSSI */
     uwb_range_config uwb;
 } co_location_config;
 
@@ -168,12 +171,39 @@ static int read_link_rssi(void* sock, int8_t* rssi) {
 }
 #endif
 
-/* Samples the RSSI of the Bluetooth link that carries this session. */
-static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
-                           const bt_rssi_config* c) {
-    SST_print_log("BLE RSSI: role=%s min_rssi_dbm=%d samples=%u interval_ms=%u",
+static int read_wifi_rssi(void* iface, int8_t* rssi) {
+    return wifi_rssi_read(iface, rssi);
+}
+
+/* Both RSSI methods sample the link that carries this session, from this
+ * side's own radio. `name` is the log prefix ("BLE RSSI", "WIFI RSSI"). */
+static int run_rssi_check(SST_session_ctx_t* session, int initiator,
+                          const char* name, const rssi_config* c,
+                          rssi_reader read, void* reader_ctx) {
+    rssi_result r;
+    int rc = rssi_run(session, c, initiator, read, reader_ctx, &r);
+    SST_print_log(
+        "%s: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d local=%s", name,
+        r.samples, r.median_rssi_dbm, c->min_rssi_dbm,
+        r.local_pass ? "PASS" : "FAIL");
+    SST_print_log("%s: peer_median_rssi_dbm=%d peer_reported=%s result=%s",
+                  name, r.peer_median_rssi_dbm,
+                  peer_report_name(r.peer_reported, r.peer_reported_pass),
+                  run_result_name(rc));
+    return rc == 1;
+}
+
+static void log_rssi_role(const char* name, int initiator,
+                          const rssi_config* c) {
+    SST_print_log("%s: role=%s min_rssi_dbm=%d samples=%u interval_ms=%u", name,
                   initiator ? "initiator" : "responder", c->min_rssi_dbm,
                   c->samples, c->interval_ms);
+}
+
+/* Samples the RSSI of the Bluetooth link that carries this session. */
+static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
+                           const rssi_config* c) {
+    log_rssi_role("BLE RSSI", initiator, c);
 #ifdef HAVE_BT_TRANSPORT
     if (!bt_link_is_bluetooth(session->sock)) {
         SST_print_error(
@@ -181,19 +211,8 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
             "bluetooth.");
         return 0;
     }
-    bt_rssi_result r;
-    int rc =
-        bt_rssi_run(session, c, initiator, read_link_rssi, &session->sock, &r);
-    SST_print_log(
-        "BLE RSSI: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d local=%s",
-        r.samples, r.median_rssi_dbm, c->min_rssi_dbm,
-        r.local_pass ? "PASS" : "FAIL");
-    SST_print_log(
-        "BLE RSSI: peer_median_rssi_dbm=%d peer_reported=%s result=%s",
-        r.peer_median_rssi_dbm,
-        peer_report_name(r.peer_reported, r.peer_reported_pass),
-        run_result_name(rc));
-    return rc == 1;
+    return run_rssi_check(session, initiator, "BLE RSSI", c, read_link_rssi,
+                          &session->sock);
 #else
     (void)session;
     SST_print_error(
@@ -201,6 +220,27 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
         "support.");
     return 0;
 #endif
+}
+
+/* Samples the RSSI of the direct Wi-Fi link that carries this session: the
+ * session's socket must run over the dongle, or its RSSI says nothing about
+ * the authenticated peer. */
+static int verify_wifi_rssi(SST_session_ctx_t* session, int initiator,
+                            const co_location_options* o,
+                            const rssi_config* c) {
+    log_rssi_role("WIFI RSSI", initiator, c);
+    char iface[32];
+    if (session->sock < 0 ||
+        wifi_rssi_socket_iface(session->sock, iface, sizeof(iface)) ||
+        strcmp(iface, o->wifi_iface)) {
+        SST_print_error(
+            "WIFI RSSI needs the SST session on the %s link; use --comm_type "
+            "wifi.",
+            o->wifi_iface);
+        return 0;
+    }
+    return run_rssi_check(session, initiator, "WIFI RSSI", c, read_wifi_rssi,
+                          (void*)o->wifi_iface);
 }
 
 /* Ranges with the peer's UWB board over this session's TCP socket. */
@@ -254,7 +294,10 @@ static int select_echo(const char* plan, co_location_config* c) {
                                        &c->echo.identity);
 }
 static int select_ble(const char* plan, co_location_config* c) {
-    return bt_rssi_plan_config(plan, &c->ble);
+    return rssi_plan_config(plan, "BLE_RSSI", &c->rssi);
+}
+static int select_wifi(const char* plan, co_location_config* c) {
+    return rssi_plan_config(plan, "WIFI_RSSI", &c->rssi);
 }
 static int select_uwb(const char* plan, co_location_config* c) {
     return uwb_range_plan_config(plan, &c->uwb);
@@ -277,7 +320,11 @@ static int run_echo(SST_session_ctx_t* s, int initiator,
 static int run_ble(SST_session_ctx_t* s, int initiator,
                    const co_location_options* o, const co_location_config* c) {
     (void)o;
-    return verify_ble_rssi(s, initiator, &c->ble);
+    return verify_ble_rssi(s, initiator, &c->rssi);
+}
+static int run_wifi(SST_session_ctx_t* s, int initiator,
+                    const co_location_options* o, const co_location_config* c) {
+    return verify_wifi_rssi(s, initiator, o, &c->rssi);
 }
 static int run_uwb(SST_session_ctx_t* s, int initiator,
                    const co_location_options* o, const co_location_config* c) {
@@ -289,6 +336,7 @@ static const co_location_method CO_LOCATION_METHODS[] = {
     {"LIFI", select_lifi, run_lifi},
     {"ULTRASOUND", select_echo, run_echo},
     {"BLE_RSSI", select_ble, run_ble},
+    {"WIFI_RSSI", select_wifi, run_wifi},
     {"UWB", select_uwb, run_uwb},
 };
 
@@ -324,7 +372,7 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     }
     if (!selected) {
         SST_print_log(
-            "CO_LOCATION: no IR/LiFi/ultrasound/BLE/UWB check selected "
+            "CO_LOCATION: no IR/LiFi/ultrasound/BLE/Wi-Fi/UWB check selected "
             "(absent or demo DUMMY).");
         return 1;
     }

@@ -12,8 +12,9 @@
 /* Command line shared by robot and locker. */
 typedef struct {
     const char* config_path;
-    const char* comm_type; /* tcp, ir, lifi, ultrasound or bluetooth */
+    const char* comm_type; /* tcp, ir, lifi, ultrasound, bluetooth or wifi */
     const char* bt_peer;   /* robot: the Locker's public LE address */
+    const char* wifi_peer; /* robot: the Locker's address on the Wi-Fi link */
     int lifi_tx_gpio, lifi_rx_gpio, lifi_led_active_low;
     /* Everything the CO_LOCATION check needs; the caller fills in
      * local_name and expected_peer once it knows them. */
@@ -23,13 +24,14 @@ typedef struct {
 static void physical_options_usage(const char* program, int robot) {
     SST_print_error_exit(
         "Usage: %s <config_file_path> "
-        "[--comm_type tcp|ir|lifi|ultrasound|bluetooth] "
+        "[--comm_type tcp|ir|lifi|ultrasound|bluetooth|wifi] "
         "[--mic <alsa_device>] [--spk <alsa_device>] %s"
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
-        "| --require-ble-rssi | --require-uwb] [--uwb-dev <serial_port>] "
+        "| --require-ble-rssi | --require-wifi-rssi | --require-uwb] "
+        "[--uwb-dev <serial_port>] [--wifi-iface <iface>] "
         "[--ultrasound-echo-test-delay-ms N] "
         "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
-        program, robot ? "[--bt-peer <bdaddr>] " : "");
+        program, robot ? "[--bt-peer <bdaddr>] [--wifi-peer <ip>] " : "");
 }
 
 /* Parses argv (unknown arguments are ignored) and applies the LiFi wiring,
@@ -43,6 +45,7 @@ static void physical_options_parse(int argc, char* argv[], int robot,
                          {"--require-lifi-hk", "LIFI"},
                          {"--require-ultrasound-echo", "ULTRASOUND"},
                          {"--require-ble-rssi", "BLE_RSSI"},
+                         {"--require-wifi-rssi", "WIFI_RSSI"},
                          {"--require-uwb", "UWB"}};
     memset(o, 0, sizeof(*o));
     o->comm_type = "tcp";
@@ -50,6 +53,8 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     o->lifi_rx_gpio = 22;
     o->co.mic_device = "plughw:1,0";
     o->co.spk_device = "plughw:2,0";
+    o->co.wifi_iface = "wlan1";
+    o->wifi_peer = "192.168.77.1";
     if (argc < 2) physical_options_usage(argv[0], robot);
     o->config_path = argv[1];
     for (int i = 2; i < argc; i++) {
@@ -75,6 +80,10 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->co.uwb_device = v;
         else if (robot && !strcmp(a, "--bt-peer"))
             o->bt_peer = v;
+        else if (robot && !strcmp(a, "--wifi-peer"))
+            o->wifi_peer = v;
+        else if (!strcmp(a, "--wifi-iface"))
+            o->co.wifi_iface = v;
         else if (!strcmp(a, "--ultrasound-echo-test-delay-ms"))
             o->co.echo_test_delay_ms = (unsigned)atoi(v);
         else if (!strcmp(a, "--lifi-tx-gpio"))
@@ -90,10 +99,12 @@ static void physical_options_parse(int argc, char* argv[], int robot,
 #endif
 }
 
-/* TCP and Bluetooth leave a real socket for secure messaging afterwards;
- * the IR, LiFi and ultrasound handshake adapters do not (yet). */
+/* TCP, Wi-Fi (TCP over the direct link) and Bluetooth leave a real socket
+ * for secure messaging afterwards; the IR, LiFi and ultrasound handshake
+ * adapters do not (yet). */
 static int physical_options_has_socket(const physical_options* o) {
-    return !strcmp(o->comm_type, "tcp") || !strcmp(o->comm_type, "bluetooth");
+    return !strcmp(o->comm_type, "tcp") || !strcmp(o->comm_type, "wifi") ||
+           !strcmp(o->comm_type, "bluetooth");
 }
 
 #endif
