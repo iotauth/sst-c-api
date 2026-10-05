@@ -136,6 +136,21 @@ int main(int argc, char* argv[]) {
         if (session_ctx == NULL) {
             SST_print_error_exit("Failed secure_connect_to_server().");
         }
+    } else if (strcmp(comm_type, "wifi") == 0) {
+        /* The same TCP handshake, routed over the direct Wi-Fi link to the
+         * Locker's address on it, so the session runs on that link. */
+        int sock;
+        if (connect_as_client(opts.wifi_peer,
+                              ctx->config.entity_server_port_num, &sock) < 0) {
+            SST_print_error_exit("Failed to connect to %s over Wi-Fi.",
+                                 opts.wifi_peer);
+        }
+        session_ctx =
+            secure_connect_to_server_with_socket(&s_key_list->s_key[0], sock);
+        if (session_ctx == NULL) {
+            SST_print_error_exit(
+                "Failed secure_connect_to_server_with_socket() over Wi-Fi.");
+        }
     } else if (strcmp(comm_type, "ultrasound") == 0) {
 #ifdef HAVE_GGWAVE_TRANSPORT
         session_ctx = secure_connect_to_server_via_ggwave(
@@ -197,8 +212,8 @@ int main(int argc, char* argv[]) {
 #endif
     } else {
         SST_print_error_exit(
-            "Unknown --comm_type '%s'. Expected tcp, ir, lifi, ultrasound, "
-            "or bluetooth.",
+            "Unknown --comm_type '%s'. Expected tcp, wifi, ir, lifi, "
+            "ultrasound, or bluetooth.",
             comm_type);
     }
 

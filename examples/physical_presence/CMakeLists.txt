@@ -14,10 +14,12 @@ add_executable(locker locker.c)
 target_link_libraries(robot sst-c-api)
 target_link_libraries(locker sst-c-api)
 
-# UWB ranging's radio: a DWM3001CDK's serial CLI (POSIX termios only, so
-# always built; it reports an error at run time if no board is attached).
+# UWB ranging's radio (a DWM3001CDK's serial CLI) and the Wi-Fi RSSI reader
+# (iw over the dongle link): POSIX only, so always built; each reports an
+# error at run time if its hardware is not attached.
 foreach(target robot locker)
-  target_sources(${target} PRIVATE ../../uwb_com/uwb_cli_dev.c)
+  target_sources(${target} PRIVATE ../../uwb_com/uwb_cli_dev.c
+                                   ../../wifi_com/wifi_rssi.c)
   target_link_libraries(${target} Threads::Threads)
 endforeach()
 

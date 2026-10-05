@@ -84,7 +84,10 @@ int main(int argc, char* argv[]) {
     session_key_list_t* s_key_list = init_empty_session_key_list();
     SST_session_ctx_t* session_ctx = NULL;
 
-    if (strcmp(comm_type, "tcp") == 0) {
+    /* Wi-Fi is the TCP handshake over the direct link: the listener accepts
+     * on every interface, and the WIFI_RSSI check later confirms the session
+     * arrived over the Wi-Fi link. */
+    if (strcmp(comm_type, "tcp") == 0 || strcmp(comm_type, "wifi") == 0) {
         clnt_sock = accept_tcp_connection(PORT_NUM, &serv_sock);
         if (clnt_sock == -1) {
             SST_print_error_exit("Failed accept_tcp_connection().");
@@ -150,8 +153,8 @@ int main(int argc, char* argv[]) {
 #endif
     } else {
         SST_print_error_exit(
-            "Unknown --comm_type '%s'. Expected tcp, ir, lifi, ultrasound, "
-            "or bluetooth.",
+            "Unknown --comm_type '%s'. Expected tcp, wifi, ir, lifi, "
+            "ultrasound, or bluetooth.",
             comm_type);
     }
 
