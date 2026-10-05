@@ -1,4 +1,7 @@
-#include "../lifi_com/lifi_hk.h"
+/* Portable test for the mutual HK core shared by IR and LiFi
+ * (physical_com/hk.h): both media run the same suite over a simulated
+ * channel, and the media's labels keep their registers apart. */
+#include "../physical_com/hk.h"
 
 #include <assert.h>
 #include <pthread.h>
@@ -12,18 +15,19 @@
 typedef struct {
     unsigned kind, len;
     uint64_t tick;
-    unsigned char data[LIFI_HK_INIT_SIZE]; /* large enough for either message */
+    unsigned char data[HK_INIT_SIZE]; /* large enough for either message */
 } packet;
 typedef struct {
     int fd, initiator, rc;
     unsigned bits_sent, controls_sent, flip, delay, corrupt_control, guard;
     unsigned stop_after_bits;
     uint64_t now;
-    unsigned char ready[LIFI_HK_READY_SIZE];
+    unsigned char ready[HK_READY_SIZE];
     const unsigned char* replay;
-    lifi_hk_config config;
+    const hk_medium* medium;
+    hk_config config;
     session_key_t key;
-    lifi_hk_result result;
+    hk_result result;
 } endpoint;
 static int write_packet(endpoint* e, const packet* p) {
     const unsigned char* b = (const unsigned char*)p;
@@ -89,21 +93,24 @@ static int recv_bit(void* ctx, unsigned char* bit, uint32_t* end) {
 }
 static void pause_us(void* ctx, unsigned us) {
     endpoint* e = ctx;
-    if (us == LIFI_HK_READY_GUARD_US) e->guard++;
+    if (us == HK_READY_GUARD_US) e->guard++;
     e->now += us;
 }
 static void* run(void* ctx) {
     endpoint* e = ctx;
-    lifi_hk_io io = {e, send_control, recv_control, send_bit, recv_bit, pause_us};
-    e->rc = lifi_hk_run(&e->key, &e->config, e->initiator, &io, &e->result);
+    hk_io io = {e, send_control, recv_control, send_bit, recv_bit, pause_us};
+    e->rc =
+        hk_run(&e->key, e->medium, &e->config, e->initiator, &io, &e->result);
     shutdown(e->fd, SHUT_WR);
     return NULL;
 }
+static const hk_medium* medium; /* the medium under test */
 static void init(endpoint e[2], unsigned rounds) {
     memset(e, 0, sizeof(endpoint) * 2);
     for (int i = 0; i < 2; ++i) {
+        e[i].medium = medium;
         e[i].initiator = i == 0;
-        e[i].config = (lifi_hk_config){rounds, 800000, 1000};
+        e[i].config = (hk_config){rounds, 800000, 1000};
         e[i].key.mac_key_size = MAC_KEY_SIZE;
         e[i].key.abs_validity = UINT64_MAX;
         memset(e[i].key.mac_key, 42, MAC_KEY_SIZE);
@@ -129,15 +136,17 @@ static void exchange(endpoint e[2]) {
     }
 }
 static void plan_tests(void) {
-    const char* fmt =
-        "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{\"CO_"
-        "LOCATION\":{\"topology\":\"MUTUAL\",\"selectedMethod\":{\"method\":"
-        "\"LIFI\",\"parameters\":{%s}}}}}";
+    char fmt[512];
+    snprintf(fmt, sizeof(fmt), "%s%s%s",
+             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
+             "\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"selectedMethod\":{"
+             "\"method\":\"",
+             medium->method, "\",\"parameters\":{%s}}}}}");
     char plan[1024];
-    lifi_hk_config c;
+    hk_config c;
     snprintf(plan, sizeof(plan), fmt,
              "\"rounds\":32,\"success_threshold\":0.8,\"max_delay_us\":1000");
-    assert(lifi_hk_plan_config(plan, &c) == 1 && lifi_hk_required(&c) == 26);
+    assert(hk_plan_config(plan, medium, &c) == 1 && hk_required(&c) == 26);
     const char* bad[] = {
         "\"rounds\":31,\"success_threshold\":0.8,\"max_delay_us\":1000",
         "\"rounds\":32,\"success_threshold\":0,\"max_delay_us\":1000",
@@ -150,31 +159,36 @@ static void plan_tests(void) {
         "\"rounds\":32,\"max_delay_us\":1000"};
     for (unsigned i = 0; i < sizeof(bad) / sizeof(bad[0]); ++i) {
         snprintf(plan, sizeof(plan), fmt, bad[i]);
-        assert(lifi_hk_plan_config(plan, &c) == -1);
+        assert(hk_plan_config(plan, medium, &c) == -1);
     }
-    assert(lifi_hk_plan_config(
+    assert(hk_plan_config(
                "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{}}",
-               &c) == -1);
-    assert(lifi_hk_plan_config("{\"requiredChecks\":[],\"verificationPlan\":{}}",
-                             &c) == 0);
-    assert(lifi_hk_plan_config("", &c) == -1);
-    assert(lifi_hk_plan_config("{", &c) == -1);
+               medium, &c) == -1);
+    assert(hk_plan_config("{\"requiredChecks\":[],\"verificationPlan\":{}}",
+                          medium, &c) == 0);
+    assert(hk_plan_config("", medium, &c) == -1);
+    assert(hk_plan_config("{", medium, &c) == -1);
+    /* The other medium's plan is not this medium's to accept. */
+    snprintf(plan, sizeof(plan), fmt,
+             "\"rounds\":32,\"success_threshold\":0.8,\"max_delay_us\":1000");
+    assert(hk_plan_config(plan, medium == &HK_IR ? &HK_LIFI : &HK_IR, &c) ==
+           -1);
     snprintf(plan, sizeof(plan), fmt,
              "\"rounds\":128,\"success_threshold\":1,\"max_delay_us\":1000");
-    assert(lifi_hk_plan_config(plan, &c) == 1 && lifi_hk_required(&c) == 128);
+    assert(hk_plan_config(plan, medium, &c) == 1 && hk_required(&c) == 128);
     /* Every truncated prefix must fail, including midway through strings. */
     for (size_t i = 0; i < strlen(plan); ++i) {
         char saved = plan[i];
         plan[i] = 0;
-        assert(lifi_hk_plan_config(plan, &c) == -1);
+        assert(hk_plan_config(plan, medium, &c) == -1);
         plan[i] = saved;
     }
 }
-int main(void) {
-    signal(SIGPIPE, SIG_IGN);
+static void suite(const hk_medium* m) {
+    medium = m;
     plan_tests();
     endpoint e[2];
-    unsigned char old_ready[LIFI_HK_READY_SIZE];
+    unsigned char old_ready[HK_READY_SIZE];
     for (unsigned n = 32; n <= 128; n *= 2) {
         init(e, n);
         exchange(e);
@@ -191,7 +205,7 @@ int main(void) {
     exchange(e);
     /* nonce_B (the only thing READY carries besides type) must be fresh
      * every run. */
-    assert(memcmp(old_ready + 1, e[1].ready + 1, LIFI_HK_NONCE_SIZE));
+    assert(memcmp(old_ready + 1, e[1].ready + 1, HK_NONCE_SIZE));
     for (int direction = 0; direction < 2; ++direction) {
         init(e, 32);
         e[direction].flip = 6;
@@ -248,8 +262,26 @@ int main(void) {
     e[1].replay = old_ready;
     exchange(e);
     assert(e[0].rc == -1 && e[1].rc == -1 && !e[0].bits_sent);
-    puts(
-        "LiFi HK: mutual rounds, threshold boundaries, delays, wrap, key "
-        "mismatch, MAC and replay tests passed.");
+    printf(
+        "%s HK: mutual rounds, threshold boundaries, delays, wrap, key "
+        "mismatch, MAC and replay tests passed.\n",
+        m->name);
+}
+
+int main(void) {
+    signal(SIGPIPE, SIG_IGN);
+    suite(&HK_IR);
+    suite(&HK_LIFI);
+    /* Domain separation: an IR endpoint and a LiFi endpoint share a key, so
+     * the control messages verify, but their response registers differ and
+     * neither side's responses count. */
+    endpoint e[2];
+    medium = &HK_IR;
+    init(e, 32);
+    e[1].medium = &HK_LIFI;
+    exchange(e);
+    assert(e[0].rc == 0 && e[1].rc == 0 && e[0].result.successes < 26 &&
+           e[1].result.successes < 26);
+    puts("HK: IR and LiFi registers are domain-separated.");
     return 0;
 }

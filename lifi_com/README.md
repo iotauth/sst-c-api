@@ -9,9 +9,9 @@ after a TCP, IR or ultrasound handshake. Both endpoints need an LED and a
 sensor. Like the IR version, this is HK-inspired, not an implementation with a
 proved Hancke–Kuhn bound.
 
-`lifi_com` is deliberately self-contained: `lifi_hk.c` / `lifi_hk_plan.c` are
-private copies of `ir_hk.c` / `ir_hk_plan.c` with `lifi_` names, a `LIFI`
-method, and LiFi pacing. The register-derivation domain is `LHK-REG1` (IR:
+The HK protocol and plan reading are shared with IR in `../physical_com/hk.c`
+(the `HK_LIFI` medium: the `LIFI` method and LiFi pacing); only the physical
+layer lives here. The register-derivation domain is `LHK-REG1` (IR:
 `IHK-REG1`), so the two media never derive the same registers even under the
 same key and nonces.
 
@@ -19,13 +19,12 @@ same key and nonces.
 
 | File | Role | IR counterpart |
 |---|---|---|
-| `lifi_hk.h` / `lifi_hk.c` | Authenticated mutual HK protocol (transport-agnostic) | `ir_hk.h` / `ir_hk.c` |
-| `lifi_hk_plan.c` | Bounded JSON reader for Auth's plan, `LIFI` method | `ir_hk_plan.c` |
+| `../physical_com/hk.h` / `hk.c` | Authenticated mutual HK protocol and plan reader (transport-agnostic), shared | same file, `HK_IR` |
 | `lifi_sst_handshake.h` / `.c` | pigpio physical layer, byte framing, SST handshake over light, HK GPIO adapter, runtime wiring | `ir_sst_handshake.h` / `.c` |
 | `lifi_test.c` | Bench RTT test with a fixed secret (initiator / responder / loopback) | `ir_test.c` |
 | `lifi_bitbang.c` | Bench 8N1 serial link test | — |
 | `run_lifi_test.sh`, `test_lifi_multihost.sh` | Bench launchers | `run_ir_test.sh`, `test_ir_multihost.sh` |
-| `../tests/lifi_hk_test.c` | Portable protocol unit test over a simulated link | `../tests/ir_hk_test.c` |
+| `../tests/hk_test.c` | Portable protocol unit test over a simulated link, both media | same file |
 | `pi42_initiator_600_1200.txt`, `pi43_responder_600_1200.txt` | Recorded bench run (600/1200 µs) showing the sensor's width narrowing | — |
 
 ## Physical layer
@@ -52,7 +51,7 @@ beyond the numbers:
 - **No AGC.** The per-bit settle gap in the byte framing only has to cover
   the sensor's recovery, so it could be far below IR's 25 ms; it is 5 ms
   (`LIFI_INTER_BIT_GAP_US`) for now, untested and deliberately generous.
-  The HK inter-bit pause (`LIFI_HK_INTER_BIT_US`) stays at the 50 ms round
+  The HK inter-bit pause (`HK_LIFI.inter_bit_us`) stays at the 50 ms round
   gap the clean bench run used; the only shorter run (5 ms) also had
   unworkable widths, so nothing shorter is validated.
 
@@ -119,7 +118,7 @@ repository carries, mirroring IR:
   only CO_LOCATION mechanism, `topology: MUTUAL`, requiring `LiFi` sensors
   and actuators on both requester and target, with
   `{"rounds": 128, "max_delay_us": 2000, "success_threshold": 0.8}`.
-  `lifi_hk_plan_config` validates the same ranges as IR: rounds in
+  `hk_plan_config(plan, &HK_LIFI, ...)` validates the same ranges as IR: rounds in
   `{32,64,128}`, threshold in `(0,1]` with at most six decimals, delay in
   `[1,1000000]` µs. (Auth's own `validateIRParameters` only runs for the
   `IR` method; the C side is the validator for `LIFI`.)
@@ -142,7 +141,7 @@ Library and portable tests (any machine):
 
 ```sh
 cmake -S . -B /tmp/sst-build && cmake --build /tmp/sst-build -j
-ctest --test-dir /tmp/sst-build --output-on-failure   # ir_hk_test, lifi_hk_test
+ctest --test-dir /tmp/sst-build --output-on-failure   # hk_test covers IR and LiFi
 ```
 
 Physical-presence examples (Raspberry Pi with pigpio installed; CMake
@@ -167,11 +166,12 @@ Bench tools, no SST/Auth involved:
 ./test_lifi_multihost.sh                                 # both, over SSH; pins per host built in
 ```
 
-`../tests/lifi_hk_test.c` runs both protocol roles through a simulated link
-with virtual timestamps — the same suite as the IR test (round counts,
+`../tests/hk_test.c` runs both protocol roles through a simulated link
+with virtual timestamps, once per medium (round counts,
 threshold boundaries in both directions, late-but-correct responses, timer
 wrap, key/key-ID mismatch, expired keys, tampered INIT/READY, READY replay,
-malformed plans). It verifies protocol logic, not GPIO timing or relay
+malformed plans), plus an IR-vs-LiFi run showing the labels keep the
+registers apart. It verifies protocol logic, not GPIO timing or relay
 resistance.
 
 ## Not yet validated on hardware

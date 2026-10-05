@@ -39,10 +39,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../physical_com/hk.h"
 #include "../src/c_common.h"
 #include "../src/c_crypto.h"
 #include "../src/c_secure_comm.h"
-#include "lifi_hk.h"
 
 // Dark widths as sent (the bench-validated lifi_test.c settings).
 // Received widths come back ~180 us narrower (see above).
@@ -163,35 +163,88 @@ static int lifi_tx_buf(const unsigned char* buf, int len) {
     return 0;
 }
 
+// Received edges, timestamped by pigpio's own sampling (every
+// PI_DEFAULT_CLK_MICROS, 5 us) rather than by when this thread happens to
+// look: a sleeping poll loop sees an edge up to its sleep late, which shaved
+// enough off short pulses to drop them (or to read a long pulse as short).
+// The alert callback is the only producer, lifi_rx_buf() the only consumer.
+#define EDGE_RING 4096 /* > the edges in the longest (255-byte) frame */
+static uint32_t edge_tick[EDGE_RING];
+static int edge_level[EDGE_RING];
+static unsigned edge_head, edge_tail;
+
+static void on_edge(int gpio, int level, uint32_t tick) {
+    (void)gpio;
+    if (level != 0 && level != 1) return; /* PI_TIMEOUT: no watchdog set */
+    unsigned h = __atomic_load_n(&edge_head, __ATOMIC_RELAXED);
+    edge_tick[h % EDGE_RING] = tick;
+    edge_level[h % EDGE_RING] = level;
+    __atomic_store_n(&edge_head, h + 1, __ATOMIC_RELEASE);
+}
+
+// Next edge into *level/*tick, waiting until `deadline` (a gpioTick() value)
+// unless `forever`. @return 1 for an edge, 0 on timeout, -1 if the ring
+// overflowed.
+static int next_edge(int* level, uint32_t* tick, int forever,
+                     uint32_t deadline) {
+    for (;;) {
+        unsigned h = __atomic_load_n(&edge_head, __ATOMIC_ACQUIRE);
+        if (h - edge_tail > EDGE_RING) {
+            SST_print_error("LiFi: receive edge buffer overflowed.");
+            return -1;
+        }
+        if (h != edge_tail) {
+            *tick = edge_tick[edge_tail % EDGE_RING];
+            *level = edge_level[edge_tail % EDGE_RING];
+            ++edge_tail;
+            return 1;
+        }
+        if (!forever && (int32_t)(gpioTick() - deadline) >= 0) return 0;
+        /* Sleeping here costs latency only, never timing accuracy. */
+        gpioDelay(1000);
+    }
+}
+
 // Waits for a sync marker, then decodes a 1-byte length header followed by
-// that many payload bytes, one bit per dark pulse. A dark interval longer
-// than LIFI_LINE_LOST_US is the peer's LED being off, not data: the partial
-// frame is dropped and decoding resumes once light returns. @return decoded
-// byte length (>0) on success, 0 on timeout, -1 on a framing error.
+// that many payload bytes, one bit per dark pulse. Pulse widths come from
+// the sampled edge timestamps above. A dark interval longer than
+// LIFI_LINE_LOST_US is the peer's LED being off, not data: the partial frame
+// is dropped and decoding resumes once light returns. @return decoded byte
+// length (>0) on success, 0 on timeout, -1 on a framing error.
 static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
                        double timeout_sec) {
-    uint32_t loop_start = gpioTick();
+    int forever = timeout_sec <= 0;
+    uint32_t deadline = gpioTick() + (uint32_t)(timeout_sec * 1000000.0);
     int have_sync = 0, byte_val = 0, bit_count = 0;
     int expected_len = -1, received_bytes = 0, reported_dark = 0;
+    int dark = 0, result = 0;
+    uint32_t fell = 0;
 
-    while (1) {
-        double elapsed = (uint32_t)(gpioTick() - loop_start) / 1000000.0;
-        if (timeout_sec > 0 && elapsed > timeout_sec) return 0;
-
-        if (gpioRead(rx_gpio) != 0) {
-            gpioDelay(100);
-            continue;
+    /* Only edges from now on: anything earlier is not part of this frame. */
+    edge_tail = __atomic_load_n(&edge_head, __ATOMIC_ACQUIRE);
+    if (gpioSetAlertFunc(rx_gpio, on_edge) != 0) {
+        SST_print_error("LiFi: cannot watch GPIO%d for edges.", rx_gpio);
+        return -1;
+    }
+    for (;;) {
+        int level;
+        uint32_t tick;
+        /* While dark, also wake up when the line counts as lost. */
+        int wait_forever = forever;
+        uint32_t wake = deadline;
+        if (dark &&
+            (forever || (int32_t)(fell + LIFI_LINE_LOST_US - deadline) < 0)) {
+            wait_forever = 0;
+            wake = fell + LIFI_LINE_LOST_US;
         }
-
-        uint32_t rx_start_tick = gpioTick();
-        int line_lost = 0;
-        while (gpioRead(rx_gpio) == 0) {
-            if ((uint32_t)(gpioTick() - rx_start_tick) > LIFI_LINE_LOST_US) {
-                line_lost = 1;
-                break;
-            }
+        int got = next_edge(&level, &tick, wait_forever, wake);
+        if (got < 0) {
+            result = -1;
+            break;
         }
-        if (line_lost) {
+        if (got == 0) {
+            if (!dark || (!forever && (int32_t)(gpioTick() - deadline) >= 0))
+                break; /* timeout: result stays 0 */
             if (!reported_dark) {
                 SST_print_log(
                     "LiFi: sensor dark > %u us; waiting for the peer's LED "
@@ -199,16 +252,23 @@ static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
                     LIFI_LINE_LOST_US);
                 reported_dark = 1;
             }
-            while (gpioRead(rx_gpio) == 0) {
-                elapsed = (uint32_t)(gpioTick() - loop_start) / 1000000.0;
-                if (timeout_sec > 0 && elapsed > timeout_sec) return 0;
-                gpioDelay(1000);
-            }
-            SST_print_log("LiFi: light is back; listening.");
+            dark = 0; /* the rising edge that ends it is not a symbol */
             have_sync = 0;
             continue;
         }
-        uint32_t pulse_width = gpioTick() - rx_start_tick;
+        if (level == 0) {
+            dark = 1;
+            fell = tick;
+            continue;
+        }
+        if (!dark) {
+            /* Light returned after a lost line (or we started mid-pulse). */
+            if (reported_dark) SST_print_log("LiFi: light is back; listening.");
+            reported_dark = 0;
+            continue;
+        }
+        dark = 0;
+        uint32_t pulse_width = tick - fell;
 
         if (pulse_width > LIFI_SYNC_THRESHOLD_US) {
             have_sync = 1;
@@ -230,7 +290,8 @@ static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
                 SST_print_error(
                     "lifi_rx_buf(): declared length %d out of range (cap %d).",
                     expected_len, out_buf_size);
-                return -1;
+                result = -1;
+                break;
             }
         } else {
             out_buf[received_bytes++] = (unsigned char)byte_val;
@@ -238,10 +299,13 @@ static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
         byte_val = 0;
         bit_count = 0;
 
-        if (expected_len >= 0 && received_bytes == expected_len) {
-            return received_bytes;
+        if (received_bytes == expected_len) {
+            result = received_bytes;
+            break;
         }
     }
+    gpioSetAlertFunc(rx_gpio, NULL);
+    return result;
 }
 
 // Confirms the sensor sees the peer's lit LED before we start. Not fatal on
@@ -493,12 +557,12 @@ static void hk_pause(void* ctx, unsigned us) {
     (void)ctx;
     gpioDelay(us);
 }
-int lifi_hk_run_gpio(const session_key_t* key, const lifi_hk_config* config,
-                     int initiator, lifi_hk_result* result) {
+int lifi_hk_run_gpio(const session_key_t* key, const hk_config* config,
+                     int initiator, hk_result* result) {
     if (lifi_init()) return -1;
-    lifi_hk_io io = {NULL,        hk_send_control, hk_recv_control,
-                     hk_send_bit, hk_recv_bit,     hk_pause};
-    int rc = lifi_hk_run(key, config, initiator, &io, result);
+    hk_io io = {NULL,        hk_send_control, hk_recv_control,
+                hk_send_bit, hk_recv_bit,     hk_pause};
+    int rc = hk_run(key, &HK_LIFI, config, initiator, &io, result);
     lifi_deinit();
     return rc;
 }

@@ -1,6 +1,7 @@
 #ifndef IR_SST_HANDSHAKE_H
 #define IR_SST_HANDSHAKE_H
 
+#include "../physical_com/hk.h"
 #include "../src/c_api.h"
 
 // Performs the SST secure-session handshake (SKEY_HANDSHAKE_1/2/3) over
@@ -34,5 +35,11 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key);
 // @return Connected session_ctx, or NULL on failure.
 SST_session_ctx_t* server_secure_comm_setup_via_ir(
     SST_ctx_t* ctx, session_key_list_t* existing_s_key_list);
+
+// Runs the IR CO_LOCATION check (physical_com/hk.h) over the GPIO wiring
+// above. Invoke only after the authenticated SST handshake; initiator = the
+// handshake client. Requires root. @return as hk_run().
+int ir_hk_run_gpio(const session_key_t* key, const hk_config* config,
+                   int initiator, hk_result* result);
 
 #endif  // IR_SST_HANDSHAKE_H

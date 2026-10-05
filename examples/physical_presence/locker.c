@@ -6,7 +6,7 @@
 #include <unistd.h>
 
 #include "../../src/c_api.h"
-#include "hk_check.h"
+#include "physical_options.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -67,77 +67,14 @@ static int accept_tcp_connection(int port, int* serv_sock) {
 
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
-    const char* comm_type = "tcp";
-    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI", "UWB" */
-    const char* require_hk = NULL;
-    unsigned echo_test_delay_ms = 0;
-    int lifi_tx_gpio = 23, lifi_rx_gpio = 22, lifi_led_active_low = 0;
-    const char* mic_device = "plughw:1,0";
-    const char* spk_device = "plughw:2,0";
-    const char* uwb_device = NULL; /* auto-detect the DWM3001CDK */
-    if (argc < 2) {
-        SST_print_error_exit(
-            "Usage: %s <config_file_path> "
-            "[--comm_type tcp|ir|lifi|ultrasound|bluetooth] "
-            "[--mic <alsa_device>] [--spk <alsa_device>] "
-            "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
-            "| --require-ble-rssi | --require-uwb] [--uwb-dev <serial_port>] "
-            "[--ultrasound-echo-test-delay-ms N] "
-            "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
-            argv[0]);
-    }
-    char* config_path = argv[1];
-    for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--require-ir-hk") == 0) {
-            require_hk = "IR";
-        } else if (strcmp(argv[i], "--require-lifi-hk") == 0) {
-            require_hk = "LIFI";
-        } else if (strcmp(argv[i], "--require-ultrasound-echo") == 0) {
-            require_hk = "ULTRASOUND";
-        } else if (strcmp(argv[i], "--require-ble-rssi") == 0) {
-            require_hk = "BLE_RSSI";
-        } else if (strcmp(argv[i], "--require-uwb") == 0) {
-            require_hk = "UWB";
-        } else if (strcmp(argv[i], "--uwb-dev") == 0 && i + 1 < argc) {
-            uwb_device = argv[i + 1];
-            i++;
-        } else if (strcmp(argv[i], "--ultrasound-echo-test-delay-ms") == 0 &&
-                   i + 1 < argc) {
-            echo_test_delay_ms = (unsigned)atoi(argv[i + 1]);
-            i++;
-        } else if (strcmp(argv[i], "--lifi-tx-gpio") == 0 && i + 1 < argc) {
-            lifi_tx_gpio = atoi(argv[i + 1]);
-            i++;
-        } else if (strcmp(argv[i], "--lifi-rx-gpio") == 0 && i + 1 < argc) {
-            lifi_rx_gpio = atoi(argv[i + 1]);
-            i++;
-        } else if (strcmp(argv[i], "--lifi-led-active-low") == 0) {
-            lifi_led_active_low = 1;
-        } else if (strcmp(argv[i], "--comm_type") == 0 && i + 1 < argc) {
-            comm_type = argv[i + 1];
-            i++;
-        } else if (strcmp(argv[i], "--mic") == 0 && i + 1 < argc) {
-            mic_device = argv[i + 1];
-            i++;
-        } else if (strcmp(argv[i], "--spk") == 0 && i + 1 < argc) {
-            spk_device = argv[i + 1];
-            i++;
-        }
-    }
-#ifdef HAVE_LIFI_TRANSPORT
-    /* Applies to both the LiFi handshake and a LiFi HK check after any
-     * handshake transport. */
-    lifi_configure(lifi_tx_gpio, lifi_rx_gpio, lifi_led_active_low);
-#else
-    (void)lifi_tx_gpio;
-    (void)lifi_rx_gpio;
-    (void)lifi_led_active_low;
-#endif
+    physical_options opts;
+    physical_options_parse(argc, argv, 0, &opts);
+    const char* comm_type = opts.comm_type;
 
     // Initialize SST context for Locker. This is used to talk to Auth over
     // TCP regardless of --comm_type: only the handshake/communication with
     // the robot itself is affected by that choice.
-    SST_ctx_t* ctx = init_SST(config_path);
+    SST_ctx_t* ctx = init_SST(opts.config_path);
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
@@ -159,7 +96,7 @@ int main(int argc, char* argv[]) {
     } else if (strcmp(comm_type, "ultrasound") == 0) {
 #ifdef HAVE_GGWAVE_TRANSPORT
         session_ctx = server_secure_comm_setup_via_ggwave(
-            ctx, mic_device, spk_device, s_key_list);
+            ctx, opts.co.mic_device, opts.co.spk_device, s_key_list);
         if (session_ctx == NULL) {
             SST_print_error_exit(
                 "Failed server_secure_comm_setup_via_ggwave().");
@@ -218,18 +155,15 @@ int main(int argc, char* argv[]) {
             comm_type);
     }
 
-    co_location_options co_opts = {
-        require_hk, mic_device,         spk_device, ctx->config.name,
-        NULL,       echo_test_delay_ms, uwb_device};
-    if (!verify_co_location(session_ctx, 0, &co_opts)) {
+    opts.co.local_name = ctx->config.name;
+    opts.co.expected_peer = NULL;
+    if (!verify_co_location(session_ctx, 0, &opts.co)) {
         SST_print_error_exit(
             "CO_LOCATION verification failed; locker access denied.");
     }
     SST_print_log("Locker: CO_LOCATION check passed.");
 
-    /* Bluetooth, like TCP, leaves a real socket for secure messaging. */
-    if (session_ctx != NULL && (strcmp(comm_type, "tcp") == 0 ||
-                                strcmp(comm_type, "bluetooth") == 0)) {
+    if (session_ctx != NULL && physical_options_has_socket(&opts)) {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void*)session_ctx);

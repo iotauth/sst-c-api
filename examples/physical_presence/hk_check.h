@@ -3,12 +3,14 @@
 #include <string.h>
 
 #include "../../bluetooth_com/bt_rssi.h"
-#include "../../ir_com/ir_hk.h"
-#include "../../lifi_com/lifi_hk.h"
+#include "../../physical_com/hk.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
 #include "../../uwb_com/uwb_cli_dev.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_link.h"
+#endif
+#ifdef HAVE_IR_TRANSPORT
+#include "../../ir_com/ir_sst_handshake.h"
 #endif
 #ifdef HAVE_LIFI_TRANSPORT
 #include "../../lifi_com/lifi_sst_handshake.h"
@@ -30,6 +32,61 @@ typedef struct {
     unsigned echo_test_delay_ms; /* timing tests only: delays our answers */
     const char* uwb_device;      /* UWB board's serial port, NULL: auto */
 } co_location_options;
+
+/* One CO_LOCATION method's settings, as read from Auth's plan. */
+typedef union {
+    hk_config hk;
+    struct {
+        ultrasonic_echo_config config;
+        ultrasonic_echo_identity identity;
+    } echo;
+    bt_rssi_config ble;
+    uwb_range_config uwb;
+} co_location_config;
+
+static const char* run_result_name(int rc) {
+    return rc == 1 ? "PASS" : rc == 0 ? "FAIL" : "ABORT";
+}
+
+static const char* peer_report_name(int reported, int pass) {
+    return !reported ? "NONE" : pass ? "PASS" : "FAIL";
+}
+
+/* IR and LiFi: the shared timed bit exchange over each medium's GPIOs. */
+static int verify_hk(SST_session_ctx_t* session, int initiator,
+                     const hk_medium* medium, const hk_config* c) {
+    unsigned required = hk_required(c);
+    SST_print_log(
+        "%s HK: role=%s rounds=%u required=%u threshold=%.6f max_delay_us=%u",
+        medium->method, initiator ? "initiator" : "responder", c->rounds,
+        required, c->threshold_ppm / 1000000.0, c->max_delay_us);
+    int (*run_gpio)(const session_key_t*, const hk_config*, int, hk_result*) =
+        NULL;
+#ifdef HAVE_IR_TRANSPORT
+    if (medium == &HK_IR) run_gpio = ir_hk_run_gpio;
+#endif
+#ifdef HAVE_LIFI_TRANSPORT
+    if (medium == &HK_LIFI) run_gpio = lifi_hk_run_gpio;
+#endif
+    if (!run_gpio) {
+        SST_print_error(
+            "Auth requires %s HK, but this build has no pigpio support.",
+            medium->name);
+        return 0;
+    }
+    hk_result r = {0};
+    int rc = run_gpio(&session->s_key, c, initiator, &r);
+    /* Print only after the complete exchange, never inside timed rounds. */
+    for (unsigned i = 0; i < r.completed; ++i) {
+        SST_print_log("%s HK round=%u correct=%u complete_rtt_us=%u timely=%u",
+                      medium->method, i + 1, r.correct[i], r.rtt_us[i],
+                      r.rtt_us[i] <= c->max_delay_us);
+    }
+    SST_print_log("%s HK: successes=%u/%u required=%u local=%s result=%s",
+                  medium->method, r.successes, c->rounds, required,
+                  r.local_pass ? "PASS" : "FAIL", run_result_name(rc));
+    return rc == 1;
+}
 
 /* Auth's plan names both parties; each side checks that against what it
  * already knows before binding its MACs to those names. */
@@ -83,9 +140,8 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
         "response_valid=%d elapsed_us=%llu max_response_us=%u timely=%d "
         "verified_at_us=%llu failure=%s",
         r.direction,
-        r.direction == ULTRASONIC_ECHO_DIR_REQUESTER_VERIFIES ? "requester "
-                                                                "verifies "
-                                                                "target"
+        r.direction == ULTRASONIC_ECHO_DIR_REQUESTER_VERIFIES
+            ? "requester verifies target"
         : r.direction == ULTRASONIC_ECHO_DIR_TARGET_VERIFIES
             ? "target verifies requester"
             : "none",
@@ -95,10 +151,7 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
         ultrasonic_echo_failure_name(r.failure));
     SST_print_log("ULTRASOUND ECHO: local=%s peer_reported=%s result=%s",
                   r.local_pass ? "PASS" : "FAIL",
-                  r.peer_reported_pass ? "PASS" : "FAIL",
-                  rc == 1   ? "PASS"
-                  : rc == 0 ? "FAIL"
-                            : "ABORT");
+                  r.peer_reported_pass ? "PASS" : "FAIL", run_result_name(rc));
     return rc == 1;
 #else
     (void)session;
@@ -132,20 +185,14 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
     int rc =
         bt_rssi_run(session, c, initiator, read_link_rssi, &session->sock, &r);
     SST_print_log(
-        "BLE RSSI: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d "
-        "local=%s",
+        "BLE RSSI: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d local=%s",
         r.samples, r.median_rssi_dbm, c->min_rssi_dbm,
         r.local_pass ? "PASS" : "FAIL");
     SST_print_log(
-        "BLE RSSI: peer_median_rssi_dbm=%d peer_reported=%s "
-        "result=%s",
+        "BLE RSSI: peer_median_rssi_dbm=%d peer_reported=%s result=%s",
         r.peer_median_rssi_dbm,
-        !r.peer_reported       ? "NONE"
-        : r.peer_reported_pass ? "PASS"
-                               : "FAIL",
-        rc == 1   ? "PASS"
-        : rc == 0 ? "FAIL"
-                  : "ABORT");
+        peer_report_name(r.peer_reported, r.peer_reported_pass),
+        run_result_name(rc));
     return rc == 1;
 #else
     (void)session;
@@ -181,51 +228,98 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
         r.local_pass ? "PASS" : "FAIL");
     SST_print_log("UWB RANGE: peer_median_cm=%d peer_reported=%s result=%s",
                   r.peer_median_cm,
-                  !r.peer_reported       ? "NONE"
-                  : r.peer_reported_pass ? "PASS"
-                                         : "FAIL",
-                  rc == 1   ? "PASS"
-                  : rc == 0 ? "FAIL"
-                            : "ABORT");
+                  peer_report_name(r.peer_reported, r.peer_reported_pass),
+                  run_result_name(rc));
     return rc == 1;
 }
 
+/* Every CO_LOCATION method an endpoint can run: how to read its settings
+ * from the plan (1 selected, 0 absent/DUMMY, -1 malformed or another
+ * method), and how to run it once selected. */
+typedef struct {
+    const char* id;
+    int (*select)(const char* plan, co_location_config* c);
+    int (*verify)(SST_session_ctx_t* session, int initiator,
+                  const co_location_options* o, const co_location_config* c);
+} co_location_method;
+
+static int select_ir(const char* plan, co_location_config* c) {
+    return hk_plan_config(plan, &HK_IR, &c->hk);
+}
+static int select_lifi(const char* plan, co_location_config* c) {
+    return hk_plan_config(plan, &HK_LIFI, &c->hk);
+}
+static int select_echo(const char* plan, co_location_config* c) {
+    return ultrasonic_echo_plan_config(plan, &c->echo.config,
+                                       &c->echo.identity);
+}
+static int select_ble(const char* plan, co_location_config* c) {
+    return bt_rssi_plan_config(plan, &c->ble);
+}
+static int select_uwb(const char* plan, co_location_config* c) {
+    return uwb_range_plan_config(plan, &c->uwb);
+}
+static int run_ir(SST_session_ctx_t* s, int initiator,
+                  const co_location_options* o, const co_location_config* c) {
+    (void)o;
+    return verify_hk(s, initiator, &HK_IR, &c->hk);
+}
+static int run_lifi(SST_session_ctx_t* s, int initiator,
+                    const co_location_options* o, const co_location_config* c) {
+    (void)o;
+    return verify_hk(s, initiator, &HK_LIFI, &c->hk);
+}
+static int run_echo(SST_session_ctx_t* s, int initiator,
+                    const co_location_options* o, const co_location_config* c) {
+    return verify_ultrasound_echo(s, initiator, o, &c->echo.config,
+                                  &c->echo.identity);
+}
+static int run_ble(SST_session_ctx_t* s, int initiator,
+                   const co_location_options* o, const co_location_config* c) {
+    (void)o;
+    return verify_ble_rssi(s, initiator, &c->ble);
+}
+static int run_uwb(SST_session_ctx_t* s, int initiator,
+                   const co_location_options* o, const co_location_config* c) {
+    return verify_uwb(s, initiator, o, &c->uwb);
+}
+
+static const co_location_method CO_LOCATION_METHODS[] = {
+    {"IR", select_ir, run_ir},
+    {"LIFI", select_lifi, run_lifi},
+    {"ULTRASOUND", select_echo, run_echo},
+    {"BLE_RSSI", select_ble, run_ble},
+    {"UWB", select_uwb, run_uwb},
+};
+
 /* Called after handshake for every transport; Auth's verificationPlan alone
- * decides whether to run IR/LiFi HK, the ultrasound echo, BLE RSSI or UWB
- * ranging. Never
- * substitute DUMMY when the selected medium is unavailable. */
+ * decides which CO_LOCATION method runs. Never substitute DUMMY when the
+ * selected medium is unavailable. */
 static int verify_co_location(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts) {
-    const char* require_method = opts->require_method;
-    ir_hk_config ir = {0};
-    lifi_hk_config lifi = {0};
-    ultrasonic_echo_config echo = {0};
-    ultrasonic_echo_identity echo_id = {{0}, {0}};
-    bt_rssi_config ble = {0};
-    uwb_range_config uwb = {0};
-    /* Each parser returns -1 for the others' methods, 0 for absent/DUMMY. */
-    int ir_selected = ir_hk_plan_config(session->s_key.challenge, &ir);
-    int lifi_selected = lifi_hk_plan_config(session->s_key.challenge, &lifi);
-    int echo_selected =
-        ultrasonic_echo_plan_config(session->s_key.challenge, &echo, &echo_id);
-    int ble_selected = bt_rssi_plan_config(session->s_key.challenge, &ble);
-    int uwb_selected = uwb_range_plan_config(session->s_key.challenge, &uwb);
-    const char* selected = ir_selected == 1     ? "IR"
-                           : lifi_selected == 1 ? "LIFI"
-                           : echo_selected == 1 ? "ULTRASOUND"
-                           : ble_selected == 1  ? "BLE_RSSI"
-                           : uwb_selected == 1  ? "UWB"
-                                                : NULL;
-    if (!selected &&
-        (ir_selected < 0 || lifi_selected < 0 || echo_selected < 0 ||
-         ble_selected < 0 || uwb_selected < 0)) {
+    const co_location_method* selected = NULL;
+    co_location_config config;
+    int malformed = 0;
+    for (size_t i = 0;
+         i < sizeof(CO_LOCATION_METHODS) / sizeof(*CO_LOCATION_METHODS); ++i) {
+        co_location_config c;
+        int rc = CO_LOCATION_METHODS[i].select(session->s_key.challenge, &c);
+        if (rc == 1 && !selected) {
+            selected = &CO_LOCATION_METHODS[i];
+            config = c;
+        }
+        /* Each parser returns -1 for the others' methods. */
+        malformed |= rc < 0;
+    }
+    if (!selected && malformed) {
         SST_print_error("Invalid or unsupported Auth CO_LOCATION plan.");
         return 0;
     }
-    if (require_method && (!selected || strcmp(selected, require_method))) {
+    if (opts->require_method &&
+        (!selected || strcmp(selected->id, opts->require_method))) {
         SST_print_error("%s required for this run, but Auth selected %s.",
-                        require_method,
-                        selected ? selected : "a different plan");
+                        opts->require_method,
+                        selected ? selected->id : "a different plan");
         return 0;
     }
     if (!selected) {
@@ -234,72 +328,6 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
             "(absent or demo DUMMY).");
         return 1;
     }
-    if (echo_selected == 1)
-        return verify_ultrasound_echo(session, initiator, opts, &echo,
-                                      &echo_id);
-    if (ble_selected == 1) return verify_ble_rssi(session, initiator, &ble);
-    if (uwb_selected == 1) return verify_uwb(session, initiator, opts, &uwb);
-    unsigned rounds = ir_selected == 1 ? ir.rounds : lifi.rounds;
-    unsigned required =
-        ir_selected == 1 ? ir_hk_required(&ir) : lifi_hk_required(&lifi);
-    unsigned threshold_ppm =
-        ir_selected == 1 ? ir.threshold_ppm : lifi.threshold_ppm;
-    unsigned max_delay_us =
-        ir_selected == 1 ? ir.max_delay_us : lifi.max_delay_us;
-    SST_print_log(
-        "%s HK: role=%s rounds=%u required=%u threshold=%.6f max_delay_us=%u",
-        selected, initiator ? "initiator" : "responder", rounds, required,
-        threshold_ppm / 1000000.0, max_delay_us);
-
-    /* Copied out of the medium-specific result so the report below is
-     * shared; each medium's result lives only inside its own branch. */
-    _Static_assert(IR_HK_MAX_ROUNDS == LIFI_HK_MAX_ROUNDS,
-                   "shared report arrays assume equal round caps");
-    unsigned completed = 0, successes = 0;
-    uint32_t rtt_us[LIFI_HK_MAX_ROUNDS] = {0};
-    unsigned char correct[LIFI_HK_MAX_ROUNDS] = {0};
-    int local_pass = 0, rc = -1;
-    if (ir_selected == 1) {
-#ifdef HAVE_IR_TRANSPORT
-        ir_hk_result result = {0};
-        rc = ir_hk_run_gpio(&session->s_key, &ir, initiator, &result);
-        completed = result.completed;
-        successes = result.successes;
-        local_pass = result.local_pass;
-        memcpy(rtt_us, result.rtt_us, sizeof(rtt_us));
-        memcpy(correct, result.correct, sizeof(correct));
-#else
-        SST_print_error(
-            "Auth requires IR HK, but this build has no pigpio support.");
-        return 0;
-#endif
-    } else {
-#ifdef HAVE_LIFI_TRANSPORT
-        lifi_hk_result result = {0};
-        rc = lifi_hk_run_gpio(&session->s_key, &lifi, initiator, &result);
-        completed = result.completed;
-        successes = result.successes;
-        local_pass = result.local_pass;
-        memcpy(rtt_us, result.rtt_us, sizeof(rtt_us));
-        memcpy(correct, result.correct, sizeof(correct));
-#else
-        SST_print_error(
-            "Auth requires LiFi HK, but this build has no pigpio support.");
-        return 0;
-#endif
-    }
-    /* Print only after the complete exchange, never inside timed rounds. */
-    for (unsigned i = 0; i < completed; ++i) {
-        SST_print_log("%s HK round=%u correct=%u complete_rtt_us=%u timely=%u",
-                      selected, i + 1, correct[i], rtt_us[i],
-                      rtt_us[i] <= max_delay_us);
-    }
-    SST_print_log("%s HK: successes=%u/%u required=%u local=%s result=%s",
-                  selected, successes, rounds, required,
-                  local_pass ? "PASS" : "FAIL",
-                  rc == 1   ? "PASS"
-                  : rc == 0 ? "FAIL"
-                            : "ABORT");
-    return rc == 1;
+    return selected->verify(session, initiator, opts, &config);
 }
 #endif

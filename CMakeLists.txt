@@ -14,10 +14,9 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/c_secure_comm.c
   ${CMAKE_CURRENT_LIST_DIR}/src/load_config.c
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c
-  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk.c
-  ${CMAKE_CURRENT_LIST_DIR}/ir_com/ir_hk_plan.c
-  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk.c
-  ${CMAKE_CURRENT_LIST_DIR}/lifi_com/lifi_hk_plan.c
+  ${CMAKE_CURRENT_LIST_DIR}/physical_com/plan_json.c
+  ${CMAKE_CURRENT_LIST_DIR}/physical_com/session_ctl.c
+  ${CMAKE_CURRENT_LIST_DIR}/physical_com/hk.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo_plan.c
   ${CMAKE_CURRENT_LIST_DIR}/bluetooth_com/bt_rssi.c
@@ -95,15 +94,10 @@ add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
 target_link_libraries(crypto_test PRIVATE sst-c-api)
 add_test(NAME crypto_test COMMAND crypto_test)
 
-add_executable(ir_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/ir_hk_test.c)
-target_link_libraries(ir_hk_test PRIVATE sst-c-api)
-target_compile_options(ir_hk_test PRIVATE -UNDEBUG)
-add_test(NAME ir_hk_test COMMAND ir_hk_test)
-
-add_executable(lifi_hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/lifi_hk_test.c)
-target_link_libraries(lifi_hk_test PRIVATE sst-c-api)
-target_compile_options(lifi_hk_test PRIVATE -UNDEBUG)
-add_test(NAME lifi_hk_test COMMAND lifi_hk_test)
+add_executable(hk_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/hk_test.c)
+target_link_libraries(hk_test PRIVATE sst-c-api)
+target_compile_options(hk_test PRIVATE -UNDEBUG)
+add_test(NAME hk_test COMMAND hk_test)
 
 add_executable(ultrasonic_echo_test ${CMAKE_CURRENT_SOURCE_DIR}/ultrasonic_com/ultrasonic_echo_test.c)
 target_link_libraries(ultrasonic_echo_test PRIVATE sst-c-api)
