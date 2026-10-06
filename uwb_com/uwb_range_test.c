@@ -4,6 +4,8 @@
  * protocol logic only, not radio behaviour. */
 #include "uwb_range.h"
 
+#include "../physical_com/freshness.h"
+
 #include <assert.h>
 #include <pthread.h>
 #include <signal.h>
@@ -19,20 +21,24 @@ typedef struct {
     uwb_range_session params;
 } air;
 
-typedef struct {
+typedef struct endpoint {
     SST_session_ctx_t session;
     uwb_range_config config;
     air* air;
     int initiator, rc;
+    struct endpoint* peer;
     int distance_cm; /* what this side measures when ranging works */
     int short_by;    /* returns this many fewer ranges than asked */
     int fail_initiate, fail_respond;
+    unsigned respond_hold_ms; /* how long this side's responder phase takes */
+    uint64_t initiated_at, responded_at;
     uwb_range_result result;
 } endpoint;
 
 static int respond(void* ctx, const uwb_range_session* s) {
     endpoint* e = ctx;
     if (e->fail_respond) return -1;
+    freshness_now_us(&e->responded_at);
     pthread_mutex_lock(&e->air->lock);
     e->air->responding = 1;
     e->air->params = *s;
@@ -45,10 +51,13 @@ static int initiate(void* ctx, const uwb_range_session* s, unsigned samples,
     endpoint* e = ctx;
     (void)timeout_ms;
     if (e->fail_initiate) return -1;
+    freshness_now_us(&e->initiated_at);
     pthread_mutex_lock(&e->air->lock);
     int match = e->air->responding && !memcmp(&e->air->params, s, sizeof(*s));
     pthread_mutex_unlock(&e->air->lock);
     if (!match) return 0;
+    /* The peer is responding: its responder phase lasts this long. */
+    if (e->peer->respond_hold_ms) usleep(e->peer->respond_hold_ms * 1000u);
     int n = (int)samples - e->short_by;
     for (int i = 0; i < n; ++i) distances_cm[i] = e->distance_cm + i % 3 - 1;
     return n;
@@ -94,6 +103,7 @@ static void init(endpoint e[2]) {
         e[i].config = (uwb_range_config){100, 5, 1000};
         e[i].air = &shared_air;
         e[i].distance_cm = 60;
+        e[i].peer = &e[1 - i];
     }
 }
 
@@ -176,11 +186,72 @@ static void params_tests(void) {
     for (int i = 0; i < 2; ++i) close(e[i].session.sock);
 }
 
+static int started;
+static void start_action(void* ctx) {
+    (void)ctx;
+    ++started;
+}
+
+/* The gate over the requester's own UWB evidence, after the whole mutual
+ * run, with a plan bound of `bound_ms`. */
+static gate_decision gate_requester(const endpoint* e, unsigned bound_ms) {
+    session_key_t key = e->session.s_key;
+    snprintf(key.challenge, sizeof(key.challenge),
+             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":"
+             "{\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"freshness_ms\":%u,"
+             "\"selectedMethod\":{\"method\":\"UWB\",\"parameters\":{}}}}}",
+             bound_ms);
+    action_evidence ev;
+    assert(action_evidence_init(&ev, "RETRIEVE_ITEM", &key) == 0);
+    physical_evidence pe = {e->rc >= 0, e->rc == 1, 1,
+                            e->result.observed_not_before_us,
+                            e->result.collection_completed_us};
+    assert(action_evidence_record(&ev, "CO_LOCATION", "UWB", &pe) == 0);
+    return action_gate_run(&key, "RETRIEVE_ITEM", &ev, NULL, start_action,
+                           NULL, NULL);
+}
+
+static void freshness_tests(void) {
+    endpoint e[2];
+    /* The requester measures first (direction 1), then responds while the
+     * target measures (direction 2), which here takes 200 ms. Its evidence
+     * keeps its own measurement's time: neither its responder phase nor the
+     * target's report moves it, so that wait counts toward its age. */
+    init(e);
+    e[0].respond_hold_ms = 200;
+    exchange(e);
+    assert(e[0].rc == 1 && e[1].rc == 1 && e[0].result.peer_reported);
+    for (int i = 0; i < 2; ++i) {
+        const uwb_range_result* r = &e[i].result;
+        assert(r->observed_not_before_us &&
+               r->observed_not_before_us <= e[i].initiated_at &&
+               e[i].initiated_at <= r->collection_completed_us);
+    }
+    assert(e[0].result.collection_completed_us <= e[0].responded_at);
+    assert(e[1].result.observed_not_before_us >= e[0].responded_at);
+    uint64_t now;
+    assert(freshness_now_us(&now) == 0);
+    assert(now - e[0].result.observed_not_before_us >= 200000);
+    /* Stale after waiting for the reverse direction: the action never
+     * starts. With a bound covering the wait, it starts exactly once. */
+    started = 0;
+    assert(gate_requester(&e[0], 100) == GATE_STALE_EVIDENCE && started == 0);
+    assert(gate_requester(&e[0], 10000) == GATE_ALLOW && started == 1);
+    /* A failed own measurement is denied even though the peer passed. */
+    init(e);
+    e[0].distance_cm = 300;
+    exchange(e);
+    assert(e[0].rc == 0 && e[1].rc == 1);
+    started = 0;
+    assert(gate_requester(&e[0], 10000) == GATE_CHECK_FAILED && started == 0);
+}
+
 int main(void) {
     /* A side writing to a peer that already aborted must see EPIPE. */
     signal(SIGPIPE, SIG_IGN);
     plan_tests();
     params_tests();
+    freshness_tests();
     endpoint e[2];
 
     /* Both near: both pass, each sees the other's report. */
@@ -231,7 +302,7 @@ int main(void) {
 
     puts(
         "UWB range: plan, session params, mutual pass, one-sided fail, "
-        "limit, too few ranges, radio failure and invalid config tests "
-        "passed.");
+        "limit, too few ranges, radio failure, invalid config and freshness "
+        "tests passed.");
     return 0;
 }

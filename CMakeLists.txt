@@ -16,6 +16,7 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/plan_json.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/session_ctl.c
+  ${CMAKE_CURRENT_LIST_DIR}/physical_com/freshness.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/hk.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo_plan.c
@@ -99,6 +100,11 @@ target_link_libraries(hk_test PRIVATE sst-c-api)
 target_compile_options(hk_test PRIVATE -UNDEBUG)
 add_test(NAME hk_test COMMAND hk_test)
 
+add_executable(freshness_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/freshness_test.c)
+target_link_libraries(freshness_test PRIVATE sst-c-api)
+target_compile_options(freshness_test PRIVATE -UNDEBUG)
+add_test(NAME freshness_test COMMAND freshness_test)
+
 add_executable(ultrasonic_echo_test ${CMAKE_CURRENT_SOURCE_DIR}/ultrasonic_com/ultrasonic_echo_test.c)
 target_link_libraries(ultrasonic_echo_test PRIVATE sst-c-api)
 target_compile_options(ultrasonic_echo_test PRIVATE -UNDEBUG)
@@ -108,6 +114,11 @@ add_executable(rssi_check_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/rssi_check_test
 target_link_libraries(rssi_check_test PRIVATE sst-c-api)
 target_compile_options(rssi_check_test PRIVATE -UNDEBUG)
 add_test(NAME rssi_check_test COMMAND rssi_check_test)
+
+add_executable(wifi_rssi_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/wifi_rssi_test.c
+  ${CMAKE_CURRENT_SOURCE_DIR}/wifi_com/wifi_rssi.c)
+target_compile_options(wifi_rssi_test PRIVATE -UNDEBUG)
+add_test(NAME wifi_rssi_test COMMAND wifi_rssi_test)
 
 add_executable(uwb_range_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_range_test.c)
 target_link_libraries(uwb_range_test PRIVATE sst-c-api)

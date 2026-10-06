@@ -38,6 +38,10 @@ int plan_json_scaled(const plan_json* j, int i, unsigned scale, unsigned* out);
  * @return 0 or -1. */
 int plan_json_name(const plan_json* j, int i, char* out, size_t capacity);
 
+/* Tokenizes the whole of `plan`, which must be one JSON object shorter
+ * than MAX_CHALLENGE_LENGTH. @return 0, or -1 when malformed. */
+int plan_json_parse(const char* plan, plan_json* j);
+
 /* Parses `plan` into `j` and finds the CO_LOCATION check:
  *   1: its selected method is `method` with MUTUAL topology; *params is
  *      that method's "parameters" object token;

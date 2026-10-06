@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "../physical_com/freshness.h"
 #include "../physical_com/plan_json.h"
 #include "../physical_com/session_ctl.h"
 #include "../src/c_common.h"
@@ -102,9 +103,13 @@ static int measure(SST_session_ctx_t* s, const uwb_range_config* c,
         send_msg(s, MSG_START, &d, 1) ||
         recv_msg(s, MSG_READY, dir, m, sizeof(m)))
         return -1;
+    /* Before the radio starts this session: initiate() only counts reports
+     * that follow its start command's "ok". */
+    if (freshness_now_us(&r->observed_not_before_us)) return -1;
     int n = radio->initiate(radio->ctx, &params, c->samples, c->timeout_ms,
                             distances);
     radio->stop(radio->ctx);
+    if (freshness_now_us(&r->collection_completed_us)) return -1;
     if (n < 0 || n > (int)c->samples) {
         SST_print_error("UWB range: ranging failed.");
         return -1;

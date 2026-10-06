@@ -238,9 +238,23 @@ int main(void) {
     /* Both directions pass, each verdict reported to the peer, and the SST
      * session (sequence numbers included) still works afterwards. */
     init(e);
+    uint64_t before_run = ultrasonic_echo_now_us();
     exchange(e);
+    uint64_t after_run = ultrasonic_echo_now_us();
     assert_pass(&e[0], 1);
     assert_pass(&e[1], 2);
+    /* Freshness: each side's lower bound is its own challenge send, before
+     * its decode; the requester's bound comes first and is not moved by the
+     * target's later direction. */
+    for (int i = 0; i < 2; ++i) {
+        const ultrasonic_echo_result* r = &e[i].result;
+        assert(before_run <= r->observed_not_before_us &&
+               r->observed_not_before_us <= r->verified_at_us &&
+               r->verified_at_us <= r->collection_completed_us &&
+               r->collection_completed_us <= after_run);
+    }
+    assert(e[0].result.collection_completed_us <=
+           e[1].result.observed_not_before_us);
     assert(e[0].result.peer_reported_pass && e[1].result.peer_reported_pass);
     assert(e[0].audio.played_count == 1 && e[1].audio.played_count == 1);
     unsigned char old_answer[ULTRASONIC_ECHO_PAYLOAD_SIZE];

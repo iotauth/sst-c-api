@@ -52,6 +52,11 @@ typedef struct {
     uint64_t elapsed_us;     /* challenge send -> response decode */
     int timing_accepted;     /* response_valid && elapsed <= max_response_us */
     uint64_t verified_at_us; /* CLOCK_MONOTONIC at decode, if valid */
+    /* Just before this side's fresh challenge went out: a valid answer
+     * binds that nonce, so it was played after this (0 if never sent).
+     * Never moved by the peer's direction or its DONE. */
+    uint64_t observed_not_before_us;
+    uint64_t collection_completed_us; /* end of this side's listening */
     int local_pass;
     ultrasonic_echo_failure failure;
     int peer_reported_pass; /* peer's verdict on us: logging only */

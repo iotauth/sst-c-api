@@ -1,8 +1,11 @@
 #ifndef PHYSICAL_PRESENCE_OPTIONS_H
 #define PHYSICAL_PRESENCE_OPTIONS_H
+#include <errno.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "../../physical_com/freshness.h"
+#include "../../physical_com/session_ctl.h"
 #include "../../src/c_common.h"
 #include "hk_check.h"
 #ifdef HAVE_LIFI_TRANSPORT
@@ -16,6 +19,10 @@ typedef struct {
     const char* bt_peer;   /* robot: the Locker's public LE address */
     const char* wifi_peer; /* robot: the Locker's address on the Wi-Fi link */
     int lifi_tx_gpio, lifi_rx_gpio, lifi_led_active_low;
+    /* Experiments only: a pause after verification, before the action
+     * gate, so the evidence ages by it. Never changes a bound or skips a
+     * check. */
+    unsigned action_test_delay_ms;
     /* Everything the CO_LOCATION check needs; the caller fills in
      * local_name and expected_peer once it knows them. */
     co_location_options co;
@@ -29,9 +36,23 @@ static void physical_options_usage(const char* program, int robot) {
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
         "| --require-ble-rssi | --require-wifi-rssi | --require-uwb] "
         "[--uwb-dev <serial_port>] [--wifi-iface <iface>] "
-        "[--ultrasound-echo-test-delay-ms N] "
+        "[--ultrasound-echo-test-delay-ms N] [--action-test-delay-ms N] "
         "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
         program, robot ? "[--bt-peer <bdaddr>] [--wifi-peer <ip>] " : "");
+}
+
+#define ACTION_TEST_DELAY_MS_LIMIT 3600000UL
+
+/* A decimal number of milliseconds in 0..ACTION_TEST_DELAY_MS_LIMIT.
+ * @return 0, or -1 for anything else (sign, junk, overflow). */
+static int parse_delay_ms(const char* v, unsigned* out) {
+    char* end;
+    if (!v || *v < '0' || *v > '9') return -1;
+    errno = 0;
+    unsigned long n = strtoul(v, &end, 10);
+    if (errno || *end || n > ACTION_TEST_DELAY_MS_LIMIT) return -1;
+    *out = (unsigned)n;
+    return 0;
 }
 
 /* Parses argv (unknown arguments are ignored) and applies the LiFi wiring,
@@ -58,6 +79,9 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     if (argc < 2) physical_options_usage(argv[0], robot);
     o->config_path = argv[1];
     for (int i = 2; i < argc; i++) {
+        /* A trailing delay flag without a value is an error, not a no-op. */
+        if (!strcmp(argv[i], "--action-test-delay-ms") && i + 1 >= argc)
+            physical_options_usage(argv[0], robot);
         const char* a = argv[i];
         const char* v = i + 1 < argc ? argv[i + 1] : NULL;
         int takes_value = 1;
@@ -86,7 +110,10 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->co.wifi_iface = v;
         else if (!strcmp(a, "--ultrasound-echo-test-delay-ms"))
             o->co.echo_test_delay_ms = (unsigned)atoi(v);
-        else if (!strcmp(a, "--lifi-tx-gpio"))
+        else if (!strcmp(a, "--action-test-delay-ms")) {
+            if (parse_delay_ms(v, &o->action_test_delay_ms))
+                physical_options_usage(argv[0], robot);
+        } else if (!strcmp(a, "--lifi-tx-gpio"))
             o->lifi_tx_gpio = atoi(v);
         else if (!strcmp(a, "--lifi-rx-gpio"))
             o->lifi_rx_gpio = atoi(v);
@@ -105,6 +132,32 @@ static void physical_options_parse(int argc, char* argv[], int robot,
 static int physical_options_has_socket(const physical_options* o) {
     return !strcmp(o->comm_type, "tcp") || !strcmp(o->comm_type, "wifi") ||
            !strcmp(o->comm_type, "bluetooth");
+}
+
+/* Test stand-in for the protected action: records that it would have
+ * started; no motor, latch or other actuator is driven. */
+static void simulated_action_start(void* action) {
+    SST_print_log(
+        "SIMULATED_ACTION_STARTED: action=%s (test callback, no actuator)",
+        (const char*)action);
+}
+
+/* The last step before `action` starts: the optional experimental delay,
+ * then the action gate over every check the key's plan requires, which
+ * starts the (simulated) action immediately on ALLOW. Exits on DENY. */
+static void physical_action_gate(const physical_options* o,
+                                 const session_key_t* key, const char* action,
+                                 const action_evidence* evidence) {
+    if (o->action_test_delay_ms) {
+        SST_print_log(
+            "ACTION_GATE: TEST ONLY: action_test_delay_ms=%u before gating %s.",
+            o->action_test_delay_ms, action);
+        session_ctl_sleep_ms(o->action_test_delay_ms);
+    }
+    if (action_gate_run(key, action, evidence, NULL, simulated_action_start,
+                        (void*)action, NULL) != GATE_ALLOW) {
+        SST_print_error_exit("%s denied by the action gate.", action);
+    }
 }
 
 #endif

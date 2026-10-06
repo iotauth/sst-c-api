@@ -144,16 +144,18 @@ int plan_json_name(const plan_json* j, int i, char* out, size_t capacity) {
     return 0;
 }
 
-int plan_co_location(const char* plan, const char* method, plan_json* j,
-                     int* params) {
-    if (!plan || !method || !j || !params ||
-        strlen(plan) >= MAX_CHALLENGE_LENGTH)
-        return -1;
+int plan_json_parse(const char* plan, plan_json* j) {
+    if (!plan || !j || strlen(plan) >= MAX_CHALLENGE_LENGTH) return -1;
     j->p = plan;
     j->count = 0;
     if (value(j, 0) != 0) return -1;
     space(j);
-    if (*j->p || j->t[0].type != '{') return -1;
+    return *j->p || j->t[0].type != '{' ? -1 : 0;
+}
+
+int plan_co_location(const char* plan, const char* method, plan_json* j,
+                     int* params) {
+    if (!method || !params || plan_json_parse(plan, j)) return -1;
     int required = plan_json_field(j, 0, "requiredChecks"), required_co = 0;
     if (required < 0 || j->t[required].type != '[') return -1;
     for (int i = required + 1; i < j->t[required].next; i = j->t[i].next) {

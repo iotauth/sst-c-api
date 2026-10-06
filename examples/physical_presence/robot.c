@@ -25,10 +25,10 @@
 // "CO_LOCATION"), and reports whether it passed.
 //
 // This currently only supports the "DUMMY" method, which requires no real
-// sensor/actuator interaction and always passes. Real physical mechanisms
-// (ultrasonic/IR ranging, camera, thermometer) would be executed here in the
-// same way once implemented; any other selected method is treated as not
-// implemented and fails closed.
+// sensor/actuator interaction. It records no evidence, so the action gate
+// denies any action that requires it. Real local sensors (camera,
+// thermometer) would run here and record timed evidence once implemented;
+// any other selected method is treated as not implemented and fails closed.
 //
 // This is separate from the handshake transport decision (which channel
 // carries the SST handshake with a target entity, e.g. "TCP" for now):
@@ -57,8 +57,10 @@ static bool execute_check(const char* challenge, const char* check_id) {
     }
 
     if (strcmp(method, "DUMMY") == 0) {
-        SST_print_log("%s: executing DUMMY method (no sensor required): PASS.",
-                      check_id);
+        SST_print_log(
+            "%s: DUMMY method (no sensor): no evidence recorded, so an action "
+            "requiring it will be denied.",
+            check_id);
         return true;
     }
 
@@ -95,12 +97,18 @@ int main(int argc, char* argv[]) {
             "Failed get_session_key_with_index() for GRIP_ITEM.");
     }
     SST_print_log("Received authorization for GRIP_ITEM successfully!");
+    action_evidence grip_evidence;
+    if (action_evidence_init(&grip_evidence, "GRIP_ITEM",
+                             &grip_s_key_list->s_key[0])) {
+        SST_print_error_exit("Failed to start GRIP_ITEM evidence.");
+    }
 
     if (!execute_check(grip_s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
         SST_print_error_exit(
             "Physical presence verification failed for GRIP_ITEM.");
     }
-    SST_print_log("GRIP_ITEM authorized: robot may grip the item.");
+    physical_action_gate(&opts, &grip_s_key_list->s_key[0], "GRIP_ITEM",
+                         &grip_evidence);
     free_session_key_list_t(grip_s_key_list);
 
     // Case 2: interactive action, targeting a specific locker identified at
@@ -120,6 +128,12 @@ int main(int argc, char* argv[]) {
             "Failed get_session_key_with_purpose() for RETRIEVE_ITEM.");
     }
     SST_print_log("Received session key for RETRIEVE_ITEM successfully!");
+    // Fresh evidence for this operation only, bound to this key.
+    action_evidence retrieve_evidence;
+    if (action_evidence_init(&retrieve_evidence, "RETRIEVE_ITEM",
+                             &s_key_list->s_key[0])) {
+        SST_print_error_exit("Failed to start RETRIEVE_ITEM evidence.");
+    }
 
     // Local checks can run before the handshake; mutual IR verification must
     // wait until both entities have authenticated with the same session key.
@@ -219,11 +233,12 @@ int main(int argc, char* argv[]) {
 
     opts.co.local_name = ctx->config.name;
     opts.co.expected_peer = target_locker;
-    if (!verify_co_location(session_ctx, 1, &opts.co)) {
-        SST_print_error_exit(
-            "CO_LOCATION verification failed; RETRIEVE_ITEM denied.");
+    if (!verify_co_location(session_ctx, 1, &opts.co, &retrieve_evidence)) {
+        SST_print_log("Robot: CO_LOCATION did not pass here.");
     }
-    SST_print_log("Robot: required physical checks passed for RETRIEVE_ITEM.");
+    // The gate alone decides, over every check the plan requires.
+    physical_action_gate(&opts, &session_ctx->s_key, "RETRIEVE_ITEM",
+                         &retrieve_evidence);
 
     if (physical_options_has_socket(&opts)) {
         sleep(1);
