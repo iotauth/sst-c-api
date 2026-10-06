@@ -150,6 +150,8 @@ static int run_verifier(SST_session_ctx_t* s, const ultrasonic_echo_config* c,
     int n = a->rx_until(a->ctx, heard, sizeof(heard),
                         start + (uint64_t)c->response_timeout_ms * 1000u);
     uint64_t end = ultrasonic_echo_now_us();
+    r->observed_not_before_us = start;
+    r->collection_completed_us = end;
     if (n < 0) {
         SST_print_error("Ultrasound echo: audio capture failed.");
         return -1;

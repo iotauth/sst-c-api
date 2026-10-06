@@ -1,6 +1,7 @@
 /* Portable test for the mutual HK core shared by IR and LiFi
  * (physical_com/hk.h): both media run the same suite over a simulated
  * channel, and the media's labels keep their registers apart. */
+#include "../physical_com/freshness.h"
 #include "../physical_com/hk.h"
 
 #include <assert.h>
@@ -191,10 +192,18 @@ static void suite(const hk_medium* m) {
     unsigned char old_ready[HK_READY_SIZE];
     for (unsigned n = 32; n <= 128; n *= 2) {
         init(e, n);
+        uint64_t before_run, after_run;
+        assert(freshness_now_us(&before_run) == 0);
         exchange(e);
+        assert(freshness_now_us(&after_run) == 0);
         for (int i = 0; i < 2; ++i) {
             assert(e[i].rc == 1 && e[i].result.successes == n);
             assert(e[i].bits_sent == 2 * n && e[i].controls_sent == 1);
+            /* The observation interval lies within this run. */
+            assert(before_run <= e[i].result.observed_not_before_us &&
+                   e[i].result.observed_not_before_us <=
+                       e[i].result.collection_completed_us &&
+                   e[i].result.collection_completed_us <= after_run);
         }
         assert(e[0].guard == 1 && e[1].guard == 0);
     }

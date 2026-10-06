@@ -2,6 +2,7 @@
 #define PHYSICAL_PRESENCE_HK_CHECK_H
 #include <string.h>
 
+#include "../../physical_com/freshness.h"
 #include "../../physical_com/hk.h"
 #include "../../physical_com/rssi_check.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
@@ -55,9 +56,24 @@ static const char* peer_report_name(int reported, int pass) {
     return !reported ? "NONE" : pass ? "PASS" : "FAIL";
 }
 
+/* A method's run result (1 pass, 0 completed without passing, -1 aborted)
+ * and its own observation interval, as freshness evidence. A lower bound of
+ * 0 means it was never taken, so the observation time is unknown. */
+static void set_evidence(physical_evidence* ev, int rc,
+                         uint64_t observed_not_before_us,
+                         uint64_t collection_completed_us) {
+    ev->complete = rc >= 0;
+    ev->local_pass = rc == 1;
+    ev->observation_time_known =
+        observed_not_before_us != 0 && collection_completed_us != 0;
+    ev->observed_not_before_us = observed_not_before_us;
+    ev->collection_completed_us = collection_completed_us;
+}
+
 /* IR and LiFi: the shared timed bit exchange over each medium's GPIOs. */
 static int verify_hk(SST_session_ctx_t* session, int initiator,
-                     const hk_medium* medium, const hk_config* c) {
+                     const hk_medium* medium, const hk_config* c,
+                     physical_evidence* ev) {
     unsigned required = hk_required(c);
     SST_print_log(
         "%s HK: role=%s rounds=%u required=%u threshold=%.6f max_delay_us=%u",
@@ -75,7 +91,7 @@ static int verify_hk(SST_session_ctx_t* session, int initiator,
         SST_print_error(
             "Auth requires %s HK, but this build has no pigpio support.",
             medium->name);
-        return 0;
+        return -1;
     }
     hk_result r = {0};
     int rc = run_gpio(&session->s_key, c, initiator, &r);
@@ -88,7 +104,8 @@ static int verify_hk(SST_session_ctx_t* session, int initiator,
     SST_print_log("%s HK: successes=%u/%u required=%u local=%s result=%s",
                   medium->method, r.successes, c->rounds, required,
                   r.local_pass ? "PASS" : "FAIL", run_result_name(rc));
-    return rc == 1;
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    return rc;
 }
 
 /* Auth's plan names both parties; each side checks that against what it
@@ -96,7 +113,8 @@ static int verify_hk(SST_session_ctx_t* session, int initiator,
 static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
                                   const co_location_options* o,
                                   const ultrasonic_echo_config* c,
-                                  const ultrasonic_echo_identity* id) {
+                                  const ultrasonic_echo_identity* id,
+                                  physical_evidence* ev) {
     int names_ok = initiator ? !strcmp(id->requester, o->local_name) &&
                                    o->expected_peer &&
                                    !strcmp(id->target, o->expected_peer)
@@ -107,7 +125,7 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
             "doesn't match this %s (%s).",
             id->requester, id->target, initiator ? "requester" : "target",
             o->local_name);
-        return 0;
+        return -1;
     }
     SST_print_log(
         "ULTRASOUND ECHO: role=%s requester=%s target=%s max_response_us=%u "
@@ -125,12 +143,12 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
     if (session->sock < 0) {
         SST_print_error(
             "Ultrasound echo needs the TCP SST session; use --comm_type tcp.");
-        return 0;
+        return -1;
     }
     /* Opened before the INIT/READY exchange, outside any timed window. */
     ultrasonic_audio* audio =
         ultrasonic_audio_open(o->mic_device, o->spk_device);
-    if (!audio) return 0;
+    if (!audio) return -1;
     ultrasonic_echo_audio io;
     ultrasonic_audio_bind(audio, &io);
     ultrasonic_echo_result r;
@@ -155,13 +173,15 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
     SST_print_log("ULTRASOUND ECHO: local=%s peer_reported=%s result=%s",
                   r.local_pass ? "PASS" : "FAIL",
                   r.peer_reported_pass ? "PASS" : "FAIL", run_result_name(rc));
-    return rc == 1;
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    return rc;
 #else
     (void)session;
+    (void)ev;
     SST_print_error(
         "Auth requires the ultrasound echo, but this build has no "
         "ggwave/ALSA support.");
-    return 0;
+    return -1;
 #endif
 }
 
@@ -171,17 +191,37 @@ static int read_link_rssi(void* sock, int8_t* rssi) {
 }
 #endif
 
-static int read_wifi_rssi(void* iface, int8_t* rssi) {
-    return wifi_rssi_read(iface, rssi);
+/* The Wi-Fi peer, as wifi_fresh_sampler's radio. */
+typedef struct {
+    const char* iface;
+    char peer_ip[16];
+} wifi_peer;
+static int read_wifi_station(void* ctx, wifi_station_info* out) {
+    return wifi_station_read(((const wifi_peer*)ctx)->iface, out);
+}
+static int probe_wifi_peer(void* ctx) {
+    const wifi_peer* p = ctx;
+    return wifi_probe_peer(p->iface, p->peer_ip);
+}
+static int read_fresh_wifi_rssi(void* sampler, int8_t* rssi) {
+    return wifi_fresh_sample(sampler, rssi);
 }
 
 /* Both RSSI methods sample the link that carries this session, from this
- * side's own radio. `name` is the log prefix ("BLE RSSI", "WIFI RSSI"). */
+ * side's own radio. `name` is the log prefix ("BLE RSSI", "WIFI RSSI").
+ * `observed_not_before_us` precedes every sampled frame, or is 0 when the
+ * reader cannot tell: then the evidence has no known observation time and a
+ * strict freshness gate denies it, even when the RSSI check itself passed. */
 static int run_rssi_check(SST_session_ctx_t* session, int initiator,
                           const char* name, const rssi_config* c,
-                          rssi_reader read, void* reader_ctx) {
+                          rssi_reader read, void* reader_ctx,
+                          uint64_t observed_not_before_us,
+                          physical_evidence* ev) {
     rssi_result r;
     int rc = rssi_run(session, c, initiator, read, reader_ctx, &r);
+    uint64_t done_us = 0;
+    freshness_now_us(&done_us);
+    set_evidence(ev, rc, observed_not_before_us, done_us);
     SST_print_log(
         "%s: samples=%u median_rssi_dbm=%.1f min_rssi_dbm=%d local=%s", name,
         r.samples, r.median_rssi_dbm, c->min_rssi_dbm,
@@ -190,7 +230,13 @@ static int run_rssi_check(SST_session_ctx_t* session, int initiator,
                   name, r.peer_median_rssi_dbm,
                   peer_report_name(r.peer_reported, r.peer_reported_pass),
                   run_result_name(rc));
-    return rc == 1;
+    if (!observed_not_before_us) {
+        SST_print_log(
+            "%s: observation time of the cached RSSI is unknown; a strict "
+            "freshness gate will not accept it.",
+            name);
+    }
+    return rc;
 }
 
 static void log_rssi_role(const char* name, int initiator,
@@ -200,34 +246,40 @@ static void log_rssi_role(const char* name, int initiator,
                   c->samples, c->interval_ms);
 }
 
-/* Samples the RSSI of the Bluetooth link that carries this session. */
+/* Samples the RSSI of the Bluetooth link that carries this session. HCI
+ * Read RSSI returns the controller's latest value, with no way to tell when
+ * it was observed, so its evidence has no known observation time. */
 static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
-                           const rssi_config* c) {
+                           const rssi_config* c, physical_evidence* ev) {
     log_rssi_role("BLE RSSI", initiator, c);
 #ifdef HAVE_BT_TRANSPORT
     if (!bt_link_is_bluetooth(session->sock)) {
         SST_print_error(
             "BLE RSSI needs the Bluetooth SST session; use --comm_type "
             "bluetooth.");
-        return 0;
+        return -1;
     }
     return run_rssi_check(session, initiator, "BLE RSSI", c, read_link_rssi,
-                          &session->sock);
+                          &session->sock, 0, ev);
 #else
     (void)session;
+    (void)ev;
     SST_print_error(
         "Auth requires the BLE RSSI check, but this build has no BlueZ "
         "support.");
-    return 0;
+    return -1;
 #endif
 }
 
 /* Samples the RSSI of the direct Wi-Fi link that carries this session: the
  * session's socket must run over the dongle, or its RSSI says nothing about
- * the authenticated peer. */
+ * the authenticated peer. The driver's RSSI is a cached value, so every
+ * sample comes from wifi_fresh_sampler: only RSSI of frames the peer sent
+ * after the sampler began, which makes that start the observation time's
+ * lower bound. */
 static int verify_wifi_rssi(SST_session_ctx_t* session, int initiator,
-                            const co_location_options* o,
-                            const rssi_config* c) {
+                            const co_location_options* o, const rssi_config* c,
+                            physical_evidence* ev) {
     log_rssi_role("WIFI RSSI", initiator, c);
     char iface[32];
     if (session->sock < 0 ||
@@ -237,15 +289,28 @@ static int verify_wifi_rssi(SST_session_ctx_t* session, int initiator,
             "WIFI RSSI needs the SST session on the %s link; use --comm_type "
             "wifi.",
             o->wifi_iface);
-        return 0;
+        return -1;
     }
-    return run_rssi_check(session, initiator, "WIFI RSSI", c, read_wifi_rssi,
-                          (void*)o->wifi_iface);
+    wifi_peer peer = {o->wifi_iface, {0}};
+    wifi_fresh_sampler sampler = {&peer, read_wifi_station, probe_wifi_peer,
+                                  0};
+    uint64_t observed_not_before_us;
+    if (wifi_rssi_socket_peer(session->sock, peer.peer_ip,
+                              sizeof(peer.peer_ip)) ||
+        freshness_now_us(&observed_not_before_us) ||
+        wifi_fresh_begin(&sampler)) {
+        SST_print_error("WIFI RSSI: could not read the peer's link state.");
+        return -1;
+    }
+    return run_rssi_check(session, initiator, "WIFI RSSI", c,
+                          read_fresh_wifi_rssi, &sampler,
+                          observed_not_before_us, ev);
 }
 
 /* Ranges with the peer's UWB board over this session's TCP socket. */
 static int verify_uwb(SST_session_ctx_t* session, int initiator,
-                      const co_location_options* o, const uwb_range_config* c) {
+                      const co_location_options* o, const uwb_range_config* c,
+                      physical_evidence* ev) {
     SST_print_log(
         "UWB RANGE: role=%s max_distance_cm=%u samples=%u timeout_ms=%u",
         initiator ? "initiator" : "responder", c->max_distance_cm, c->samples,
@@ -253,10 +318,10 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
     if (session->sock < 0) {
         SST_print_error(
             "UWB ranging needs the TCP SST session; use --comm_type tcp.");
-        return 0;
+        return -1;
     }
     uwb_cli* cli = uwb_cli_open(o->uwb_device);
-    if (!cli) return 0;
+    if (!cli) return -1;
     uwb_range_radio radio;
     uwb_cli_bind(cli, &radio);
     uwb_range_result r;
@@ -270,17 +335,20 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
                   r.peer_median_cm,
                   peer_report_name(r.peer_reported, r.peer_reported_pass),
                   run_result_name(rc));
-    return rc == 1;
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    return rc;
 }
 
 /* Every CO_LOCATION method an endpoint can run: how to read its settings
  * from the plan (1 selected, 0 absent/DUMMY, -1 malformed or another
- * method), and how to run it once selected. */
+ * method), and how to run it once selected (1 pass, 0 fail, -1 aborted,
+ * with its evidence). */
 typedef struct {
     const char* id;
     int (*select)(const char* plan, co_location_config* c);
     int (*verify)(SST_session_ctx_t* session, int initiator,
-                  const co_location_options* o, const co_location_config* c);
+                  const co_location_options* o, const co_location_config* c,
+                  physical_evidence* ev);
 } co_location_method;
 
 static int select_ir(const char* plan, co_location_config* c) {
@@ -303,32 +371,38 @@ static int select_uwb(const char* plan, co_location_config* c) {
     return uwb_range_plan_config(plan, &c->uwb);
 }
 static int run_ir(SST_session_ctx_t* s, int initiator,
-                  const co_location_options* o, const co_location_config* c) {
+                  const co_location_options* o, const co_location_config* c,
+                  physical_evidence* ev) {
     (void)o;
-    return verify_hk(s, initiator, &HK_IR, &c->hk);
+    return verify_hk(s, initiator, &HK_IR, &c->hk, ev);
 }
 static int run_lifi(SST_session_ctx_t* s, int initiator,
-                    const co_location_options* o, const co_location_config* c) {
+                    const co_location_options* o, const co_location_config* c,
+                    physical_evidence* ev) {
     (void)o;
-    return verify_hk(s, initiator, &HK_LIFI, &c->hk);
+    return verify_hk(s, initiator, &HK_LIFI, &c->hk, ev);
 }
 static int run_echo(SST_session_ctx_t* s, int initiator,
-                    const co_location_options* o, const co_location_config* c) {
+                    const co_location_options* o, const co_location_config* c,
+                    physical_evidence* ev) {
     return verify_ultrasound_echo(s, initiator, o, &c->echo.config,
-                                  &c->echo.identity);
+                                  &c->echo.identity, ev);
 }
 static int run_ble(SST_session_ctx_t* s, int initiator,
-                   const co_location_options* o, const co_location_config* c) {
+                   const co_location_options* o, const co_location_config* c,
+                   physical_evidence* ev) {
     (void)o;
-    return verify_ble_rssi(s, initiator, &c->rssi);
+    return verify_ble_rssi(s, initiator, &c->rssi, ev);
 }
 static int run_wifi(SST_session_ctx_t* s, int initiator,
-                    const co_location_options* o, const co_location_config* c) {
-    return verify_wifi_rssi(s, initiator, o, &c->rssi);
+                    const co_location_options* o, const co_location_config* c,
+                    physical_evidence* ev) {
+    return verify_wifi_rssi(s, initiator, o, &c->rssi, ev);
 }
 static int run_uwb(SST_session_ctx_t* s, int initiator,
-                   const co_location_options* o, const co_location_config* c) {
-    return verify_uwb(s, initiator, o, &c->uwb);
+                   const co_location_options* o, const co_location_config* c,
+                   physical_evidence* ev) {
+    return verify_uwb(s, initiator, o, &c->uwb, ev);
 }
 
 static const co_location_method CO_LOCATION_METHODS[] = {
@@ -342,12 +416,18 @@ static const co_location_method CO_LOCATION_METHODS[] = {
 
 /* Called after handshake for every transport; Auth's verificationPlan alone
  * decides which CO_LOCATION method runs. Never substitute DUMMY when the
- * selected medium is unavailable. */
+ * selected medium is unavailable. The result goes into this operation's
+ * `evidence` (any earlier CO_LOCATION evidence is dropped first); only the
+ * action gate decides whether it still allows the action.
+ * @return 1 when the selected method passed here, 0 otherwise (including
+ * an absent or DUMMY check, which leaves no evidence). */
 static int verify_co_location(SST_session_ctx_t* session, int initiator,
-                              const co_location_options* opts) {
+                              const co_location_options* opts,
+                              action_evidence* evidence) {
     const co_location_method* selected = NULL;
     co_location_config config;
     int malformed = 0;
+    action_evidence_invalidate(evidence, "CO_LOCATION");
     for (size_t i = 0;
          i < sizeof(CO_LOCATION_METHODS) / sizeof(*CO_LOCATION_METHODS); ++i) {
         co_location_config c;
@@ -373,9 +453,22 @@ static int verify_co_location(SST_session_ctx_t* session, int initiator,
     if (!selected) {
         SST_print_log(
             "CO_LOCATION: no IR/LiFi/ultrasound/BLE/Wi-Fi/UWB check selected "
-            "(absent or demo DUMMY).");
-        return 1;
+            "(absent or demo DUMMY); no evidence recorded.");
+        return 0;
     }
-    return selected->verify(session, initiator, opts, &config);
+    physical_evidence ev = {0};
+    int rc = selected->verify(session, initiator, opts, &config, &ev);
+    SST_print_log(
+        "CO_LOCATION evidence: method=%s complete=%d local_pass=%d "
+        "observation_time_known=%d observed_not_before_us=%llu "
+        "collection_completed_us=%llu",
+        selected->id, ev.complete, ev.local_pass, ev.observation_time_known,
+        (unsigned long long)ev.observed_not_before_us,
+        (unsigned long long)ev.collection_completed_us);
+    if (action_evidence_record(evidence, "CO_LOCATION", selected->id, &ev)) {
+        SST_print_error("CO_LOCATION: could not store the evidence.");
+        return 0;
+    }
+    return rc == 1;
 }
 #endif

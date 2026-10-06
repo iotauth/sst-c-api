@@ -6,6 +6,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "freshness.h"
 #include "plan_json.h"
 #include "session_ctl.h"
 
@@ -140,7 +141,9 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
                 CRYPTO_memcmp(tag, ready_msg + 1 + HK_NONCE_SIZE, HK_TAG_SIZE))
                 goto done;
         }
-        if (derive(key, medium, nonce_a, nonce_b, reg, challenges)) goto done;
+        if (derive(key, medium, nonce_a, nonce_b, reg, challenges) ||
+            freshness_now_us(&r->observed_not_before_us))
+            goto done;
         io->pause_us(io->ctx, HK_READY_GUARD_US);
         challenge = bit_at(challenges, 0);
         if (io->send_bit(io->ctx, challenge, &sent)) goto done;
@@ -185,7 +188,10 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
                     ready_msg + 1 + HK_NONCE_SIZE))
                 goto done;
         }
-        if (io->send_control(io->ctx, ready_msg, sizeof(ready_msg))) goto done;
+        /* Before READY: the initiator's first bit can only follow it. */
+        if (freshness_now_us(&r->observed_not_before_us) ||
+            io->send_control(io->ctx, ready_msg, sizeof(ready_msg)))
+            goto done;
 
         for (unsigned i = 0; i < c->rounds; ++i) {
             if (recv_bit(io, &peer_challenge, &ignored) ||
@@ -199,6 +205,7 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
                 goto done;
         }
     }
+    if (freshness_now_us(&r->collection_completed_us)) goto done;
     r->local_pass = r->successes >= r->required && session_key_fresh(key);
     status = r->local_pass;
 done:

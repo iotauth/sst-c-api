@@ -57,6 +57,10 @@ typedef struct {
 typedef struct {
     unsigned samples; /* successful ranges this side measured */
     int median_cm;    /* of those, if samples > 0 */
+    /* CLOCK_MONOTONIC (freshness_now_us) just before this side started its
+     * own initiator session, and once it stopped; the responder direction
+     * and the peer's report never move them. 0 if not reached. */
+    uint64_t observed_not_before_us, collection_completed_us;
     int local_pass;
     int peer_reported; /* the peer's report arrived */
     int peer_reported_pass;

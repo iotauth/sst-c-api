@@ -158,13 +158,21 @@ int main(int argc, char* argv[]) {
             comm_type);
     }
 
+    // The plan is the requester's operation plan, carried by the session
+    // key; the Locker checks its own evidence for every check it requires
+    // before its own action, LOCKER_OPEN.
+    action_evidence open_evidence;
+    if (action_evidence_init(&open_evidence, "LOCKER_OPEN",
+                             &session_ctx->s_key)) {
+        SST_print_error_exit("Failed to start LOCKER_OPEN evidence.");
+    }
     opts.co.local_name = ctx->config.name;
     opts.co.expected_peer = NULL;
-    if (!verify_co_location(session_ctx, 0, &opts.co)) {
-        SST_print_error_exit(
-            "CO_LOCATION verification failed; locker access denied.");
+    if (!verify_co_location(session_ctx, 0, &opts.co, &open_evidence)) {
+        SST_print_log("Locker: CO_LOCATION did not pass here.");
     }
-    SST_print_log("Locker: CO_LOCATION check passed.");
+    physical_action_gate(&opts, &session_ctx->s_key, "LOCKER_OPEN",
+                         &open_evidence);
 
     if (session_ctx != NULL && physical_options_has_socket(&opts)) {
         pthread_t thread;

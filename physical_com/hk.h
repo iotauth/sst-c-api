@@ -43,6 +43,10 @@ typedef struct {
     uint32_t rtt_us[HK_MAX_ROUNDS];
     unsigned char correct[HK_MAX_ROUNDS];
     int local_pass;
+    /* freshness_now_us() after this run's nonces were exchanged and before
+     * its first timed bit, so every scored response came after it; and once
+     * the last round completed. 0 when not reached or unreadable. */
+    uint64_t observed_not_before_us, collection_completed_us;
 } hk_result;
 
 /* All IO callbacks return 0 on success, -1 on timeout/framing/IO failure.
