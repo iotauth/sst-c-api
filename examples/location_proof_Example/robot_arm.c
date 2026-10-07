@@ -8,6 +8,7 @@
 #include "location_verifier.h"
 #include "../../src/c_api.h"
 #include "protocol.h"
+#include "verification_policy.h"
 
 #define PORT_NUM 21100
 
@@ -188,6 +189,14 @@ int main(int argc, char *argv[])
         );
     }
 
+    char *verification_policy = load_verification_policy("../verification_policy.json");
+
+    if(verification_policy == NULL){
+        SST_print_error_exit("Failed to load verification policy");
+    }
+
+    printf("[ROBOT ARM] Verification policy recieved:\n%s\n", verification_policy);
+
 
     /*
      * Cache of session keys.
@@ -281,7 +290,47 @@ int main(int argc, char *argv[])
         request.required_zone
     );
 
+    LocationRequest location_request;
+    location_request.requested = true;
 
+    int result = send_secure_message(
+        (char *)&location_request,
+        sizeof(location_request),
+        session_ctx
+    );
+
+    if(result < 0){
+        SST_print_error_exit("Failed to send location request");
+    }
+
+    printf("[ROBOT_ARM] Requested robot location\n");
+
+
+    LocationResponse location_response;
+
+    bytes_read = read_secure_message(
+        (unsigned char *)&location_response,
+        session_ctx
+    );
+
+    if(bytes_read < 0){
+        SST_print_error_exit("Failed to read location response");
+    }
+
+    if(bytes_read == 0) {
+        SST_print_error_exit("Robot disconnected");
+    }
+
+    if(bytes_read != sizeof(LocationResponse)){
+        SST_print_error_exit("Invalid LocationResponse size");
+    }
+
+    printf(
+        "[ROBOT ARM] Robot claims position: "
+        "(%.2f, %.2f)\n",
+        location_response.x,
+        location_response.y
+    );
     /*
      * --------------------------------
      * Verify physical context
@@ -321,7 +370,7 @@ int main(int argc, char *argv[])
      * --------------------------------
      */
 
-    int result =
+    result =
         send_secure_message(
             (char *)&response,
             sizeof(response),
@@ -352,6 +401,10 @@ int main(int argc, char *argv[])
 
     free_session_key_list_t(
         s_key_list
+    );
+
+    free_verification_policy(
+        verification_policy
     );
 
     close(clnt_sock);

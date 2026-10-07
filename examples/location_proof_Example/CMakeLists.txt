@@ -17,6 +17,7 @@ add_executable(
     robot_arm
     robot_arm.c
     location_verifier.c
+    verification_policy.c
 )
 
 # Link against SST

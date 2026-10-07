@@ -30,4 +30,13 @@ typedef struct {
     bool allowed;
 } ActionResponse;
 
+typedef struct {
+    bool requested;
+} LocationRequest;
+
+typedef struct {
+    double x;
+    double y;
+} LocationResponse;
+
 #endif
