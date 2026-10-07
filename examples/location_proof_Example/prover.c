@@ -96,18 +96,75 @@ int main(int argc, char *argv[])
     }
 
     /*
-     * Wait for the Robot Arm's response.
+     * Wait for the location request.
      */
-    ActionResponse response;
+    LocationRequest location_request;
 
     int bytes_read = read_secure_message(
+        (unsigned char *)&location_request,
+        session_ctx
+    );
+
+    if(bytes_read < 0){
+        SST_print_error_exit("Failed to read location request");
+    }
+
+    if(bytes_read == 0){
+        SST_print_error_exit("Robot Arm disconnected");
+    }
+
+    if(bytes_read != sizeof(LocationRequest)){
+        SST_print_error_exit("Invalid LocationRequest size");
+    }
+
+    printf("[PROVER] Robot Arm requested location\n");
+
+    /* 
+    *Obtain the robots location
+    *hard coded for now
+    *then we will do Ranging to trilateration to coordinates
+    */
+
+    LocationResponse location_response;
+    location_response.x = 0.50;
+    location_response.y = 0.50;
+
+    printf("[PROVER] Current position: (%.2f, %.2f)\n", location_response.x, location_response.y);
+
+    /* send Location to ARM*/
+
+    result = send_secure_message(
+        (char *)&location_response,
+        sizeof(location_response),
+        session_ctx
+    );
+
+    if (result < 0) {
+        SST_print_error_exit(
+            "Failed to send location response."
+        );
+    }
+
+    printf(
+        "[PROVER] Location response sent\n"
+    );
+
+        /*
+    * --------------------------------
+    * Wait for final action decision
+    * --------------------------------
+    */
+
+    ActionResponse response;
+
+    bytes_read = read_secure_message(
         (unsigned char *)&response,
         session_ctx
     );
 
     if (bytes_read < 0) {
         SST_print_error_exit(
-            "Failed read_secure_message()."
+            "Failed to read action response."
         );
     }
 
@@ -122,25 +179,14 @@ int main(int argc, char *argv[])
             "Invalid ActionResponse size."
         );
     }
-
-    /*
-     * Process response.
-     */
-    if (response.allowed) {
-
-        printf(
-            "[PROVER] ACTION ALLOWED\n"
-        );
-
-    } else {
-
-        printf(
-            "[PROVER] ACTION DENIED\n"
-        );
+    if(response.allowed){
+        printf("[PROVER] ACTION ALLOWED\n");
+    }   else {
+        printf("[PROVER] ACTION DENIED\n");
     }
 
-
-    /*
+        
+        /*
      * Cleanup.
      */
     free_session_ctx(session_ctx);
