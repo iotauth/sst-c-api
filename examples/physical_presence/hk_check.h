@@ -2,6 +2,7 @@
 #define PHYSICAL_PRESENCE_HK_CHECK_H
 #include <string.h>
 
+#include "../../bluetooth_com/ble_adv_rssi.h"
 #include "../../physical_com/freshness.h"
 #include "../../physical_com/hk.h"
 #include "../../physical_com/rssi_check.h"
@@ -9,7 +10,7 @@
 #include "../../uwb_com/uwb_cli_dev.h"
 #include "../../wifi_com/wifi_rssi.h"
 #ifdef HAVE_BT_TRANSPORT
-#include "../../bluetooth_com/bt_link.h"
+#include "../../bluetooth_com/bt_adv_radio.h"
 #endif
 #ifdef HAVE_IR_TRANSPORT
 #include "../../ir_com/ir_sst_handshake.h"
@@ -44,7 +45,8 @@ typedef union {
         ultrasonic_echo_config config;
         ultrasonic_echo_identity identity;
     } echo;
-    rssi_config rssi; /* BLE_RSSI and WIFI_RSSI */
+    rssi_config rssi; /* WIFI_RSSI */
+    ble_adv_rssi_config ble;
     uwb_range_config uwb;
 } co_location_config;
 
@@ -185,12 +187,6 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
 #endif
 }
 
-#ifdef HAVE_BT_TRANSPORT
-static int read_link_rssi(void* sock, int8_t* rssi) {
-    return bt_link_read_rssi(*(const int*)sock, rssi);
-}
-#endif
-
 /* The Wi-Fi peer, as wifi_fresh_sampler's radio. */
 typedef struct {
     const char* iface;
@@ -246,21 +242,42 @@ static void log_rssi_role(const char* name, int initiator,
                   c->samples, c->interval_ms);
 }
 
-/* Samples the RSSI of the Bluetooth link that carries this session. HCI
- * Read RSSI returns the controller's latest value, with no way to tell when
- * it was observed, so its evidence has no known observation time. */
+/* BLE RSSI from advertising packets that answer a fresh challenge over this
+ * session (ble_adv_rssi.h): each sample is a packet the peer sent after this
+ * side's challenge, so the challenge time bounds every observation. Uses
+ * this host's controller next to the session's own BLE connection. */
 static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
-                           const rssi_config* c, physical_evidence* ev) {
-    log_rssi_role("BLE RSSI", initiator, c);
+                           const ble_adv_rssi_config* c,
+                           physical_evidence* ev) {
+    SST_print_log(
+        "BLE RSSI: role=%s min_rssi_dbm=%d samples=%u timeout_ms=%u "
+        "(advertising challenge)",
+        initiator ? "initiator" : "responder", c->min_rssi_dbm, c->samples,
+        c->timeout_ms);
 #ifdef HAVE_BT_TRANSPORT
-    if (!bt_link_is_bluetooth(session->sock)) {
+    if (session->sock < 0) {
         SST_print_error(
-            "BLE RSSI needs the Bluetooth SST session; use --comm_type "
+            "BLE RSSI needs a socket-backed SST session; use --comm_type "
             "bluetooth.");
         return -1;
     }
-    return run_rssi_check(session, initiator, "BLE RSSI", c, read_link_rssi,
-                          &session->sock, 0, ev);
+    bt_adv_radio* bt = bt_adv_radio_open();
+    if (!bt) return -1;
+    ble_adv_radio radio;
+    bt_adv_radio_bind(bt, &radio);
+    ble_adv_rssi_result r;
+    int rc = ble_adv_rssi_run(session, c, initiator, &radio, &r);
+    bt_adv_radio_close(bt);
+    SST_print_log(
+        "BLE RSSI: samples=%u/%u median_rssi_dbm=%.1f min_rssi_dbm=%d local=%s",
+        r.samples, c->samples, r.median_rssi_dbm, c->min_rssi_dbm,
+        r.local_pass ? "PASS" : "FAIL");
+    SST_print_log("BLE RSSI: peer_median_rssi_dbm=%d peer_reported=%s result=%s",
+                  r.peer_median_rssi_dbm,
+                  peer_report_name(r.peer_reported, r.peer_reported_pass),
+                  run_result_name(rc));
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    return rc;
 #else
     (void)session;
     (void)ev;
@@ -362,7 +379,7 @@ static int select_echo(const char* plan, co_location_config* c) {
                                        &c->echo.identity);
 }
 static int select_ble(const char* plan, co_location_config* c) {
-    return rssi_plan_config(plan, "BLE_RSSI", &c->rssi);
+    return ble_adv_rssi_plan_config(plan, &c->ble);
 }
 static int select_wifi(const char* plan, co_location_config* c) {
     return rssi_plan_config(plan, "WIFI_RSSI", &c->rssi);
@@ -392,7 +409,7 @@ static int run_ble(SST_session_ctx_t* s, int initiator,
                    const co_location_options* o, const co_location_config* c,
                    physical_evidence* ev) {
     (void)o;
-    return verify_ble_rssi(s, initiator, &c->rssi, ev);
+    return verify_ble_rssi(s, initiator, &c->ble, ev);
 }
 static int run_wifi(SST_session_ctx_t* s, int initiator,
                     const co_location_options* o, const co_location_config* c,

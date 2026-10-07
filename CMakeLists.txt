@@ -21,7 +21,8 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo_plan.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/rssi_check.c
-  ${CMAKE_CURRENT_LIST_DIR}/uwb_com/uwb_range.c)
+  ${CMAKE_CURRENT_LIST_DIR}/uwb_com/uwb_range.c
+  ${CMAKE_CURRENT_LIST_DIR}/bluetooth_com/ble_adv_rssi.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -119,6 +120,11 @@ add_executable(wifi_rssi_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/wifi_rssi_test.c
   ${CMAKE_CURRENT_SOURCE_DIR}/wifi_com/wifi_rssi.c)
 target_compile_options(wifi_rssi_test PRIVATE -UNDEBUG)
 add_test(NAME wifi_rssi_test COMMAND wifi_rssi_test)
+
+add_executable(ble_adv_rssi_test ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/ble_adv_rssi_test.c)
+target_link_libraries(ble_adv_rssi_test PRIVATE sst-c-api)
+target_compile_options(ble_adv_rssi_test PRIVATE -UNDEBUG)
+add_test(NAME ble_adv_rssi_test COMMAND ble_adv_rssi_test)
 
 add_executable(uwb_range_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_range_test.c)
 target_link_libraries(uwb_range_test PRIVATE sst-c-api)
