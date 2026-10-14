@@ -23,6 +23,16 @@ add_executable(
     location_verifier.c
     verification_policy.c
 )
+add_executable(
+    trilateration_test
+    trilateration_test.c
+    trilateration.c
+)
+
+target_link_libraries(
+    trilateration_test
+    m
+)
 
 # Link against SST
 target_link_libraries(
