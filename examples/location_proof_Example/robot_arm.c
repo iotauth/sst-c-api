@@ -197,6 +197,17 @@ int main(int argc, char *argv[])
 
     printf("[ROBOT ARM] Verification policy recieved:\n%s\n", verification_policy);
 
+    VerificationPolicy policy;
+    if(parse_verification_policy(verification_policy, &policy) != 0){
+        SST_print_error_exit("Failed to parse verification policy");
+    }
+
+    printf("[ROBOT ARM] Parsed verification policy:\n"
+           " Type: %s\n"
+           " Method: %s\n"
+           " Ranging method: %s\n",
+           policy.type, policy.method, policy.ranging_method
+        );
 
     /*
      * Cache of session keys.

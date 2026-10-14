@@ -6,6 +6,10 @@ add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
 
 find_package(Threads REQUIRED)
 
+# cJSON
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
+
 # Prover executable
 add_executable(
     prover
@@ -21,5 +25,13 @@ add_executable(
 )
 
 # Link against SST
-target_link_libraries(prover sst-c-api)
-target_link_libraries(robot_arm sst-c-api)
+target_link_libraries(
+    prover
+    sst-c-api
+)
+
+target_link_libraries(
+    robot_arm
+    sst-c-api
+    PkgConfig::CJSON
+)
