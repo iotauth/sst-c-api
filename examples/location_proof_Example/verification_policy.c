@@ -80,7 +80,7 @@ int parse_verification_policy(const char *json, VerificationPolicy *policy){
             verification,
             "ranging_method"
         );
-
+    
     if (!cJSON_IsString(type) ||
         !cJSON_IsString(method) ||
         !cJSON_IsString(ranging_method)) {
@@ -108,8 +108,143 @@ int parse_verification_policy(const char *json, VerificationPolicy *policy){
         "%s",
         ranging_method->valuestring
     );
+     //anchors now
+    cJSON *anchors =
+    cJSON_GetObjectItemCaseSensitive(
+        verification,
+        "anchors"
+    );
+
+    if(!cJSON_IsArray(anchors)){
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    int anchor_count = cJSON_GetArraySize(anchors);
+
+    if(anchor_count <= 0 || anchor_count > MAX_ANCHORS){
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    policy->anchor_count = anchor_count;
+
+    for(int i = 0; i < anchor_count; i++){
+        cJSON *anchor = cJSON_GetArrayItem(anchors, i);
+
+        if(!cJSON_IsObject(anchor)){
+            cJSON_Delete(root);
+            return -1;
+        }
+
+        cJSON *id =
+            cJSON_GetObjectItemCaseSensitive(
+                anchor,
+                "id"
+            );
+
+        cJSON *x =
+            cJSON_GetObjectItemCaseSensitive(
+                anchor,
+                "x"
+            );
+
+        cJSON *y =
+            cJSON_GetObjectItemCaseSensitive(
+                anchor,
+                "y"
+            );
+
+        if(!cJSON_IsNumber(id) ||
+           !cJSON_IsNumber(x) ||
+           !cJSON_IsNumber(y)){
+            cJSON_Delete(root);
+            return -1;
+        }
+
+        policy->anchors[i].id = id->valueint;
+        policy->anchors[i].x = x->valuedouble;
+        policy->anchors[i].y = y->valuedouble;
+    }
+
+    cJSON *required_zone =
+        cJSON_GetObjectItemCaseSensitive(
+            verification,
+            "required_zone"
+        );
+
+    if(!cJSON_IsObject(required_zone)){
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    cJSON *zone_name =
+        cJSON_GetObjectItemCaseSensitive(
+            required_zone,
+            "name"
+        );
+
+    cJSON *x_min =
+        cJSON_GetObjectItemCaseSensitive(
+            required_zone,
+            "x_min"
+        );
+
+    cJSON *x_max =
+        cJSON_GetObjectItemCaseSensitive(
+            required_zone,
+            "x_max"
+        );
+
+    cJSON *y_min =
+        cJSON_GetObjectItemCaseSensitive(
+            required_zone,
+            "y_min"
+        );
+
+    cJSON *y_max =
+        cJSON_GetObjectItemCaseSensitive(
+            required_zone,
+            "y_max"
+        );
+
+    if(!cJSON_IsString(zone_name) ||
+       !cJSON_IsNumber(x_min) ||
+       !cJSON_IsNumber(x_max) ||
+       !cJSON_IsNumber(y_min) ||
+       !cJSON_IsNumber(y_max)){
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    snprintf(
+        policy->required_zone.name,
+        sizeof(policy->required_zone.name),
+        "%s",
+        zone_name->valuestring
+    );
+
+    policy->required_zone.x_min = x_min->valuedouble;
+    policy->required_zone.x_max = x_max->valuedouble;
+    policy->required_zone.y_min = y_min->valuedouble;
+    policy->required_zone.y_max = y_max->valuedouble;
+
+    cJSON *max_error =
+        cJSON_GetObjectItemCaseSensitive(
+            verification,
+            "max_error_m"
+        );
+
+    if(!cJSON_IsNumber(max_error)){
+        cJSON_Delete(root);
+        return -1;
+    }
+
+    policy->max_error_m = max_error->valuedouble;
+
     cJSON_Delete(root);
     return 0;
+
 }
 void free_verification_policy(char *policy){
     free(policy);

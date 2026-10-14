@@ -126,7 +126,7 @@ int main(int argc, char *argv[])
     */
 
     LocationResponse location_response;
-    location_response.x = 0.50;
+    location_response.x = 1.50;
     location_response.y = 0.50;
 
     printf("[PROVER] Current position: (%.2f, %.2f)\n", location_response.x, location_response.y);
