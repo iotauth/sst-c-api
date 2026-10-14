@@ -202,12 +202,42 @@ int main(int argc, char *argv[])
         SST_print_error_exit("Failed to parse verification policy");
     }
 
-    printf("[ROBOT ARM] Parsed verification policy:\n"
-           " Type: %s\n"
-           " Method: %s\n"
-           " Ranging method: %s\n",
-           policy.type, policy.method, policy.ranging_method
+    printf(
+    "[ROBOT ARM] Parsed verification policy:\n"
+    "  Type: %s\n"
+    "  Method: %s\n"
+    "  Ranging method: %s\n"
+    "  Anchors: %d\n",
+    policy.type,
+    policy.method,
+    policy.ranging_method,
+    policy.anchor_count
+    );
+
+
+    for (int i = 0; i < policy.anchor_count; i++) {
+
+        printf(
+            "  Anchor %d: (%.2f, %.2f)\n",
+            policy.anchors[i].id,
+            policy.anchors[i].x,
+            policy.anchors[i].y
         );
+    }
+
+
+    printf(
+        "  Required zone: %s\n"
+        "  X bounds: %.2f - %.2f\n"
+        "  Y bounds: %.2f - %.2f\n"
+        "  Maximum error: %.2f m\n",
+        policy.required_zone.name,
+        policy.required_zone.x_min,
+        policy.required_zone.x_max,
+        policy.required_zone.y_min,
+        policy.required_zone.y_max,
+        policy.max_error_m
+    );
 
     /*
      * Cache of session keys.
@@ -348,8 +378,12 @@ int main(int argc, char *argv[])
      * --------------------------------
      */
 
-    bool allowed = verify_location(request.required_zone);
-
+    bool allowed =
+        verify_position_against_policy(
+            location_response.x,
+            location_response.y,
+            &policy
+        );
     /*
      * --------------------------------
      * Build response
@@ -364,11 +398,21 @@ int main(int argc, char *argv[])
     if (allowed) {
 
         printf(
+            "[ROBOT ARM] Location verification successful at (%.2f, %.2f)\n",
+            location_response.x,
+            location_response.y
+        );
+
+        printf(
             "[ROBOT ARM] Movement allowed\n"
         );
 
     } else {
-
+        printf(
+            "[ROBOT ARM] Location verification failed at (%.2f, %.2f)\n",
+            location_response.x,
+            location_response.y
+        );
         printf(
             "[ROBOT ARM] Movement denied\n"
         );
