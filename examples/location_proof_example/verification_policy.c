@@ -46,55 +46,59 @@ char* load_verification_policy(const char* path) {
 
     return buffer;
 }
+
 int parse_verification_policy(const char* json, VerificationPolicy* policy) {
     if (json == NULL || policy == NULL) {
         return -1;
     }
+
     memset(policy, 0, sizeof(VerificationPolicy));
 
     cJSON* root = cJSON_Parse(json);
+
     if (root == NULL) {
         return -1;
     }
+
+    int ret = -1;
 
     cJSON* verification =
         cJSON_GetObjectItemCaseSensitive(root, "verification");
 
     if (!cJSON_IsObject(verification)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
+
     cJSON* type = cJSON_GetObjectItemCaseSensitive(verification, "type");
-
     cJSON* method = cJSON_GetObjectItemCaseSensitive(verification, "method");
-
     cJSON* ranging_method =
         cJSON_GetObjectItemCaseSensitive(verification, "ranging_method");
 
     if (!cJSON_IsString(type) || !cJSON_IsString(method) ||
         !cJSON_IsString(ranging_method)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
+
     snprintf(policy->type, sizeof(policy->type), "%s", type->valuestring);
 
     snprintf(policy->method, sizeof(policy->method), "%s", method->valuestring);
 
     snprintf(policy->ranging_method, sizeof(policy->ranging_method), "%s",
              ranging_method->valuestring);
-    // anchors now
+
+    /*
+     * Parse UWB anchors.
+     */
     cJSON* anchors = cJSON_GetObjectItemCaseSensitive(verification, "anchors");
 
     if (!cJSON_IsArray(anchors)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
 
     int anchor_count = cJSON_GetArraySize(anchors);
 
     if (anchor_count <= 0 || anchor_count > MAX_ANCHORS) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
 
     policy->anchor_count = anchor_count;
@@ -103,19 +107,15 @@ int parse_verification_policy(const char* json, VerificationPolicy* policy) {
         cJSON* anchor = cJSON_GetArrayItem(anchors, i);
 
         if (!cJSON_IsObject(anchor)) {
-            cJSON_Delete(root);
-            return -1;
+            goto cleanup;
         }
 
         cJSON* id = cJSON_GetObjectItemCaseSensitive(anchor, "id");
-
         cJSON* x = cJSON_GetObjectItemCaseSensitive(anchor, "x");
-
         cJSON* y = cJSON_GetObjectItemCaseSensitive(anchor, "y");
 
         if (!cJSON_IsNumber(id) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
-            cJSON_Delete(root);
-            return -1;
+            goto cleanup;
         }
 
         policy->anchors[i].id = id->valueint;
@@ -123,29 +123,26 @@ int parse_verification_policy(const char* json, VerificationPolicy* policy) {
         policy->anchors[i].y = y->valuedouble;
     }
 
+    /*
+     * Parse required physical zone.
+     */
     cJSON* required_zone =
         cJSON_GetObjectItemCaseSensitive(verification, "required_zone");
 
     if (!cJSON_IsObject(required_zone)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
 
     cJSON* zone_name = cJSON_GetObjectItemCaseSensitive(required_zone, "name");
-
     cJSON* x_min = cJSON_GetObjectItemCaseSensitive(required_zone, "x_min");
-
     cJSON* x_max = cJSON_GetObjectItemCaseSensitive(required_zone, "x_max");
-
     cJSON* y_min = cJSON_GetObjectItemCaseSensitive(required_zone, "y_min");
-
     cJSON* y_max = cJSON_GetObjectItemCaseSensitive(required_zone, "y_max");
 
     if (!cJSON_IsString(zone_name) || !cJSON_IsNumber(x_min) ||
         !cJSON_IsNumber(x_max) || !cJSON_IsNumber(y_min) ||
         !cJSON_IsNumber(y_max)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
 
     snprintf(policy->required_zone.name, sizeof(policy->required_zone.name),
@@ -156,17 +153,32 @@ int parse_verification_policy(const char* json, VerificationPolicy* policy) {
     policy->required_zone.y_min = y_min->valuedouble;
     policy->required_zone.y_max = y_max->valuedouble;
 
+    if (policy->required_zone.x_min > policy->required_zone.x_max ||
+        policy->required_zone.y_min > policy->required_zone.y_max) {
+        goto cleanup;
+    }
+
+    /*
+     * Parse maximum permitted location error.
+     */
     cJSON* max_error =
         cJSON_GetObjectItemCaseSensitive(verification, "max_error_m");
 
     if (!cJSON_IsNumber(max_error)) {
-        cJSON_Delete(root);
-        return -1;
+        goto cleanup;
     }
 
     policy->max_error_m = max_error->valuedouble;
 
+    if (policy->max_error_m < 0.0) {
+        goto cleanup;
+    }
+
+    ret = 0;
+
+cleanup:
     cJSON_Delete(root);
-    return 0;
+    return ret;
 }
+
 void free_verification_policy(char* policy) { free(policy); }

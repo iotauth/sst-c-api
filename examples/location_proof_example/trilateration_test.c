@@ -1,5 +1,6 @@
 #include "trilateration.h"
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -42,8 +43,6 @@ int main(void) {
         return EXIT_FAILURE;
     }
 
-    printf("Estimated position: (%.3f, %.3f) m\n", position.x, position.y);
-
     /*
      * We know the expected answer for this test.
      */
@@ -53,13 +52,16 @@ int main(void) {
     double error_x = position.x - expected_x;
     double error_y = position.y - expected_y;
 
-    printf("Expected position:  (%.3f, %.3f) m\n", expected_x, expected_y);
-
-    printf("Error:              (%.6f, %.6f) m\n", error_x, error_y);
+    printf("Estimated position:  (%.3f, %.3f) m\n", position.x, position.y);
+    printf("Expected position:   (%.3f, %.3f) m\n", expected_x, expected_y);
+    printf("Error:               (%.6f, %.6f) m\n", error_x, error_y);
     const double tolerance = 1e-6;
 
-    if (error_x > tolerance || error_y > tolerance) {
+    if (fabs(error_x) > tolerance || fabs(error_y) > tolerance) {
         fprintf(stderr, "Multilateration test failed.\n");
         return EXIT_FAILURE;
     }
+
+    printf("Multilateration test passed.\n");
+    return EXIT_SUCCESS;
 }

@@ -6,11 +6,19 @@
 #include "protocol.h"
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
+    if (argc != 2 && argc != 4) {
+        SST_print_error_exit("Usage: %s <config_file_path> [x y]", argv[0]);
     }
 
     const char* config_path = argv[1];
+
+    double x = 1.50;
+    double y = 0.50;
+
+    if (argc == 4) {
+        x = strtod(argv[2], NULL);
+        y = strtod(argv[3], NULL);
+    }
 
     /*
      * Initialize SST using prover.config.
@@ -48,21 +56,15 @@ int main(int argc, char* argv[]) {
     printf("[PROVER] Secure connection established\n");
 
     /*
-     * Build our protocol request.
+     * Build action request.
      *
-     * For the prototype:
-     *
-     * Robot wants to MOVE
-     * and movement requires Zone A.
+     * The Robot requests a MOVE action.
+     * Location requirements are defined by the Resource policy.
      */
-    ActionRequest request;
+    ActionRequest request = {.msg_type = MSG_ACTION_REQUEST,
+                             .action = ACTION_MOVE};
 
-    request.action = ACTION_MOVE;
-    request.required_zone = ZONE_A;
-
-    printf(
-        "[PROVER] Sending MOVE request "
-        "requiring ZONE_A\n");
+    printf("[PROVER] Sending MOVE request\n");
 
     /*
      * Send ActionRequest through SST.
@@ -80,35 +82,25 @@ int main(int argc, char* argv[]) {
      * Wait for the location request.
      */
     LocationRequest location_request;
-    unsigned char recv_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_read = read_secure_message(recv_buf, session_ctx);
-
-    if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read location request.");
+    if (read_exact_message(session_ctx, &location_request,
+                           sizeof(location_request), "LocationRequest") != 0) {
+        SST_print_error_exit("Failed to receive LocationRequest.");
     }
 
-    if (bytes_read == 0) {
-        SST_print_error_exit("Robot Arm disconnected.");
+    if (location_request.msg_type != MSG_LOCATION_REQUEST) {
+        SST_print_error_exit("Unexpected message type.");
     }
-
-    if (bytes_read != sizeof(LocationRequest)) {
-        SST_print_error_exit("Invalid LocationRequest size.");
-    }
-
-    memcpy(&location_request, recv_buf, sizeof(location_request));
 
     printf("[PROVER] Robot Arm requested location\n");
 
     /*
-     *Obtain the robots location
-     *hard coded for now
-     *then we will do Ranging to trilateration to coordinates
+     * Use the supplied prototype location.
+     * This will later be replaced by UWB multilateration.
      */
 
-    LocationResponse location_response;
-    location_response.x = 1.50;
-    location_response.y = 0.50;
+    LocationResponse location_response = {
+        .msg_type = MSG_LOCATION_RESPONSE, .x = x, .y = y};
 
     printf("[PROVER] Current position: (%.2f, %.2f)\n", location_response.x,
            location_response.y);
@@ -132,22 +124,14 @@ int main(int argc, char* argv[]) {
 
     ActionResponse response;
 
-    bytes_read = read_secure_message(recv_buf, session_ctx);
-
-    if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read action response.");
+    if (read_exact_message(session_ctx, &response, sizeof(response),
+                           "ActionResponse") != 0) {
+        SST_print_error_exit("Failed to receive ActionResponse.");
     }
 
-    if (bytes_read == 0) {
-        SST_print_error_exit("Robot Arm disconnected.");
+    if (response.msg_type != MSG_ACTION_RESPONSE) {
+        SST_print_error_exit("Unexpected message type.");
     }
-
-    if (bytes_read != sizeof(ActionResponse)) {
-        SST_print_error_exit("Invalid ActionResponse size.");
-    }
-
-    memcpy(&response, recv_buf, sizeof(response));
-
     if (response.allowed) {
         printf("[PROVER] ACTION ALLOWED\n");
     } else {

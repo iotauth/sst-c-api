@@ -11,5 +11,4 @@
 bool verify_position_against_policy(double x, double y,
                                     const VerificationPolicy* policy);
 
-bool verify_location(Zone required_zone);
 #endif

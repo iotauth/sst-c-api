@@ -10,7 +10,7 @@
 #include "location_verifier.h"
 #include "protocol.h"
 #include "verification_policy.h"
-
+/* Must match entity.server.port.number in robot_arm.config. */
 #define PORT_NUM 21100
 
 /*
@@ -28,10 +28,45 @@
  */
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
+    if (argc != 3) {
+        SST_print_error_exit(
+            "Usage: %s <config_file_path> <verification_policy_path>", argv[0]);
     }
 
+    const char* config_path = argv[1];
+    const char* policy_path = argv[2];
+
+    /*
+     * --------------------------------
+     * Initialize SST
+     * --------------------------------
+     */
+
+    SST_ctx_t* ctx = init_SST(config_path);
+
+    if (ctx == NULL) {
+        SST_print_error_exit("init_SST() failed.");
+    }
+    /*
+     * --------------------------------
+     * Load verification policy
+     * --------------------------------
+     */
+
+    char* verification_policy = load_verification_policy(policy_path);
+
+    if (verification_policy == NULL) {
+        SST_print_error_exit("Failed to load verification policy.");
+    }
+
+    VerificationPolicy policy;
+
+    if (parse_verification_policy(verification_policy, &policy) != 0) {
+        free_verification_policy(verification_policy);
+        SST_print_error_exit("Failed to parse verification policy.");
+    }
+
+    printf("[ROBOT ARM] Verification policy loaded\n");
     /*
      * --------------------------------
      * Create TCP server
@@ -95,35 +130,7 @@ int main(int argc, char* argv[]) {
 
     printf("[ROBOT ARM] TCP connection accepted\n");
 
-    /*
-     * --------------------------------
-     * Initialize SST
-     * --------------------------------
-     */
-
-    const char* config_path = argv[1];
-
-    SST_ctx_t* ctx = init_SST(config_path);
-
-    if (ctx == NULL) {
-        SST_print_error_exit("init_SST() failed.");
-    }
-
-    char* verification_policy =
-        load_verification_policy("../verification_policy.json");
-
-    if (verification_policy == NULL) {
-        SST_print_error_exit("Failed to load verification policy");
-    }
-
-    printf("[ROBOT ARM] Verification policy recieved:\n%s\n",
-           verification_policy);
-
-    VerificationPolicy policy;
-    if (parse_verification_policy(verification_policy, &policy) != 0) {
-        SST_print_error_exit("Failed to parse verification policy");
-    }
-
+    // VERIFICATION POLICY PARSING
     printf(
         "[ROBOT ARM] Parsed verification policy:\n"
         "  Type: %s\n"
@@ -177,55 +184,72 @@ int main(int argc, char* argv[]) {
      */
 
     ActionRequest request;
-    unsigned char recv_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_read = read_secure_message(recv_buf, session_ctx);
-
-    if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read action request.");
+    if (read_exact_message(session_ctx, &request, sizeof(request),
+                           "ActionRequest") != 0) {
+        SST_print_error_exit("Failed to receive ActionRequest.");
     }
 
-    if (bytes_read != sizeof(ActionRequest)) {
-        SST_print_error_exit("Invalid ActionRequest size.");
+    if (request.msg_type != MSG_ACTION_REQUEST) {
+        SST_print_error_exit("Unexpected message type.");
     }
 
-    memcpy(&request, recv_buf, sizeof(request));
+    /* Only ACTION_MOVE is currently supported. */
+    if (request.action != ACTION_MOVE) {
+        printf("[ROBOT ARM] Unsupported action: %u\n", request.action);
+
+        ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
+                                   .allowed = 0};
+
+        int result = send_secure_message((char*)&response, sizeof(response),
+                                         session_ctx);
+
+        if (result < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
+
+        free_session_ctx(session_ctx);
+        free_session_key_list_t(s_key_list);
+        free_verification_policy(verification_policy);
+
+        close(clnt_sock);
+        close(serv_sock);
+
+        free_SST_ctx_t(ctx);
+
+        return EXIT_FAILURE;
+    }
 
     printf("[ROBOT ARM] Received action request\n");
+    printf("[ROBOT ARM] Action: %u\n", request.action);
+    /*
+     * --------------------------------
+     * Request Robot location
+     * --------------------------------
+     */
 
-    printf("[ROBOT ARM] Action: %d\n", request.action);
-
-    printf("[ROBOT ARM] Required zone: %d\n", request.required_zone);
-
-    LocationRequest location_request;
-    location_request.requested = true;
+    LocationRequest location_request = {.msg_type = MSG_LOCATION_REQUEST};
 
     int result = send_secure_message((char*)&location_request,
                                      sizeof(location_request), session_ctx);
 
     if (result < 0) {
-        SST_print_error_exit("Failed to send location request");
+        SST_print_error_exit("Failed to send location request.");
     }
 
-    printf("[ROBOT_ARM] Requested robot location\n");
+    printf("[ROBOT ARM] Location requested\n");
 
     LocationResponse location_response;
 
-    bytes_read = read_secure_message(recv_buf, session_ctx);
-
-    if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read location response.");
+    if (read_exact_message(session_ctx, &location_response,
+                           sizeof(location_response),
+                           "LocationResponse") != 0) {
+        SST_print_error_exit("Failed to receive LocationResponse.");
     }
 
-    if (bytes_read == 0) {
-        SST_print_error_exit("Robot disconnected.");
+    if (location_response.msg_type != MSG_LOCATION_RESPONSE) {
+        SST_print_error_exit("Unexpected message type.");
     }
-
-    if (bytes_read != sizeof(LocationResponse)) {
-        SST_print_error_exit("Invalid LocationResponse size.");
-    }
-
-    memcpy(&location_response, recv_buf, sizeof(location_response));
 
     printf(
         "[ROBOT ARM] Robot claims position: "
@@ -245,9 +269,8 @@ int main(int argc, char* argv[]) {
      * --------------------------------
      */
 
-    ActionResponse response;
-    response.allowed = allowed;
-
+    ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
+                               .allowed = allowed ? 1 : 0};
     if (allowed) {
         printf("[ROBOT ARM] Location verification successful at (%.2f, %.2f)\n",
                location_response.x, location_response.y);

@@ -14,12 +14,13 @@ pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
 add_executable(
     prover
     prover.c
+    protocol.c
 )
 
-# Robot arm / resource executable
 add_executable(
     robot_arm
     robot_arm.c
+    protocol.c
     location_verifier.c
     verification_policy.c
 )

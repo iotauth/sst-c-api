@@ -2,15 +2,18 @@
 
 #include <math.h>
 #include <stddef.h>
+#define MIN_DETERMINANT 1e-6
 
 bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
                    Position* position) {
-    if (anchors == NULL || position == NULL) {
+    if (anchors == NULL || position == NULL || anchor_count < 3) {
         return false;
     }
 
-    if (anchor_count < 3) {
-        return false;
+    for (int i = 0; i < anchor_count; i++) {
+        if (!isfinite(anchors[i].distance) || anchors[i].distance < 0.0) {
+            return false;
+        }
     }
 
     /*
@@ -72,11 +75,9 @@ bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
     double denominator = (sum_AA * sum_BB) - (sum_AB * sum_AB);
 
     /*
-     * If this is approximately zero, the anchor
-     * geometry does not provide enough independent
-     * information for a reliable 2D position.
+     * Compares denominator to the threshhold for degenerate anchor geometry
      */
-    if (fabs(denominator) < 0.000001) {
+    if (fabs(denominator) < MIN_DETERMINANT) {
         return false;
     }
 
