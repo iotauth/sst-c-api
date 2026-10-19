@@ -211,20 +211,21 @@ int main(int argc, char* argv[]) {
 
     LocationResponse location_response;
 
-    bytes_read =
-        read_secure_message((unsigned char*)&location_response, session_ctx);
+    bytes_read = read_secure_message(recv_buf, session_ctx);
 
     if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read location response");
+        SST_print_error_exit("Failed to read location response.");
     }
 
     if (bytes_read == 0) {
-        SST_print_error_exit("Robot disconnected");
+        SST_print_error_exit("Robot disconnected.");
     }
 
     if (bytes_read != sizeof(LocationResponse)) {
-        SST_print_error_exit("Invalid LocationResponse size");
+        SST_print_error_exit("Invalid LocationResponse size.");
     }
+
+    memcpy(&location_response, recv_buf, sizeof(location_response));
 
     printf(
         "[ROBOT ARM] Robot claims position: "

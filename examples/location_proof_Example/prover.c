@@ -79,21 +79,23 @@ int main(int argc, char* argv[]) {
      * Wait for the location request.
      */
     LocationRequest location_request;
+    unsigned char recv_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_read =
-        read_secure_message((unsigned char*)&location_request, session_ctx);
+    int bytes_read = read_secure_message(recv_buf, session_ctx);
 
     if (bytes_read < 0) {
-        SST_print_error_exit("Failed to read location request");
+        SST_print_error_exit("Failed to read location request.");
     }
 
     if (bytes_read == 0) {
-        SST_print_error_exit("Robot Arm disconnected");
+        SST_print_error_exit("Robot Arm disconnected.");
     }
 
     if (bytes_read != sizeof(LocationRequest)) {
-        SST_print_error_exit("Invalid LocationRequest size");
+        SST_print_error_exit("Invalid LocationRequest size.");
     }
+
+    memcpy(&location_request, recv_buf, sizeof(location_request));
 
     printf("[PROVER] Robot Arm requested location\n");
 
@@ -129,7 +131,7 @@ int main(int argc, char* argv[]) {
 
     ActionResponse response;
 
-    bytes_read = read_secure_message((unsigned char*)&response, session_ctx);
+    bytes_read = read_secure_message(recv_buf, session_ctx);
 
     if (bytes_read < 0) {
         SST_print_error_exit("Failed to read action response.");
@@ -142,6 +144,9 @@ int main(int argc, char* argv[]) {
     if (bytes_read != sizeof(ActionResponse)) {
         SST_print_error_exit("Invalid ActionResponse size.");
     }
+
+    memcpy(&response, recv_buf, sizeof(response));
+
     if (response.allowed) {
         printf("[PROVER] ACTION ALLOWED\n");
     } else {
