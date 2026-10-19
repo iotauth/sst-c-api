@@ -83,6 +83,6 @@ bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
     position->x = ((sum_AC * sum_BB) - (sum_AB * sum_BC)) / denominator;
 
     position->y = ((sum_AA * sum_BC) - (sum_AB * sum_AC)) / denominator;
-
-    return true;
+    //returns only if valid coordinate
+    return isfinite(position->x) && isfinite(position->y);
 }

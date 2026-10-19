@@ -1,6 +1,9 @@
 #ifndef TRILATERATION_H
 #define TRILATERATION_H
-
+/**
+ *  Contains the anchor measurement and position structures used to estimate 
+ * a Robot's location from multiple UWB distance measurements
+ */
 #include <stdbool.h>
 
 typedef struct {

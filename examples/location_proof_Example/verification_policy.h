@@ -1,6 +1,12 @@
 #ifndef VERIFICATION_POLICY_H
 #define VERIFICATION_POLICY_H
-
+/**
+ * Defines the location verification policy and the parsing interface
+ * 
+ *  Contains the structures used to represent verification requirements,
+ * UWB anchor configs, authorized zones, and error margin
+ * 
+ */
 #define MAX_ANCHORS 4
 
 typedef struct {

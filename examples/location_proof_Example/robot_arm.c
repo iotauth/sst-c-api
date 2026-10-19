@@ -26,16 +26,6 @@
  *     ↓
  * current zone
  */
-static Zone get_current_zone(void) {
-    /*
-     * HARD-CODED FOR PROTOTYPE.
-     */
-    return ZONE_A;
-}
-
-static bool location_allows_action(Zone current_zone, Zone required_zone) {
-    return current_zone == required_zone;
-}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -111,7 +101,7 @@ int main(int argc, char* argv[]) {
      * --------------------------------
      */
 
-    char* config_path = argv[1];
+    const char* config_path = argv[1];
 
     SST_ctx_t* ctx = init_SST(config_path);
 
@@ -187,20 +177,22 @@ int main(int argc, char* argv[]) {
      */
 
     ActionRequest request;
+    unsigned char recv_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_read = read_secure_message((unsigned char*)&request, session_ctx);
+    int bytes_read = read_secure_message(
+        recv_buf,
+        session_ctx
+    );
 
     if (bytes_read < 0) {
-        SST_print_error_exit("Failed read_secure_message().");
-    }
-
-    if (bytes_read == 0) {
-        SST_print_error_exit("Prover disconnected.");
+        SST_print_error_exit("Failed to read action request.");
     }
 
     if (bytes_read != sizeof(ActionRequest)) {
         SST_print_error_exit("Invalid ActionRequest size.");
     }
+
+    memcpy(&request, recv_buf, sizeof(request));
 
     printf("[ROBOT ARM] Received action request\n");
 

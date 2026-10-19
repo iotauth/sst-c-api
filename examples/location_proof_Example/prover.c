@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
-    char* config_path = argv[1];
+    const char* config_path = argv[1];
 
     /*
      * Initialize SST using prover.config.

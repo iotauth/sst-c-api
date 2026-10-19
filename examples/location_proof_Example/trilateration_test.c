@@ -56,6 +56,10 @@ int main(void) {
     printf("Expected position:  (%.3f, %.3f) m\n", expected_x, expected_y);
 
     printf("Error:              (%.6f, %.6f) m\n", error_x, error_y);
+    const double tolerance = 1e-6;
 
-    return EXIT_SUCCESS;
+    if (error_x > tolerance || error_y > tolerance) {
+        fprintf(stderr, "Multilateration test failed.\n");
+        return EXIT_FAILURE;
+    }
 }
