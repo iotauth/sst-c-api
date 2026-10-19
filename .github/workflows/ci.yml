@@ -143,8 +143,20 @@ jobs:
 
     - name: Install IPFS
       run: |
-        wget --max-redirect=0 https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
-        tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
+        KUBO_VERSION=v0.36.0
+        KUBO_TAR=kubo_${KUBO_VERSION}_linux-amd64.tar.gz
+        # dist.ipfs.tech is sometimes unreachable from GitHub runners, so try GitHub Releases first.
+        for base in https://github.com/ipfs/kubo/releases/download/${KUBO_VERSION} https://dist.ipfs.tech/kubo/${KUBO_VERSION}; do
+          if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 -o "$KUBO_TAR" "$base/$KUBO_TAR" &&
+             curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 -o "$KUBO_TAR.sha512" "$base/$KUBO_TAR.sha512"; then
+            break
+          fi
+          echo "Download from $base failed, trying next mirror."
+          rm -f "$KUBO_TAR" "$KUBO_TAR.sha512"
+        done
+        test -f "$KUBO_TAR"
+        echo "$(cut -d' ' -f1 "$KUBO_TAR.sha512")  $KUBO_TAR" | sha512sum -c -
+        tar -xvzf "$KUBO_TAR"
         cd kubo
         sudo bash install.sh
         ipfs init
