@@ -1,17 +1,15 @@
 #include "trilateration.h"
-#include <stddef.h>
-#include <math.h>
 
-bool multilaterate(
-    const AnchorMeasurement *anchors,
-    int anchor_count,
-    Position *position)
-{
-    if(anchors == NULL || position == NULL){
+#include <math.h>
+#include <stddef.h>
+
+bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
+                   Position* position) {
+    if (anchors == NULL || position == NULL) {
         return false;
     }
 
-    if(anchor_count < 3){
+    if (anchor_count < 3) {
         return false;
     }
 
@@ -41,25 +39,17 @@ bool multilaterate(
     double sum_AC = 0.0;
     double sum_BC = 0.0;
 
-    for(int i = 1; i < anchor_count; i++){
-
+    for (int i = 1; i < anchor_count; i++) {
         double xi = anchors[i].x;
         double yi = anchors[i].y;
         double ri = anchors[i].distance;
 
-        double A =
-            2.0 * (xi - x1);
+        double A = 2.0 * (xi - x1);
 
-        double B =
-            2.0 * (yi - y1);
+        double B = 2.0 * (yi - y1);
 
-        double C =
-            (r1 * r1) -
-            (ri * ri) -
-            (x1 * x1) +
-            (xi * xi) -
-            (y1 * y1) +
-            (yi * yi);
+        double C = (r1 * r1) - (ri * ri) - (x1 * x1) + (xi * xi) - (y1 * y1) +
+                   (yi * yi);
 
         /*
          * Build A^T A and A^T b.
@@ -79,28 +69,20 @@ bool multilaterate(
     /*
      * Solve the 2x2 least-squares system.
      */
-    double denominator =
-        (sum_AA * sum_BB) -
-        (sum_AB * sum_AB);
+    double denominator = (sum_AA * sum_BB) - (sum_AB * sum_AB);
 
     /*
      * If this is approximately zero, the anchor
      * geometry does not provide enough independent
      * information for a reliable 2D position.
      */
-    if(fabs(denominator) < 0.000001){
+    if (fabs(denominator) < 0.000001) {
         return false;
     }
 
-    position->x =
-        ((sum_AC * sum_BB) -
-         (sum_AB * sum_BC)) /
-        denominator;
+    position->x = ((sum_AC * sum_BB) - (sum_AB * sum_BC)) / denominator;
 
-    position->y =
-        ((sum_AA * sum_BC) -
-         (sum_AB * sum_AC)) /
-        denominator;
+    position->y = ((sum_AA * sum_BC) - (sum_AB * sum_AC)) / denominator;
 
     return true;
 }

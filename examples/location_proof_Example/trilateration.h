@@ -15,10 +15,7 @@ typedef struct {
     double y;
 } Position;
 
-bool multilaterate(
-    const AnchorMeasurement *anchors,
-    int anchor_count,
-    Position *position
-);
+bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
+                   Position* position);
 
 #endif

@@ -3,17 +3,9 @@
 
 #include <stdbool.h>
 
-typedef enum {
-    ACTION_MOVE = 0,
-    ACTION_STOP
-} Action;
+typedef enum { ACTION_MOVE = 0, ACTION_STOP } Action;
 
-typedef enum {
-    ZONE_UNKNOWN = 0,
-    ZONE_A,
-    ZONE_B,
-    ZONE_RESTRICTED
-} Zone;
+typedef enum { ZONE_UNKNOWN = 0, ZONE_A, ZONE_B, ZONE_RESTRICTED } Zone;
 
 /*
  * Message sent from the prover/robot to the resource.

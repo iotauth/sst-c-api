@@ -27,13 +27,10 @@ typedef struct {
     double max_error_m;
 } VerificationPolicy;
 
-char *load_verification_policy(const char *path);
+char* load_verification_policy(const char* path);
 
-int parse_verification_policy(
-    const char *json,
-    VerificationPolicy *policy
-);
+int parse_verification_policy(const char* json, VerificationPolicy* policy);
 
-void free_verification_policy(char *policy);
+void free_verification_policy(char* policy);
 
 #endif

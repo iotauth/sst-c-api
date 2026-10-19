@@ -6,30 +6,30 @@
 
 #include "cJSON.h"
 
-char *load_verification_policy(const char *path){
-    FILE *file = fopen(path, "rb");
+char* load_verification_policy(const char* path) {
+    FILE* file = fopen(path, "rb");
 
-    if(file == NULL){
+    if (file == NULL) {
         return NULL;
     }
 
-    if(fseek(file, 0, SEEK_END) != 0){
+    if (fseek(file, 0, SEEK_END) != 0) {
         fclose(file);
         return NULL;
     }
 
     long size = ftell(file);
 
-    if(size < 0){
+    if (size < 0) {
         fclose(file);
         return NULL;
     }
 
     rewind(file);
 
-    char *buffer = malloc((size_t)size + 1);
+    char* buffer = malloc((size_t)size + 1);
 
-    if(buffer == NULL){
+    if (buffer == NULL) {
         fclose(file);
         return NULL;
     }
@@ -37,7 +37,7 @@ char *load_verification_policy(const char *path){
 
     fclose(file);
 
-    if(bytes_read != (size_t)size){
+    if (bytes_read != (size_t)size) {
         free(buffer);
         return NULL;
     }
@@ -46,118 +46,74 @@ char *load_verification_policy(const char *path){
 
     return buffer;
 }
-int parse_verification_policy(const char *json, VerificationPolicy *policy){
-    if(json == NULL || policy == NULL){
+int parse_verification_policy(const char* json, VerificationPolicy* policy) {
+    if (json == NULL || policy == NULL) {
         return -1;
     }
     memset(policy, 0, sizeof(VerificationPolicy));
 
-    cJSON *root = cJSON_Parse(json);
-    if(root == NULL){
+    cJSON* root = cJSON_Parse(json);
+    if (root == NULL) {
         return -1;
     }
 
-    cJSON *verification = cJSON_GetObjectItemCaseSensitive(root, "verification");
+    cJSON* verification =
+        cJSON_GetObjectItemCaseSensitive(root, "verification");
 
-    if(!cJSON_IsObject(verification)){
+    if (!cJSON_IsObject(verification)) {
         cJSON_Delete(root);
         return -1;
     }
-        cJSON *type =
-        cJSON_GetObjectItemCaseSensitive(
-            verification,
-            "type"
-        );
+    cJSON* type = cJSON_GetObjectItemCaseSensitive(verification, "type");
 
-    cJSON *method =
-        cJSON_GetObjectItemCaseSensitive(
-            verification,
-            "method"
-        );
+    cJSON* method = cJSON_GetObjectItemCaseSensitive(verification, "method");
 
-    cJSON *ranging_method =
-        cJSON_GetObjectItemCaseSensitive(
-            verification,
-            "ranging_method"
-        );
-    
-    if (!cJSON_IsString(type) ||
-        !cJSON_IsString(method) ||
+    cJSON* ranging_method =
+        cJSON_GetObjectItemCaseSensitive(verification, "ranging_method");
+
+    if (!cJSON_IsString(type) || !cJSON_IsString(method) ||
         !cJSON_IsString(ranging_method)) {
-
         cJSON_Delete(root);
         return -1;
     }
-        snprintf(
-        policy->type,
-        sizeof(policy->type),
-        "%s",
-        type->valuestring
-    );
+    snprintf(policy->type, sizeof(policy->type), "%s", type->valuestring);
 
-    snprintf(
-        policy->method,
-        sizeof(policy->method),
-        "%s",
-        method->valuestring
-    );
+    snprintf(policy->method, sizeof(policy->method), "%s", method->valuestring);
 
-    snprintf(
-        policy->ranging_method,
-        sizeof(policy->ranging_method),
-        "%s",
-        ranging_method->valuestring
-    );
-     //anchors now
-    cJSON *anchors =
-    cJSON_GetObjectItemCaseSensitive(
-        verification,
-        "anchors"
-    );
+    snprintf(policy->ranging_method, sizeof(policy->ranging_method), "%s",
+             ranging_method->valuestring);
+    // anchors now
+    cJSON* anchors = cJSON_GetObjectItemCaseSensitive(verification, "anchors");
 
-    if(!cJSON_IsArray(anchors)){
+    if (!cJSON_IsArray(anchors)) {
         cJSON_Delete(root);
         return -1;
     }
 
     int anchor_count = cJSON_GetArraySize(anchors);
 
-    if(anchor_count <= 0 || anchor_count > MAX_ANCHORS){
+    if (anchor_count <= 0 || anchor_count > MAX_ANCHORS) {
         cJSON_Delete(root);
         return -1;
     }
 
     policy->anchor_count = anchor_count;
 
-    for(int i = 0; i < anchor_count; i++){
-        cJSON *anchor = cJSON_GetArrayItem(anchors, i);
+    for (int i = 0; i < anchor_count; i++) {
+        cJSON* anchor = cJSON_GetArrayItem(anchors, i);
 
-        if(!cJSON_IsObject(anchor)){
+        if (!cJSON_IsObject(anchor)) {
             cJSON_Delete(root);
             return -1;
         }
 
-        cJSON *id =
-            cJSON_GetObjectItemCaseSensitive(
-                anchor,
-                "id"
-            );
+        cJSON* id = cJSON_GetObjectItemCaseSensitive(anchor, "id");
 
-        cJSON *x =
-            cJSON_GetObjectItemCaseSensitive(
-                anchor,
-                "x"
-            );
+        cJSON* x = cJSON_GetObjectItemCaseSensitive(anchor, "x");
 
-        cJSON *y =
-            cJSON_GetObjectItemCaseSensitive(
-                anchor,
-                "y"
-            );
+        cJSON* y = cJSON_GetObjectItemCaseSensitive(anchor, "y");
 
-        if(!cJSON_IsNumber(id) ||
-           !cJSON_IsNumber(x) ||
-           !cJSON_IsNumber(y)){
+        if (!cJSON_IsNumber(id) || !cJSON_IsNumber(x) || !cJSON_IsNumber(y)) {
             cJSON_Delete(root);
             return -1;
         }
@@ -167,75 +123,43 @@ int parse_verification_policy(const char *json, VerificationPolicy *policy){
         policy->anchors[i].y = y->valuedouble;
     }
 
-    cJSON *required_zone =
-        cJSON_GetObjectItemCaseSensitive(
-            verification,
-            "required_zone"
-        );
+    cJSON* required_zone =
+        cJSON_GetObjectItemCaseSensitive(verification, "required_zone");
 
-    if(!cJSON_IsObject(required_zone)){
+    if (!cJSON_IsObject(required_zone)) {
         cJSON_Delete(root);
         return -1;
     }
 
-    cJSON *zone_name =
-        cJSON_GetObjectItemCaseSensitive(
-            required_zone,
-            "name"
-        );
+    cJSON* zone_name = cJSON_GetObjectItemCaseSensitive(required_zone, "name");
 
-    cJSON *x_min =
-        cJSON_GetObjectItemCaseSensitive(
-            required_zone,
-            "x_min"
-        );
+    cJSON* x_min = cJSON_GetObjectItemCaseSensitive(required_zone, "x_min");
 
-    cJSON *x_max =
-        cJSON_GetObjectItemCaseSensitive(
-            required_zone,
-            "x_max"
-        );
+    cJSON* x_max = cJSON_GetObjectItemCaseSensitive(required_zone, "x_max");
 
-    cJSON *y_min =
-        cJSON_GetObjectItemCaseSensitive(
-            required_zone,
-            "y_min"
-        );
+    cJSON* y_min = cJSON_GetObjectItemCaseSensitive(required_zone, "y_min");
 
-    cJSON *y_max =
-        cJSON_GetObjectItemCaseSensitive(
-            required_zone,
-            "y_max"
-        );
+    cJSON* y_max = cJSON_GetObjectItemCaseSensitive(required_zone, "y_max");
 
-    if(!cJSON_IsString(zone_name) ||
-       !cJSON_IsNumber(x_min) ||
-       !cJSON_IsNumber(x_max) ||
-       !cJSON_IsNumber(y_min) ||
-       !cJSON_IsNumber(y_max)){
+    if (!cJSON_IsString(zone_name) || !cJSON_IsNumber(x_min) ||
+        !cJSON_IsNumber(x_max) || !cJSON_IsNumber(y_min) ||
+        !cJSON_IsNumber(y_max)) {
         cJSON_Delete(root);
         return -1;
     }
 
-    snprintf(
-        policy->required_zone.name,
-        sizeof(policy->required_zone.name),
-        "%s",
-        zone_name->valuestring
-    );
+    snprintf(policy->required_zone.name, sizeof(policy->required_zone.name),
+             "%s", zone_name->valuestring);
 
     policy->required_zone.x_min = x_min->valuedouble;
     policy->required_zone.x_max = x_max->valuedouble;
     policy->required_zone.y_min = y_min->valuedouble;
     policy->required_zone.y_max = y_max->valuedouble;
 
-    cJSON *max_error =
-        cJSON_GetObjectItemCaseSensitive(
-            verification,
-            "max_error_m"
-        );
+    cJSON* max_error =
+        cJSON_GetObjectItemCaseSensitive(verification, "max_error_m");
 
-    if(!cJSON_IsNumber(max_error)){
+    if (!cJSON_IsNumber(max_error)) {
         cJSON_Delete(root);
         return -1;
     }
@@ -244,8 +168,5 @@ int parse_verification_policy(const char *json, VerificationPolicy *policy){
 
     cJSON_Delete(root);
     return 0;
-
 }
-void free_verification_policy(char *policy){
-    free(policy);
-}
+void free_verification_policy(char* policy) { free(policy); }
