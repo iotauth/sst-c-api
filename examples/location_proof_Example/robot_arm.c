@@ -179,10 +179,7 @@ int main(int argc, char* argv[]) {
     ActionRequest request;
     unsigned char recv_buf[MAX_SECURE_COMM_MSG_LENGTH];
 
-    int bytes_read = read_secure_message(
-        recv_buf,
-        session_ctx
-    );
+    int bytes_read = read_secure_message(recv_buf, session_ctx);
 
     if (bytes_read < 0) {
         SST_print_error_exit("Failed to read action request.");
