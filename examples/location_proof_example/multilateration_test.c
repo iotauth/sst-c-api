@@ -1,4 +1,4 @@
-#include "trilateration.h"
+#include "multilateration.h"
 
 #include <math.h>
 #include <stdio.h>

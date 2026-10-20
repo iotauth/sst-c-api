@@ -1,11 +1,13 @@
 #ifndef LOCATION_VERIFIER_H
 #define LOCATION_VERIFIER_H
-#include <stdbool.h>
+
 /**
- *Defines the structures and interfaces for representing verification
- * requirements, UWB anchor configurations, and authorized location zones.
+ * Checks a claimed position against the required zone of a
+ * VerificationPolicy.
  */
-#include "protocol.h"
+
+#include <stdbool.h>
+
 #include "verification_policy.h"
 
 bool verify_position_against_policy(double x, double y,

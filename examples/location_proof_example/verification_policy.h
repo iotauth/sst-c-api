@@ -37,6 +37,6 @@ char* load_verification_policy(const char* path);
 
 int parse_verification_policy(const char* json, VerificationPolicy* policy);
 
-void free_verification_policy(char* policy);
+void free_verification_policy_json(char* policy);
 
 #endif

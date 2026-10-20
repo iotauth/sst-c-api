@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 
 #include "../../src/c_api.h"
 #include "protocol.h"
@@ -11,7 +10,6 @@ int main(int argc, char* argv[]) {
     }
 
     const char* config_path = argv[1];
-
     double x = 1.50;
     double y = 0.50;
 
@@ -20,9 +18,6 @@ int main(int argc, char* argv[]) {
         y = strtod(argv[3], NULL);
     }
 
-    /*
-     * Initialize SST using prover.config.
-     */
     SST_ctx_t* ctx = init_SST(config_path);
 
     if (ctx == NULL) {
@@ -31,9 +26,6 @@ int main(int argc, char* argv[]) {
 
     printf("[PROVER] SST initialized\n");
 
-    /*
-     * Request a session key from Auth.
-     */
     session_key_list_t* s_key_list = get_session_key(ctx, NULL);
 
     if (s_key_list == NULL) {
@@ -44,7 +36,7 @@ int main(int argc, char* argv[]) {
 
     /*
      * Establish secure SST connection
-     * with the Robot Arm / Resource.
+     * with the Resource.
      */
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
@@ -66,11 +58,6 @@ int main(int argc, char* argv[]) {
 
     printf("[PROVER] Sending MOVE request\n");
 
-    /*
-     * Send ActionRequest through SST.
-     *
-     * SST encrypts/authenticates the bytes.
-     */
     int result =
         send_secure_message((char*)&request, sizeof(request), session_ctx);
 
@@ -81,18 +68,18 @@ int main(int argc, char* argv[]) {
     /*
      * Wait for the location request.
      */
-    LocationRequest location_request;
+    uint8_t message_type;
 
-    if (read_exact_message(session_ctx, &location_request,
-                           sizeof(location_request), "LocationRequest") != 0) {
+    if (read_exact_message(session_ctx, &message_type, sizeof(message_type),
+                           "LocationRequest") != 0) {
         SST_print_error_exit("Failed to receive LocationRequest.");
     }
 
-    if (location_request.msg_type != MSG_LOCATION_REQUEST) {
+    if (message_type != MSG_LOCATION_REQUEST) {
         SST_print_error_exit("Unexpected message type.");
     }
 
-    printf("[PROVER] Robot Arm requested location\n");
+    printf("[PROVER] Resource requested location\n");
 
     /*
      * Use the supplied prototype location.
@@ -105,8 +92,6 @@ int main(int argc, char* argv[]) {
     printf("[PROVER] Current position: (%.2f, %.2f)\n", location_response.x,
            location_response.y);
 
-    /* send Location to ARM*/
-
     result = send_secure_message((char*)&location_response,
                                  sizeof(location_response), session_ctx);
 
@@ -115,12 +100,6 @@ int main(int argc, char* argv[]) {
     }
 
     printf("[PROVER] Location response sent\n");
-
-    /*
-     * --------------------------------
-     * Wait for final action decision
-     * --------------------------------
-     */
 
     ActionResponse response;
 
@@ -145,5 +124,5 @@ int main(int argc, char* argv[]) {
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
 
-    return 0;
+    return EXIT_SUCCESS;
 }

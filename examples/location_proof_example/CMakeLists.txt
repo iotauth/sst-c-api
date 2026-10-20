@@ -27,9 +27,9 @@ add_executable(
 
 # Multilateration test
 add_executable(
-    trilateration_test
-    trilateration_test.c
-    trilateration.c
+    multilateration_test
+    multilateration_test.c
+    multilateration.c
 )
 
 # Link against SST
@@ -45,6 +45,6 @@ target_link_libraries(
 )
 
 target_link_libraries(
-    trilateration_test
+    multilateration_test
     m
 )

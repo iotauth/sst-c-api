@@ -79,6 +79,12 @@ int parse_verification_policy(const char* json, VerificationPolicy* policy) {
         goto cleanup;
     }
 
+    if (strcmp(type->valuestring, "location") != 0 ||
+        strcmp(method->valuestring, "uwb") != 0 ||
+        strcmp(ranging_method->valuestring, "ds_twr") != 0) {
+        goto cleanup;
+    }
+
     snprintf(policy->type, sizeof(policy->type), "%s", type->valuestring);
 
     snprintf(policy->method, sizeof(policy->method), "%s", method->valuestring);
@@ -174,6 +180,16 @@ int parse_verification_policy(const char* json, VerificationPolicy* policy) {
         goto cleanup;
     }
 
+    double zone_width =
+        policy->required_zone.x_max - policy->required_zone.x_min;
+    double zone_height =
+        policy->required_zone.y_max - policy->required_zone.y_min;
+
+    if (2.0 * policy->max_error_m > zone_width ||
+        2.0 * policy->max_error_m > zone_height) {
+        goto cleanup;
+    }
+
     ret = 0;
 
 cleanup:
@@ -181,4 +197,4 @@ cleanup:
     return ret;
 }
 
-void free_verification_policy(char* policy) { free(policy); }
+void free_verification_policy_json(char* policy_json) { free(policy_json); }

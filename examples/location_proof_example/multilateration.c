@@ -1,7 +1,8 @@
-#include "trilateration.h"
+#include "multilateration.h"
 
 #include <math.h>
 #include <stddef.h>
+
 #define MIN_DETERMINANT 1e-6
 
 bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
@@ -75,7 +76,8 @@ bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
     double denominator = (sum_AA * sum_BB) - (sum_AB * sum_AB);
 
     /*
-     * Compares denominator to the threshhold for degenerate anchor geometry
+     * Absolute threshold for detecting degenerate anchor geometry.
+     * Its scale depends on the coordinate units and anchor spacing.
      */
     if (fabs(denominator) < MIN_DETERMINANT) {
         return false;
@@ -84,6 +86,6 @@ bool multilaterate(const AnchorMeasurement* anchors, int anchor_count,
     position->x = ((sum_AC * sum_BB) - (sum_AB * sum_BC)) / denominator;
 
     position->y = ((sum_AA * sum_BC) - (sum_AB * sum_AC)) / denominator;
-    // returns only if valid coordinate
+    /* Return true only if the estimated coordinates are finite. */
     return isfinite(position->x) && isfinite(position->y);
 }

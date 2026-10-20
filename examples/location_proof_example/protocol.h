@@ -1,10 +1,12 @@
 /**
  * @file protocol.h
- * @brief Defines messages used by the location verification protocol.
+ * @brief Defines the messages and helpers used by the location verification
+ * protocol.
  */
 
 #ifndef PROTOCOL_H
 #define PROTOCOL_H
+
 #include <stddef.h>
 #include <stdint.h>
 
@@ -23,10 +25,6 @@ typedef struct {
     uint8_t msg_type;
     uint8_t action;
 } ActionRequest;
-
-typedef struct {
-    uint8_t msg_type;
-} LocationRequest;
 
 typedef struct {
     uint8_t msg_type;

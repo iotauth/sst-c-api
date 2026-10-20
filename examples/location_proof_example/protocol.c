@@ -1,5 +1,6 @@
 /**
- *  Shared helpers for the location verification protocol.
+ * @file protocol.c
+ * @brief Provides shared helpers for the location verification protocol.
  */
 
 #include "protocol.h"
