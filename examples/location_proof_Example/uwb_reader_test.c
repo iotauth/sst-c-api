@@ -1,11 +1,12 @@
 /**
  * @file uwb_reader_test.c
- * @brief Standalone test for live UWB serial ranging.
+ * @brief Standalone test for live UWB ranging and multilateration.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 
+#include "trilateration.h"
 #include "uwb_reader.h"
 
 int main(void)
@@ -30,6 +31,27 @@ int main(void)
             return EXIT_FAILURE;
         }
 
+        /*
+         * Physical anchor coordinates in meters:
+         *
+         * A3 (0.000, 0.200) -------- A4 (0.588, 0.200)
+         *        |                          |
+         *        |                          |
+         * A1 (0.000, 0.000) -------- A2 (0.588, 0.000)
+         */
+
+        measurements[0].x = 0.000;
+        measurements[0].y = 0.000;
+
+        measurements[1].x = 0.588;
+        measurements[1].y = 0.000;
+
+        measurements[2].x = 0.000;
+        measurements[2].y = 0.200;
+
+        measurements[3].x = 0.588;
+        measurements[3].y = 0.200;
+
         printf("UWB measurements:\n");
 
         for (int i = 0; i < UWB_ANCHOR_COUNT; i++) {
@@ -40,7 +62,22 @@ int main(void)
             );
         }
 
-        printf("\n");
+        Position position;
+
+        if (!multilaterate(
+                measurements,
+                UWB_ANCHOR_COUNT,
+                &position
+            )) {
+            fprintf(stderr, "Multilateration failed.\n\n");
+            continue;
+        }
+
+        printf(
+            "Estimated position: (%.3f, %.3f) m\n\n",
+            position.x,
+            position.y
+        );
     }
 
     uwb_close(fd);

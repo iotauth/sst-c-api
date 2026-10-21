@@ -30,7 +30,12 @@ add_executable(
     trilateration_test.c
     trilateration.c
 )
-
+add_executable(
+    uwb_reader_test
+    uwb_reader_test.c
+    uwb_reader.c
+    trilateration.c
+)
 # Link against SST
 target_link_libraries(
     prover
@@ -47,3 +52,10 @@ target_link_libraries(
     trilateration_test
     m
 )
+
+target_link_libraries(
+    uwb_reader_test
+    m
+)
+
+
