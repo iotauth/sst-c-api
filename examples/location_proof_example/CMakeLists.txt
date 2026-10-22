@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.19)
+project(SST-Location-Proof VERSION 1.0.0 LANGUAGES C)
+
+# Include the main SST library
+add_subdirectory(../../ ${CMAKE_BINARY_DIR}/sst-lib-build)
+
+find_package(Threads REQUIRED)
+
+# cJSON
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
+
+# Prover executable
+add_executable(
+    prover
+    prover.c
+    protocol.c
+)
+
+add_executable(
+    robot_arm
+    robot_arm.c
+    protocol.c
+    location_verifier.c
+    verification_policy.c
+)
+
+# Multilateration test
+add_executable(
+    multilateration_test
+    multilateration_test.c
+    multilateration.c
+)
+add_executable(
+    uwb_reader_test
+    uwb_reader_test.c
+    uwb_reader.c
+    multilateration.c
+)
+# Link against SST
+target_link_libraries(
+    prover
+    sst-c-api
+)
+
+target_link_libraries(
+    robot_arm
+    sst-c-api
+    PkgConfig::CJSON
+)
+
+target_link_libraries(
+    multilateration_test
+    m
+)
+
+target_link_libraries(
+    uwb_reader_test
+    m
+)
+
+

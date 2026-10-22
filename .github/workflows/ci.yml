@@ -124,6 +124,15 @@ jobs:
         ./threaded_get_target_id_client ../c_client.config
         ./threaded_get_target_id_server ../c_server.config
 
+    - name: Install cJSON
+      run: sudo apt-get install -y libcjson-dev pkg-config
+
+    - name: Run the location_proof_example examples.
+      working-directory: entity/c/examples/location_proof_example
+      run: |
+        mkdir build && cd build && cmake ../ && make
+        ./multilateration_test
+
     - name: Run the tests examples.
       working-directory: entity/c/tests
       run: |
