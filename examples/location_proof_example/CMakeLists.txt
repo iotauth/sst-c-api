@@ -35,7 +35,7 @@ add_executable(
     uwb_reader_test
     uwb_reader_test.c
     uwb_reader.c
-    trilateration.c
+    multilateration.c
 )
 # Link against SST
 target_link_libraries(

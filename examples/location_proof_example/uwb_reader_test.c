@@ -3,14 +3,14 @@
  * @brief Standalone test for live UWB ranging and multilateration.
  */
 
+#include "uwb_reader.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "multilateration.h"
-#include "uwb_reader.h"
 
-int main(void)
-{
+int main(void) {
     printf("Opening UWB device: %s\n", UWB_SERIAL_DEVICE);
 
     int fd = uwb_open();
@@ -55,29 +55,19 @@ int main(void)
         printf("UWB measurements:\n");
 
         for (int i = 0; i < UWB_ANCHOR_COUNT; i++) {
-            printf(
-                "  Anchor %d: %.2f m\n",
-                measurements[i].id,
-                measurements[i].distance
-            );
+            printf("  Anchor %d: %.2f m\n", measurements[i].id,
+                   measurements[i].distance);
         }
 
         Position position;
 
-        if (!multilaterate(
-                measurements,
-                UWB_ANCHOR_COUNT,
-                &position
-            )) {
+        if (!multilaterate(measurements, UWB_ANCHOR_COUNT, &position)) {
             fprintf(stderr, "Multilateration failed.\n\n");
             continue;
         }
 
-        printf(
-            "Estimated position: (%.3f, %.3f) m\n\n",
-            position.x,
-            position.y
-        );
+        printf("Estimated position: (%.3f, %.3f) m\n\n", position.x,
+               position.y);
     }
 
     uwb_close(fd);

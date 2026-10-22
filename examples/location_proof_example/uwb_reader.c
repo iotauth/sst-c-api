@@ -14,8 +14,7 @@
 
 #define SERIAL_BUFFER_SIZE 512
 
-int uwb_open(void)
-{
+int uwb_open(void) {
     int fd = open(UWB_SERIAL_DEVICE, O_RDWR | O_NOCTTY);
 
     if (fd < 0) {
@@ -60,11 +59,8 @@ int uwb_open(void)
     return fd;
 }
 
-static bool parse_measurement(
-    const char *line,
-    AnchorMeasurement *measurement
-)
-{
+static bool parse_measurement(const char *line,
+                              AnchorMeasurement *measurement) {
     unsigned int anchor_id;
     int distance_cm;
 
@@ -98,11 +94,8 @@ static bool parse_measurement(
     return true;
 }
 
-bool uwb_read_measurements(
-    int fd,
-    AnchorMeasurement measurements[UWB_ANCHOR_COUNT]
-)
-{
+bool uwb_read_measurements(int fd,
+                           AnchorMeasurement measurements[UWB_ANCHOR_COUNT]) {
     char line[SERIAL_BUFFER_SIZE];
     size_t line_length = 0;
 
@@ -152,8 +145,7 @@ bool uwb_read_measurements(
     return true;
 }
 
-void uwb_close(int fd)
-{
+void uwb_close(int fd) {
     if (fd >= 0) {
         close(fd);
     }
