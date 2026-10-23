@@ -7,6 +7,7 @@
 #include "../../physical_com/freshness.h"
 #include "../../physical_com/session_ctl.h"
 #include "../../src/c_common.h"
+#include "benchmark.h"
 #include "hk_check.h"
 #ifdef HAVE_LIFI_TRANSPORT
 #include "../../lifi_com/lifi_sst_handshake.h"
@@ -23,6 +24,11 @@ typedef struct {
      * gate, so the evidence ages by it. Never changes a bound or skips a
      * check. */
     unsigned action_test_delay_ms;
+    /* --benchmark: one measured run of the protected operation only (no
+     * GRIP_ITEM, no messaging after the gate), recorded as JSON. */
+    int benchmark;
+    const char* benchmark_run_id;
+    const char* benchmark_output;
     /* Everything the CO_LOCATION check needs; the caller fills in
      * local_name and expected_peer once it knows them. */
     co_location_options co;
@@ -37,6 +43,7 @@ static void physical_options_usage(const char* program, int robot) {
         "| --require-ble-rssi | --require-wifi-rssi | --require-uwb] "
         "[--uwb-dev <serial_port>] [--wifi-iface <iface>] "
         "[--ultrasound-echo-test-delay-ms N] [--action-test-delay-ms N] "
+        "[--benchmark --benchmark-run-id ID --benchmark-output FILE] "
         "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
         program, robot ? "[--bt-peer <bdaddr>] [--wifi-peer <ip>] " : "");
 }
@@ -75,6 +82,10 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     o->co.mic_device = "plughw:1,0";
     o->co.spk_device = "plughw:2,0";
     o->co.wifi_iface = "wlan1";
+    o->co.wifi_timing_mode = WIFI_TIMING_MODE_DISABLED;
+    o->co.wifi_timing_rounds = 20;
+    o->co.wifi_timing_deadline_us = 0;
+    o->co.wifi_timing_recv_timeout_us = 500000;
     o->wifi_peer = "192.168.77.1";
     if (argc < 2) physical_options_usage(argv[0], robot);
     o->config_path = argv[1];
@@ -93,6 +104,9 @@ static void physical_options_parse(int argc, char* argv[], int robot,
         if (!strcmp(a, "--lifi-led-active-low")) {
             o->lifi_led_active_low = 1;
         }
+        /* Relay experiment: IR/LiFi HK control over the TCP session. */
+        if (!strcmp(a, "--hk-control-tcp")) o->co.hk_control_over_tcp = 1;
+        if (!strcmp(a, "--benchmark")) o->benchmark = 1;
         if (!v) continue;
         if (!strcmp(a, "--comm_type"))
             o->comm_type = v;
@@ -108,12 +122,27 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->wifi_peer = v;
         else if (!strcmp(a, "--wifi-iface"))
             o->co.wifi_iface = v;
+        else if (!strcmp(a, "--wifi-timing-mode"))
+            o->co.wifi_timing_mode =
+                !strcmp(v, "enforce")   ? WIFI_TIMING_MODE_ENFORCE
+                : !strcmp(v, "measure") ? WIFI_TIMING_MODE_MEASURE
+                                        : WIFI_TIMING_MODE_DISABLED;
+        else if (!strcmp(a, "--wifi-timing-rounds"))
+            o->co.wifi_timing_rounds = (unsigned)atoi(v);
+        else if (!strcmp(a, "--wifi-timing-deadline-us"))
+            o->co.wifi_timing_deadline_us = (uint64_t)strtoull(v, NULL, 10);
+        else if (!strcmp(a, "--wifi-timing-recv-timeout-us"))
+            o->co.wifi_timing_recv_timeout_us = (uint64_t)strtoull(v, NULL, 10);
         else if (!strcmp(a, "--ultrasound-echo-test-delay-ms"))
             o->co.echo_test_delay_ms = (unsigned)atoi(v);
         else if (!strcmp(a, "--action-test-delay-ms")) {
             if (parse_delay_ms(v, &o->action_test_delay_ms))
                 physical_options_usage(argv[0], robot);
-        } else if (!strcmp(a, "--lifi-tx-gpio"))
+        } else if (!strcmp(a, "--benchmark-run-id"))
+            o->benchmark_run_id = v;
+        else if (!strcmp(a, "--benchmark-output"))
+            o->benchmark_output = v;
+        else if (!strcmp(a, "--lifi-tx-gpio"))
             o->lifi_tx_gpio = atoi(v);
         else if (!strcmp(a, "--lifi-rx-gpio"))
             o->lifi_rx_gpio = atoi(v);
@@ -121,9 +150,38 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             takes_value = 0;
         if (takes_value) i++;
     }
+    /* A benchmark run needs its ID and output, an ID safe in file names
+     * and JSON, and no experimental delays: they would be measured. */
+    if (o->benchmark &&
+        (!o->benchmark_run_id || !o->benchmark_output ||
+         !*o->benchmark_run_id ||
+         strspn(o->benchmark_run_id,
+                "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                "0123456789._-") != strlen(o->benchmark_run_id) ||
+         o->action_test_delay_ms || o->co.echo_test_delay_ms))
+        physical_options_usage(argv[0], robot);
 #ifdef HAVE_LIFI_TRANSPORT
     lifi_configure(o->lifi_tx_gpio, o->lifi_rx_gpio, o->lifi_led_active_low);
 #endif
+}
+
+/* Starts the benchmark record for this endpoint's protected action, once
+ * SST is initialized and before anything is measured. */
+static void physical_benchmark_init(benchmark_trace* b,
+                                    const physical_options* o,
+                                    const SST_ctx_t* ctx, int robot) {
+    memset(b, 0, sizeof(*b));
+    if (!o->benchmark) return;
+    b->enabled = 1;
+    b->run_id = o->benchmark_run_id;
+    b->output = o->benchmark_output;
+    b->role = robot ? "requester" : "locker";
+    b->action = robot ? "RETRIEVE_ITEM" : "LOCKER_OPEN";
+    b->handshake_transport = o->comm_type;
+    b->dist_key_loaded_at_init = ctx->dist_key.cipher_key_size != 0;
+    b->perm_dist_key_mode = (int)ctx->config.perm_dist_key_mode;
+    SST_print_log("BENCHMARK: run_id=%s role=%s output=%s", b->run_id, b->role,
+                  b->output);
 }
 
 /* TCP, Wi-Fi (TCP over the direct link) and Bluetooth leave a real socket
@@ -144,20 +202,32 @@ static void simulated_action_start(void* action) {
 
 /* The last step before `action` starts: the optional experimental delay,
  * then the action gate over every check the key's plan requires, which
- * starts the (simulated) action immediately on ALLOW. Exits on DENY. */
-static void physical_action_gate(const physical_options* o,
-                                 const session_key_t* key, const char* action,
-                                 const action_evidence* evidence) {
+ * starts the (simulated) action immediately on ALLOW. Exits on DENY, except
+ * in a benchmark run (`bench` enabled), where the gate starts the benchmark
+ * callback instead and the caller records the decision. */
+static gate_decision physical_action_gate(const physical_options* o,
+                                          const session_key_t* key,
+                                          const char* action,
+                                          const action_evidence* evidence,
+                                          benchmark_trace* bench) {
     if (o->action_test_delay_ms) {
         SST_print_log(
             "ACTION_GATE: TEST ONLY: action_test_delay_ms=%u before gating %s.",
             o->action_test_delay_ms, action);
         session_ctl_sleep_ms(o->action_test_delay_ms);
     }
+    if (bench && bench->enabled) {
+        bench->decision = action_gate_run(key, action, evidence, NULL,
+                                          bench_action_callback, bench,
+                                          &bench->gate);
+        bench->gate_ran = 1;
+        return bench->decision;
+    }
     if (action_gate_run(key, action, evidence, NULL, simulated_action_start,
                         (void*)action, NULL) != GATE_ALLOW) {
         SST_print_error_exit("%s denied by the action gate.", action);
     }
+    return GATE_ALLOW;
 }
 
 #endif

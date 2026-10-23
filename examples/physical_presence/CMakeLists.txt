@@ -19,7 +19,8 @@ target_link_libraries(locker sst-c-api)
 # error at run time if its hardware is not attached.
 foreach(target robot locker)
   target_sources(${target} PRIVATE ../../uwb_com/uwb_cli_dev.c
-                                   ../../wifi_com/wifi_rssi.c)
+                                   ../../wifi_com/wifi_rssi.c
+                                   ../../wifi_com/wifi_timing.c)
   target_link_libraries(${target} Threads::Threads)
 endforeach()
 

@@ -1,5 +1,6 @@
 #ifndef PHYSICAL_PRESENCE_HK_CHECK_H
 #define PHYSICAL_PRESENCE_HK_CHECK_H
+#include <stdarg.h>
 #include <string.h>
 
 #include "../../bluetooth_com/ble_adv_rssi.h"
@@ -9,6 +10,7 @@
 #include "../../ultrasonic_com/ultrasonic_echo.h"
 #include "../../uwb_com/uwb_cli_dev.h"
 #include "../../wifi_com/wifi_rssi.h"
+#include "../../wifi_com/wifi_timing.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_adv_radio.h"
 #endif
@@ -36,6 +38,21 @@ typedef struct {
     unsigned echo_test_delay_ms; /* timing tests only: delays our answers */
     const char* uwb_device;      /* UWB board's serial port, NULL: auto */
     const char* wifi_iface;      /* the Wi-Fi dongle's direct link */
+    /* IR/LiFi only: send the HK preparation control messages (INIT/READY)
+     * over the TCP session, keeping just the timed rounds optical. For the
+     * relay experiment. 0 = all of HK over the optical link (default). */
+    int hk_control_over_tcp;
+    /* WIFI_RSSI only: an authenticated response-time challenge--response over
+     * the Wi-Fi session, added after the RSSI sampling (see wifi_timing.h).
+     * mode 0 = disabled (default, unchanged behavior). */
+    int wifi_timing_mode;
+    unsigned wifi_timing_rounds;
+    uint64_t wifi_timing_deadline_us;
+    uint64_t wifi_timing_recv_timeout_us;
+    /* Benchmark only: when set, the selected method writes its own
+     * observations here as one JSON object, after its exchange. */
+    char* observations;
+    size_t observations_size;
 } co_location_options;
 
 /* One CO_LOCATION method's settings, as read from Auth's plan. */
@@ -72,17 +89,35 @@ static void set_evidence(physical_evidence* ev, int rc,
     ev->collection_completed_us = collection_completed_us;
 }
 
+/* Appends to the benchmark's observations JSON, if it is being recorded.
+ * Only ever called after an exchange has finished. */
+static void obs_add(const co_location_options* o, size_t* off,
+                    const char* fmt, ...) {
+    if (!o->observations || *off >= o->observations_size) return;
+    va_list ap;
+    va_start(ap, fmt);
+    int n = vsnprintf(o->observations + *off, o->observations_size - *off, fmt,
+                      ap);
+    va_end(ap);
+    if (n < 0 || (size_t)n >= o->observations_size - *off) {
+        o->observations[0] = 0; /* truncated JSON is worse than none */
+        *off = o->observations_size;
+        return;
+    }
+    *off += (size_t)n;
+}
+
 /* IR and LiFi: the shared timed bit exchange over each medium's GPIOs. */
 static int verify_hk(SST_session_ctx_t* session, int initiator,
-                     const hk_medium* medium, const hk_config* c,
-                     physical_evidence* ev) {
+                     const co_location_options* o, const hk_medium* medium,
+                     const hk_config* c, physical_evidence* ev) {
     unsigned required = hk_required(c);
     SST_print_log(
         "%s HK: role=%s rounds=%u required=%u threshold=%.6f max_delay_us=%u",
         medium->method, initiator ? "initiator" : "responder", c->rounds,
         required, c->threshold_ppm / 1000000.0, c->max_delay_us);
-    int (*run_gpio)(const session_key_t*, const hk_config*, int, hk_result*) =
-        NULL;
+    int (*run_gpio)(const session_key_t*, const hk_config*, int, hk_result*,
+                    SST_session_ctx_t*, int) = NULL;
 #ifdef HAVE_IR_TRANSPORT
     if (medium == &HK_IR) run_gpio = ir_hk_run_gpio;
 #endif
@@ -96,7 +131,8 @@ static int verify_hk(SST_session_ctx_t* session, int initiator,
         return -1;
     }
     hk_result r = {0};
-    int rc = run_gpio(&session->s_key, c, initiator, &r);
+    int rc = run_gpio(&session->s_key, c, initiator, &r, session,
+                      o->hk_control_over_tcp);
     /* Print only after the complete exchange, never inside timed rounds. */
     for (unsigned i = 0; i < r.completed; ++i) {
         SST_print_log("%s HK round=%u correct=%u complete_rtt_us=%u timely=%u",
@@ -107,6 +143,22 @@ static int verify_hk(SST_session_ctx_t* session, int initiator,
                   medium->method, r.successes, c->rounds, required,
                   r.local_pass ? "PASS" : "FAIL", run_result_name(rc));
     set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"%s\", \"role\": \"%s\", \"rounds\": %u, "
+            "\"completed_rounds\": %u, \"correct_and_timely\": %u, "
+            "\"required\": %u, \"max_delay_us\": %u, "
+            "\"success_threshold_ppm\": %u, \"inter_bit_us\": %u, "
+            "\"rtt_us\": [",
+            medium->method, initiator ? "initiator" : "responder", c->rounds,
+            r.completed, r.successes, required, c->max_delay_us,
+            c->threshold_ppm, medium->inter_bit_us);
+    for (unsigned i = 0; i < r.completed; ++i)
+        obs_add(o, &off, "%s%u", i ? ", " : "", r.rtt_us[i]);
+    obs_add(o, &off, "], \"correct\": [");
+    for (unsigned i = 0; i < r.completed; ++i)
+        obs_add(o, &off, "%s%u", i ? ", " : "", r.correct[i]);
+    obs_add(o, &off, "]}");
     return rc;
 }
 
@@ -176,6 +228,19 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
                   r.local_pass ? "PASS" : "FAIL",
                   r.peer_reported_pass ? "PASS" : "FAIL", run_result_name(rc));
     set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"ULTRASOUND\", \"role\": \"%s\", "
+            "\"direction\": %u, \"decoded\": %s, \"response_valid\": %s, "
+            "\"challenge_to_decode_us\": %llu, \"timing_accepted\": %s, "
+            "\"max_response_us\": %u, \"response_timeout_ms\": %u, "
+            "\"failure\": \"%s\", \"peer_reported_pass\": %s}",
+            initiator ? "initiator" : "responder", r.direction,
+            r.decoded ? "true" : "false", r.response_valid ? "true" : "false",
+            (unsigned long long)r.elapsed_us,
+            r.timing_accepted ? "true" : "false", c->max_response_us,
+            c->response_timeout_ms, ultrasonic_echo_failure_name(r.failure),
+            r.peer_reported_pass ? "true" : "false");
     return rc;
 #else
     (void)session;
@@ -212,9 +277,10 @@ static int run_rssi_check(SST_session_ctx_t* session, int initiator,
                           const char* name, const rssi_config* c,
                           rssi_reader read, void* reader_ctx,
                           uint64_t observed_not_before_us,
-                          physical_evidence* ev) {
+                          physical_evidence* ev, rssi_result* out) {
     rssi_result r;
     int rc = rssi_run(session, c, initiator, read, reader_ctx, &r);
+    *out = r;
     uint64_t done_us = 0;
     freshness_now_us(&done_us);
     set_evidence(ev, rc, observed_not_before_us, done_us);
@@ -247,6 +313,7 @@ static void log_rssi_role(const char* name, int initiator,
  * side's challenge, so the challenge time bounds every observation. Uses
  * this host's controller next to the session's own BLE connection. */
 static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
+                           const co_location_options* o,
                            const ble_adv_rssi_config* c,
                            physical_evidence* ev) {
     SST_print_log(
@@ -277,9 +344,22 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
                   peer_report_name(r.peer_reported, r.peer_reported_pass),
                   run_result_name(rc));
     set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"BLE_RSSI\", \"role\": \"%s\", "
+            "\"required_reports\": %u, \"received_reports\": %u, "
+            "\"median_rssi_dbm\": %.1f, \"min_rssi_dbm\": %d, "
+            "\"timeout_ms\": %u, \"nominal_advertising_interval_ms\": 100, "
+            "\"peer_reported\": %s, \"peer_reported_pass\": %s, "
+            "\"peer_median_rssi_dbm\": %d}",
+            initiator ? "initiator" : "responder", c->samples, r.samples,
+            r.median_rssi_dbm, c->min_rssi_dbm, c->timeout_ms,
+            r.peer_reported ? "true" : "false",
+            r.peer_reported_pass ? "true" : "false", r.peer_median_rssi_dbm);
     return rc;
 #else
     (void)session;
+    (void)o;
     (void)ev;
     SST_print_error(
         "Auth requires the BLE RSSI check, but this build has no BlueZ "
@@ -319,9 +399,42 @@ static int verify_wifi_rssi(SST_session_ctx_t* session, int initiator,
         SST_print_error("WIFI RSSI: could not read the peer's link state.");
         return -1;
     }
-    return run_rssi_check(session, initiator, "WIFI RSSI", c,
-                          read_fresh_wifi_rssi, &sampler,
-                          observed_not_before_us, ev);
+    rssi_result r;
+    int rc = run_rssi_check(session, initiator, "WIFI RSSI", c,
+                            read_fresh_wifi_rssi, &sampler,
+                            observed_not_before_us, ev, &r);
+    /* Optional authenticated response-time check over the same Wi-Fi session;
+     * in enforce mode it is ANDed with the RSSI outcome. */
+    if (o->wifi_timing_mode != WIFI_TIMING_MODE_DISABLED) {
+        wifi_timing_config tc = {o->wifi_timing_mode, o->wifi_timing_rounds,
+                                 o->wifi_timing_deadline_us,
+                                 o->wifi_timing_recv_timeout_us};
+        wifi_timing_result tr;
+        int trc = wifi_timing_run(session, initiator,
+                                  initiator ? "initiator" : "responder",
+                                  o->wifi_iface, "", peer.peer_ip, &tc, &tr);
+        if (o->wifi_timing_mode == WIFI_TIMING_MODE_ENFORCE) {
+            int combined =
+                (rc < 0 || trc < 0) ? -1 : (rc == 1 && trc == 1) ? 1 : 0;
+            uint64_t done_us = 0;
+            freshness_now_us(&done_us);
+            set_evidence(ev, combined, observed_not_before_us, done_us);
+            rc = combined;
+        }
+    }
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"WIFI_RSSI\", \"role\": \"%s\", "
+            "\"interface\": \"%s\", \"required_samples\": %u, "
+            "\"samples\": %u, \"median_rssi_dbm\": %.1f, "
+            "\"min_rssi_dbm\": %d, \"interval_ms\": %u, \"probes\": %u, "
+            "\"peer_reported\": %s, \"peer_reported_pass\": %s, "
+            "\"peer_median_rssi_dbm\": %d}",
+            initiator ? "initiator" : "responder", o->wifi_iface, c->samples,
+            r.samples, r.median_rssi_dbm, c->min_rssi_dbm, c->interval_ms,
+            sampler.probes, r.peer_reported ? "true" : "false",
+            r.peer_reported_pass ? "true" : "false", r.peer_median_rssi_dbm);
+    return rc;
 }
 
 /* Ranges with the peer's UWB board over this session's TCP socket. */
@@ -353,6 +466,17 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
                   peer_report_name(r.peer_reported, r.peer_reported_pass),
                   run_result_name(rc));
     set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"UWB\", \"role\": \"%s\", "
+            "\"required_ranges\": %u, \"successful_ranges\": %u, "
+            "\"median_cm\": %d, \"max_distance_cm\": %u, "
+            "\"timeout_ms\": %u, \"peer_reported\": %s, "
+            "\"peer_reported_pass\": %s, \"peer_median_cm\": %d}",
+            initiator ? "initiator" : "responder", c->samples, r.samples,
+            r.median_cm, c->max_distance_cm, c->timeout_ms,
+            r.peer_reported ? "true" : "false",
+            r.peer_reported_pass ? "true" : "false", r.peer_median_cm);
     return rc;
 }
 
@@ -390,14 +514,12 @@ static int select_uwb(const char* plan, co_location_config* c) {
 static int run_ir(SST_session_ctx_t* s, int initiator,
                   const co_location_options* o, const co_location_config* c,
                   physical_evidence* ev) {
-    (void)o;
-    return verify_hk(s, initiator, &HK_IR, &c->hk, ev);
+    return verify_hk(s, initiator, o, &HK_IR, &c->hk, ev);
 }
 static int run_lifi(SST_session_ctx_t* s, int initiator,
                     const co_location_options* o, const co_location_config* c,
                     physical_evidence* ev) {
-    (void)o;
-    return verify_hk(s, initiator, &HK_LIFI, &c->hk, ev);
+    return verify_hk(s, initiator, o, &HK_LIFI, &c->hk, ev);
 }
 static int run_echo(SST_session_ctx_t* s, int initiator,
                     const co_location_options* o, const co_location_config* c,
@@ -408,8 +530,7 @@ static int run_echo(SST_session_ctx_t* s, int initiator,
 static int run_ble(SST_session_ctx_t* s, int initiator,
                    const co_location_options* o, const co_location_config* c,
                    physical_evidence* ev) {
-    (void)o;
-    return verify_ble_rssi(s, initiator, &c->ble, ev);
+    return verify_ble_rssi(s, initiator, o, &c->ble, ev);
 }
 static int run_wifi(SST_session_ctx_t* s, int initiator,
                     const co_location_options* o, const co_location_config* c,

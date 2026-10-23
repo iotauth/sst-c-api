@@ -70,6 +70,44 @@ static bool execute_check(const char* challenge, const char* check_id) {
     return false;
 }
 
+// Resolves the Locker's address on the direct Wi-Fi link for --comm_type wifi.
+// Mirrors c_api.c's TCP resolve_target_server_address: the WIFI handshake
+// transport method in the plan Auth sent (s_key->challenge.handshakeTransport)
+// carries the Locker's Wi-Fi-link host/port, filled from the Wi-Fi challenge
+// catalog. Falls back to --wifi-peer and the config port when the plan carries
+// no WIFI address (e.g. an older catalog with empty WIFI parameters).
+static void resolve_wifi_peer_address(const session_key_t* s_key,
+                                      const SST_ctx_t* ctx,
+                                      const char* fallback_host,
+                                      char* out_host, size_t out_host_size,
+                                      int* out_port) {
+    char check_obj[512];
+    char method[64] = {0};
+    char port_str[16] = {0};
+    if (extract_json_object_value(s_key->challenge, "handshakeTransport",
+                                  check_obj, sizeof(check_obj)) == 0 &&
+        parse_json_string_value(check_obj, "method", method, sizeof(method)) ==
+            0 &&
+        strcmp(method, "WIFI") == 0 &&
+        parse_json_string_value(check_obj, "host", out_host, out_host_size) ==
+            0 &&
+        parse_json_string_value(check_obj, "port", port_str,
+                                sizeof(port_str)) == 0) {
+        *out_port = atoi(port_str);
+        SST_print_log(
+            "WIFI PEER: resolved from Auth plan (handshakeTransport WIFI) "
+            "host=%s port=%d",
+            out_host, *out_port);
+        return;
+    }
+    snprintf(out_host, out_host_size, "%s", fallback_host);
+    *out_port = ctx->config.entity_server_port_num;
+    SST_print_log(
+        "WIFI PEER: plan carries no WIFI address; using --wifi-peer fallback "
+        "host=%s port=%d",
+        out_host, *out_port);
+}
+
 // Reads the target locker's entity ID via the robot's camera (e.g., a QR
 // code on the locker). Camera-based scanning is not implemented here; this
 // simply stands in for it and returns as if "net1.locker1" had been scanned.
@@ -86,30 +124,39 @@ int main(int argc, char* argv[]) {
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
+    // --benchmark measures RETRIEVE_ITEM alone, from a fresh SST context.
+    benchmark_trace bench;
+    physical_benchmark_init(&bench, &opts, ctx, 1);
+    bench_arm(&bench);
 
     // Case 1: solo action, no target entity. Request authorization for
     // gripping an item on the floor (purpose index 0: "action":"GRIP_ITEM").
-    // Runs first since it needs no peer entity to be reachable.
-    session_key_list_t* grip_s_key_list =
-        get_session_key_with_index(ctx, 0, NULL);
-    if (grip_s_key_list == NULL) {
-        SST_print_error_exit(
-            "Failed get_session_key_with_index() for GRIP_ITEM.");
-    }
-    SST_print_log("Received authorization for GRIP_ITEM successfully!");
-    action_evidence grip_evidence;
-    if (action_evidence_init(&grip_evidence, "GRIP_ITEM",
-                             &grip_s_key_list->s_key[0])) {
-        SST_print_error_exit("Failed to start GRIP_ITEM evidence.");
-    }
+    // Runs first since it needs no peer entity to be reachable. A benchmark
+    // run skips it, so it cannot change the key state RETRIEVE_ITEM starts
+    // from.
+    if (!opts.benchmark) {
+        session_key_list_t* grip_s_key_list =
+            get_session_key_with_index(ctx, 0, NULL);
+        if (grip_s_key_list == NULL) {
+            SST_print_error_exit(
+                "Failed get_session_key_with_index() for GRIP_ITEM.");
+        }
+        SST_print_log("Received authorization for GRIP_ITEM successfully!");
+        action_evidence grip_evidence;
+        if (action_evidence_init(&grip_evidence, "GRIP_ITEM",
+                                 &grip_s_key_list->s_key[0])) {
+            SST_print_error_exit("Failed to start GRIP_ITEM evidence.");
+        }
 
-    if (!execute_check(grip_s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
-        SST_print_error_exit(
-            "Physical presence verification failed for GRIP_ITEM.");
+        if (!execute_check(grip_s_key_list->s_key[0].challenge,
+                           "HUMAN_PRESENCE")) {
+            SST_print_error_exit(
+                "Physical presence verification failed for GRIP_ITEM.");
+        }
+        physical_action_gate(&opts, &grip_s_key_list->s_key[0], "GRIP_ITEM",
+                             &grip_evidence, NULL);
+        free_session_key_list_t(grip_s_key_list);
     }
-    physical_action_gate(&opts, &grip_s_key_list->s_key[0], "GRIP_ITEM",
-                         &grip_evidence);
-    free_session_key_list_t(grip_s_key_list);
 
     // Case 2: interactive action, targeting a specific locker identified at
     // runtime (not known ahead of time, so it can't live in a static config
@@ -121,8 +168,12 @@ int main(int argc, char* argv[]) {
     snprintf(retrieve_purpose, sizeof(retrieve_purpose),
              "{\"action\":\"RETRIEVE_ITEM\",\"target\":\"%s\"}", target_locker);
 
+    // Everything above is setup; the measured operation starts here.
+    bench_stage(&bench, "authorization");
+    bench_mark(&bench, &bench.authorization_start_us);
     session_key_list_t* s_key_list =
         get_session_key_with_purpose(ctx, retrieve_purpose, NULL);
+    bench_mark(&bench, &bench.authorization_end_us);
     if (s_key_list == NULL) {
         SST_print_error_exit(
             "Failed get_session_key_with_purpose() for RETRIEVE_ITEM.");
@@ -134,6 +185,9 @@ int main(int argc, char* argv[]) {
                              &s_key_list->s_key[0])) {
         SST_print_error_exit("Failed to start RETRIEVE_ITEM evidence.");
     }
+    bench.key = &s_key_list->s_key[0];
+    bench.evidence = &retrieve_evidence;
+    bench_stage(&bench, "local_checks");
 
     // Local checks can run before the handshake; mutual IR verification must
     // wait until both entities have authenticated with the same session key.
@@ -145,6 +199,8 @@ int main(int argc, char* argv[]) {
     // transport for this robot<->Locker handshake only; the session key
     // itself was still obtained from Auth over TCP either way.
     SST_session_ctx_t* session_ctx = NULL;
+    bench_stage(&bench, "peer_handshake");
+    bench_mark(&bench, &bench.peer_handshake_start_us);
     if (strcmp(comm_type, "tcp") == 0) {
         session_ctx = secure_connect_to_server(&s_key_list->s_key[0], ctx);
         if (session_ctx == NULL) {
@@ -152,12 +208,17 @@ int main(int argc, char* argv[]) {
         }
     } else if (strcmp(comm_type, "wifi") == 0) {
         /* The same TCP handshake, routed over the direct Wi-Fi link to the
-         * Locker's address on it, so the session runs on that link. */
+         * Locker's address on it, so the session runs on that link. Auth puts
+         * that address in the WIFI handshake transport plan; --wifi-peer is the
+         * fallback. */
+        char wifi_host[INET_ADDRSTRLEN] = {0};
+        int wifi_port = 0;
+        resolve_wifi_peer_address(&s_key_list->s_key[0], ctx, opts.wifi_peer,
+                                  wifi_host, sizeof(wifi_host), &wifi_port);
         int sock;
-        if (connect_as_client(opts.wifi_peer,
-                              ctx->config.entity_server_port_num, &sock) < 0) {
-            SST_print_error_exit("Failed to connect to %s over Wi-Fi.",
-                                 opts.wifi_peer);
+        if (connect_as_client(wifi_host, wifi_port, &sock) < 0) {
+            SST_print_error_exit("Failed to connect to %s:%d over Wi-Fi.",
+                                 wifi_host, wifi_port);
         }
         session_ctx =
             secure_connect_to_server_with_socket(&s_key_list->s_key[0], sock);
@@ -231,14 +292,36 @@ int main(int argc, char* argv[]) {
             comm_type);
     }
 
+    bench_mark(&bench, &bench.peer_handshake_end_us);
+
     opts.co.local_name = ctx->config.name;
     opts.co.expected_peer = target_locker;
-    if (!verify_co_location(session_ctx, 1, &opts.co, &retrieve_evidence)) {
+    if (bench.enabled) {
+        opts.co.observations = bench.observations;
+        opts.co.observations_size = sizeof(bench.observations);
+    }
+    bench_stage(&bench, "cooperative_verification");
+    bench_mark(&bench, &bench.cooperative_start_us);
+    int co_passed =
+        verify_co_location(session_ctx, 1, &opts.co, &retrieve_evidence);
+    bench_mark(&bench, &bench.cooperative_end_us);
+    if (!co_passed) {
         SST_print_log("Robot: CO_LOCATION did not pass here.");
     }
     // The gate alone decides, over every check the plan requires.
-    physical_action_gate(&opts, &session_ctx->s_key, "RETRIEVE_ITEM",
-                         &retrieve_evidence);
+    bench_stage(&bench, "action_gate");
+    gate_decision decision =
+        physical_action_gate(&opts, &session_ctx->s_key, "RETRIEVE_ITEM",
+                             &retrieve_evidence, &bench);
+    if (bench.enabled) {
+        // The measured run ends at the gate; no example messaging after it.
+        bench.stage = NULL;
+        int written = bench_write(&bench);
+        free_session_ctx(session_ctx);
+        free_session_key_list_t(s_key_list);
+        free_SST_ctx_t(ctx);
+        return written ? 4 : decision == GATE_ALLOW ? 0 : 3;
+    }
 
     if (physical_options_has_socket(&opts)) {
         sleep(1);
