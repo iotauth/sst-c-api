@@ -49,6 +49,11 @@ typedef struct {
     unsigned wifi_timing_rounds;
     uint64_t wifi_timing_deadline_us;
     uint64_t wifi_timing_recv_timeout_us;
+    /* WIFI_RSSI only, set at run time (not from the plan): the measurement
+     * Wi-Fi link's socket, separate from the handshake transport. The caller
+     * brings the link up and establishes it (locker accepts, robot connects)
+     * before the check. < 0 means no measurement link was set up. */
+    int wifi_measure_sock;
     /* Benchmark only: when set, the selected method writes its own
      * observations here as one JSON object, after its exchange. */
     char* observations;
@@ -378,41 +383,63 @@ static int verify_wifi_rssi(SST_session_ctx_t* session, int initiator,
                             const co_location_options* o, const rssi_config* c,
                             physical_evidence* ev) {
     log_rssi_role("WIFI RSSI", initiator, c);
-    char iface[32];
-    if (session->sock < 0 ||
-        wifi_rssi_socket_iface(session->sock, iface, sizeof(iface)) ||
-        strcmp(iface, o->wifi_iface)) {
+    /* Proximity is measured on the dedicated Wi-Fi measurement link, which is
+     * independent of the handshake transport (the handshake may have run over
+     * TCP on another interface). The caller brought the link up and
+     * established this socket (locker accepted, robot connected). */
+    if (o->wifi_measure_sock < 0) {
         SST_print_error(
-            "WIFI RSSI needs the SST session on the %s link; use --comm_type "
-            "wifi.",
+            "WIFI RSSI needs the measurement Wi-Fi link; none was set up.");
+        return -1;
+    }
+    char miface[32];
+    wifi_peer peer = {o->wifi_iface, {0}};
+    if (wifi_rssi_socket_iface(o->wifi_measure_sock, miface, sizeof(miface)) ||
+        strcmp(miface, o->wifi_iface) ||
+        wifi_rssi_socket_peer(o->wifi_measure_sock, peer.peer_ip,
+                              sizeof(peer.peer_ip))) {
+        SST_print_error(
+            "WIFI RSSI: the measurement socket is not on the %s link.",
             o->wifi_iface);
         return -1;
     }
-    wifi_peer peer = {o->wifi_iface, {0}};
+    /* Make the two channels distinguishable in the logs. */
+    char hiface[32] = "n/a", hpeer[16] = "n/a", mlocal[16] = "n/a";
+    if (session->sock >= 0) {
+        wifi_rssi_socket_iface(session->sock, hiface, sizeof(hiface));
+        wifi_rssi_socket_peer(session->sock, hpeer, sizeof(hpeer));
+    }
+    wifi_iface_ipv4(o->wifi_iface, mlocal, sizeof(mlocal));
+    SST_print_log(
+        "WIFI RSSI: channels: handshake_interface=%s handshake_peer=%s "
+        "measurement_interface=%s measurement_local=%s measurement_peer=%s",
+        hiface, hpeer, miface, mlocal, peer.peer_ip);
     wifi_fresh_sampler sampler = {&peer, read_wifi_station, probe_wifi_peer,
                                   0};
     uint64_t observed_not_before_us;
-    if (wifi_rssi_socket_peer(session->sock, peer.peer_ip,
-                              sizeof(peer.peer_ip)) ||
-        freshness_now_us(&observed_not_before_us) ||
+    if (freshness_now_us(&observed_not_before_us) ||
         wifi_fresh_begin(&sampler)) {
         SST_print_error("WIFI RSSI: could not read the peer's link state.");
         return -1;
     }
     rssi_result r;
+    /* RSSI medians are exchanged over the existing SST session (its control
+     * channel); the sampling and the timing responses below are on the
+     * measurement link. */
     int rc = run_rssi_check(session, initiator, "WIFI RSSI", c,
                             read_fresh_wifi_rssi, &sampler,
                             observed_not_before_us, ev, &r);
-    /* Optional authenticated response-time check over the same Wi-Fi session;
-     * in enforce mode it is ANDed with the RSSI outcome. */
+    /* Optional authenticated response-time check over the measurement Wi-Fi
+     * link; in enforce mode it is ANDed with the RSSI outcome. */
     if (o->wifi_timing_mode != WIFI_TIMING_MODE_DISABLED) {
         wifi_timing_config tc = {o->wifi_timing_mode, o->wifi_timing_rounds,
                                  o->wifi_timing_deadline_us,
                                  o->wifi_timing_recv_timeout_us};
         wifi_timing_result tr;
-        int trc = wifi_timing_run(session, initiator,
+        int trc = wifi_timing_run(o->wifi_measure_sock, &session->s_key,
+                                  initiator,
                                   initiator ? "initiator" : "responder",
-                                  o->wifi_iface, "", peer.peer_ip, &tc, &tr);
+                                  o->wifi_iface, mlocal, peer.peer_ip, &tc, &tr);
         if (o->wifi_timing_mode == WIFI_TIMING_MODE_ENFORCE) {
             int combined =
                 (rc < 0 || trc < 0) ? -1 : (rc == 1 && trc == 1) ? 1 : 0;
