@@ -71,6 +71,15 @@ int main(int argc, char* argv[]) {
     physical_options_parse(argc, argv, 0, &opts);
     const char* comm_type = opts.comm_type;
 
+    // See robot.c: the measurement Wi-Fi link is Auth-provisioned and comes up
+    // after the handshake, so it cannot also carry the handshake.
+    if (physical_requires_wifi_rssi(&opts) && !strcmp(comm_type, "wifi")) {
+        SST_print_error_exit(
+            "--require-wifi-rssi uses a separate Auth-provisioned measurement "
+            "link established after the handshake; use --comm_type tcp (not "
+            "wifi).");
+    }
+
     // Initialize SST context for Locker. This is used to talk to Auth over
     // TCP regardless of --comm_type: only the handshake/communication with
     // the robot itself is affected by that choice.
@@ -187,11 +196,21 @@ int main(int argc, char* argv[]) {
         opts.co.observations = bench.observations;
         opts.co.observations_size = sizeof(bench.observations);
     }
+
+    // After the handshake, start the Auth-provisioned measurement Wi-Fi AP,
+    // signal the robot over the session, and accept its measurement socket
+    // (separate from the handshake).
+    if (physical_requires_wifi_rssi(&opts) &&
+        physical_wifi_measure_setup_locker(&opts, session_ctx)) {
+        SST_print_error_exit("Failed to set up the measurement Wi-Fi link.");
+    }
+
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
     int co_passed =
         verify_co_location(session_ctx, 0, &opts.co, &open_evidence);
     bench_mark(&bench, &bench.cooperative_end_us);
+    physical_wifi_measure_cleanup(&opts);
     if (!co_passed) {
         SST_print_log("Locker: CO_LOCATION did not pass here.");
     }

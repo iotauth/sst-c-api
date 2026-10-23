@@ -7,6 +7,7 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -148,4 +149,111 @@ int wifi_rssi_socket_peer(int sock, char* ip, size_t capacity) {
         !inet_ntop(AF_INET, &peer.sin_addr, ip, (socklen_t)capacity))
         return -1;
     return 0;
+}
+
+/* ---- Measurement Wi-Fi link: a socket on the dongle link (wifi_link.sh),
+ * kept separate from the SST handshake transport. The locker is the AP and
+ * listens; the robot is the station and connects. getpeername() on the
+ * resulting socket gives each side the other's address on the measured link,
+ * replacing any dependency on the handshake socket's peer. ---- */
+
+int wifi_iface_ipv4(const char* iface, char* out, size_t n) {
+    if (!valid_iface(iface)) return -1;
+    struct ifaddrs* list;
+    if (getifaddrs(&list)) return -1;
+    int rc = -1;
+    for (struct ifaddrs* a = list; a; a = a->ifa_next) {
+        if (!a->ifa_addr || a->ifa_addr->sa_family != AF_INET) continue;
+        if (strcmp(a->ifa_name, iface)) continue;
+        const struct sockaddr_in* in = (const struct sockaddr_in*)a->ifa_addr;
+        if (inet_ntop(AF_INET, &in->sin_addr, out, (socklen_t)n)) rc = 0;
+        break;
+    }
+    freeifaddrs(list);
+    return rc;
+}
+
+int wifi_measure_link_up(const char* script, int is_ap, int minutes,
+                         const char* creds_file) {
+    if (!script || !*script || !creds_file || !*creds_file) return -1;
+    char mins[16];
+    snprintf(mins, sizeof(mins), "%d", minutes);
+    pid_t pid = fork();
+    if (pid < 0) return -1;
+    if (pid == 0) {
+        /* The SSID/passphrase reach the script through a root-only file, never
+         * the command line, so they do not appear in the process table. */
+        setenv("WIFI_CREDS_FILE", creds_file, 1);
+        execl(script, script, is_ap ? "ap" : "sta", mins, (char*)NULL);
+        _exit(127);
+    }
+    int status = 0;
+    if (waitpid(pid, &status, 0) < 0) return -1;
+    return (WIFEXITED(status) && WEXITSTATUS(status) == 0) ? 0 : -1;
+}
+
+/* Locker side: bind a listener to `iface`'s IPv4 and port. The interface must
+ * already be up (wifi_measure_link_up). @return 0 and *listen_fd, or -1. */
+int wifi_measure_listen(const char* iface, int port, int* listen_fd) {
+    char ip[INET_ADDRSTRLEN];
+    /* The AP address appears a moment after the link comes up. */
+    int have_ip = -1;
+    for (int t = 0; t < 50 && have_ip; ++t) {
+        have_ip = wifi_iface_ipv4(iface, ip, sizeof(ip));
+        if (have_ip) usleep(100000);
+    }
+    if (have_ip) return -1;
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    int one = 1;
+    setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+    if (inet_pton(AF_INET, ip, &addr.sin_addr) != 1 ||
+        bind(fd, (struct sockaddr*)&addr, sizeof(addr)) || listen(fd, 1)) {
+        close(fd);
+        return -1;
+    }
+    *listen_fd = fd;
+    return 0;
+}
+
+/* Locker side: accept one measurement connection; report the peer's address
+ * on the measured link. @return the connected fd, or -1. */
+int wifi_measure_accept(int listen_fd, char* peer_ip, size_t n) {
+    int fd = accept(listen_fd, NULL, NULL);
+    if (fd < 0) return -1;
+    if (wifi_rssi_socket_peer(fd, peer_ip, n)) {
+        close(fd);
+        return -1;
+    }
+    return fd;
+}
+
+/* Robot side: connect to the locker's measured-link address, retrying while
+ * the link associates. Reports the peer's address on the measured link.
+ * @return the connected fd, or -1. */
+int wifi_measure_connect(const char* host, int port, int retries, char* peer_ip,
+                         size_t n) {
+    struct sockaddr_in addr;
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons((uint16_t)port);
+    if (inet_pton(AF_INET, host, &addr.sin_addr) != 1) return -1;
+    for (int t = 0; t <= retries; ++t) {
+        int fd = socket(AF_INET, SOCK_STREAM, 0);
+        if (fd < 0) return -1;
+        if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            if (wifi_rssi_socket_peer(fd, peer_ip, n)) {
+                close(fd);
+                return -1;
+            }
+            return fd;
+        }
+        close(fd);
+        if (t < retries) usleep(200000);
+    }
+    return -1;
 }

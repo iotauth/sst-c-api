@@ -41,6 +41,35 @@ int wifi_rssi_socket_iface(int sock, char* iface, size_t capacity);
 /* The IPv4 address of `sock`'s peer, as text. @return 0, or -1. */
 int wifi_rssi_socket_peer(int sock, char* ip, size_t capacity);
 
+/* The measurement Wi-Fi link: a socket on the dongle link (wifi_link.sh),
+ * separate from the SST handshake transport. The locker is the AP and
+ * listens, the robot is the station and connects; getpeername() on the result
+ * gives each side the other's address on the measured link. */
+
+/* The local IPv4 address of `iface`, as text. @return 0, or -1. */
+int wifi_iface_ipv4(const char* iface, char* out, size_t n);
+
+/* Brings the dongle link up by running `script ap|sta <minutes>` (needs root;
+ * the process must already be privileged). The SSID/passphrase are passed to
+ * the script through `creds_file` (WIFI_CREDS_FILE), not the command line, so
+ * they never appear in the process table. @return 0, or -1. */
+int wifi_measure_link_up(const char* script, int is_ap, int minutes,
+                         const char* creds_file);
+
+/* Locker: bind a listener to `iface`'s IPv4 and `port`. @return 0 and
+ * *listen_fd, or -1. */
+int wifi_measure_listen(const char* iface, int port, int* listen_fd);
+
+/* Locker: accept one measurement connection; `peer_ip` receives the station's
+ * address on the measured link. @return the connected fd, or -1. */
+int wifi_measure_accept(int listen_fd, char* peer_ip, size_t n);
+
+/* Robot: connect to `host`:`port` on the measured link, retrying up to
+ * `retries` times while it associates; `peer_ip` receives the AP's address on
+ * the measured link. @return the connected fd, or -1. */
+int wifi_measure_connect(const char* host, int port, int retries, char* peer_ip,
+                         size_t n);
+
 /* Samples whose RSSI is known to come from a frame received after a point
  * in time. wifi_fresh_begin() records the peer's frame counter; each sample
  * then probes the peer and accepts the driver's RSSI only once the counter

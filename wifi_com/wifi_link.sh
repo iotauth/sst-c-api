@@ -33,14 +33,33 @@ ROLE="$1"
 MINUTES="${2:-15}"
 IFACE="${WIFI_IFACE:-wlan1}"
 CHANNEL="${WIFI_CHANNEL:-36}"
-SSID="iotauth-wifi"
-PASSPHRASE="iotauth-test-link"
+# The SSID and passphrase are never hardcoded: Auth provisions a fresh pair per
+# authorized execution, and the caller passes them in a credentials file
+# (WIFI_CREDS_FILE) holding shell assignments SSID=... and PASSPHRASE=..., kept
+# root-readable only. load_creds() requires them for the ap/sta roles.
+SSID=""
+PASSPHRASE=""
 AP_ADDR="192.168.77.1/24"
 STA_ADDR="192.168.77.2/24"
 RUN_DIR="/run/wifi_test"
 REVERT_UNIT="iotauth-wifi-test-revert"
 SCRIPT="$(cd "$(dirname "$0")" && pwd)/$(basename "$0")"
 IW=/usr/sbin/iw
+
+# Loads SSID/PASSPHRASE from WIFI_CREDS_FILE; required for ap/sta. No hardcoded
+# fallback, so a misconfigured run fails instead of using stale credentials.
+load_creds() {
+    if [ -z "${WIFI_CREDS_FILE:-}" ] || [ ! -r "$WIFI_CREDS_FILE" ]; then
+        echo "No readable WIFI_CREDS_FILE: an Auth-provisioned SSID/password is required." >&2
+        exit 1
+    fi
+    # shellcheck disable=SC1090
+    . "$WIFI_CREDS_FILE"
+    if [ -z "${SSID:-}" ] || [ -z "${PASSPHRASE:-}" ]; then
+        echo "WIFI_CREDS_FILE is missing SSID or PASSPHRASE." >&2
+        exit 1
+    fi
+}
 
 down() {
     for pid in "$RUN_DIR"/*.pid; do
@@ -74,6 +93,7 @@ prepare() {
     sudo ip addr flush dev "$IFACE"
     sudo ip link set "$IFACE" up
     sudo mkdir -p "$RUN_DIR"
+    sudo chmod 700 "$RUN_DIR"  # hostapd.conf/wpa.conf hold the passphrase
 }
 
 case "$ROLE" in
@@ -81,6 +101,7 @@ down)
     down
     ;;
 ap)
+    load_creds
     prepare
     if [ "$CHANNEL" -le 14 ]; then HW_MODE=g; else HW_MODE=a; fi
     sudo tee "$RUN_DIR/hostapd.conf" > /dev/null <<EOF
@@ -102,6 +123,7 @@ EOF
     echo "AP up: $IFACE ${AP_ADDR%/*}"
     ;;
 sta)
+    load_creds
     prepare
     sudo tee "$RUN_DIR/wpa.conf" > /dev/null <<EOF
 ctrl_interface=$RUN_DIR/wpa_ctrl
