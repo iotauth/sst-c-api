@@ -102,6 +102,7 @@ int wifi_fresh_sample(wifi_fresh_sampler* s, int8_t* rssi) {
     for (int i = 0; i < WIFI_FRESH_TRIES; ++i) {
         wifi_station_info seen, now;
         s->probe(s->ctx);
+        s->probes++;
         if (s->read(s->ctx, &seen)) return -1;
         if (seen.rx_packets <= s->last_rx_packets) continue;
         /* A new frame was counted. Its RSSI was recorded along with the

@@ -55,6 +55,7 @@ typedef struct {
     int (*read)(void* ctx, wifi_station_info* out);
     int (*probe)(void* ctx); /* asks the peer for a frame; result unused */
     uint64_t last_rx_packets;
+    unsigned probes; /* sent so far, for the record */
 } wifi_fresh_sampler;
 
 /* Reads the current frame counter. Every later sample is from a frame
