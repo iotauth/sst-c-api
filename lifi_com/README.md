@@ -71,12 +71,12 @@ sensor was never lit by its own LED.
 
 ### Wiring
 
-Unlike IR, pins and polarity are runtime settings, because the bench Pis are
-not wired identically. `lifi_configure(tx_gpio, rx_gpio, led_active_low)` is
+Pins and polarity are runtime settings. `lifi_configure(tx_gpio, rx_gpio, led_active_low)` is
 called by `robot` / `locker` from `--lifi-tx-gpio N`, `--lifi-rx-gpio N`,
 `--lifi-led-active-low`. Defaults are BCM TX 23 / RX 22, LED active HIGH
-(KS0032 with R to GND, V from the GPIO) — the pi42 wiring; pi43 is wired the
-other way round (TX 22 / RX 23). A KS0016 between its + rail and S is active
+(KS0032 with R to GND, V from the GPIO), and every bench Pi (robot and locker)
+is wired this way: LED on pin 16 (GPIO23), sensor S on pin 15 (GPIO22) and
+V on pin 17 (3.3 V). A KS0016 between its + rail and S is active
 LOW. The sensor pin uses no
 internal pull (the module has its own 10k load). pigpio: Pi 4 and earlier
 only, root required.
@@ -125,8 +125,8 @@ repository carries, mirroring IR:
 - `LiFi` sensor/actuator capabilities on robot1 and locker1 in
   `examples/configs/physical_presence_remote.graph` (already present).
 - `examples/test_physical_presence_multihost.sh --lifi-hk`, passing
-  `--require-lifi-hk` to both executables and the per-Pi wiring from
-  `ROBOT_LIFI_ARGS` / `LOCKER_LIFI_ARGS`; `--comm_type lifi` is accepted and
+  `--require-lifi-hk` to both executables and any wiring overrides from
+  `ROBOT_LIFI_ARGS` / `LOCKER_LIFI_ARGS` (empty by default); `--comm_type lifi` is accepted and
   runs both under sudo.
 
 `verify_co_location()` in `examples/physical_presence/hk_check.h` dispatches
@@ -149,8 +149,8 @@ enables both IR and LiFi when it finds pigpio):
 
 ```sh
 cmake -S examples/physical_presence -B /tmp/pp-build && cmake --build /tmp/pp-build -j
-sudo ./locker locker_pi43.config --comm_type lifi --require-lifi-hk --lifi-tx-gpio 22 --lifi-rx-gpio 23
-sudo ./robot  robot_pi42.config  --comm_type lifi --require-lifi-hk     # defaults: TX 23 / RX 22
+sudo ./locker locker_pi43.config --comm_type lifi --require-lifi-hk   # defaults: TX 23 / RX 22
+sudo ./robot  robot_pi42.config  --comm_type lifi --require-lifi-hk
 ```
 
 Run both under sudo even with `--comm_type tcp` when the plan selects LiFi.
@@ -161,9 +161,9 @@ Bench tools, no SST/Auth involved:
 
 ```sh
 ./run_lifi_test.sh loopback                              # sensor latency and width fidelity
-./run_lifi_test.sh responder --tx-gpio 22 --rx-gpio 23   # on pi43
-./run_lifi_test.sh initiator                             # on pi42 (defaults: TX 23 / RX 22)
-./test_lifi_multihost.sh                                 # both, over SSH; pins per host built in
+./run_lifi_test.sh responder                             # on pi43 (defaults: TX 23 / RX 22)
+./run_lifi_test.sh initiator                             # on pi42
+./test_lifi_multihost.sh                                 # both, over SSH
 ```
 
 `../tests/hk_test.c` runs both protocol roles through a simulated link

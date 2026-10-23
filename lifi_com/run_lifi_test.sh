@@ -8,8 +8,8 @@
 #   ./run_lifi_test.sh responder [extra lifi_test options]
 #   ./run_lifi_test.sh loopback  [extra lifi_test options]
 #
-# Extra options are passed through. Defaults are the pi42 wiring (TX 23 /
-# RX 22); pi43 needs --tx-gpio 22 --rx-gpio 23. --led-active-low for KS0016. Run initiator on one
+# Extra options are passed through. Defaults are the wiring of every bench
+# Pi (TX 23 / RX 22). --led-active-low for KS0016. Run initiator on one
 # Pi and responder on the other; loopback needs one Pi with the LED aimed at
 # its own sensor. Requires pigpio (the direct/embedded C library, header
 # pigpio.h) already built and installed:
