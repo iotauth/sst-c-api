@@ -30,8 +30,8 @@
 // relay through another channel). Read the summary as a latency budget, not
 // as metres.
 //
-// Options: --tx-gpio N (23)  --rx-gpio N (22)   BCM numbers; pi42 wiring.
-//                                                pi43 is the reverse (22/23).
+// Options: --tx-gpio N (23)  --rx-gpio N (22)   BCM numbers; the bench
+//                                                wiring of every Pi.
 //          --led-active-low    LED lights on GPIO LOW (KS0016 between its +
 //                              rail and S). Default is active HIGH: KS0032
 //                              with R tied to GND and V driven from the GPIO.

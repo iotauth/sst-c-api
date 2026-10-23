@@ -39,7 +39,13 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
 // Runs the IR CO_LOCATION check (physical_com/hk.h) over the GPIO wiring
 // above. Invoke only after the authenticated SST handshake; initiator = the
 // handshake client. Requires root. @return as hk_run().
+//
+// When ctrl_tcp is nonzero and `session` is socket-backed (sock >= 0), the
+// HK preparation control messages (INIT/READY) travel over the authenticated
+// TCP session instead of the IR link; only the timed rounds stay on IR. For
+// the relay experiment. session may be NULL when ctrl_tcp is 0.
 int ir_hk_run_gpio(const session_key_t* key, const hk_config* config,
-                   int initiator, hk_result* result);
+                   int initiator, hk_result* result,
+                   SST_session_ctx_t* session, int ctrl_tcp);
 
 #endif  // IR_SST_HANDSHAKE_H

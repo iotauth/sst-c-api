@@ -4,10 +4,9 @@
 #include "../physical_com/hk.h"
 #include "../src/c_api.h"
 
-// Wiring for both the LiFi handshake and lifi_hk_run_gpio(). Unlike the IR
-// pins, these are runtime settings because the two bench Pis are not wired
-// identically. Defaults (BCM TX 23 / RX 22, LED active HIGH) are the pi42
-// wiring; pi43 is the reverse (TX 22 / RX 23). Call before any LiFi function;
+// Wiring for both the LiFi handshake and lifi_hk_run_gpio(). Defaults (BCM
+// TX 23 / RX 22, LED active HIGH) are the wiring of every bench Pi. Call
+// before any LiFi function;
 // safe to skip to keep the defaults.
 // @param led_active_low Nonzero when the LED lights on GPIO LOW (KS0016
 // between its + rail and S); zero for a module driven from the GPIO (KS0032).
@@ -45,7 +44,14 @@ SST_session_ctx_t* server_secure_comm_setup_via_lifi(
 // Runs the LiFi CO_LOCATION check (physical_com/hk.h) over the GPIO wiring
 // above. Invoke only after the authenticated SST handshake; initiator = the
 // handshake client. Requires root. @return as hk_run().
+//
+// When ctrl_tcp is nonzero and `session` is socket-backed (sock >= 0), the
+// HK preparation control messages (INIT/READY) travel over the authenticated
+// TCP session instead of the light link; only the timed rounds stay optical.
+// This is for the relay experiment, where the slow framed control messages do
+// not survive a relayed optical path. session may be NULL when ctrl_tcp is 0.
 int lifi_hk_run_gpio(const session_key_t* key, const hk_config* config,
-                     int initiator, hk_result* result);
+                     int initiator, hk_result* result,
+                     SST_session_ctx_t* session, int ctrl_tcp);
 
 #endif  // LIFI_SST_HANDSHAKE_H

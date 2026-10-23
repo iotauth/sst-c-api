@@ -78,6 +78,9 @@ int main(int argc, char* argv[]) {
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
+    benchmark_trace bench;
+    physical_benchmark_init(&bench, &opts, ctx, 0);
+    bench_arm(&bench);
 
     int serv_sock = -1;
     int clnt_sock = -1;
@@ -87,12 +90,22 @@ int main(int argc, char* argv[]) {
     /* Wi-Fi is the TCP handshake over the direct link: the listener accepts
      * on every interface, and the WIFI_RSSI check later confirms the session
      * arrived over the Wi-Fi link. */
+    /* Other transports accept inside their handshake call, so their
+     * handshake time cannot be separated from waiting for the robot. */
+    bench_stage(&bench, "accept_and_peer_handshake");
     if (strcmp(comm_type, "tcp") == 0 || strcmp(comm_type, "wifi") == 0) {
+        bench_stage(&bench, "accept");
         clnt_sock = accept_tcp_connection(PORT_NUM, &serv_sock);
         if (clnt_sock == -1) {
             SST_print_error_exit("Failed accept_tcp_connection().");
         }
+        /* The Locker's handshake interval starts once the connection is
+         * accepted: it excludes waiting for the robot to show up, and
+         * includes this side's session-key lookup with Auth. */
+        bench_stage(&bench, "peer_handshake");
+        bench_mark(&bench, &bench.peer_handshake_start_us);
         session_ctx = server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+        bench_mark(&bench, &bench.peer_handshake_end_us);
         if (session_ctx == NULL) {
             SST_print_error_exit("Failed server_secure_comm_setup().");
         }
@@ -166,13 +179,35 @@ int main(int argc, char* argv[]) {
                              &session_ctx->s_key)) {
         SST_print_error_exit("Failed to start LOCKER_OPEN evidence.");
     }
+    bench.key = &session_ctx->s_key;
+    bench.evidence = &open_evidence;
     opts.co.local_name = ctx->config.name;
     opts.co.expected_peer = NULL;
-    if (!verify_co_location(session_ctx, 0, &opts.co, &open_evidence)) {
+    if (bench.enabled) {
+        opts.co.observations = bench.observations;
+        opts.co.observations_size = sizeof(bench.observations);
+    }
+    bench_stage(&bench, "cooperative_verification");
+    bench_mark(&bench, &bench.cooperative_start_us);
+    int co_passed =
+        verify_co_location(session_ctx, 0, &opts.co, &open_evidence);
+    bench_mark(&bench, &bench.cooperative_end_us);
+    if (!co_passed) {
         SST_print_log("Locker: CO_LOCATION did not pass here.");
     }
-    physical_action_gate(&opts, &session_ctx->s_key, "LOCKER_OPEN",
-                         &open_evidence);
+    bench_stage(&bench, "action_gate");
+    gate_decision decision = physical_action_gate(
+        &opts, &session_ctx->s_key, "LOCKER_OPEN", &open_evidence, &bench);
+    if (bench.enabled) {
+        bench.stage = NULL;
+        int written = bench_write(&bench);
+        free_session_ctx(session_ctx);
+        free_session_key_list_t(s_key_list);
+        if (clnt_sock != -1) close(clnt_sock);
+        if (serv_sock != -1) close(serv_sock);
+        free_SST_ctx_t(ctx);
+        return written ? 4 : decision == GATE_ALLOW ? 0 : 3;
+    }
 
     if (session_ctx != NULL && physical_options_has_socket(&opts)) {
         pthread_t thread;

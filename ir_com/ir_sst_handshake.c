@@ -21,6 +21,7 @@
 #include <string.h>
 
 #include "../physical_com/hk.h"
+#include "../physical_com/session_ctl.h"
 #include "../src/c_common.h"
 #include "../src/c_crypto.h"
 #include "../src/c_secure_comm.h"
@@ -430,11 +431,26 @@ static void hk_pause(void* ctx, unsigned us) {
     (void)ctx;
     gpioDelay(us);
 }
+/* HK control over the TCP session (relay experiment); only the timed rounds
+ * stay on IR. hk.c validates the message itself, so no prefix match here. */
+static int hk_send_control_tcp(void* ctx, const unsigned char* p, unsigned n) {
+    return session_ctl_send((SST_session_ctx_t*)ctx, p, n);
+}
+static int hk_recv_control_tcp(void* ctx, unsigned char* p, unsigned n) {
+    return session_ctl_recv((SST_session_ctx_t*)ctx, NULL, 0, p, n,
+                            "IR HK control");
+}
 int ir_hk_run_gpio(const session_key_t* key, const hk_config* config,
-                   int initiator, hk_result* result) {
+                   int initiator, hk_result* result,
+                   SST_session_ctx_t* session, int ctrl_tcp) {
     if (ir_init()) return -1;
     hk_io io = {NULL,        hk_send_control, hk_recv_control,
                 hk_send_bit, hk_recv_bit,     hk_pause};
+    if (ctrl_tcp && session && session->sock >= 0) {
+        io.ctx = session;
+        io.send_control = hk_send_control_tcp;
+        io.recv_control = hk_recv_control_tcp;
+    }
     int rc = hk_run(key, &HK_IR, config, initiator, &io, result);
     ir_deinit();
     return rc;

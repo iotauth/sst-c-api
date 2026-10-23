@@ -36,12 +36,12 @@ set -e
 
 INITIATOR_HOST="pi42@pi42"
 RESPONDER_HOST="pi43@pi43"
-# Per-host arguments passed straight to lifi_test: pi42 is wired TX 23 /
-# RX 22, pi43 the reverse. Symbol widths and the gap take lifi_test's
+# Per-host arguments passed straight to lifi_test. Both Pis are wired TX 23 /
+# RX 22 (lifi_test's defaults). Symbol widths and the gap take lifi_test's
 # defaults (600/1200 us, 50 ms); if overriding, both sides must get the same
 # --short-us/--long-us.
-INITIATOR_ARGS="${INITIATOR_ARGS:---tx-gpio 23 --rx-gpio 22}"
-RESPONDER_ARGS="${RESPONDER_ARGS:---tx-gpio 22 --rx-gpio 23}"
+INITIATOR_ARGS="${INITIATOR_ARGS:-}"
+RESPONDER_ARGS="${RESPONDER_ARGS:-}"
 REMOTE_REPO="project/iotauth"
 LIFI_DIR="$REMOTE_REPO/entity/c/lifi_com"
 TAIL_PID=""
