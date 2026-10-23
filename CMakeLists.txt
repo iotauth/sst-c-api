@@ -126,6 +126,11 @@ target_link_libraries(ble_adv_rssi_test PRIVATE sst-c-api)
 target_compile_options(ble_adv_rssi_test PRIVATE -UNDEBUG)
 add_test(NAME ble_adv_rssi_test COMMAND ble_adv_rssi_test)
 
+add_executable(benchmark_test ${CMAKE_CURRENT_SOURCE_DIR}/examples/physical_presence/benchmark_test.c)
+target_link_libraries(benchmark_test PRIVATE sst-c-api)
+target_compile_options(benchmark_test PRIVATE -UNDEBUG)
+add_test(NAME benchmark_test COMMAND benchmark_test)
+
 add_executable(uwb_range_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_range_test.c)
 target_link_libraries(uwb_range_test PRIVATE sst-c-api)
 target_compile_options(uwb_range_test PRIVATE -UNDEBUG)
