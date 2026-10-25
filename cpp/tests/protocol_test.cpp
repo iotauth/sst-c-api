@@ -392,11 +392,69 @@ void test_handshake_msg_type_and_flags() {
     server.join();
 }
 
+void test_empty_handshake_frames() {
+    Credentials credentials;
+    sst::SST_API api(credentials.config(0));
+    sst::SessionKeyList keys;
+    int sockets[2];
+
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    send_frame(sockets[1], 30, {});
+    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+        api.server_secure_comm_setup(sockets[0], keys);
+    });
+    ::close(sockets[1]);
+
+    sst::session_key_t key{};
+    key.key_id[7] = 42;
+    key.abs_validity = UINT64_MAX;
+    key.cipher_key_size = 16;
+    key.mac_key_size = 32;
+    key.enc_mode = sst::AES_128_CBC;
+    key.hmac_mode = sst::USE_HMAC;
+    sst::distribution_key_t crypto{};
+    crypto.cipher_key_size = key.cipher_key_size;
+    crypto.mac_key_size = key.mac_key_size;
+    crypto.enc_mode = key.enc_mode;
+
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    std::thread empty_handshake2([&] {
+        SocketOwner peer{sockets[1]};
+        IoTSPMessage::receive(peer.fd, 256);
+        send_frame(peer.fd, 31, {});
+    });
+    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+        sst::SST_API::secure_connect_to_server_with_socket(key, sockets[0]);
+    });
+    empty_handshake2.join();
+
+    keys.add(key);
+    Bytes handshake1(key.key_id, key.key_id + sst::SESSION_KEY_ID_SIZE);
+    Bytes body{0x01};
+    body.insert(body.end(), 8, 0x55);
+    Bytes encrypted = encrypt(crypto, body);
+    handshake1.insert(handshake1.end(), encrypted.begin(), encrypted.end());
+
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    std::thread empty_handshake3([&] {
+        SocketOwner peer{sockets[1]};
+        send_frame(peer.fd, 30, handshake1);
+        auto response = IoTSPMessage::receive(peer.fd, 256);
+        CHECK(response.get_type() == MessageType::SKEY_HANDSHAKE_2);
+        send_frame(peer.fd, 32, {});
+    });
+    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+        api.server_secure_comm_setup(sockets[0], keys);
+    });
+    empty_handshake3.join();
+}
+
 }  // namespace
 
 int main() {
     test_private_credential_directories();
     test_auth_exchanges();
     test_handshake_msg_type_and_flags();
+    test_empty_handshake_frames();
     std::puts("All protocol regression tests passed.");
 }

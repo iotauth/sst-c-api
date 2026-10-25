@@ -222,17 +222,21 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     // Receive handshake 2.
     MessageType message_type;
     Bytes received;
-    int data_buf_length =
-        IoTSPMessage::read(sock, MAX_HS_BUF_LENGTH, message_type, received);
-    if (data_buf_length < 0) {
+    SST_IOResult read_result =
+        IoTSPMessage::read_result(sock, MAX_HS_BUF_LENGTH, message_type,
+                                  received);
+    if (read_result.status == SST_IOStatus::Error) {
         throw SST_Exception(
             "Socket read error in secure_connect_to_server_with_socket().",
-            SST_ErrorCode::Network);
-    } else if (data_buf_length == 0) {
+            read_result.error);
+    } else if (read_result.status == SST_IOStatus::PeerClosed) {
         throw SST_Exception(
             "Socket disconnected during handshake2 in "
             "secure_connect_to_server_with_socket().",
             SST_ErrorCode::PeerClosed);
+    } else if (read_result.bytes == 0) {
+        throw SST_Exception("Empty handshake2 frame.",
+                            SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_2) {
         throw SST_Exception(
@@ -263,16 +267,19 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     // Receive handshake 1.
     MessageType message_type;
     Bytes received;
-    int data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
-                                             message_type, received);
-    if (data_buf_length < 0) {
+    SST_IOResult read_result = IoTSPMessage::read_result(
+        clnt_sock, MAX_HS_BUF_LENGTH, message_type, received);
+    if (read_result.status == SST_IOStatus::Error) {
         throw SST_Exception("Socket read error in server_secure_comm_setup().",
-                            SST_ErrorCode::Network);
-    } else if (data_buf_length == 0) {
+                            read_result.error);
+    } else if (read_result.status == SST_IOStatus::PeerClosed) {
         throw SST_Exception(
             "Socket disconnected during handshake1 in "
             "server_secure_comm_setup().",
             SST_ErrorCode::PeerClosed);
+    } else if (read_result.bytes == 0) {
+        throw SST_Exception("Empty handshake1 frame.",
+                            SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_1) {
         throw SST_Exception(
@@ -304,16 +311,19 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     LOG_DBG << "Switching to HANDSHAKE_2_SENT.";
 
     // Receive handshake 3.
-    data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
-                                         message_type, received);
-    if (data_buf_length < 0) {
+    read_result = IoTSPMessage::read_result(clnt_sock, MAX_HS_BUF_LENGTH,
+                                            message_type, received);
+    if (read_result.status == SST_IOStatus::Error) {
         throw SST_Exception("Socket read error in server_secure_comm_setup().",
-                            SST_ErrorCode::Network);
-    } else if (data_buf_length == 0) {
+                            read_result.error);
+    } else if (read_result.status == SST_IOStatus::PeerClosed) {
         throw SST_Exception(
             "Socket disconnected during handshake3 in "
             "server_secure_comm_setup().",
             SST_ErrorCode::PeerClosed);
+    } else if (read_result.bytes == 0) {
+        throw SST_Exception("Empty handshake3 frame.",
+                            SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_3) {
         throw SST_Exception(

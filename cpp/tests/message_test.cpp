@@ -174,6 +174,20 @@ void test_typed_frame_results() {
     CHECK(IoTSPMessage::read_result(fds[1], 100, type, payload).status ==
           sst::SST_IOStatus::PeerClosed);
     ::close(fds[1]);
+
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+    const unsigned char truncated[] = {33, 2, 0xAA};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], truncated,
+                                             sizeof(truncated)) == 3);
+    ::close(fds[0]);
+    result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Protocol);
+    ::close(fds[1]);
+
+    result = IoTSPMessage::read_result(-1, 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Network);
 }
 
 void test_auth_hello_message() {

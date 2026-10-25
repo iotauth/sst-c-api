@@ -322,26 +322,11 @@ log "Step 7: Running API integration test (connecting to Auth)..."
 
 # Compile the Auth connection test program (cpp/auth_connect_test.cpp).
 TEST_APP="$BUILD_DIR/auth_connect_test"
-(
-    cd "$BUILD_DIR"
-    g++ -std=c++17 -I"$CPP_ROOT" -I"$CPP_ROOT/src" \
-        "$CPP_ROOT/auth_connect_test.cpp" \
-        -L. -lsst-cpp-api \
-        ./_deps/spdlog-build/libspdlog.a \
-        -lcrypto \
-        -lpthread \
-        -o auth_connect_test 2>&1
-)
-
-if [[ $? -eq 0 ]]; then
-    log "Test application compiled."
-    log "Running Auth connection test..."
-    echo ""
-    ./auth_connect_test "$CONFIG_FILE"
-else
-    error "Failed to compile Auth connection test."
-    exit 1
-fi
+cmake --build "$BUILD_DIR" --target auth_connect_test -j"$(nproc)" 2>&1 | tail -10
+log "Test application built."
+log "Running Auth connection test..."
+echo ""
+"$TEST_APP" "$CONFIG_FILE"
 
 # --- Cleanup ---
 

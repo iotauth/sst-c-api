@@ -57,7 +57,7 @@ int sst_read_from_socket(int sock, unsigned char* buf, unsigned int buf_length);
 
 // Reads exactly `length` bytes.
 // @return `length` on success, 0 on EOF before any byte was read, -1 on
-// error or on a truncated read.
+// socket error, or -2 on EOF after a partial read.
 int read_exact(int sock, unsigned char* buf, unsigned int length);
 
 // Writes the whole buffer, retrying partial writes.

@@ -29,9 +29,12 @@ SST_IOResult IoTSPMessage::read_result(int sock,
     payload.clear();
     unsigned char header[MSG_TYPE_SIZE + internal::MAX_PAYLOAD_BUF_SIZE];
     int ret = internal::read_exact(sock, header, MSG_TYPE_SIZE);
-    if (ret < 0) {
+    if (ret == -1) {
         LOG_ERR << "Socket read error while reading the message type.";
         return SST_IOResult::failure(SST_ErrorCode::Network);
+    } else if (ret < 0) {
+        LOG_ERR << "Truncated message type.";
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     } else if (ret == 0) {
         LOG_INF << "End of file. Disconnected from socket " << sock;
         return SST_IOResult::closed();
@@ -46,8 +49,8 @@ SST_IOResult IoTSPMessage::read_result(int sock,
             sock, header + MSG_TYPE_SIZE + var_length_buf_size, 1);
         if (ret <= 0) {
             LOG_ERR << "Failed to read variable length header.";
-            return SST_IOResult::failure(ret < 0 ? SST_ErrorCode::Network
-                                                 : SST_ErrorCode::Protocol);
+            return SST_IOResult::failure(ret == -1 ? SST_ErrorCode::Network
+                                                   : SST_ErrorCode::Protocol);
         }
         var_length_buf_size++;
         if ((header[MSG_TYPE_SIZE + var_length_buf_size - 1] & 128) == 0) {
@@ -71,10 +74,13 @@ SST_IOResult IoTSPMessage::read_result(int sock,
     }
     // Bound the peer-supplied length before allocating the payload buffer.
     payload.assign(payload_length, 0);
-    if (payload_length > 0 &&
-        internal::read_exact(sock, payload.data(), payload_length) <= 0) {
-        LOG_ERR << "Failed to read from socket while reading the payload.";
-        return SST_IOResult::failure(SST_ErrorCode::Protocol);
+    if (payload_length > 0) {
+        ret = internal::read_exact(sock, payload.data(), payload_length);
+        if (ret <= 0) {
+            LOG_ERR << "Failed to read from socket while reading the payload.";
+            return SST_IOResult::failure(ret == -1 ? SST_ErrorCode::Network
+                                                   : SST_ErrorCode::Protocol);
+        }
     }
     return SST_IOResult::success(payload_length);
 }

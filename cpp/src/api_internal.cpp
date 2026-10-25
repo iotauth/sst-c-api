@@ -148,7 +148,7 @@ int read_exact(int sock, unsigned char* buf, unsigned int length) {
             return -1;
         }
         if (bytes_read == 0) {
-            return total_read == 0 ? 0 : -1;
+            return total_read == 0 ? 0 : -2;
         }
         total_read += static_cast<unsigned int>(bytes_read);
     }
