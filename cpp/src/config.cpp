@@ -4,17 +4,17 @@
  */
 
 #include <algorithm>
+#include <array>
 #include <cerrno>
 #include <cstring>
 #include <fstream>
 #include <iterator>
+#include <string_view>
 
 #include "api_internal.hpp"
 #include "log/log_manager.hpp"
 
-namespace sst {
-
-namespace internal {
+namespace sst::internal {
 namespace {
 
 void copy_config_value(char* dest, size_t dest_size, const std::string& value,
@@ -26,7 +26,7 @@ void copy_config_value(char* dest, size_t dest_size, const std::string& value,
     std::memcpy(dest, value.c_str(), value.size() + 1);
 }
 
-AES_encryption_mode_t parse_enc_mode(const std::string& v,
+AES_encryption_mode_t parse_enc_mode(std::string_view v,
                                      const std::string& key) {
     if (v == "AES_128_CBC") return AES_128_CBC;
     if (v == "AES_128_CTR") return AES_128_CTR;
@@ -35,18 +35,18 @@ AES_encryption_mode_t parse_enc_mode(const std::string& v,
     if (v == "0") return AES_128_CBC;
     if (v == "1") return AES_128_CTR;
     if (v == "2") return AES_128_GCM;
-    throw SST_Exception("Wrong input for " + key +
-                            ". Please type \"AES_128_CBC\", \"AES_128_CTR\" or "
-                            "\"AES_128_GCM\".",
-                        SST_ErrorCode::Configuration);
+    throw SST_Exception(
+        "Wrong input for " + key +
+            R"(. Please type "AES_128_CBC", "AES_128_CTR" or "AES_128_GCM".)",
+        SST_ErrorCode::Configuration);
 }
 
-bool parse_on_off(const std::string& v, const std::string& key) {
+bool parse_on_off(std::string_view v, const std::string& key) {
     if (v == "on" || v == "1") return true;
     if (v == "off" || v == "0") return false;
-    throw SST_Exception("Wrong input for " + key +
-                            ". Please type \"on\"/\"1\" or \"off\"/\"0\".",
-                        SST_ErrorCode::Configuration);
+    throw SST_Exception(
+        "Wrong input for " + key + R"(. Please type "on"/"1" or "off"/"0".)",
+        SST_ErrorCode::Configuration);
 }
 
 int parse_int(const std::string& v, const std::string& key) {
@@ -71,31 +71,11 @@ int parse_port(const std::string& v, const std::string& key) {
     return port;
 }
 
-std::string trim(const std::string& s) {
+std::string trim(std::string_view s) {
     size_t start = s.find_first_not_of(" \t\r\n");
     if (start == std::string::npos) return "";
     size_t end = s.find_last_not_of(" \t\r\n");
-    return s.substr(start, end - start + 1);
-}
-
-template <auto Field, auto Parse>
-void set_config_value(config_t& config, const std::string& value,
-                      const std::string& key) {
-    config.*Field = Parse(value, key);
-}
-
-template <auto Field>
-void set_config_string(config_t& config, const std::string& value,
-                       const std::string& key) {
-    auto& destination = config.*Field;
-    copy_config_value(destination, sizeof(destination), value, key);
-}
-
-template <int Index>
-void set_config_purpose(config_t& config, const std::string& value,
-                        const std::string& key) {
-    copy_config_value(config.purpose[Index], sizeof(config.purpose[Index]),
-                      value, key);
+    return std::string(s.substr(start, end - start + 1));
 }
 
 unsigned short parse_purpose_index(const std::string& value,
@@ -125,46 +105,98 @@ struct ConfigField {
 };
 
 // Each alias uses the same destination and validator as its canonical name.
-const ConfigField config_fields[] = {
-    {"entityInfo.name", "name", set_config_string<&config_t::name>},
-    {"purpose[0]", nullptr, set_config_purpose<0>},
-    {"purpose[1]", nullptr, set_config_purpose<1>},
-    {"purpose_index", nullptr,
-     set_config_value<&config_t::purpose_index, parse_purpose_index>},
-    {"entityInfo.number_key", "numkey",
-     set_config_value<&config_t::numkey, parse_int>},
-    {"sessionKey.encryptionMode", "session_key_enc_mode",
-     set_config_value<&config_t::session_key_enc_mode, parse_enc_mode>},
-    {"distKey.encryptionMode", "dist_key_enc_mode",
-     set_config_value<&config_t::dist_key_enc_mode, parse_enc_mode>},
-    {"HmacMode", "hmac_mode",
-     set_config_value<&config_t::hmac_mode, parse_hmac_mode>},
-    {"PermanentDistKeyMode", "perm_dist_key_mode",
-     set_config_value<&config_t::perm_dist_key_mode, parse_perm_dist_key_mode>},
-    {"authInfo.id", "auth_id", set_config_value<&config_t::auth_id, parse_int>},
-    {"authInfo.pubkey.path", "auth_pubkey_path",
-     set_config_string<&config_t::auth_pubkey_path>},
-    {"entityInfo.privkey.path", "entity_privkey_path",
-     set_config_string<&config_t::entity_privkey_path>},
-    {"auth.ip.address", "auth_ip_addr",
-     set_config_string<&config_t::auth_ip_addr>},
-    {"auth.port.number", "auth_port_num",
-     set_config_value<&config_t::auth_port_num, parse_port>},
-    {"entity.server.ip.address", "entity_server_ip_addr",
-     set_config_string<&config_t::entity_server_ip_addr>},
-    {"entity.server.port.number", "entity_server_port_num",
-     set_config_value<&config_t::entity_server_port_num, parse_port>},
-    {"network.protocol", nullptr,
-     set_config_string<&config_t::network_protocol>},
-    {"fileSystemManager.ip.address", nullptr,
-     set_config_string<&config_t::file_system_manager_ip_addr>},
-    {"fileSystemManager.port.number", nullptr,
-     set_config_value<&config_t::file_system_manager_port_num, parse_port>},
-    {"distKey.cipherkey.path", nullptr,
-     set_config_string<&config_t::dist_cipher_key_path>},
-    {"distkey.mackey.path", nullptr,
-     set_config_string<&config_t::dist_mac_key_path>},
-};
+const std::array<ConfigField, 21> config_fields{
+    {{"entityInfo.name", "name",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.name, sizeof(c.name), value, key);
+      }},
+     {"purpose[0]", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.purpose[0], sizeof(c.purpose[0]), value, key);
+      }},
+     {"purpose[1]", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.purpose[1], sizeof(c.purpose[1]), value, key);
+      }},
+     {"purpose_index", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.purpose_index = parse_purpose_index(value, key);
+      }},
+     {"entityInfo.number_key", "numkey",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.numkey = parse_int(value, key);
+      }},
+     {"sessionKey.encryptionMode", "session_key_enc_mode",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.session_key_enc_mode = parse_enc_mode(value, key);
+      }},
+     {"distKey.encryptionMode", "dist_key_enc_mode",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.dist_key_enc_mode = parse_enc_mode(value, key);
+      }},
+     {"HmacMode", "hmac_mode",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.hmac_mode = parse_hmac_mode(value, key);
+      }},
+     {"PermanentDistKeyMode", "perm_dist_key_mode",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.perm_dist_key_mode = parse_perm_dist_key_mode(value, key);
+      }},
+     {"authInfo.id", "auth_id",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.auth_id = parse_int(value, key);
+      }},
+     {"authInfo.pubkey.path", "auth_pubkey_path",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.auth_pubkey_path, sizeof(c.auth_pubkey_path),
+                            value, key);
+      }},
+     {"entityInfo.privkey.path", "entity_privkey_path",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.entity_privkey_path,
+                            sizeof(c.entity_privkey_path), value, key);
+      }},
+     {"auth.ip.address", "auth_ip_addr",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.auth_ip_addr, sizeof(c.auth_ip_addr), value, key);
+      }},
+     {"auth.port.number", "auth_port_num",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.auth_port_num = parse_port(value, key);
+      }},
+     {"entity.server.ip.address", "entity_server_ip_addr",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.entity_server_ip_addr,
+                            sizeof(c.entity_server_ip_addr), value, key);
+      }},
+     {"entity.server.port.number", "entity_server_port_num",
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.entity_server_port_num = parse_port(value, key);
+      }},
+     {"network.protocol", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.network_protocol, sizeof(c.network_protocol),
+                            value, key);
+      }},
+     {"fileSystemManager.ip.address", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.file_system_manager_ip_addr,
+                            sizeof(c.file_system_manager_ip_addr), value, key);
+      }},
+     {"fileSystemManager.port.number", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          c.file_system_manager_port_num = parse_port(value, key);
+      }},
+     {"distKey.cipherkey.path", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.dist_cipher_key_path,
+                            sizeof(c.dist_cipher_key_path), value, key);
+      }},
+     {"distkey.mackey.path", nullptr,
+      [](config_t& c, const std::string& value, const std::string& key) {
+          copy_config_value(c.dist_mac_key_path, sizeof(c.dist_mac_key_path),
+                            value, key);
+      }}}};
 
 }  // namespace
 
@@ -225,7 +257,7 @@ void load_config(config_t& c, const std::string& path) {
             c.purpose_index = purpose_count++;
             continue;
         }
-        const auto* field = std::find_if(
+        const auto field = std::find_if(
             std::begin(config_fields), std::end(config_fields),
             [&key](const ConfigField& entry) {
                 return key == entry.name || (entry.alias && key == entry.alias);
@@ -237,17 +269,13 @@ void load_config(config_t& c, const std::string& path) {
         field->set(c, value, key);
     }
 
-    if (c.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
-        if (std::strlen(c.dist_cipher_key_path) > 0 ||
-            std::strlen(c.dist_mac_key_path) > 0) {
-            throw SST_Exception(
-                "PermanentDistKeyMode is turned off, but dist_key path(s) are "
-                "provided.",
-                SST_ErrorCode::Configuration);
-        }
+    if (c.perm_dist_key_mode == NO_PERMANENT_DIST_KEY &&
+        (c.dist_cipher_key_path[0] != '\0' || c.dist_mac_key_path[0] != '\0')) {
+        throw SST_Exception(
+            "PermanentDistKeyMode is turned off, but dist_key path(s) are "
+            "provided.",
+            SST_ErrorCode::Configuration);
     }
 }
 
-}  // namespace internal
-
-}  // namespace sst
+}  // namespace sst::internal

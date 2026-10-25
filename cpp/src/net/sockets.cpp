@@ -55,7 +55,7 @@ std::unique_ptr<SST_SocketInfo> open_socket(SST_SOCK_DOMAIN domain,
 Socket::~Socket() { Close(); }
 
 void Socket::Close() {
-    std::lock_guard<std::mutex> lock(gate);
+    std::scoped_lock lock(gate);
     if (info) {
         LOG_TRA << "Closing socket with FD: " << info->sock;
         info.reset();
@@ -74,7 +74,7 @@ int Socket::Read(char* buf, int nbytes) const {
 }
 
 int Socket::Write(char* buf, int nbytes) {
-    std::lock_guard<std::mutex> lock(gate);
+    std::scoped_lock lock(gate);
     if (!info || info->sock == -1) {
         std::cerr << "Invalid socket info" << std::endl;
         return -1;
@@ -83,12 +83,12 @@ int Socket::Write(char* buf, int nbytes) {
 }
 
 void Socket::SetSocketInfo(std::unique_ptr<SST_SocketInfo> socket_info) {
-    std::lock_guard<std::mutex> lock(gate);
+    std::scoped_lock lock(gate);
     info = std::move(socket_info);
 }
 
 std::unique_ptr<SST_SocketInfo> Socket::GetSocketInfo() const {
-    std::lock_guard<std::mutex> lock(gate);
+    std::scoped_lock lock(gate);
     if (!info) return nullptr;
 
     // Duplicating the descriptor lets either owner close its handle without
@@ -121,7 +121,8 @@ ClientSocket::ClientSocket(SST_SOCK_DOMAIN domain, const char* host, int port) {
     SetSocketInfo(open_socket(domain, host, port));
 }
 
-int ClientSocket::Connect() {
+// Retain the public member type, including callers taking its address.
+int ClientSocket::Connect() {  // NOSONAR: S5817, public API compatibility.
     const auto& info = get_info_ref();
     if (!info || info->sock == -1 || !info->addr) {
         std::cerr << "Invalid socket info" << std::endl;
@@ -136,9 +137,8 @@ ServerSocket::ServerSocket(SST_SOCK_DOMAIN domain, const char* host, int port) {
 
     // Allow a restarted listener to bind while old connections are in
     // TIME_WAIT.
-    int on = 1;
-    if (::setsockopt(info->sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) ==
-        -1) {
+    if (const int on = 1; ::setsockopt(info->sock, SOL_SOCKET, SO_REUSEADDR,
+                                       &on, sizeof(on)) == -1) {
         std::cerr << "Failed to set SO_REUSEADDR for ServerSocket" << std::endl;
         return;
     }
@@ -153,7 +153,8 @@ ServerSocket::ServerSocket(SST_SOCK_DOMAIN domain, const char* host, int port) {
     SetSocketInfo(std::move(info));
 }
 
-int ServerSocket::Accept(ServerSocket& acceptedSocket) {
+// Retain the public member type, including callers taking its address.
+int ServerSocket::Accept(ServerSocket& acceptedSocket) {  // NOSONAR: S5817
     if (get_fd() == -1) {
         std::cerr << "Invalid socket info for accepting connection"
                   << std::endl;
@@ -162,19 +163,18 @@ int ServerSocket::Accept(ServerSocket& acceptedSocket) {
     sockaddr_storage addr{};
     socklen_t len = sizeof(addr);
     auto peer = std::make_unique<SST_SocketInfo>();
-    peer->sock = ::accept(get_fd(), reinterpret_cast<sockaddr*>(&addr), &len);
+    peer->addr = SST_SocketInfo::AllocAddr(&addr, len);
+    if (!peer->addr) {
+        std::cerr << "Failed to allocate memory for accepted peer address"
+                  << std::endl;
+        return -1;
+    }
+    peer->sock = ::accept(get_fd(), peer->addr.get(), &len);
     if (peer->sock == -1) {
         std::cerr << "Failed to accept connection on ServerSocket" << std::endl;
         return -1;
     }
     peer->len = len;
-    peer->addr = SST_SocketInfo::AllocAddr(&addr, len);
-    if (!peer->addr) {
-        // peer owns the accepted descriptor even if address allocation fails.
-        std::cerr << "Failed to allocate memory for accepted peer address"
-                  << std::endl;
-        return -1;
-    }
     acceptedSocket.SetSocketInfo(std::move(peer));
     return 0;
 }

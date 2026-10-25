@@ -179,6 +179,7 @@ cpp/
     ├── crypto_test.cpp   # crypto unit tests
     ├── message_test.cpp  # message classes vs. the Auth wire formats
     ├── socket_test.cpp   # socket unit tests
+    ├── temporary_directory.hpp # private, automatically cleaned test directories
     └── protocol_test.cpp # local Auth stand-in and handshake wire regression tests
 ```
 
@@ -190,6 +191,19 @@ cpp/
 - A POSIX environment (Linux or macOS)
 - spdlog, supplied as an installed CMake package, a local source tree, or fetched
   by CMake (the fallback requires Git and network access)
+
+SonarCloud automatic analysis is configured for C++17 in the repository's
+`.sonarcloud.properties`, matching CMake. Recommendations for newer facilities
+such as `std::span`, `std::jthread`, and `std::format` do not apply to this API.
+SonarCloud reads that file from the default branch; to use the same setting on
+a pull request before merging it, set `sonar.cfamily.reportingCppStandardOverride`
+to `c++17` in the project's analysis settings.
+
+Four local `NOSONAR` comments retain existing public member signatures:
+`Connect()`, `Accept()`, `shutdown()`, and the `std::string` secure-send overload.
+Changing their const qualification or parameter type would break existing
+member-function pointers or binary callers. Internal helpers follow the newer
+recommendations where they are compatible with C++17.
 
 On macOS with Homebrew, point CMake at the Homebrew OpenSSL if needed:
 
@@ -218,6 +232,10 @@ When no local dependency is supplied and fetching is enabled, CMake downloads
 spdlog v1.17.0.
 
 ## Build and run the tests
+
+Run tests from a writable directory. Tests that generate credentials create a
+unique directory there with owner-only permissions and remove it on completion.
+CTest uses the build directory as the working directory.
 
 From this `cpp/` directory:
 

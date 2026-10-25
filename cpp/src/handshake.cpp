@@ -3,6 +3,8 @@
  * @brief Entity-to-entity session key handshakes using the SST C wire format.
  */
 
+#include <array>
+#include <cstddef>
 #include <cstring>
 #include <utility>
 
@@ -27,14 +29,14 @@ namespace {
 
 constexpr unsigned int HS_NONCE_SIZE = 8;
 constexpr unsigned int HS_NONCE_FIELDS_SIZE = 1 + HS_NONCE_SIZE * 2;
-constexpr unsigned char HS_NONCE_PRESENT = 0x01;
-constexpr unsigned char HS_REPLY_NONCE_PRESENT = 0x02;
+constexpr std::byte HS_NONCE_PRESENT{0x01};
+constexpr std::byte HS_REPLY_NONCE_PRESENT{0x02};
 constexpr unsigned int MAX_HS_BUF_LENGTH = 256;
 
 // Each peer sends a fresh nonce and proves key possession by echoing the other.
 struct HS_nonce_t {
-    unsigned char nonce[HS_NONCE_SIZE];
-    unsigned char reply_nonce[HS_NONCE_SIZE];
+    std::array<unsigned char, HS_NONCE_SIZE> nonce{};
+    std::array<unsigned char, HS_NONCE_SIZE> reply_nonce{};
 };
 
 // Decrypted handshake body: handshake_flags (1) + nonce (8) + replyNonce (8).
@@ -47,7 +49,7 @@ int serialize_handshake_body(const unsigned char* nonce,
         LOG_ERR << "Handshake should include at least one nonce.";
         return -1;
     }
-    unsigned char handshake_flags = 0;
+    std::byte handshake_flags{0};
     if (nonce != nullptr) {
         handshake_flags |= HS_NONCE_PRESENT;
         std::memcpy(ret + 1, nonce, HS_NONCE_SIZE);
@@ -56,17 +58,19 @@ int serialize_handshake_body(const unsigned char* nonce,
         handshake_flags |= HS_REPLY_NONCE_PRESENT;
         std::memcpy(ret + 1 + HS_NONCE_SIZE, reply_nonce, HS_NONCE_SIZE);
     }
-    ret[0] = handshake_flags;
+    ret[0] = std::to_integer<unsigned char>(handshake_flags);
     return 0;
 }
 
 void parse_handshake_body(const unsigned char* buf, HS_nonce_t& ret) {
-    std::memset(&ret, 0, sizeof(ret));
-    if ((buf[0] & HS_NONCE_PRESENT) != 0) {
-        std::memcpy(ret.nonce, buf + 1, HS_NONCE_SIZE);
+    ret = {};
+    const auto handshake_flags = static_cast<std::byte>(buf[0]);
+    if ((handshake_flags & HS_NONCE_PRESENT) != std::byte{0}) {
+        std::memcpy(ret.nonce.data(), buf + 1, HS_NONCE_SIZE);
     }
-    if ((buf[0] & HS_REPLY_NONCE_PRESENT) != 0) {
-        std::memcpy(ret.reply_nonce, buf + 1 + HS_NONCE_SIZE, HS_NONCE_SIZE);
+    if ((handshake_flags & HS_REPLY_NONCE_PRESENT) != std::byte{0}) {
+        std::memcpy(ret.reply_nonce.data(), buf + 1 + HS_NONCE_SIZE,
+                    HS_NONCE_SIZE);
     }
 }
 
@@ -75,15 +79,19 @@ void parse_handshake_body(const unsigned char* buf, HS_nonce_t& ret) {
 int handshake_encrypt(const unsigned char* buf, unsigned int buf_length,
                       const session_key_t& s_key, Bytes& ret) {
     return symmetric_encrypt_authenticate(
-        buf, buf_length, s_key.mac_key, MAC_KEY_SIZE, s_key.cipher_key,
-        CIPHER_KEY_SIZE, s_key.enc_mode, USE_HMAC, ret);
+        buf, buf_length,
+        {s_key.mac_key, MAC_KEY_SIZE, s_key.cipher_key, CIPHER_KEY_SIZE,
+         s_key.enc_mode, USE_HMAC},
+        ret);
 }
 
 int handshake_decrypt(const unsigned char* buf, unsigned int buf_length,
                       const session_key_t& s_key, Bytes& ret) {
     return symmetric_decrypt_authenticate(
-        buf, buf_length, s_key.mac_key, MAC_KEY_SIZE, s_key.cipher_key,
-        CIPHER_KEY_SIZE, s_key.enc_mode, USE_HMAC, ret);
+        buf, buf_length,
+        {s_key.mac_key, MAC_KEY_SIZE, s_key.cipher_key, CIPHER_KEY_SIZE,
+         s_key.enc_mode, USE_HMAC},
+        ret);
 }
 
 // SKEY_HANDSHAKE_1 payload: sessionKeyId (8) + Enc(handshake_flags + nonce).
@@ -94,13 +102,13 @@ Bytes make_handshake_1_payload(const session_key_t& s_key,
         throw SST_Exception("Failed to generate entity nonce.",
                             SST_ErrorCode::Crypto);
     }
-    unsigned char handshake_body[1 + HS_NONCE_SIZE];
-    handshake_body[0] = HS_NONCE_PRESENT;
-    std::memcpy(handshake_body + 1, entity_nonce, HS_NONCE_SIZE);
+    std::array<unsigned char, 1 + HS_NONCE_SIZE> handshake_body{};
+    handshake_body[0] = std::to_integer<unsigned char>(HS_NONCE_PRESENT);
+    std::memcpy(handshake_body.data() + 1, entity_nonce, HS_NONCE_SIZE);
 
     Bytes encrypted;
-    if (handshake_encrypt(handshake_body, 1 + HS_NONCE_SIZE, s_key, encrypted) <
-        0) {
+    if (handshake_encrypt(handshake_body.data(), 1 + HS_NONCE_SIZE, s_key,
+                          encrypted) < 0) {
         throw SST_Exception("Failed to encrypt handshake 1.",
                             SST_ErrorCode::Crypto);
     }
@@ -126,7 +134,7 @@ Bytes check_handshake_2_send_handshake_3(const unsigned char* data_buf,
     HS_nonce_t hs;
     parse_handshake_body(decrypted.data(), hs);
 
-    if (std::memcmp(hs.reply_nonce, entity_nonce, HS_NONCE_SIZE) != 0) {
+    if (std::memcmp(hs.reply_nonce.data(), entity_nonce, HS_NONCE_SIZE) != 0) {
         throw SST_Exception(
             "Comm init failed: server NOT verified, nonce NOT matched, "
             "disconnecting...",
@@ -134,14 +142,14 @@ Bytes check_handshake_2_send_handshake_3(const unsigned char* data_buf,
     }
     LOG_DBG << "Server authenticated/authorized by solving nonce!";
 
-    unsigned char buf[HS_NONCE_FIELDS_SIZE];
-    std::memset(buf, 0, HS_NONCE_FIELDS_SIZE);
-    if (serialize_handshake_body(entity_nonce, hs.nonce, buf) < 0) {
+    std::array<unsigned char, HS_NONCE_FIELDS_SIZE> buf{};
+    if (serialize_handshake_body(entity_nonce, hs.nonce.data(), buf.data()) <
+        0) {
         throw SST_Exception("Failed serialize_handshake_body().",
                             SST_ErrorCode::Protocol);
     }
     Bytes ret;
-    if (handshake_encrypt(buf, HS_NONCE_FIELDS_SIZE, s_key, ret) < 0) {
+    if (handshake_encrypt(buf.data(), buf.size(), s_key, ret) < 0) {
         throw SST_Exception("Error during encryption while send_handshake_3.",
                             SST_ErrorCode::Crypto);
     }
@@ -166,7 +174,7 @@ Bytes check_handshake1_send_handshake2(const unsigned char* received_buf,
     }
     HS_nonce_t hs;
     parse_handshake_body(decrypted.data(), hs);
-    LOG_DBG << "Client's nonce: " << to_hex(hs.nonce, HS_NONCE_SIZE);
+    LOG_DBG << "Client's nonce: " << to_hex(hs.nonce.data(), HS_NONCE_SIZE);
 
     if (Crypto::generate_nonce(HS_NONCE_SIZE, server_nonce) < 0) {
         throw SST_Exception("Failed to generate server nonce.",
@@ -174,14 +182,14 @@ Bytes check_handshake1_send_handshake2(const unsigned char* received_buf,
     }
     LOG_DBG << "Server's nonce: " << to_hex(server_nonce, HS_NONCE_SIZE);
 
-    unsigned char buf[HS_NONCE_FIELDS_SIZE];
-    std::memset(buf, 0, HS_NONCE_FIELDS_SIZE);
-    if (serialize_handshake_body(server_nonce, hs.nonce, buf) < 0) {
+    std::array<unsigned char, HS_NONCE_FIELDS_SIZE> buf{};
+    if (serialize_handshake_body(server_nonce, hs.nonce.data(), buf.data()) <
+        0) {
         throw SST_Exception("Failed serialize_handshake_body().",
                             SST_ErrorCode::Protocol);
     }
     Bytes ret;
-    if (handshake_encrypt(buf, HS_NONCE_FIELDS_SIZE, s_key, ret) < 0) {
+    if (handshake_encrypt(buf.data(), buf.size(), s_key, ret) < 0) {
         throw SST_Exception("Error during encryption while sending handshake2.",
                             SST_ErrorCode::Crypto);
     }
@@ -209,12 +217,12 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     FdGuard guard(sock);
 
     // Send handshake 1.
-    unsigned char entity_nonce[HS_NONCE_SIZE];
-    Bytes parsed = make_handshake_1_payload(s_key, entity_nonce);
-    Bytes sender_HS_1 =
-        IoTSPMessage(MessageType::SKEY_HANDSHAKE_1, std::move(parsed))
-            .serialize();
-    if (write_bytes_to_socket(sock, sender_HS_1) < 0) {
+    std::array<unsigned char, HS_NONCE_SIZE> entity_nonce{};
+    Bytes parsed = make_handshake_1_payload(s_key, entity_nonce.data());
+    if (Bytes sender_HS_1 =
+            IoTSPMessage(MessageType::SKEY_HANDSHAKE_1, std::move(parsed))
+                .serialize();
+        write_bytes_to_socket(sock, sender_HS_1) < 0) {
         throw SST_Exception("Failed to send handshake 1.",
                             SST_ErrorCode::Network);
     }
@@ -222,10 +230,9 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     // Receive handshake 2.
     MessageType message_type;
     Bytes received;
-    SST_IOResult read_result =
-        IoTSPMessage::read_result(sock, MAX_HS_BUF_LENGTH, message_type,
-                                  received);
-    if (read_result.status == SST_IOStatus::Error) {
+    if (const SST_IOResult read_result = IoTSPMessage::read_result(
+            sock, MAX_HS_BUF_LENGTH, message_type, received);
+        read_result.status == SST_IOStatus::Error) {
         throw SST_Exception(
             "Socket read error in secure_connect_to_server_with_socket().",
             read_result.error);
@@ -235,8 +242,7 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
             "secure_connect_to_server_with_socket().",
             SST_ErrorCode::PeerClosed);
     } else if (read_result.bytes == 0) {
-        throw SST_Exception("Empty handshake2 frame.",
-                            SST_ErrorCode::Protocol);
+        throw SST_Exception("Empty handshake2 frame.", SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_2) {
         throw SST_Exception(
@@ -248,10 +254,11 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     // Send handshake 3.
     Bytes hs3 = check_handshake_2_send_handshake_3(
         received.data(), static_cast<unsigned int>(received.size()),
-        entity_nonce, s_key);
-    Bytes sender_HS_3 =
-        IoTSPMessage(MessageType::SKEY_HANDSHAKE_3, std::move(hs3)).serialize();
-    if (write_bytes_to_socket(sock, sender_HS_3) < 0) {
+        entity_nonce.data(), s_key);
+    if (Bytes sender_HS_3 =
+            IoTSPMessage(MessageType::SKEY_HANDSHAKE_3, std::move(hs3))
+                .serialize();
+        write_bytes_to_socket(sock, sender_HS_3) < 0) {
         throw SST_Exception("Failed to send handshake 3.",
                             SST_ErrorCode::Network);
     }
@@ -278,8 +285,7 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
             "server_secure_comm_setup().",
             SST_ErrorCode::PeerClosed);
     } else if (read_result.bytes == 0) {
-        throw SST_Exception("Empty handshake1 frame.",
-                            SST_ErrorCode::Protocol);
+        throw SST_Exception("Empty handshake1 frame.", SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_1) {
         throw SST_Exception(
@@ -292,19 +298,21 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     }
     LOG_DBG << "Received session key handshake1.";
 
-    unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
-    std::memcpy(target_session_key_id, received.data(), SESSION_KEY_ID_SIZE);
-    session_key_t* s_key =
-        get_session_key_by_ID(target_session_key_id, existing_s_key_list);
+    std::array<unsigned char, SESSION_KEY_ID_SIZE> target_session_key_id{};
+    std::memcpy(target_session_key_id.data(), received.data(),
+                SESSION_KEY_ID_SIZE);
+    session_key_t* s_key = get_session_key_by_ID(target_session_key_id.data(),
+                                                 existing_s_key_list);
 
     // Send handshake 2.
-    unsigned char server_nonce[HS_NONCE_SIZE];
+    std::array<unsigned char, HS_NONCE_SIZE> server_nonce{};
     Bytes hs2 = check_handshake1_send_handshake2(
         received.data(), static_cast<unsigned int>(received.size()),
-        server_nonce, *s_key);
-    Bytes sender =
-        IoTSPMessage(MessageType::SKEY_HANDSHAKE_2, std::move(hs2)).serialize();
-    if (write_bytes_to_socket(clnt_sock, sender) < 0) {
+        server_nonce.data(), *s_key);
+    if (Bytes sender =
+            IoTSPMessage(MessageType::SKEY_HANDSHAKE_2, std::move(hs2))
+                .serialize();
+        write_bytes_to_socket(clnt_sock, sender) < 0) {
         throw SST_Exception("Failed to send handshake 2.",
                             SST_ErrorCode::Network);
     }
@@ -322,8 +330,7 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
             "server_secure_comm_setup().",
             SST_ErrorCode::PeerClosed);
     } else if (read_result.bytes == 0) {
-        throw SST_Exception("Empty handshake3 frame.",
-                            SST_ErrorCode::Protocol);
+        throw SST_Exception("Empty handshake3 frame.", SST_ErrorCode::Protocol);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_3) {
         throw SST_Exception(
@@ -343,7 +350,8 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     }
     HS_nonce_t hs;
     parse_handshake_body(decrypted.data(), hs);
-    if (std::memcmp(hs.reply_nonce, server_nonce, HS_NONCE_SIZE) != 0) {
+    if (std::memcmp(hs.reply_nonce.data(), server_nonce.data(),
+                    HS_NONCE_SIZE) != 0) {
         throw SST_Exception(
             "Comm init failed: client NOT verified, nonce NOT matched, "
             "disconnecting...",

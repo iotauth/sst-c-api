@@ -43,8 +43,9 @@ void EntityRespMessage::decrypt_and_parse(const distribution_key_t& dist_key,
     if (internal::symmetric_decrypt_authenticate(
             encrypted_payload_.data(),
             static_cast<unsigned int>(encrypted_payload_.size()),
-            dist_key.mac_key, dist_key.mac_key_size, dist_key.cipher_key,
-            dist_key.cipher_key_size, enc_mode, USE_HMAC, plaintext) < 0) {
+            {dist_key.mac_key, dist_key.mac_key_size, dist_key.cipher_key,
+             dist_key.cipher_key_size, enc_mode, USE_HMAC},
+            plaintext) < 0) {
         throw SST_Exception("Failed to decrypt message type " +
                                 to_string(type_) +
                                 " with the distribution key.",

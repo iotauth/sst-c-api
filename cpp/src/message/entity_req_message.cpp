@@ -44,9 +44,9 @@ Bytes encrypt_with_distribution_key(const Bytes& buf,
                                     const std::string& name) {
     Bytes encrypted;
     if (internal::symmetric_encrypt_authenticate(
-            buf.data(), static_cast<unsigned int>(buf.size()), dist_key.mac_key,
-            dist_key.mac_key_size, dist_key.cipher_key,
-            dist_key.cipher_key_size, dist_key.enc_mode, USE_HMAC,
+            buf.data(), static_cast<unsigned int>(buf.size()),
+            {dist_key.mac_key, dist_key.mac_key_size, dist_key.cipher_key,
+             dist_key.cipher_key_size, dist_key.enc_mode, USE_HMAC},
             encrypted) < 0) {
         throw SST_Exception(
             "Error during encryption with the distribution key.",

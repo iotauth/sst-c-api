@@ -40,6 +40,7 @@ if(NOT TARGET spdlog::spdlog)
 endif()
 
 find_package(OpenSSL REQUIRED)
+find_package(Threads REQUIRED)
 
 # SST library and protocol messages.
 add_library(${PROJECT_NAME} STATIC
@@ -71,7 +72,7 @@ target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
 
 # The logging header exposes spdlog types to consumers.
-target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto spdlog::spdlog)
+target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto spdlog::spdlog Threads::Threads)
 
 # Compiler warnings.
 if(MSVC)
@@ -100,7 +101,6 @@ add_executable(message_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/message_test.cpp)
 target_link_libraries(message_test PRIVATE ${PROJECT_NAME})
 add_test(NAME message_test COMMAND message_test)
 
-find_package(Threads REQUIRED)
 add_executable(protocol_test tests/protocol_test.cpp)
 target_link_libraries(protocol_test PRIVATE ${PROJECT_NAME} Threads::Threads)
 add_test(NAME protocol_test COMMAND protocol_test)

@@ -17,12 +17,14 @@
 #include <fstream>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <thread>
 
 #include "api.hpp"
 #include "api_internal.hpp"
 #include "message/iotsp_message.hpp"
 #include "net/sockets.hpp"
+#include "temporary_directory.hpp"
 
 #define CHECK(condition)                                            \
     do {                                                            \
@@ -40,10 +42,7 @@ using Key = std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)>;
 
 namespace {
 
-struct SocketOwner {
-    int fd;
-    ~SocketOwner() { ::close(fd); }
-};
+using SocketOwner = sst::internal::FdGuard;
 
 void number(Bytes& bytes, uint64_t value, int length) {
     for (int i = length - 1; i >= 0; --i) {
@@ -51,12 +50,13 @@ void number(Bytes& bytes, uint64_t value, int length) {
     }
 }
 
-void string(Bytes& bytes, const std::string& value) {
+void string(Bytes& bytes, std::string_view value) {
     size_t length = value.size();
     do {
-        unsigned char next = length & 0x7f;
+        const auto next = static_cast<std::byte>(length & 0x7f);
         length >>= 7;
-        bytes.push_back(next | (length ? 0x80 : 0));
+        bytes.push_back(std::to_integer<unsigned char>(
+            next | (length ? std::byte{0x80} : std::byte{0})));
     } while (length);
     bytes.insert(bytes.end(), value.begin(), value.end());
 }
@@ -65,9 +65,10 @@ void send_frame(int fd, unsigned char msg_type, const Bytes& payload) {
     Bytes wire{msg_type};
     size_t length = payload.size();
     do {
-        unsigned char next = length & 0x7f;
+        const auto next = static_cast<std::byte>(length & 0x7f);
         length >>= 7;
-        wire.push_back(next | (length ? 0x80 : 0));
+        wire.push_back(std::to_integer<unsigned char>(
+            next | (length ? std::byte{0x80} : std::byte{0})));
     } while (length);
     wire.insert(wire.end(), payload.begin(), payload.end());
     CHECK(sst::internal::sst_write_to_socket(fd, wire.data(), wire.size()) ==
@@ -77,8 +78,9 @@ void send_frame(int fd, unsigned char msg_type, const Bytes& payload) {
 Bytes encrypt(const sst::distribution_key_t& key, const Bytes& plain) {
     Bytes encrypted;
     CHECK(sst::internal::symmetric_encrypt_authenticate(
-              plain.data(), plain.size(), key.mac_key, key.mac_key_size,
-              key.cipher_key, key.cipher_key_size, key.enc_mode, sst::USE_HMAC,
+              plain.data(), plain.size(),
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
               encrypted) == 0);
     return encrypted;
 }
@@ -86,28 +88,19 @@ Bytes encrypt(const sst::distribution_key_t& key, const Bytes& plain) {
 Bytes decrypt(const sst::distribution_key_t& key, const Bytes& encrypted) {
     Bytes plain;
     CHECK(sst::internal::symmetric_decrypt_authenticate(
-              encrypted.data(), encrypted.size(), key.mac_key, key.mac_key_size,
-              key.cipher_key, key.cipher_key_size, key.enc_mode, sst::USE_HMAC,
+              encrypted.data(), encrypted.size(),
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
               plain) == 0);
     return plain;
 }
 
-std::filesystem::path make_private_temp_directory() {
-    std::string pattern =
-        (std::filesystem::temp_directory_path() / "sst_protocol_test_XXXXXX")
-            .string();
-    // Atomically create a fresh directory with mode 0700. Reusing a predictable
-    // path could follow an attacker-created symlink when writing credentials.
-    char* dir = ::mkdtemp(pattern.data());
-    CHECK(dir != nullptr);
-    return dir;
-}
-
 struct Credentials {
-    Key auth{EVP_RSA_gen(2048), EVP_PKEY_free};
-    Key entity{EVP_RSA_gen(2048), EVP_PKEY_free};
+    sst::test::TemporaryDirectory temporary{"sst_protocol_test_"};
+    Key auth{EVP_RSA_gen(2048), &EVP_PKEY_free};
+    Key entity{EVP_RSA_gen(2048), &EVP_PKEY_free};
     sst::distribution_key_t dist{};
-    std::filesystem::path dir = make_private_temp_directory();
+    const std::filesystem::path dir = temporary.path();
 
     Credentials() {
         CHECK(auth && entity);
@@ -140,7 +133,6 @@ struct Credentials {
                                            0, nullptr, nullptr) == 1);
         std::fclose(file);
     }
-    ~Credentials() { std::filesystem::remove_all(dir); }
 
     std::string config(int port) const {
         const auto path = dir / "entity.config";
@@ -215,13 +207,13 @@ struct Exchange {
 void serve_exchange(int listener, const Credentials& credentials,
                     const Exchange& expected) {
     SocketOwner peer{::accept(listener, nullptr, nullptr)};
-    CHECK(peer.fd >= 0);
+    CHECK(peer.get() >= 0);
     const std::array<unsigned char, 8> auth_nonce{1, 2, 3, 4, 5, 6, 7, 8};
     Bytes hello;
     number(hello, 101, 4);
     hello.insert(hello.end(), auth_nonce.begin(), auth_nonce.end());
-    send_frame(peer.fd, 0, hello);
-    IoTSPMessage request = IoTSPMessage::receive(peer.fd, 4096);
+    send_frame(peer.get(), 0, hello);
+    IoTSPMessage request = IoTSPMessage::receive(peer.get(), 4096);
     CHECK(static_cast<unsigned char>(request.get_type()) ==
           expected.request_type);
     bool public_key =
@@ -259,13 +251,15 @@ void serve_exchange(int listener, const Credentials& credentials,
     string(expected_body, expected.purpose);
     CHECK(plain == expected_body);
     if (expected.alert) {
-        send_frame(peer.fd, 100, Bytes{1});
+        send_frame(peer.get(), 100, Bytes{1});
         return;
     }
     Bytes response(plain.begin(), plain.begin() + 8);
-    if (expected.wrong_nonce) response[0] ^= 0xff;
+    if (expected.wrong_nonce)
+        response[0] = std::to_integer<unsigned char>(
+            static_cast<std::byte>(response[0]) ^ std::byte{0xff});
     if (key_request) {
-        string(response, "{\"cipher\":\"AES-128-CBC\"}");
+        string(response, R"({"cipher":"AES-128-CBC"})");
         number(response, expected.key_count, 4);
         for (unsigned int i = 0; i < expected.key_count; ++i) {
             number(response, expected.key_id + i, 8);
@@ -283,8 +277,10 @@ void serve_exchange(int listener, const Credentials& credentials,
     wire_payload.insert(wire_payload.end(), encrypted.begin(), encrypted.end());
     if (expected.key_count == 10 && public_key)
         CHECK(wire_payload.size() > 1024);
-    send_frame(peer.fd,
-               key_request ? (public_key ? 21 : 23) : (public_key ? 61 : 63),
+    const unsigned char key_response_type = public_key ? 21 : 23;
+    const unsigned char reader_response_type = public_key ? 61 : 63;
+    send_frame(peer.get(),
+               key_request ? key_response_type : reader_response_type,
                wire_payload);
 }
 
@@ -309,7 +305,7 @@ void test_auth_exchanges() {
     CHECK(::getsockname(listener.get_fd(),
                         reinterpret_cast<sockaddr*>(&address), &length) == 0);
     const std::string config = credentials.config(ntohs(address.sin_port));
-    std::thread auth([&] {
+    std::thread auth([&listener, &credentials] {
         for (const Exchange& exchange :
              {Exchange{20, "default", 42, 10}, Exchange{22, "other"},
               Exchange{22, "default"}, Exchange{22, "other"},
@@ -331,19 +327,21 @@ void test_auth_exchanges() {
     CHECK(list.size() == 1 && other_list.size() == 1);
     api.get_session_key(list);  // no room for ten more valid keys: no request
     CHECK(list.size() == 1);
-    unsigned char id[8] = {0, 0, 0, 0, 0, 0, 0, 99};
-    CHECK(api.get_session_key_by_ID(id, list)->key_id[7] == 99);
-    CHECK(api.get_session_key_by_ID(id, list)->key_id[7] == 99);  // cache hit
+    std::array<unsigned char, 8> id{0, 0, 0, 0, 0, 0, 0, 99};
+    CHECK(api.get_session_key_by_ID(id.data(), list)->key_id[7] == 99);
+    CHECK(api.get_session_key_by_ID(id.data(), list)->key_id[7] ==
+          99);  // cache hit
     api.send_add_reader_req_via_TCP("reader");
     id[7] = 100;
-    expect_error(sst::SST_ErrorCode::Protocol,
-                 [&] { api.get_session_key_by_ID(id, list); });
+    expect_error(sst::SST_ErrorCode::Protocol, [&api, &id, &list] {
+        api.get_session_key_by_ID(id.data(), list);
+    });
     CHECK(api.get_session_key().size() ==
           1);  // failed ID request leaves no sticky purpose
     expect_error(sst::SST_ErrorCode::Protocol,
-                 [&] { api.send_add_reader_req_via_TCP("bad-nonce"); });
+                 [&api] { api.send_add_reader_req_via_TCP("bad-nonce"); });
     expect_error(sst::SST_ErrorCode::AuthRejected,
-                 [&] { api.send_add_reader_req_via_TCP("alert"); });
+                 [&api] { api.send_add_reader_req_via_TCP("alert"); });
     sst::SST_API reader_first(config);
     reader_first.send_add_reader_req_via_TCP("first-reader");
     CHECK(reader_first.get_session_key().size() == 1);
@@ -363,11 +361,11 @@ void test_handshake_msg_type_and_flags() {
     crypto.cipher_key_size = key.cipher_key_size;
     crypto.mac_key_size = key.mac_key_size;
     crypto.enc_mode = key.enc_mode;
-    int sockets[2];
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
-    std::thread server([&] {
+    std::array<int, 2> sockets{};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+    std::thread server([&sockets, &key, &crypto] {
         SocketOwner peer{sockets[1]};
-        auto first = IoTSPMessage::receive(peer.fd, 256);
+        auto first = IoTSPMessage::receive(peer.get(), 256);
         CHECK(static_cast<unsigned char>(first.get_type()) ==
               30);  // outer msgType
         CHECK(std::memcmp(first.get_payload().data(), key.key_id, 8) == 0);
@@ -377,8 +375,8 @@ void test_handshake_msg_type_and_flags() {
         Bytes reply{0x03};
         reply.insert(reply.end(), 8, 0x55);
         reply.insert(reply.end(), body.begin() + 1, body.end());
-        send_frame(peer.fd, 31, encrypt(crypto, reply));
-        auto third = IoTSPMessage::receive(peer.fd, 256);
+        send_frame(peer.get(), 31, encrypt(crypto, reply));
+        auto third = IoTSPMessage::receive(peer.get(), 256);
         CHECK(static_cast<unsigned char>(third.get_type()) == 32);
         Bytes final_body = decrypt(crypto, third.get_payload());
         // Preserve C's two-nonce handshake 3 body (Node sends replyNonce only).
@@ -396,11 +394,11 @@ void test_empty_handshake_frames() {
     Credentials credentials;
     sst::SST_API api(credentials.config(0));
     sst::SessionKeyList keys;
-    int sockets[2];
+    std::array<int, 2> sockets{};
 
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
     send_frame(sockets[1], 30, {});
-    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+    expect_error(sst::SST_ErrorCode::Protocol, [&api, &sockets, &keys] {
         api.server_secure_comm_setup(sockets[0], keys);
     });
     ::close(sockets[1]);
@@ -417,13 +415,13 @@ void test_empty_handshake_frames() {
     crypto.mac_key_size = key.mac_key_size;
     crypto.enc_mode = key.enc_mode;
 
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
-    std::thread empty_handshake2([&] {
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+    std::thread empty_handshake2([&sockets] {
         SocketOwner peer{sockets[1]};
-        IoTSPMessage::receive(peer.fd, 256);
-        send_frame(peer.fd, 31, {});
+        IoTSPMessage::receive(peer.get(), 256);
+        send_frame(peer.get(), 31, {});
     });
-    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+    expect_error(sst::SST_ErrorCode::Protocol, [&key, &sockets] {
         sst::SST_API::secure_connect_to_server_with_socket(key, sockets[0]);
     });
     empty_handshake2.join();
@@ -435,15 +433,15 @@ void test_empty_handshake_frames() {
     Bytes encrypted = encrypt(crypto, body);
     handshake1.insert(handshake1.end(), encrypted.begin(), encrypted.end());
 
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
-    std::thread empty_handshake3([&] {
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+    std::thread empty_handshake3([&sockets, &handshake1] {
         SocketOwner peer{sockets[1]};
-        send_frame(peer.fd, 30, handshake1);
-        auto response = IoTSPMessage::receive(peer.fd, 256);
+        send_frame(peer.get(), 30, handshake1);
+        auto response = IoTSPMessage::receive(peer.get(), 256);
         CHECK(response.get_type() == MessageType::SKEY_HANDSHAKE_2);
-        send_frame(peer.fd, 32, {});
+        send_frame(peer.get(), 32, {});
     });
-    expect_error(sst::SST_ErrorCode::Protocol, [&] {
+    expect_error(sst::SST_ErrorCode::Protocol, [&api, &sockets, &keys] {
         api.server_secure_comm_setup(sockets[0], keys);
     });
     empty_handshake3.join();

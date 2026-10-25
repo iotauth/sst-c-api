@@ -6,6 +6,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
 #include <cstring>
 #include <utility>
 
@@ -33,7 +34,8 @@ SST_Session::~SST_Session() {
     }
 }
 
-void SST_Session::shutdown() {
+// Retain the public member type, including callers taking its address.
+void SST_Session::shutdown() {  // NOSONAR: S5817, public API compatibility.
     if (sock_ >= 0) {
         ::shutdown(sock_, SHUT_RDWR);
     }
@@ -53,7 +55,10 @@ int SST_Session::read_secure_message(unsigned char* plaintext,
     return read_secure_message_result(plaintext, capacity).legacy_value();
 }
 
-SST_IOResult SST_Session::send_secure_message_result(const std::string& msg) {
+// The std::string overload is part of the public API; retain its exact
+// signature.
+SST_IOResult SST_Session::send_secure_message_result(
+    const std::string& msg) {  // NOSONAR: S6009, public API compatibility.
     if (msg.size() > MAX_PAYLOAD_LENGTH) {
         return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
     }
@@ -64,7 +69,7 @@ SST_IOResult SST_Session::send_secure_message_result(const std::string& msg) {
 
 SST_IOResult SST_Session::send_secure_message_result(const unsigned char* msg,
                                                      unsigned int msg_length) {
-    std::lock_guard<std::mutex> lock(send_mutex_);
+    std::scoped_lock lock(send_mutex_);
     if (msg_length > MAX_PAYLOAD_LENGTH || (!msg && msg_length != 0)) {
         LOG_ERR << "Invalid message buffer or length: " << msg_length;
         return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
@@ -106,15 +111,16 @@ SST_IOResult SST_Session::send_secure_message_result(const unsigned char* msg,
 
 SST_IOResult SST_Session::read_secure_message_result(
     unsigned char* plaintext, unsigned int plaintext_capacity) {
-    std::lock_guard<std::mutex> lock(recv_mutex_);
+    std::scoped_lock lock(recv_mutex_);
     if (!plaintext && plaintext_capacity != 0) {
         return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
     }
     MessageType message_type;
     Bytes received;
-    SST_IOResult frame = IoTSPMessage::read_result(
-        sock_, MAX_SECURE_COMM_MSG_LENGTH, message_type, received);
-    if (!frame.ok()) return frame;
+    if (const SST_IOResult frame = IoTSPMessage::read_result(
+            sock_, MAX_SECURE_COMM_MSG_LENGTH, message_type, received);
+        !frame.ok())
+        return frame;
     if (message_type != MessageType::SECURE_COMM_MSG) {
         LOG_ERR << "Wrong message type " << message::to_string(message_type)
                 << ", expected SECURE_COMM_MSG.";
@@ -123,8 +129,9 @@ SST_IOResult SST_Session::read_secure_message_result(
     Bytes decrypted;
     if (symmetric_decrypt_authenticate(
             received.data(), static_cast<unsigned int>(received.size()),
-            s_key_.mac_key, MAC_KEY_SIZE, s_key_.cipher_key, CIPHER_KEY_SIZE,
-            s_key_.enc_mode, s_key_.hmac_mode, decrypted) < 0) {
+            {s_key_.mac_key, MAC_KEY_SIZE, s_key_.cipher_key, CIPHER_KEY_SIZE,
+             s_key_.enc_mode, s_key_.hmac_mode},
+            decrypted) < 0) {
         LOG_ERR << "Failed to decrypt received message.";
         return SST_IOResult::failure(SST_ErrorCode::Crypto);
     }
@@ -161,9 +168,10 @@ SST_IOResult SST_Session::read_secure_message_result(
 }
 
 void SST_Session::receive_loop() {
-    unsigned char data_buf[MAX_SECURE_COMM_MSG_LENGTH];
+    std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> data_buf{};
     while (true) {
-        int data_buf_length = read_secure_message(data_buf, sizeof(data_buf));
+        int data_buf_length =
+            read_secure_message(data_buf.data(), data_buf.size());
         if (data_buf_length < 0) {
             LOG_ERR << "Failed to read_secure_message().";
             return;
@@ -172,8 +180,8 @@ void SST_Session::receive_loop() {
             return;
         }
         LOG_INF << "Received: "
-                << std::string(reinterpret_cast<const char*>(data_buf),
-                               static_cast<size_t>(data_buf_length));
+                << std::string(data_buf.begin(),
+                               data_buf.begin() + data_buf_length);
     }
 }
 

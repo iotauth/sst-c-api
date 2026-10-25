@@ -216,14 +216,14 @@ void SST_API::load_permanent_distribution_key() {
 }
 
 SessionKeyList SST_API::get_session_key_with_index(int purpose_index) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     return request_session_keys_locked(
         configured_purpose(config_, purpose_index));
 }
 
 void SST_API::get_session_key_with_index(int purpose_index,
                                          SessionKeyList& existing_s_key_list) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     const char* purpose = configured_purpose(config_, purpose_index);
     if (!existing_s_key_list.addable(config_.numkey)) {
         LOG_WRN << "The session key list is not addable.";
@@ -243,7 +243,7 @@ void SST_API::get_session_key(SessionKeyList& existing_s_key_list) {
 session_key_t* SST_API::get_session_key_by_ID(
     const unsigned char* target_session_key_id,
     SessionKeyList& existing_s_key_list) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     uint64_t target_id =
         convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE);
     int session_key_idx = existing_s_key_list.find(target_id);
@@ -356,7 +356,7 @@ SessionKeyList SST_API::request_session_keys_locked(
 }
 
 void SST_API::send_add_reader_req_via_TCP(const std::string& add_reader) {
-    std::lock_guard<std::mutex> lock(mutex_);
+    std::scoped_lock lock(mutex_);
     request_auth_locked<message::AddReaderReqMessage,
                         message::AddReaderRespMessage>(config_.name,
                                                        add_reader);

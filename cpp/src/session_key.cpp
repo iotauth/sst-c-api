@@ -43,8 +43,8 @@ size_t storage_slot_for_index(const SessionKeyList& list, size_t index) {
 }
 
 size_t checked_storage_slot(const SessionKeyList& list, int slot) {
-    const int max = static_cast<int>(MAX_SESSION_KEY);
-    if (slot < 0 || slot >= max ||
+    if (const auto max = static_cast<int>(MAX_SESSION_KEY);
+        slot < 0 || slot >= max ||
         (slot - list.rear_idx + list.num_key + max) % max >= list.num_key) {
         throw SST_Exception("Session key slot is not active.",
                             SST_ErrorCode::InvalidArgument);
@@ -77,7 +77,7 @@ bool is_session_key_valid(const session_key_t& session_key) {
 int SessionKeyList::find(uint64_t key_id) const {
     // Walk the ring from the oldest key so that slots left behind by dropped
     // or overwritten keys are never matched.
-    const int max = static_cast<int>(MAX_SESSION_KEY);
+    const auto max = static_cast<int>(MAX_SESSION_KEY);
     for (int i = 0; i < num_key; i++) {
         int idx = (i + rear_idx - num_key) % max;
         if (idx < 0) idx += max;
@@ -124,7 +124,7 @@ void SessionKeyList::append(const SessionKeyList& src) {
         append(snapshot);
         return;
     }
-    const int max = static_cast<int>(MAX_SESSION_KEY);
+    const auto max = static_cast<int>(MAX_SESSION_KEY);
     if (num_key + src.num_key > max) {
         int lost = num_key + src.num_key - max;
         LOG_DBG << "Warning: Losing " << lost
@@ -143,7 +143,7 @@ bool SessionKeyList::addable(int requested_num_key) {
         requested_num_key > static_cast<int>(MAX_SESSION_KEY)) {
         return false;
     }
-    const int max = static_cast<int>(MAX_SESSION_KEY);
+    const auto max = static_cast<int>(MAX_SESSION_KEY);
     int deficit = requested_num_key - (max - num_key);
     if (deficit <= 0) {
         return true;

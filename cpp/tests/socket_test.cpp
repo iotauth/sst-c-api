@@ -6,6 +6,7 @@
 #include <arpa/inet.h>
 #include <fcntl.h>
 
+#include <array>
 #include <cerrno>
 #include <cstdio>
 #include <cstdlib>
@@ -47,15 +48,22 @@ void test_invalid_addresses() {
 }
 
 int listener_port(int fd, sst::SST_SOCK_DOMAIN domain) {
-    sockaddr_storage address{};
-    socklen_t length = sizeof(address);
-    check(
-        ::getsockname(fd, reinterpret_cast<sockaddr*>(&address), &length) == 0,
-        "query listener address");
+    sockaddr_storage storage{};
+    auto address = sst::SST_SocketInfo::AllocAddr(&storage, sizeof(storage));
+    check(address != nullptr, "allocate listener address");
+    socklen_t length = sizeof(storage);
+    check(::getsockname(fd, address.get(), &length) == 0,
+          "query listener address");
     if (domain == sst::SST_SOCK_INET) {
-        return ntohs(reinterpret_cast<sockaddr_in*>(&address)->sin_port);
+        sockaddr_in ipv4{};
+        check(length == sizeof(ipv4), "IPv4 address length");
+        std::memcpy(&ipv4, address.get(), sizeof(ipv4));
+        return ntohs(ipv4.sin_port);
     }
-    return ntohs(reinterpret_cast<sockaddr_in6*>(&address)->sin6_port);
+    sockaddr_in6 ipv6{};
+    check(length == sizeof(ipv6), "IPv6 address length");
+    std::memcpy(&ipv6, address.get(), sizeof(ipv6));
+    return ntohs(ipv6.sin6_port);
 }
 
 void test_loopback(sst::SST_SOCK_DOMAIN domain, const char* host) {
@@ -88,17 +96,17 @@ void test_loopback(sst::SST_SOCK_DOMAIN domain, const char* host) {
     int duplicate_fd = copy->sock;
     {
         sst::ClientSocket duplicate(std::move(copy));
-        char message[] = "SST";
-        check(duplicate.Write(message, sizeof(message)) == sizeof(message),
+        std::array<char, 4> message{'S', 'S', 'T', '\0'};
+        check(duplicate.Write(message.data(), message.size()) == message.size(),
               "write through duplicate");
         check(::shutdown(duplicate.get_fd(), SHUT_WR) == 0,
               "close the sending direction");
-        char received[16]{};
-        check(accepted.Read(received, sizeof(received)) == sizeof(message),
+        std::array<char, 16> received{};
+        check(accepted.Read(received.data(), received.size()) == message.size(),
               "read returns partial data at EOF");
-        check(std::memcmp(received, message, sizeof(message)) == 0,
+        check(std::memcmp(received.data(), message.data(), message.size()) == 0,
               "received bytes match");
-        check(accepted.Read(received, sizeof(received)) == 0,
+        check(accepted.Read(received.data(), received.size()) == 0,
               "subsequent read reports EOF");
     }
     check(::fcntl(duplicate_fd, F_GETFD) == -1 && errno == EBADF,

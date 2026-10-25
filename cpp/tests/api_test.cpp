@@ -25,6 +25,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -33,6 +34,8 @@
 #include <fstream>
 #include <string>
 #include <vector>
+
+#include "temporary_directory.hpp"
 
 // assert() is compiled out in Release builds (NDEBUG), so use a check that is
 // always active.
@@ -52,8 +55,8 @@ using sst::SST_Exception;
 
 namespace {
 
-const std::filesystem::path kTmpDir =
-    std::filesystem::temp_directory_path() / "sst_cpp_api_test";
+const sst::test::TemporaryDirectory temporary_directory{"sst_cpp_api_test_"};
+const std::filesystem::path kTmpDir = temporary_directory.path();
 
 // Writes a self-signed X.509 certificate (for the "Auth public key") and a
 // private key, both PEM, so that SST_API can be constructed offline.
@@ -530,11 +533,11 @@ void test_session_key_access() {
         }
         CHECK(caught);
     };
-    expect_invalid_access([&] { list.at(list.size()); });
-    expect_invalid_access([&] { read_only.at(list.size()); });
+    expect_invalid_access([&list] { list.at(list.size()); });
+    expect_invalid_access([&read_only] { read_only.at(read_only.size()); });
     for (int slot : {-1, static_cast<int>(sst::MAX_SESSION_KEY)}) {
-        expect_invalid_access([&] { list.at_slot(slot); });
-        expect_invalid_access([&] { read_only.at_slot(slot); });
+        expect_invalid_access([&list, slot] { list.at_slot(slot); });
+        expect_invalid_access([&read_only, slot] { read_only.at_slot(slot); });
     }
 
     SessionKeyList partial;
@@ -542,8 +545,9 @@ void test_session_key_access() {
     partial.add(make_session_key(2, UINT64_MAX));
     CHECK(partial.addable(sst::MAX_SESSION_KEY - 1));
     const SessionKeyList& read_only_partial = partial;
-    expect_invalid_access([&] { partial.at_slot(0); });
-    expect_invalid_access([&] { read_only_partial.at_slot(0); });
+    expect_invalid_access([&partial] { partial.at_slot(0); });
+    expect_invalid_access(
+        [&read_only_partial] { read_only_partial.at_slot(0); });
     partial.append(partial);
     CHECK(partial.size() == 2);
     CHECK(sst::convert_skid_buf_to_int(partial.at(0).key_id, 8) == 2);
@@ -554,39 +558,42 @@ void test_typed_message_results() {
     using sst::SST_ErrorCode;
     using sst::SST_IOStatus;
     session_key_t key = make_session_key(42, UINT64_MAX);
-    int sockets[2];
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets) == 0);
+    std::array<int, 2> sockets{};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
     sst::SST_Session sender(sockets[0], key);
     sst::SST_Session receiver(sockets[1], key);
-    unsigned char plaintext[64];
+    std::array<unsigned char, 64> plaintext{};
     CHECK(sender.send_secure_message_result("").ok());
     auto empty =
-        receiver.read_secure_message_result(plaintext, sizeof(plaintext));
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size());
     CHECK(empty.ok() && empty.bytes == 0);
     CHECK(sender.send_secure_message("legacy") > 0);
-    CHECK(receiver.read_secure_message(plaintext, sizeof(plaintext)) == 6);
+    CHECK(receiver.read_secure_message(plaintext.data(), plaintext.size()) ==
+          6);
     CHECK(sender.send_secure_message_result("typed").ok());
     auto result =
-        receiver.read_secure_message_result(plaintext, sizeof(plaintext));
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size());
     CHECK(result.ok() && result.bytes == 5 &&
           result.error == SST_ErrorCode::None);
-    CHECK(std::memcmp(plaintext, "typed", 5) == 0);
+    CHECK(std::memcmp(plaintext.data(), "typed", 5) == 0);
     CHECK(sender.send_secure_message_result("too large").ok());
-    CHECK(receiver.read_secure_message_result(plaintext, 1).error ==
+    CHECK(receiver.read_secure_message_result(plaintext.data(), 1).error ==
           SST_ErrorCode::BufferTooSmall);
     CHECK(sender.send_secure_message_result(nullptr, 1).error ==
           SST_ErrorCode::InvalidArgument);
     CHECK(receiver.read_secure_message_result(nullptr, 1).error ==
           SST_ErrorCode::InvalidArgument);
     sender.shutdown();
-    CHECK(receiver.read_secure_message_result(plaintext, sizeof(plaintext))
-              .status == SST_IOStatus::PeerClosed);
-    CHECK(receiver.read_secure_message(plaintext, sizeof(plaintext)) == 0);
+    CHECK(
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size())
+            .status == SST_IOStatus::PeerClosed);
+    CHECK(receiver.read_secure_message(plaintext.data(), plaintext.size()) ==
+          0);
 
     sst::SST_Session invalid(-1, key);
     CHECK(invalid.send_secure_message_result("test").error ==
           SST_ErrorCode::Network);
-    CHECK(invalid.read_secure_message_result(plaintext, sizeof(plaintext))
+    CHECK(invalid.read_secure_message_result(plaintext.data(), plaintext.size())
               .error == SST_ErrorCode::Network);
     key.abs_validity = 1;
     sst::SST_Session expired(-1, key);
@@ -601,7 +608,6 @@ void test_typed_message_results() {
 
 int main() {
     std::printf("===== Running SST C++ API tests =====\n\n");
-    std::filesystem::create_directories(kTmpDir);
     generate_test_credentials((kTmpDir / "auth_cert.pem").string(),
                               (kTmpDir / "entity_key.pem").string());
 
@@ -623,7 +629,6 @@ int main() {
     test_session_key_access();
     test_typed_message_results();
 
-    std::filesystem::remove_all(kTmpDir);
     std::printf("\n===== All SST C++ API tests passed. =====\n");
     return 0;
 }

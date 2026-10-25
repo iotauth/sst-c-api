@@ -14,8 +14,7 @@
 
 #include "api.hpp"
 
-namespace sst {
-namespace internal {
+namespace sst::internal {
 
 using Bytes = std::vector<unsigned char>;
 
@@ -48,8 +47,9 @@ class FdGuard {
 };
 
 // Connects to ip_addr:port_num with retries, like the C API.
+// max_attempts must be positive and includes the initial connection attempt.
 // @return connected socket, or -1 on failure.
-int connect_as_client(const char* ip_addr, int port_num);
+int connect_as_client(const char* ip_addr, int port_num, int max_attempts = 10);
 
 // Reads up to buf_length bytes with a single read().
 // @return bytes read, 0 on EOF, -1 on error.
@@ -91,16 +91,24 @@ void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
 
 // ---- Symmetric cryptography ----
 
+// Borrows key material for one crypto operation; does not own the buffers.
+struct SymmetricKeyView {
+    const unsigned char* mac_key;
+    unsigned int mac_key_size;
+    const unsigned char* cipher_key;
+    unsigned int cipher_key_size;
+    AES_encryption_mode_t enc_mode;
+    hmac_mode_t hmac_mode;
+};
+
 // True when the distribution key's absolute validity has not passed yet.
 bool is_distribution_key_valid(const distribution_key_t& dist_key);
 
 // Encrypt-then-MAC into a vector sized from the expected length.
 // @return 0 on success, -1 on failure.
-int symmetric_encrypt_authenticate(
-    const unsigned char* buf, unsigned int buf_length,
-    const unsigned char* mac_key, unsigned int mac_key_size,
-    const unsigned char* cipher_key, unsigned int cipher_key_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, Bytes& ret);
+int symmetric_encrypt_authenticate(const unsigned char* buf,
+                                   unsigned int buf_length,
+                                   const SymmetricKeyView& key, Bytes& ret);
 
 // Rejects buffers too short for the IV, optional HMAC and GCM tag (and, for
 // CBC, a whole number of ciphertext blocks).
@@ -110,13 +118,10 @@ bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
 
 // Verify-then-decrypt into a vector.
 // @return 0 on success, -1 on failure.
-int symmetric_decrypt_authenticate(
-    const unsigned char* buf, unsigned int buf_length,
-    const unsigned char* mac_key, unsigned int mac_key_size,
-    const unsigned char* cipher_key, unsigned int cipher_key_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, Bytes& ret);
+int symmetric_decrypt_authenticate(const unsigned char* buf,
+                                   unsigned int buf_length,
+                                   const SymmetricKeyView& key, Bytes& ret);
 
-}  // namespace internal
-}  // namespace sst
+}  // namespace sst::internal
 
 #endif  // SST_API_INTERNAL_HPP

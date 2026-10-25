@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -71,9 +72,10 @@ Bytes decrypt_with(const sst::distribution_key_t& key, const unsigned char* buf,
                    size_t len) {
     Bytes plain;
     CHECK(sst::internal::symmetric_decrypt_authenticate(
-              buf, static_cast<unsigned int>(len), key.mac_key,
-              key.mac_key_size, key.cipher_key, key.cipher_key_size,
-              key.enc_mode, sst::USE_HMAC, plain) == 0);
+              buf, static_cast<unsigned int>(len),
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
+              plain) == 0);
     return plain;
 }
 
@@ -81,8 +83,9 @@ Bytes encrypt_with(const sst::distribution_key_t& key, const Bytes& plain) {
     Bytes enc;
     CHECK(sst::internal::symmetric_encrypt_authenticate(
               plain.data(), static_cast<unsigned int>(plain.size()),
-              key.mac_key, key.mac_key_size, key.cipher_key,
-              key.cipher_key_size, key.enc_mode, sst::USE_HMAC, enc) == 0);
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
+              enc) == 0);
     return enc;
 }
 
@@ -153,20 +156,21 @@ void test_iotsp_message_serialize_and_read() {
 }
 
 void test_typed_frame_results() {
-    int fds[2];
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+    std::array<int, 2> fds{};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds.data()) == 0);
     // An empty framed payload is distinct from EOF in the typed API.
-    const unsigned char empty[] = {34, 0};
-    CHECK(sst::internal::sst_write_to_socket(fds[0], empty, sizeof(empty)) ==
-          2);
+    const std::array<unsigned char, 2> empty = {34, 0};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], empty.data(),
+                                             empty.size()) == 2);
     MessageType type;
     Bytes payload;
     auto result = IoTSPMessage::read_result(fds[1], 100, type, payload);
     CHECK(result.ok() && result.bytes == 0 &&
           type == MessageType::FIN_SECURE_COMM);
-    const unsigned char malformed[] = {33, 0x80, 0x80, 0x80, 0x80, 0x80};
-    CHECK(sst::internal::sst_write_to_socket(fds[0], malformed,
-                                             sizeof(malformed)) == 6);
+    const std::array<unsigned char, 6> malformed = {33,   0x80, 0x80,
+                                                    0x80, 0x80, 0x80};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], malformed.data(),
+                                             malformed.size()) == 6);
     result = IoTSPMessage::read_result(fds[1], 100, type, payload);
     CHECK(result.status == sst::SST_IOStatus::Error);
     CHECK(result.error == sst::SST_ErrorCode::Protocol);
@@ -175,10 +179,10 @@ void test_typed_frame_results() {
           sst::SST_IOStatus::PeerClosed);
     ::close(fds[1]);
 
-    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
-    const unsigned char truncated[] = {33, 2, 0xAA};
-    CHECK(sst::internal::sst_write_to_socket(fds[0], truncated,
-                                             sizeof(truncated)) == 3);
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds.data()) == 0);
+    const std::array<unsigned char, 3> truncated = {33, 2, 0xAA};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], truncated.data(),
+                                             truncated.size()) == 3);
     ::close(fds[0]);
     result = IoTSPMessage::read_result(fds[1], 100, type, payload);
     CHECK(result.status == sst::SST_IOStatus::Error);

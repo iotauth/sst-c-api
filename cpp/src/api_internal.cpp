@@ -12,28 +12,28 @@
 
 #include <algorithm>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
-#include <iomanip>
-#include <sstream>
+#include <string_view>
+#include <thread>
 
 #include "log/log_manager.hpp"
 
-namespace sst {
-
-namespace internal {
+namespace sst::internal {
 
 FdGuard::~FdGuard() {
     if (fd_ >= 0) ::close(fd_);
 }
 
 std::string to_hex(const unsigned char* buf, size_t size) {
-    std::ostringstream oss;
-    for (size_t i = 0; i < size; i++) {
-        if (i != 0) oss << ' ';
-        oss << std::hex << std::setw(2) << std::setfill('0')
-            << static_cast<int>(buf[i]);
+    constexpr std::string_view digits = "0123456789abcdef";
+    std::string result;
+    for (size_t i = 0; i < size; ++i) {
+        if (i != 0) result += ' ';
+        result += digits[buf[i] / 16];
+        result += digits[buf[i] % 16];
     }
-    return oss.str();
+    return result;
 }
 
 void write_in_n_bytes(uint64_t num, int n, unsigned char* buf) {
@@ -63,8 +63,9 @@ void var_length_int_to_num(const unsigned char* buf, unsigned int buf_length,
     // bytes; anything longer is malformed and leaves the size at 0.
     unsigned int limit = std::min(buf_length, MAX_PAYLOAD_BUF_SIZE);
     for (unsigned int i = 0; i < limit; i++) {
-        *num |= static_cast<unsigned int>(buf[i] & 127) << (7 * i);
-        if ((buf[i] & 128) == 0) {
+        const auto byte = static_cast<std::byte>(buf[i]);
+        *num |= std::to_integer<unsigned int>(byte & std::byte{127}) << (7 * i);
+        if ((byte & std::byte{128}) == std::byte{0}) {
             *var_len_int_buf_size = static_cast<int>(i + 1);
             break;
         }
@@ -155,7 +156,11 @@ int read_exact(int sock, unsigned char* buf, unsigned int length) {
     return static_cast<int>(total_read);
 }
 
-int connect_as_client(const char* ip_addr, int port_num) {
+int connect_as_client(const char* ip_addr, int port_num, int max_attempts) {
+    if (max_attempts < 1) {
+        errno = EINVAL;
+        return -1;
+    }
     struct sockaddr_in serv_addr;
     std::memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -165,6 +170,12 @@ int connect_as_client(const char* ip_addr, int port_num) {
     }
     serv_addr.sin_port = htons(static_cast<uint16_t>(port_num));
 
+    // IPv4 sockaddr_in and sockaddr have the same ABI size. Copying avoids
+    // accessing the address through an unrelated C++ pointer type.
+    sockaddr address{};
+    static_assert(sizeof(address) == sizeof(serv_addr));
+    std::memcpy(&address, &serv_addr, sizeof(address));
+
     int sock = ::socket(AF_INET, SOCK_STREAM, 0);
     if (sock == -1) {
         LOG_ERR << "socket() error: " << std::strerror(errno);
@@ -172,10 +183,9 @@ int connect_as_client(const char* ip_addr, int port_num) {
     }
     int count_retries = 0;
     int ret = -1;
-    // FIXME: Make the maximum number of retries configurable.
-    while (count_retries++ < 10) {
-        ret = ::connect(sock, reinterpret_cast<struct sockaddr*>(&serv_addr),
-                        sizeof(serv_addr));
+    while (count_retries < max_attempts) {
+        ++count_retries;
+        ret = ::connect(sock, &address, sizeof(address));
         if (ret == 0) {
             LOG_DBG << "Successfully connected to " << ip_addr << ":"
                     << port_num << " on attempt " << count_retries << ".";
@@ -194,11 +204,11 @@ int connect_as_client(const char* ip_addr, int port_num) {
             LOG_ERR << "socket() error during retry";
             return -1;
         }
-        ::usleep(50000);
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
     if (ret < 0) {
         LOG_ERR << "Failed to connect to " << ip_addr << ":" << port_num
-                << " after " << (count_retries - 1) << " attempts.";
+                << " after " << count_retries << " attempts.";
         ::close(sock);
         return -1;
     }
@@ -211,19 +221,18 @@ int write_bytes_to_socket(int sock, const Bytes& buf) {
                                static_cast<unsigned int>(buf.size()));
 }
 
-int symmetric_encrypt_authenticate(
-    const unsigned char* buf, unsigned int buf_length,
-    const unsigned char* mac_key, unsigned int mac_key_size,
-    const unsigned char* cipher_key, unsigned int cipher_key_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, Bytes& ret) {
+int symmetric_encrypt_authenticate(const unsigned char* buf,
+                                   unsigned int buf_length,
+                                   const SymmetricKeyView& key, Bytes& ret) {
     unsigned int expected = Crypto::get_expected_encrypted_total_length(
-        buf_length, AES_128_CBC_IV_SIZE, mac_key_size, enc_mode, hmac_mode);
+        buf_length, AES_128_CBC_IV_SIZE, key.mac_key_size, key.enc_mode,
+        key.hmac_mode);
     ret.assign(expected, 0);
     unsigned int ret_length = 0;
     if (Crypto::symmetric_encrypt_authenticate(
-            buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-            AES_128_CBC_IV_SIZE, enc_mode, hmac_mode, ret.data(),
-            &ret_length) < 0) {
+            buf, buf_length, key.mac_key, key.mac_key_size, key.cipher_key,
+            key.cipher_key_size, AES_128_CBC_IV_SIZE, key.enc_mode,
+            key.hmac_mode, ret.data(), &ret_length) < 0) {
         return -1;
     }
     ret.resize(ret_length);
@@ -244,8 +253,8 @@ bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
         LOG_ERR << "Encrypted buffer too short: " << buf_length;
         return false;
     }
-    unsigned int ciphertext_length = buf_length - overhead;
-    if (enc_mode == AES_128_CBC &&
+    if (const unsigned int ciphertext_length = buf_length - overhead;
+        enc_mode == AES_128_CBC &&
         (ciphertext_length == 0 ||
          ciphertext_length % AES_128_CBC_IV_SIZE != 0)) {
         LOG_ERR << "CBC ciphertext length is not a whole number of blocks: "
@@ -255,31 +264,28 @@ bool check_encrypted_length(unsigned int buf_length, unsigned int mac_key_size,
     return true;
 }
 
-int symmetric_decrypt_authenticate(
-    const unsigned char* buf, unsigned int buf_length,
-    const unsigned char* mac_key, unsigned int mac_key_size,
-    const unsigned char* cipher_key, unsigned int cipher_key_size,
-    AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode, Bytes& ret) {
-    if (!check_encrypted_length(buf_length, mac_key_size, enc_mode,
-                                hmac_mode)) {
+int symmetric_decrypt_authenticate(const unsigned char* buf,
+                                   unsigned int buf_length,
+                                   const SymmetricKeyView& key, Bytes& ret) {
+    if (!check_encrypted_length(buf_length, key.mac_key_size, key.enc_mode,
+                                key.hmac_mode)) {
         return -1;
     }
     unsigned int expected = Crypto::get_expected_decrypted_maximum_length(
-        buf_length, AES_128_CBC_IV_SIZE, mac_key_size, enc_mode, hmac_mode);
+        buf_length, AES_128_CBC_IV_SIZE, key.mac_key_size, key.enc_mode,
+        key.hmac_mode);
     // One extra block: EVP_DecryptUpdate may emit a full block before the
     // padding is stripped by EVP_DecryptFinal_ex.
     ret.assign(expected + AES_128_CBC_IV_SIZE, 0);
     unsigned int ret_length = 0;
     if (Crypto::symmetric_decrypt_authenticate(
-            buf, buf_length, mac_key, mac_key_size, cipher_key, cipher_key_size,
-            AES_128_CBC_IV_SIZE, enc_mode, hmac_mode, ret.data(),
-            &ret_length) < 0) {
+            buf, buf_length, key.mac_key, key.mac_key_size, key.cipher_key,
+            key.cipher_key_size, AES_128_CBC_IV_SIZE, key.enc_mode,
+            key.hmac_mode, ret.data(), &ret_length) < 0) {
         return -1;
     }
     ret.resize(ret_length);
     return 0;
 }
 
-}  // namespace internal
-
-}  // namespace sst
+}  // namespace sst::internal
