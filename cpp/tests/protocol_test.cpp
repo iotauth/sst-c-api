@@ -92,17 +92,25 @@ Bytes decrypt(const sst::distribution_key_t& key, const Bytes& encrypted) {
     return plain;
 }
 
+std::filesystem::path make_private_temp_directory() {
+    std::string pattern =
+        (std::filesystem::temp_directory_path() / "sst_protocol_test_XXXXXX")
+            .string();
+    // Atomically create a fresh directory with mode 0700. Reusing a predictable
+    // path could follow an attacker-created symlink when writing credentials.
+    char* dir = ::mkdtemp(pattern.data());
+    CHECK(dir != nullptr);
+    return dir;
+}
+
 struct Credentials {
     Key auth{EVP_RSA_gen(2048), EVP_PKEY_free};
     Key entity{EVP_RSA_gen(2048), EVP_PKEY_free};
     sst::distribution_key_t dist{};
-    std::filesystem::path dir =
-        std::filesystem::temp_directory_path() /
-        ("sst_protocol_test_" + std::to_string(::getpid()));
+    std::filesystem::path dir = make_private_temp_directory();
 
     Credentials() {
         CHECK(auth && entity);
-        std::filesystem::create_directories(dir);
         dist.mac_key_size = sst::MAC_KEY_SIZE;
         dist.cipher_key_size = sst::CIPHER_KEY_SIZE;
         dist.enc_mode = sst::AES_128_CBC;
@@ -173,6 +181,27 @@ struct Credentials {
         return encrypted;
     }
 };
+
+void test_private_credential_directories() {
+    std::filesystem::path first_dir;
+    std::filesystem::path second_dir;
+    {
+        Credentials first;
+        Credentials second;
+        first_dir = first.dir;
+        second_dir = second.dir;
+        CHECK(first_dir != second_dir);
+        for (const auto& dir : {first_dir, second_dir}) {
+            const auto status = std::filesystem::symlink_status(dir);
+            CHECK(std::filesystem::is_directory(status));
+            using Perms = std::filesystem::perms;
+            CHECK((status.permissions() &
+                   (Perms::group_all | Perms::others_all)) == Perms::none);
+        }
+    }
+    CHECK(!std::filesystem::exists(first_dir));
+    CHECK(!std::filesystem::exists(second_dir));
+}
 
 struct Exchange {
     unsigned char request_type;
@@ -366,6 +395,7 @@ void test_handshake_msg_type_and_flags() {
 }  // namespace
 
 int main() {
+    test_private_credential_directories();
     test_auth_exchanges();
     test_handshake_msg_type_and_flags();
     std::puts("All protocol regression tests passed.");

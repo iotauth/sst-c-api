@@ -515,26 +515,35 @@ void test_session_key_access() {
           11);
     const SessionKeyList& read_only = list;
     CHECK(&read_only.at(0) == &read_only.at_slot(list.find(2)));
-    bool caught = false;
-    try {
-        list.at(list.size());
-    } catch (const SST_Exception& error) {
-        caught = true;
-        CHECK(error.code() == sst::SST_ErrorCode::InvalidArgument);
+    list.at(0).rel_validity = 123;
+    CHECK(read_only.at_slot(list.find(2)).rel_validity == 123);
+    list.at_slot(list.find(2)).rel_validity = 456;
+    CHECK(read_only.at(0).rel_validity == 456);
+
+    auto expect_invalid_access = [](auto access) {
+        bool caught = false;
+        try {
+            access();
+        } catch (const SST_Exception& error) {
+            caught = true;
+            CHECK(error.code() == sst::SST_ErrorCode::InvalidArgument);
+        }
+        CHECK(caught);
+    };
+    expect_invalid_access([&] { list.at(list.size()); });
+    expect_invalid_access([&] { read_only.at(list.size()); });
+    for (int slot : {-1, static_cast<int>(sst::MAX_SESSION_KEY)}) {
+        expect_invalid_access([&] { list.at_slot(slot); });
+        expect_invalid_access([&] { read_only.at_slot(slot); });
     }
-    CHECK(caught);
 
     SessionKeyList partial;
     partial.add(make_session_key(1, 1));
     partial.add(make_session_key(2, UINT64_MAX));
     CHECK(partial.addable(sst::MAX_SESSION_KEY - 1));
-    caught = false;
-    try {
-        partial.at_slot(0);
-    } catch (const SST_Exception&) {
-        caught = true;
-    }
-    CHECK(caught);
+    const SessionKeyList& read_only_partial = partial;
+    expect_invalid_access([&] { partial.at_slot(0); });
+    expect_invalid_access([&] { read_only_partial.at_slot(0); });
     partial.append(partial);
     CHECK(partial.size() == 2);
     CHECK(sst::convert_skid_buf_to_int(partial.at(0).key_id, 8) == 2);

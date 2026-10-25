@@ -4,7 +4,6 @@
  */
 
 #include <chrono>
-#include <utility>
 
 #include "api.hpp"
 #include "api_internal.hpp"
@@ -29,6 +28,28 @@ uint64_t current_time_ms() {
 // @return true when abs_validity_ms is still in the future.
 bool check_validity(uint64_t abs_validity_ms) {
     return current_time_ms() < abs_validity_ms;
+}
+
+// Share index validation while each accessor preserves its own constness.
+size_t storage_slot_for_index(const SessionKeyList& list, size_t index) {
+    if (index >= static_cast<size_t>(list.num_key)) {
+        throw SST_Exception("Session key index out of range.",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    int slot = (list.rear_idx - list.num_key +
+                static_cast<int>(MAX_SESSION_KEY) + static_cast<int>(index)) %
+               static_cast<int>(MAX_SESSION_KEY);
+    return static_cast<size_t>(slot);
+}
+
+size_t checked_storage_slot(const SessionKeyList& list, int slot) {
+    const int max = static_cast<int>(MAX_SESSION_KEY);
+    if (slot < 0 || slot >= max ||
+        (slot - list.rear_idx + list.num_key + max) % max >= list.num_key) {
+        throw SST_Exception("Session key slot is not active.",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    return static_cast<size_t>(slot);
 }
 
 }  // namespace
@@ -69,32 +90,19 @@ int SessionKeyList::find(uint64_t key_id) const {
 }
 
 const session_key_t& SessionKeyList::at(size_t index) const {
-    if (index >= static_cast<size_t>(num_key)) {
-        throw SST_Exception("Session key index out of range.",
-                            SST_ErrorCode::InvalidArgument);
-    }
-    int slot = (rear_idx - num_key + static_cast<int>(MAX_SESSION_KEY) +
-                static_cast<int>(index)) %
-               static_cast<int>(MAX_SESSION_KEY);
-    return s_key[static_cast<size_t>(slot)];
+    return s_key[storage_slot_for_index(*this, index)];
 }
 
 session_key_t& SessionKeyList::at(size_t index) {
-    return const_cast<session_key_t&>(std::as_const(*this).at(index));
+    return s_key[storage_slot_for_index(*this, index)];
 }
 
 const session_key_t& SessionKeyList::at_slot(int slot) const {
-    const int max = static_cast<int>(MAX_SESSION_KEY);
-    if (slot < 0 || slot >= max ||
-        (slot - rear_idx + num_key + max) % max >= num_key) {
-        throw SST_Exception("Session key slot is not active.",
-                            SST_ErrorCode::InvalidArgument);
-    }
-    return s_key[static_cast<size_t>(slot)];
+    return s_key[checked_storage_slot(*this, slot)];
 }
 
 session_key_t& SessionKeyList::at_slot(int slot) {
-    return const_cast<session_key_t&>(std::as_const(*this).at_slot(slot));
+    return s_key[checked_storage_slot(*this, slot)];
 }
 
 int SessionKeyList::add(const session_key_t& key) {
