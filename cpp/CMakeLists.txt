@@ -47,6 +47,11 @@ add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/net/sockets.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/api.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/api_internal.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/config.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/handshake.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/session.cpp
+  ${CMAKE_CURRENT_LIST_DIR}/src/session_key.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.cpp
   # Auth/entity messages, mirroring org.iot.auth.message in the Auth server.
   ${CMAKE_CURRENT_LIST_DIR}/src/message/iotsp_message.cpp

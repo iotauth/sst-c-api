@@ -1,13 +1,15 @@
 /**
  * @file api_internal.hpp
- * @brief Helpers shared by the SST C++ API modules (api.cpp, ipfs.cpp and
- * the message classes in message/). Not part of the public API.
+ * @brief Helpers shared by the SST C++ implementation modules.
+ * Not part of the public API; callers should include api.hpp.
  */
 
 #ifndef SST_API_INTERNAL_HPP
 #define SST_API_INTERNAL_HPP
 
+#include <cstddef>
 #include <cstdint>
+#include <string>
 #include <vector>
 
 #include "api.hpp"
@@ -20,7 +22,30 @@ using Bytes = std::vector<unsigned char>;
 // Largest encoding of a variable length integer (7 bits per byte).
 constexpr unsigned int MAX_PAYLOAD_BUF_SIZE = 5;
 
+// Accepts both the C API configuration names and the earlier C++ aliases.
+// Throws SST_Exception on file errors or invalid configuration values.
+void load_config(config_t& config, const std::string& path);
+
 // ---- Sockets ----
+
+// Owns a raw socket until ownership is transferred to an SST_Session.
+// Also closes sockets when Auth requests or handshakes throw.
+class FdGuard {
+   public:
+    explicit FdGuard(int fd) : fd_(fd) {}
+    ~FdGuard();
+    FdGuard(const FdGuard&) = delete;
+    FdGuard& operator=(const FdGuard&) = delete;
+    int get() const { return fd_; }
+    int release() {
+        int fd = fd_;
+        fd_ = -1;
+        return fd;
+    }
+
+   private:
+    int fd_;
+};
 
 // Connects to ip_addr:port_num with retries, like the C API.
 // @return connected socket, or -1 on failure.
@@ -40,7 +65,13 @@ int read_exact(int sock, unsigned char* buf, unsigned int length);
 int sst_write_to_socket(int sock, const unsigned char* buf,
                         unsigned int buf_length);
 
+// Vector form of sst_write_to_socket, with the same return values.
+int write_bytes_to_socket(int sock, const Bytes& buf);
+
 // ---- Byte encoding ----
+
+// Formats bytes for logging, separated by spaces with no leading space.
+std::string to_hex(const unsigned char* buf, size_t size);
 
 // Writes `num` as an n-byte big-endian integer.
 void write_in_n_bytes(uint64_t num, int n, unsigned char* buf);

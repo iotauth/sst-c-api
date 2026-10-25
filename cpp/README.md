@@ -11,7 +11,7 @@ session API for SST communication. The project is organized into four layers:
 |-------|----------|---------|
 | **Crypto** | `src/crypto.hpp/cpp` | Stateless primitives — RSA, AES, SHA-256, HMAC |
 | **Network** | `src/net/sockets.hpp/cpp` | RAII POSIX socket wrappers |
-| **API** | `src/api.hpp/cpp` | High-level `SST_API` session management |
+| **API** | `src/api.hpp` | Public `SST_API`, `SST_Session` and `SessionKeyList` interfaces |
 | **Logging** | `src/log/log_manager.hpp/cpp` | Singleton logger with rotating file output |
 
 ## Crypto Design
@@ -159,9 +159,14 @@ cpp/
 │   ├── server_client_example/        # secure server/client via sst::SST_API
 │   └── ipfs_examples/    # IPFS file sharing via sst::SST_API + sst::ipfs
 ├── src/
-│   ├── api.hpp/cpp       # high-level SST_API, SessionKeyList, SST_Session
+│   ├── api.hpp           # public SST_API, SessionKeyList, SST_Session interfaces
+│   ├── api.cpp           # entity initialization and Auth requests
+│   ├── config.cpp        # configuration parsing, defaults and validation
+│   ├── handshake.cpp     # entity-to-entity session key handshakes
+│   ├── session.cpp       # secure session lifetime and message I/O
+│   ├── session_key.cpp   # key validity, key ring and buffer encryption
 │   ├── ipfs.hpp/cpp      # IPFS file sharing helpers (sst::ipfs)
-│   ├── api_internal.hpp  # helpers shared by the modules (not public)
+│   ├── api_internal.hpp/cpp  # shared byte, socket and crypto helpers (not public)
 │   ├── message/          # Auth/entity messages (sst::message), one class
 │   │                     # per file, mirroring org.iot.auth.message
 │   ├── crypto.hpp/cpp    # cryptographic primitives (sst::Crypto)
