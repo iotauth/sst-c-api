@@ -1,294 +1,129 @@
 /**
- * @file Sockets.h
- * @brief A high-level C++ wrapper for POSIX socket operations.
+ * @file sockets.hpp
+ * @brief Owning POSIX TCP sockets for SST clients and listeners.
  * @author Salomon Lee
- * @date 2026-03-15
  */
-#ifndef SOCKET_H
-#define SOCKET_H
+#ifndef SST_CPP_SOCKETS_HPP
+#define SST_CPP_SOCKETS_HPP
 
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <poll.h>
-#include <sys/ioctl.h>
 #include <sys/socket.h>
 #include <unistd.h>
 
 #include <cstddef>
 #include <cstring>
-#include <iostream>
 #include <memory>
 #include <mutex>
 #include <new>
-#include <string>
 
 namespace sst {
-/**
- * @brief Supported network domains for socket creation.
- * Maps directly to system AF_* constants.
- */
+
 enum SST_SOCK_DOMAIN {
     SST_SOCK_INET = AF_INET,
     SST_SOCK_INET6 = AF_INET6,
-    SST_SOCK_UNIX = AF_UNIX
 };
 
-/**
- * @struct SST_SocketInfo
- * @brief Container for raw socket data and address information.
- *
- * Uses RAII (Resource Acquistion Is Instantiation) to ensure that the file
- * descriptor is closed and the allocated sockaddr memory is freed automatically
- * when the struct goes out of scope.
- */
+/** @brief Owns a socket descriptor and a copy of its address. */
 struct SST_SocketInfo {
-    int sock;       ///< Raw file descriptor for the socket.
-    socklen_t len;  ///< Length of the address structure.
-
-    /**
-     * @brief Smart pointer managing the sockaddr lifecycle.
-     * Uses a custom deleter that releases the underlying byte-array
-     * allocation.
-     */
+    int sock;
+    socklen_t len;
     std::unique_ptr<sockaddr, void (*)(sockaddr*)> addr;
 
-    /**
-     * @brief Deleter for the managed sockaddr: releases the byte array
-     * backing the address storage.
-     */
     static void FreeAddr(sockaddr* p) {
         delete[] reinterpret_cast<std::byte*>(p);
     }
 
-    /**
-     * @brief Constructor initializing an empty/invalid socket info.
-     */
     SST_SocketInfo() : sock(-1), len(0), addr(nullptr, &FreeAddr) {}
 
-    /**
-     * @brief Destructor that closes the socket if it is open.
-     */
     ~SST_SocketInfo() {
         if (sock != -1) {
             ::close(sock);
         }
     }
 
-    /**
-     * @brief Factory helper to allocate and copy a sockaddr into a managed
-     * unique_ptr.
-     * @param src Pointer to the source address data.
-     * @param length Size of the address structure in bytes.
-     * @return A unique_ptr<sockaddr> with the FreeAddr deleter, or nullptr on
-     * failure.
-     */
+    // Address storage is copied as bytes and must use the matching deleter.
     static std::unique_ptr<sockaddr, void (*)(sockaddr*)> AllocAddr(
         const void* src, socklen_t length) {
         std::byte* raw = new (std::nothrow) std::byte[length];
         if (!raw) return {nullptr, &FreeAddr};
-        memcpy(reinterpret_cast<void*>(raw), src, length);
-        // reinterpret_cast for POSIX socket programming: sockaddr_in/embeds
-        // sockaddr as first member, pointer layout is compatible
+        std::memcpy(raw, src, length);
         return {reinterpret_cast<sockaddr*>(raw), &FreeAddr};
     }
 };
 
 /**
- * @class Socket
- * @brief Base class providing core socket functionality and I/O operations.
+ * @brief Owns a TCP socket; destruction closes its descriptor.
  *
- * This class serves as a foundation for Client, Server, and EndPoint sockets,
- * providing thread-safe access to common operations like Read, Write, and Poll.
+ * Writes and ownership changes are serialized. Reads do not take that lock:
+ * callers must finish all I/O before closing or replacing the socket.
+ * These operations transfer plain bytes; SST_Session handles secure framing.
  */
 class Socket {
    public:
-    Socket();
-
+    Socket() = default;
     virtual ~Socket();
 
-    /** @brief Manually close the underlying socket. */
+    /** @brief Closes the socket. Safe to call again on a closed socket. */
     void Close();
 
     /**
-     * @brief Returns the number of bytes available to be read from the socket.
-     * @return Number of pending bytes, or -1 on error.
-     */
-    int Pending() const;
-
-    /**
-     * @brief Polls the socket to see if data is ready to be read within a
-     * timeout.
-     * @param timeout Timeout in milliseconds.
-     * @return true if data is available, false otherwise.
-     */
-    bool ReadyToReadTimeOut(int timeout) const;
-
-    /** @brief Checks if data is ready to be read (non-blocking). */
-    bool ReadyToRead() const;
-
-    /**
-     * @brief Standard blocking read operation.
-     * @param buf Buffer to store data.
-     * @param nbytes Number of bytes to read.
-     * @return Number of bytes read, or -1 on error.
+     * @brief Reads until nbytes have arrived, EOF, or an error.
+     * @return Bytes read (possibly fewer at EOF), 0 on EOF, or -1 on error.
      */
     virtual int Read(char* buf, int nbytes) const;
 
     /**
-     * @brief Standard blocking write operation.
-     * @param buf Buffer containing data to send.
-     * @param nbytes Number of bytes to write.
-     * @return Number of bytes written, or -1 on error.
+     * @brief Performs one blocking write; callers must handle partial writes.
+     * @return Bytes written, or -1 on error.
      */
     virtual int Write(char* buf, int nbytes);
 
-    /**
-     * @brief Reads from the socket with a specific timeout.
-     * @param buf Buffer to store data.
-     * @param size Maximum size to read.
-     * @param timeout Timeout in milliseconds.
-     * @return Number of bytes read, or -1/0 on timeout or error.
-     */
-    int NonBlockingRead(char* buf, int size, int timeout) const;
+    /** @brief Takes ownership of the supplied info, closing the old socket. */
+    void SetSocketInfo(std::unique_ptr<SST_SocketInfo> socket_info);
 
     /**
-     * @brief Writes to the socket with a specific timeout.
-     * @param buf Buffer containing data to send.
-     * @param size Maximum size to write.
-     * @param timeout Timeout in milliseconds.
-     * @return Number of bytes written, or -1/0 on timeout or error.
-     */
-    int NonBlockingWrite(char* buf, int size, int timeout);
-
-    /** @brief Outputs the current socket state to the console for debugging. */
-    void DebugDump() const;
-
-    /**
-     * @brief Transfers ownership of a SocketInfo structure to this instance.
-     * @param tmp Unique pointer to the SocketInfo.
-     */
-    void SetSocketInfo(std::unique_ptr<SST_SocketInfo> tmp);
-
-    /**
-     * @brief Retrieves a copy of the current SocketInfo.
-     * @return Unique pointer to a new SocketInfo containing the same data aka
-     * copy of the smartpointer .
+     * @brief Copies the address and duplicates the descriptor with dup().
+     * The copy closes independently but shares the same connection and I/O
+     * state. Returns nullptr if the socket is uninitialized or copying fails.
      */
     std::unique_ptr<SST_SocketInfo> GetSocketInfo() const;
 
-    // Returns the raw file descriptor of the underlying socket, or -1 if not
-    // initialized.
+    /** @brief Borrows the descriptor, or returns -1 if uninitialized. */
     int get_fd() const;
 
-    /**
-     * @brief Retrieves the address of the connected peer.
-     * @param peer Pointer to a SocketInfo struct to be populated.
-     * @return 0 on success, -1 on failure.
-     */
-    int GetPeerName(SST_SocketInfo* peer) const;
-
-    /**
-     * @brief Static helper to create and populate a sockaddr structure.
-     * @param domain The network domain (IPv4, IPv6, Unix).
-     * @param host_or_path The IP address or Unix socket path.
-     * @param port The port number (ignored for Unix sockets).
-     * @param addr [out] Pointer to the allocated address structure.
-     * @param len [out] Pointer to the length of the created address.
-     * @return 0 on success, non-zero on error.
-     */
-    static int CreateAddr(SST_SOCK_DOMAIN domain, const char* host_or_path,
-                          int port, std::byte** addr, int* len);
-
-    /** @brief Returns the managed socket info for derived classes. */
-    std::unique_ptr<SST_SocketInfo>& get_info_ref() { return info; }
-
-    /** @brief Returns the managed socket info for derived classes. */
+   protected:
     const std::unique_ptr<SST_SocketInfo>& get_info_ref() const { return info; }
 
-    /** @brief Returns the thread-safe mutex for socket operations. */
-    std::mutex& get_gate_ref() const { return gate; }
-
    private:
-    std::unique_ptr<SST_SocketInfo> info;  ///< Managed socket resources.
-    mutable std::mutex gate;  ///< Mutex for thread-safe socket operations.
+    std::unique_ptr<SST_SocketInfo> info;
+    mutable std::mutex gate;
 };
 
-/**
- * @class ClientSocket
- * @brief Specialization for client-side connection establishment.
- */
+/** @brief TCP client. A failed constructor leaves get_fd() equal to -1. */
 class ClientSocket : public Socket {
    public:
-    /**
-     * @brief Constructs a client socket with an existing SocketInfo.
-     * @param info Unique pointer to a pre-populated SocketInfo structure.
-     */
     ClientSocket(std::unique_ptr<SST_SocketInfo> socket_info);
+    // host must be a numeric IPv4 or IPv6 address matching domain.
+    ClientSocket(SST_SOCK_DOMAIN domain, const char* host, int port);
 
-    /**
-     * @brief Constructs a client socket.
-     * @param domain Network domain.
-     * @param host_or_path Destination host or path.
-     * @param port Destination port.
-     */
-    ClientSocket(SST_SOCK_DOMAIN domain, const char* host_or_path, int port);
-    virtual ~ClientSocket();
-
-    /** @brief Initiates connection to the target specified in constructor.
-     * @return 0 on success. */
+    /** @brief Connects to the configured address; returns 0 or -1 on error. */
     int Connect();
-
-    /** @brief Internal method to open a client socket. */
-    int SocketClientOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
-                         const char* host_or_path, int port) const;
-
-    /** @brief Internal method to connect a prepared socket info. */
-    int SocketClientConnect(SST_SocketInfo* socket_info) const;
 };
 
 /**
- * @class ServerSocket
- * @brief Specialization for server-side listening and accepting.
+ * @brief Binds and listens on a numeric IPv4 or IPv6 address.
+ * A failed constructor leaves get_fd() equal to -1. Port 0 lets the OS choose
+ * an available port, which can be queried with getsockname(get_fd(), ...).
  */
 class ServerSocket : public Socket {
    public:
-    /**
-     * @brief Constructs a server socket and binds to the specified
-     * address/port.
-     */
-    ServerSocket(SST_SOCK_DOMAIN domain, const char* host_or_path, int port);
-    virtual ~ServerSocket();
+    ServerSocket(SST_SOCK_DOMAIN domain, const char* host, int port);
 
     /**
-     * @brief Blocks until a new connection is received.
-     * @param acceptedSocket A Socket instance to be populated with the new
-     * connection.
-     * @return 0 on success.
+     * @brief Accepts one connection, replacing acceptedSocket's old socket.
+     * @return 0 on success, -1 on failure (acceptedSocket stays unchanged).
      */
     int Accept(ServerSocket& acceptedSocket);
-
-    /** @brief Internal method to set up the listener socket. */
-    int SocketServerOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
-                         const char* host_or_path, int port) const;
-
-    /** @brief Internal method to accept a raw connection. */
-    int SocketServerAccept(SST_SocketInfo* socket_info,
-                           SST_SocketInfo* peer) const;
 };
 
-/**
- * @class EndPointSocket
- * @brief General purpose socket for connectionless or specific endpoint
- * scenarios.
- */
-class EndPointSocket : public Socket {
-   public:
-    EndPointSocket(SST_SOCK_DOMAIN domain, const char* host_or_path, int port);
-    virtual ~EndPointSocket();
-
-    /** @brief Internal method to open the endpoint. */
-    int SocketEndPointOpen(SST_SocketInfo** socket_info, SST_SOCK_DOMAIN domain,
-                           const char* host_or_path, int port) const;
-};
 }  // namespace sst
-#endif  // SOCKET_H
+#endif  // SST_CPP_SOCKETS_HPP

@@ -91,7 +91,7 @@ class SST_Exception : public std::runtime_error {
 };
 
 // ---------------------------------------------------------------------------
-// Plain data types (binary compatible with the C API structs)
+// Data types corresponding to the C API; wire fields are serialized explicitly.
 // ---------------------------------------------------------------------------
 
 /** @brief Whether a permanent (pre-shared) distribution key is used. */
@@ -103,8 +103,8 @@ enum perm_dist_key_mode_t {
 /** @brief Session key with all cryptographic parameters. */
 struct session_key_t {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    uint64_t abs_validity;
-    uint64_t rel_validity;
+    uint64_t abs_validity;  ///< Expiration time in milliseconds since Unix epoch.
+    uint64_t rel_validity;  ///< Lifetime in milliseconds after a handshake.
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
@@ -120,7 +120,7 @@ struct distribution_key_t {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    uint64_t abs_validity;
+    uint64_t abs_validity;  ///< Expiration time in milliseconds since Unix epoch.
     AES_encryption_mode_t enc_mode;
 };
 
@@ -209,7 +209,8 @@ class SessionKeyList {
  *
  * Owns the TCP socket: it is closed when the session is destroyed. Sending
  * and receiving are each guarded by a mutex, so one thread can send while
- * another one receives.
+ * another one receives. Call shutdown() and join those threads before
+ * destroying the session.
  */
 class SST_Session {
    public:
@@ -260,14 +261,16 @@ class SST_Session {
     void receive_loop();
 
     /**
-     * @brief Shuts down the socket for reading and writing. A thread blocked
-     * in read_secure_message() then returns 0, which lets a receiver thread
-     * be joined cleanly.
+     * @brief Shuts down both directions to unblock I/O before joining threads.
+     * An interrupted read returns 0 at a frame boundary or -1 for a truncated
+     * frame. The descriptor remains owned until the session is destroyed.
      */
     void shutdown();
 
+    /** @brief Borrows the socket descriptor; the session retains ownership. */
     int get_sock() const { return sock_; }
     const session_key_t& get_session_key() const { return s_key_; }
+    // Read counters only when no send/receive operation is running.
     unsigned int get_sent_seq_num() const { return sent_seq_num_; }
     unsigned int get_received_seq_num() const { return received_seq_num_; }
 
@@ -289,8 +292,9 @@ class SST_Session {
  * SST_ctx_t and the top-level functions of c_api.h).
  *
  * All methods that talk to Auth are serialized with an internal mutex, so an
- * SST_API instance can be shared between threads (see the
- * threaded_get_target_id_server example).
+ * SST_API instance can be shared between threads. Callers must separately
+ * synchronize direct access to borrowed config/key references and key lists
+ * that may be modified by another thread.
  */
 class SST_API {
    public:
@@ -336,7 +340,8 @@ class SST_API {
      * @brief Returns the session key with the given 8-byte ID. If the key is
      * not in `existing_s_key_list`, it is requested from Auth by ID and added
      * to the list.
-     * @return Pointer to the key inside `existing_s_key_list`.
+     * @return Borrowed pointer into `existing_s_key_list`. Later additions can
+     * overwrite that slot; copy the key if it must outlive changes to the list.
      * @throws SST_Exception on failure.
      */
     session_key_t* get_session_key_by_ID(
@@ -407,7 +412,11 @@ class SST_API {
     const config_t& get_config() const { return config_; }
     const distribution_key_t& get_dist_key() const { return dist_key_; }
 
-    /** @brief Mutex serializing all Auth communication of this context. */
+    /**
+     * @brief Mutex for inspecting shared state while Auth requests may run.
+     * Do not hold it while calling methods that communicate with Auth: those
+     * methods acquire the same non-recursive mutex internally.
+     */
     std::mutex& get_mutex() { return mutex_; }
 
    private:

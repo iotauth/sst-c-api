@@ -1,4 +1,4 @@
-# SST C++ cryptography API.
+# SST C++ API.
 #
 # Builds the SST C++ library (crypto, sockets, logging, session API and
 # IPFS helpers) and its unit tests.
@@ -15,26 +15,17 @@ project(sst-cpp-api VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-
-# Include spdlog
 include(FetchContent)
 FetchContent_Declare(
   spdlog
   GIT_REPOSITORY https://github.com/gabime/spdlog.git
-  GIT_TAG v1.17.0  # Replace with the desired tag or branch
+  GIT_TAG v1.17.0
 )
 FetchContent_MakeAvailable(spdlog)
 
-set(INCLUDE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/include")
-message(STATUS "SPDLOG INCLUDE PATH: ${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/spdlog-src/include")
-include_directories(
-    ${INCLUDE_DIRS}
-    ${CMAKE_CURRENT_SOURCE_DIR}/build/_deps/spdlog-src/include)
-
-
 find_package(OpenSSL REQUIRED)
 
-# Crypto library.
+# SST library and protocol messages.
 add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/crypto.cpp
   ${CMAKE_CURRENT_LIST_DIR}/src/crypto.hpp
@@ -75,9 +66,8 @@ set_target_properties(${PROJECT_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
 target_include_directories(${PROJECT_NAME} PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>)
 
-target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto)
-
-target_link_libraries(${PROJECT_NAME} PRIVATE spdlog::spdlog)
+# The logging header exposes spdlog types to consumers.
+target_link_libraries(${PROJECT_NAME} PUBLIC OpenSSL::Crypto spdlog::spdlog)
 
 # Compiler warnings.
 if(MSVC)
@@ -96,6 +86,7 @@ add_test(NAME crypto_test COMMAND crypto_test)
 add_executable(socket_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/socket_test.cpp)
 target_link_libraries(socket_test PRIVATE ${PROJECT_NAME})
 add_test(NAME socket_test COMMAND socket_test)
+set_tests_properties(socket_test PROPERTIES TIMEOUT 10)
 
 add_executable(api_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/api_test.cpp)
 target_link_libraries(api_test PRIVATE ${PROJECT_NAME})
@@ -104,3 +95,7 @@ add_test(NAME api_test COMMAND api_test)
 add_executable(message_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/message_test.cpp)
 target_link_libraries(message_test PRIVATE ${PROJECT_NAME})
 add_test(NAME message_test COMMAND message_test)
+
+# Manual integration probe; requires a configured, running Auth server.
+add_executable(auth_connect_test EXCLUDE_FROM_ALL auth_connect_test.cpp)
+target_link_libraries(auth_connect_test PRIVATE ${PROJECT_NAME})

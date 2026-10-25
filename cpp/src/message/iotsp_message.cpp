@@ -38,7 +38,8 @@ int IoTSPMessage::read_impl(int sock, unsigned int max_payload_length,
     }
     type = static_cast<MessageType>(header[0]);
 
-    // Variable length payload size: continue while the high bit is set.
+    // Read the length one byte at a time: TCP can split any field across reads
+    // or coalesce adjacent frames. The high bit marks a continuation byte.
     unsigned int var_length_buf_size = 0;
     while (var_length_buf_size < internal::MAX_PAYLOAD_BUF_SIZE) {
         ret = internal::read_exact(
@@ -67,6 +68,7 @@ int IoTSPMessage::read_impl(int sock, unsigned int max_payload_length,
                 << ", maximum: " << max_payload_length;
         return -1;
     }
+    // Bound the peer-supplied length before allocating the payload buffer.
     payload.assign(payload_length, 0);
     if (payload_length > 0 &&
         internal::read_exact(sock, payload.data(), payload_length) <= 0) {

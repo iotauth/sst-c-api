@@ -1,59 +1,41 @@
-# Network Layer — `sockets`
+# TCP socket wrappers
 
-This directory provides RAII wrappers around POSIX sockets. All types live in the `sst` namespace.
+`sockets.hpp` provides `sst::Socket`, `sst::ClientSocket`, and
+`sst::ServerSocket`. They own POSIX TCP descriptors and transfer plain bytes.
+For authenticated, encrypted communication, use `SST_API` and `SST_Session`
+from [`api.hpp`](../api.hpp).
 
-## Files
+- `ClientSocket(domain, host, port)` opens a socket for a numeric IPv4 or IPv6
+  address. Call `Connect()` to establish the connection.
+- `ServerSocket(domain, host, port)` binds and listens. Port 0 selects an
+  available port. `Accept(ServerSocket&)` replaces the destination's socket
+  only after accepting a connection successfully.
+- Failed socket construction leaves `get_fd()` equal to -1. `Connect()` and
+  `Accept()` return 0 on success and -1 on failure.
+- `Read()` waits for the requested byte count, EOF, or an error. `Write()` makes
+  one POSIX write and may return fewer bytes than requested.
 
-| File | Purpose |
-|---|---|
-| [`sockets.hpp`](sockets.hpp) / [`sockets.cpp`](sockets.cpp) | Base socket classes — `Socket`, `ClientSocket`, `ServerSocket`, `EndPointSocket`. Pure TCP, no encryption. |
+`SST_SocketInfo` owns both its descriptor and a copy of its address.
+`SetSocketInfo()` transfers ownership, closing the previous descriptor.
+`GetSocketInfo()` copies the address and uses `dup()` for the descriptor:
+closing either owner leaves the other handle open, but they share the same
+connection and I/O state. `get_fd()` only borrows the descriptor.
 
-## Architecture
+Writes and ownership changes use a mutex. Reads, connection setup, and borrowed
+handles require coordination by the caller; finish I/O before closing or
+replacing a socket.
 
-```mermaid
-graph TD
-    Socket["Socket (base)\nRead/Write/Poll"] --> ClientSocket["ClientSocket\nConnect()"]
-    Socket --> ServerSocket["ServerSocket\nAccept()"]
-    Socket --> EndPointSocket["EndPointSocket\nGeneral purpose"]
-```
-
-### `sockets.hpp` — Base TCP sockets
-
-**`SST_SocketInfo`** — RAII container for a raw file descriptor and its address. Closes the FD in the destructor; manages `sockaddr` address storage as a `std::byte` array owned by a `unique_ptr` whose deleter calls `delete[]`. No `malloc` or `free` anywhere in the layer.
-
-**`Socket`** (base class)
-- `Write()` guards its operation with a mutex. Reads and all other operations are not uniformly locked; coordinate concurrent access in application code.
-- `Read()` loops until the requested byte count, EOF, or error. `Write()` makes one POSIX write call and may write fewer bytes than requested.
-- Timeout-aware `NonBlockingRead()` / `NonBlockingWrite()` — temporarily sets `O_NONBLOCK`, falls back to `poll()` if the operation would block, then restores the original flags.
-- `Pending()` returns bytes available via `ioctl(FIONREAD)`.
-- `ReadyToReadTimeOut(ms)` uses `poll()` with a timeout; `ReadyToRead()` blocks indefinitely.
-
-**`ClientSocket`** — connects to a remote host/port. Constructor takes either an existing `SST_SocketInfo` or `(domain, host, port)`. Call `Connect()` after construction.
-
-**`ServerSocket`** — binds and listens on a local address. Call `Accept(ServerSocket&)` to block until a new connection arrives; the accepted socket is populated into the argument.
-
-**`EndPointSocket`** — creates a `SOCK_STREAM` endpoint. It does not currently provide UDP or raw-socket transport.
-
-## Pitfalls
-
-1. **Non-blocking flag restoration**: `NonBlockingRead()` and `NonBlockingWrite()` temporarily set `O_NONBLOCK`. If an exception occurs between setting and restoring, the socket stays non-blocking — wrap calls in try/catch if you depend on blocking mode afterward.
-2. **FD duplication in GetSocketInfo**: Returns a copy with a duplicated FD (`dup()`). Callers should not assume the returned fd is the same as the original — it's an independent OS-level handle.
-
-## Usage Example
+## Example
 
 ```cpp
-// Client connection (plain TCP)
-sst::ClientSocket client(sst::SST_SOCK_INET, "127.0.0.1", 8080);
-client.Connect();
-char buf[1024];
-int n = client.Read(buf, sizeof(buf));  // waits for 1024 bytes, EOF, or error
-
-// Server-side accept
 sst::ServerSocket server(sst::SST_SOCK_INET, "127.0.0.1", 8080);
-// Accept currently requires a ServerSocket, so bind its initial listener
-// to an ephemeral port. Accept replaces and closes that initial socket.
-sst::ServerSocket accepted(sst::SST_SOCK_INET, "127.0.0.1", 0);
-server.Accept(accepted);
-```
+if (server.get_fd() == -1) return 1;
 
-These are separate client and server excerpts. Check `Connect()` / `Accept()` results in application code. For encrypted SST communication, use [`SST_API` and `SST_Session`](https://iotauth.github.io/docs/cpp-guide/) instead of these plain socket wrappers.
+// Accept replaces this temporary listener and closes its descriptor.
+sst::ServerSocket accepted(sst::SST_SOCK_INET, "127.0.0.1", 0);
+if (server.Accept(accepted) != 0) return 1;
+
+char buffer[1024];
+int length = accepted.Read(buffer, sizeof(buffer));
+// Read waits for 1024 bytes, EOF, or an error; it does not delimit messages.
+```

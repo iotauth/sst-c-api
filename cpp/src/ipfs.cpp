@@ -54,7 +54,6 @@ void write_file(const std::string& path, const unsigned char* data,
     if (!out.is_open()) {
         throw SST_Exception("Cannot open file for writing: " + path);
     }
-    // reinterpret_cast: ofstream writes char buffers.
     out.write(reinterpret_cast<const char*>(data),
               static_cast<std::streamsize>(length));
     if (!out.good()) {
@@ -328,7 +327,6 @@ std::string download_file(const unsigned char* received_buf,
         throw SST_Exception("Download response truncated.");
     }
     std::memcpy(skey_id_out, received_buf + 2, SESSION_KEY_ID_SIZE);
-    // reinterpret_cast: the command is ASCII text.
     std::string cid = extract_cid(std::string(
         reinterpret_cast<const char*>(received_buf + 3 + SESSION_KEY_ID_SIZE),
         command_size));

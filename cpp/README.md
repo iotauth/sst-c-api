@@ -22,8 +22,6 @@ All entry points are grouped into the `sst::Crypto` class:
 - Helpers used only internally (`print_crypto_error`, `get_evp_cipher`,
   `get_symmetric_encrypt_authenticate_buffer`,
   `get_symmetric_decrypt_authenticate_buffer`) are **private** static methods.
-- `sst::SignedData` is a small class holding an RSA-sized data block plus its
-  RSA signature (fixed-size `std::array` members, so it lives on the stack).
 
 The routines are stateless, so the public methods are `static` — `Crypto` acts
 as a strongly-typed namespace rather than something to instantiate.
@@ -188,6 +186,9 @@ All C++ crypto tests passed.
 - `tests/api_test.cpp` exercises the high-level **API** layer without a
   server: config-file parsing (including error cases), session key list
   bookkeeping, and session key encryption/decryption round trips.
+
+- `tests/socket_test.cpp` checks IPv4/IPv6 loopback connections, invalid
+  addresses, descriptor ownership and duplication, and reads at peer closure.
 
 - `tests/message_test.cpp` checks each message class against the wire
   format of its Java counterpart in the Auth server: framing, AUTH_HELLO and

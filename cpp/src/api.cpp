@@ -2,10 +2,8 @@
  * @file api.cpp
  * @brief Implementation of the SST C++ API (see api.hpp).
  *
- * The protocol code is a port of src/c_common.c, src/c_secure_comm.c,
- * src/load_config.c and src/c_api.c, built on the zero-allocation
- * sst::Crypto layer. Variable-length working buffers use std::vector; the
- * on-the-wire formats are byte-for-byte identical to the C API.
+ * Uses the SST C API wire formats. Variable-length protocol buffers use
+ * std::vector; cryptographic operations write into caller-provided buffers.
  */
 
 #include "api.hpp"
@@ -49,17 +47,15 @@ namespace {
 // Protocol constants (mirror src/c_common.h and src/c_secure_comm.h)
 // ---------------------------------------------------------------------------
 
-// Sizes.
 constexpr unsigned int HS_NONCE_SIZE = 8;
 constexpr unsigned int HS_INDICATOR_SIZE = 1 + HS_NONCE_SIZE * 2;
 constexpr unsigned int MAX_HS_BUF_LENGTH = 256;
 constexpr unsigned int NONCE_SIZE = 8;
-constexpr unsigned int KEY_ID_SIZE = 8;
 // The C API uses 1024 here; a larger buffer also fits responses carrying
 // MAX_SESSION_KEY keys together with a distribution key.
 constexpr unsigned int MAX_AUTH_COMM_LENGTH = 4096;
 
-// Handshake nonces (HS_nonce_t).
+// Each peer sends a fresh nonce and proves key possession by echoing the other.
 struct HS_nonce_t {
     unsigned char nonce[HS_NONCE_SIZE];
     unsigned char reply_nonce[HS_NONCE_SIZE];
@@ -125,7 +121,6 @@ unsigned int read_unsigned_int_BE(const unsigned char* buf, int byte_length) {
         read_unsigned_long_int_BE(buf, byte_length));
 }
 
-// Decodes a variable length integer (7 bits per byte, high bit = continue).
 void var_length_int_to_num(const unsigned char* buf, unsigned int buf_length,
                            unsigned int* num, int* var_len_int_buf_size) {
     *num = 0;
@@ -142,7 +137,6 @@ void var_length_int_to_num(const unsigned char* buf, unsigned int buf_length,
     }
 }
 
-// Encodes a variable length integer.
 void num_to_var_length_int(unsigned int num, unsigned char* var_len_int_buf,
                            unsigned int* var_len_int_buf_size) {
     *var_len_int_buf_size = 1;
@@ -211,9 +205,6 @@ int sst_write_to_socket(int sock, const unsigned char* buf,
     return static_cast<int>(total_written);
 }
 
-// Reads exactly `length` bytes.
-// @return `length` on success, 0 on EOF before any byte was read, -1 on
-// error or on a truncated read.
 int read_exact(int sock, unsigned char* buf, unsigned int length) {
     unsigned int total_read = 0;
     while (total_read < length) {
@@ -230,8 +221,6 @@ int read_exact(int sock, unsigned char* buf, unsigned int length) {
     return static_cast<int>(total_read);
 }
 
-// Connects to ip_addr:port_num with retries, like the C API.
-// @return connected socket, or -1 on failure.
 int connect_as_client(const char* ip_addr, int port_num) {
     struct sockaddr_in serv_addr;
     std::memset(&serv_addr, 0, sizeof(serv_addr));
@@ -251,7 +240,6 @@ int connect_as_client(const char* ip_addr, int port_num) {
     int ret = -1;
     // FIXME: Make the maximum number of retries configurable.
     while (count_retries++ < 10) {
-        // reinterpret_cast: required by the POSIX connect() signature.
         ret = ::connect(sock, reinterpret_cast<struct sockaddr*>(&serv_addr),
                         sizeof(serv_addr));
         if (ret == 0) {
@@ -303,7 +291,8 @@ int write_bytes_to_socket(int sock, const Bytes& buf) {
 // Handshake helpers (c_common.c)
 // ---------------------------------------------------------------------------
 
-// ret = indicator (1) + nonce (8) + reply_nonce (8).
+// Fixed layout: indicator (1) + nonce (8) + reply_nonce (8).
+// Indicator bits 0 and 1 mark which nonce slots are present.
 int serialize_handshake(const unsigned char* nonce,
                         const unsigned char* reply_nonce, unsigned char* ret) {
     if (nonce == nullptr && reply_nonce == nullptr) {
@@ -463,8 +452,8 @@ Bytes parse_handshake_1(const session_key_t& s_key,
         throw SST_Exception("Failed to encrypt handshake 1.");
     }
     Bytes ret;
-    ret.reserve(KEY_ID_SIZE + encrypted.size());
-    ret.insert(ret.end(), s_key.key_id, s_key.key_id + KEY_ID_SIZE);
+    ret.reserve(SESSION_KEY_ID_SIZE + encrypted.size());
+    ret.insert(ret.end(), s_key.key_id, s_key.key_id + SESSION_KEY_ID_SIZE);
     ret.insert(ret.end(), encrypted.begin(), encrypted.end());
     return ret;
 }
@@ -921,7 +910,6 @@ void SST_Session::shutdown() {
 }
 
 int SST_Session::send_secure_message(const std::string& msg) {
-    // reinterpret_cast: std::string bytes are sent as raw unsigned bytes.
     return send_secure_message(
         reinterpret_cast<const unsigned char*>(msg.data()),
         static_cast<unsigned int>(msg.size()));
@@ -939,7 +927,8 @@ int SST_Session::send_secure_message(const unsigned char* msg,
         LOG_ERR << "Session key expired!";
         return -1;
     }
-    // seq_num (8) + msg.
+    // Encrypt the sequence number with the payload so authentication also
+    // protects message ordering. Each direction has its own counter.
     Bytes buf(SEQ_NUM_SIZE + msg_length, 0);
     write_in_n_bytes(sent_seq_num_, SEQ_NUM_SIZE, buf.data());
     std::memcpy(buf.data() + SEQ_NUM_SIZE, msg, msg_length);
@@ -1035,7 +1024,6 @@ void SST_Session::receive_loop() {
         if (data_buf_length == 0) {
             return;
         }
-        // reinterpret_cast: print the plaintext bytes as text.
         LOG_INF << "Received: "
                 << std::string(reinterpret_cast<const char*>(data_buf),
                                static_cast<size_t>(data_buf_length));
@@ -1099,7 +1087,6 @@ void SST_API::load_permanent_distribution_key() {
                 std::string("Failed to open dist_cipher_key_path: ") +
                 config_.dist_cipher_key_path);
         }
-        // reinterpret_cast: ifstream reads into char buffers.
         fp.read(reinterpret_cast<char*>(dist_key_.cipher_key), CIPHER_KEY_SIZE);
         if (static_cast<unsigned int>(fp.gcount()) != CIPHER_KEY_SIZE) {
             throw SST_Exception(

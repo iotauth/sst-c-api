@@ -79,7 +79,6 @@ void SessionKeyRespMessage::parse_fields(const Bytes& plaintext,
             SESSION_KEY_COUNT_SIZE) {
         throw SST_Exception("Session key response truncated.");
     }
-    // reinterpret_cast: the crypto spec is ASCII JSON.
     crypto_spec_.assign(
         reinterpret_cast<const char*>(buf + buf_idx + prefix_len),
         crypto_spec_len);

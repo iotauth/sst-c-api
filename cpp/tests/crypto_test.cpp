@@ -2,8 +2,8 @@
  * @file crypto_test.cpp
  * @brief Unit test for the SST C++ crypto API (cpp/src/crypto.{hpp,cpp}).
  *
- * Like the API itself, the test performs NO dynamic allocation: every output
- * buffer is a stack std::array sized via the get_expected_* helpers.
+ * Output buffers use fixed-size arrays; OpenSSL allocates its own operation
+ * contexts and keys internally.
  *
  * It tests:
  * 1. Crypto::encrypt_aes() / Crypto::decrypt_aes()

@@ -2,13 +2,14 @@
 
 #include <filesystem>
 #include <iostream>
+#include <thread>
 
-#include "spdlog/sinks/basic_file_sink.h"
 #include "spdlog/sinks/rotating_file_sink.h"
+#include "spdlog/sinks/stdout_color_sinks.h"
 
 std::mutex Log::_log_mutex;
 std::shared_ptr<spdlog::logger> LogManager::logger = nullptr;
-bool LogManager::is_verbose = false;  // Definition
+bool LogManager::is_verbose = false;
 
 void LogManager::Initialize([[maybe_unused]] const std::string& logName,
                             [[maybe_unused]] const std::string& logFilePath,
@@ -27,13 +28,7 @@ void LogManager::Initialize([[maybe_unused]] const std::string& logName,
         std::filesystem::create_directories(log_dir);
     }
 
-    // Rotating sink: when the active file hits maxSizeBytes spdlog rotates
-    // it to <name>.1.log, shifts the others down, and deletes anything
-    // beyond maxFiles. This keeps disk usage bounded without any external
-    // tooling. If logrotate is configured to gzip the rotated files, those
-    // archives end up gzipped on its own schedule (delaycompress recommended
-    // so the most-recent rotated file isn't compressed while spdlog might
-    // still hold a handle to it during the next rotation).
+    // The sink rotates files itself and keeps at most maxFiles backups.
     logger = spdlog::rotating_logger_mt(logName, logFilePath, maxSizeBytes,
                                         maxFiles);
 #endif
@@ -64,7 +59,7 @@ void LogManager::SetLogFilePath([[maybe_unused]] const std::string& logName,
 
 spdlog::logger& LogManager::GetLogger() {
     if (!logger) {
-        // Create a default stdout logger if none exists to prevent crashes.
+        // Logging remains usable before explicit file logger setup.
         static std::shared_ptr<spdlog::logger> default_logger =
             spdlog::stdout_color_mt("default");
         return *default_logger;
