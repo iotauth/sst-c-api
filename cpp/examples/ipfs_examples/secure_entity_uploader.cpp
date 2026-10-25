@@ -36,14 +36,14 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         sst::ipfs::estimate_time_t t;
-        std::string hash_value = sst::ipfs::file_encrypt_upload(
-            s_key_list_0.s_key[0], api, argv[2], t);
+        std::string hash_value =
+            sst::ipfs::file_encrypt_upload(s_key_list_0.at(0), api, argv[2], t);
         std::printf(
             "FileSharing session key ID to upload: %llu\n",
             static_cast<unsigned long long>(sst::convert_skid_buf_to_int(
-                s_key_list_0.s_key[0].key_id, sst::SESSION_KEY_ID_SIZE)));
+                s_key_list_0.at(0).key_id, sst::SESSION_KEY_ID_SIZE)));
         std::vector<unsigned char> upload_req =
-            sst::ipfs::make_upload_req_buffer(s_key_list_0.s_key[0], api,
+            sst::ipfs::make_upload_req_buffer(s_key_list_0.at(0), api,
                                               hash_value);
 
         // Purpose index 0 requests the session key for the file system
@@ -53,7 +53,7 @@ int main(int argc, char* argv[]) {
             std::fprintf(stderr, "No file system manager session key.\n");
             return 1;
         }
-        auto session = api.secure_connect_to_server(s_key_list.s_key[0]);
+        auto session = api.secure_connect_to_server(s_key_list.at(0));
         ::sleep(1);
         std::thread receiver([&session] { session->receive_loop(); });
         // The receiver must be shut down and joined on every path, so

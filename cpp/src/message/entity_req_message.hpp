@@ -7,13 +7,14 @@
  * the encryption lives in its connection handler. On the entity side both
  * requests are encrypted the same way, so that code lives here once.
  *
- * Encryption (chosen by serialize_and_encrypt()):
+ * IoTSP payload layout after encryption (outer msgType/payloadLen omitted):
  * <pre>
  * With a valid distribution key (dist_key_type):
  *      senderLen: /UInt8/, sender: /string/,
- *      Enc_distKey(payload)
+ *      Enc_distKey(plaintextBody)
  * Otherwise (pub_enc_type), and Auth answers with a new distribution key:
- *      Enc_authPubKey(payload), Sign_entityPrivKey(Enc_authPubKey(payload))
+ *      Enc_authPubKey(plaintextBody),
+ * Sign_entityPrivKey(Enc_authPubKey(plaintextBody))
  * </pre>
  */
 

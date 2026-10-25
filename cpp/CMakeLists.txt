@@ -15,49 +15,48 @@ project(sst-cpp-api VERSION 1.0.0 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-include(FetchContent)
-FetchContent_Declare(
-  spdlog
-  GIT_REPOSITORY https://github.com/gabime/spdlog.git
-  GIT_TAG v1.17.0
-)
-FetchContent_MakeAvailable(spdlog)
+option(SST_FETCH_SPDLOG "Fetch spdlog when no installed package is available" ON)
+set(SST_SPDLOG_SOURCE_DIR "" CACHE PATH "Local spdlog source tree for offline builds")
+
+if(NOT TARGET spdlog::spdlog)
+  if(SST_SPDLOG_SOURCE_DIR)
+    add_subdirectory("${SST_SPDLOG_SOURCE_DIR}" "${CMAKE_CURRENT_BINARY_DIR}/spdlog"
+                     EXCLUDE_FROM_ALL)
+  else()
+    find_package(spdlog CONFIG QUIET)
+    if(NOT TARGET spdlog::spdlog)
+      if(NOT SST_FETCH_SPDLOG)
+        message(FATAL_ERROR
+          "spdlog was not found. Set spdlog_DIR or SST_SPDLOG_SOURCE_DIR, "
+          "or enable SST_FETCH_SPDLOG to download it.")
+      endif()
+      include(FetchContent)
+      FetchContent_Declare(spdlog
+        GIT_REPOSITORY https://github.com/gabime/spdlog.git
+        GIT_TAG v1.17.0)
+      FetchContent_MakeAvailable(spdlog)
+    endif()
+  endif()
+endif()
 
 find_package(OpenSSL REQUIRED)
 
 # SST library and protocol messages.
 add_library(${PROJECT_NAME} STATIC
   ${CMAKE_CURRENT_LIST_DIR}/src/crypto.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/crypto.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/net/sockets.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/net/sockets.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/log/log_manager.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/api.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/api.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/api_internal.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.cpp
   # Auth/entity messages, mirroring org.iot.auth.message in the Auth server.
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/message_type.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/iotsp_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/iotsp_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_hello_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_hello_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_code.hpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/auth_alert_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_req_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_req_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_req_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_req_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_req_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_req_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_resp_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/entity_resp_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_resp_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/session_key_resp_message.cpp
-  ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_resp_message.hpp
   ${CMAKE_CURRENT_LIST_DIR}/src/message/add_reader_resp_message.cpp
   )
 
@@ -95,6 +94,12 @@ add_test(NAME api_test COMMAND api_test)
 add_executable(message_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/message_test.cpp)
 target_link_libraries(message_test PRIVATE ${PROJECT_NAME})
 add_test(NAME message_test COMMAND message_test)
+
+find_package(Threads REQUIRED)
+add_executable(protocol_test tests/protocol_test.cpp)
+target_link_libraries(protocol_test PRIVATE ${PROJECT_NAME} Threads::Threads)
+add_test(NAME protocol_test COMMAND protocol_test)
+set_tests_properties(protocol_test PROPERTIES TIMEOUT 30)
 
 # Manual integration probe; requires a configured, running Auth server.
 add_executable(auth_connect_test EXCLUDE_FROM_ALL auth_connect_test.cpp)

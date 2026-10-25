@@ -16,9 +16,9 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
-#include <ctime>
 #include <fstream>
 #include <iomanip>
 #include <sstream>
@@ -48,11 +48,14 @@ namespace {
 // ---------------------------------------------------------------------------
 
 constexpr unsigned int HS_NONCE_SIZE = 8;
-constexpr unsigned int HS_INDICATOR_SIZE = 1 + HS_NONCE_SIZE * 2;
+constexpr unsigned int HS_NONCE_FIELDS_SIZE = 1 + HS_NONCE_SIZE * 2;
+constexpr unsigned char HS_NONCE_PRESENT = 0x01;
+constexpr unsigned char HS_REPLY_NONCE_PRESENT = 0x02;
 constexpr unsigned int MAX_HS_BUF_LENGTH = 256;
 constexpr unsigned int NONCE_SIZE = 8;
-// The C API uses 1024 here; a larger buffer also fits responses carrying
-// MAX_SESSION_KEY keys together with a distribution key.
+// Payload limit for Auth responses, excluding msgType and payloadLen.
+// Keep 4096 rather than the C API's 1024: ten keys plus an RSA-encrypted
+// distribution key/signature, cryptoSpec, IV, padding and MAC can exceed 1 KiB.
 constexpr unsigned int MAX_AUTH_COMM_LENGTH = 4096;
 
 // Each peer sends a fresh nonce and proves key possession by echoing the other.
@@ -88,7 +91,8 @@ class FdGuard {
 std::string to_hex(const unsigned char* buf, size_t size) {
     std::ostringstream oss;
     for (size_t i = 0; i < size; i++) {
-        oss << ' ' << std::hex << std::setw(2) << std::setfill('0')
+        if (i != 0) oss << ' ';
+        oss << std::hex << std::setw(2) << std::setfill('0')
             << static_cast<int>(buf[i]);
     }
     return oss.str();
@@ -291,33 +295,35 @@ int write_bytes_to_socket(int sock, const Bytes& buf) {
 // Handshake helpers (c_common.c)
 // ---------------------------------------------------------------------------
 
-// Fixed layout: indicator (1) + nonce (8) + reply_nonce (8).
-// Indicator bits 0 and 1 mark which nonce slots are present.
-int serialize_handshake(const unsigned char* nonce,
-                        const unsigned char* reply_nonce, unsigned char* ret) {
+// Decrypted handshake body: handshake_flags (1) + nonce (8) + replyNonce (8).
+// These flags are the protocol's inner "indicator" bitmask. The outer frame
+// starts with msgType, added separately by IoTSPMessage::serialize().
+int serialize_handshake_body(const unsigned char* nonce,
+                             const unsigned char* reply_nonce,
+                             unsigned char* ret) {
     if (nonce == nullptr && reply_nonce == nullptr) {
         LOG_ERR << "Handshake should include at least one nonce.";
         return -1;
     }
-    unsigned char indicator = 0;
+    unsigned char handshake_flags = 0;
     if (nonce != nullptr) {
-        indicator += 1;
+        handshake_flags |= HS_NONCE_PRESENT;
         std::memcpy(ret + 1, nonce, HS_NONCE_SIZE);
     }
     if (reply_nonce != nullptr) {
-        indicator += 2;
+        handshake_flags |= HS_REPLY_NONCE_PRESENT;
         std::memcpy(ret + 1 + HS_NONCE_SIZE, reply_nonce, HS_NONCE_SIZE);
     }
-    ret[0] = indicator;
+    ret[0] = handshake_flags;
     return 0;
 }
 
-void parse_handshake(const unsigned char* buf, HS_nonce_t& ret) {
+void parse_handshake_body(const unsigned char* buf, HS_nonce_t& ret) {
     std::memset(&ret, 0, sizeof(ret));
-    if ((buf[0] & 1) != 0) {
+    if ((buf[0] & HS_NONCE_PRESENT) != 0) {
         std::memcpy(ret.nonce, buf + 1, HS_NONCE_SIZE);
     }
-    if ((buf[0] & 2) != 0) {
+    if ((buf[0] & HS_REPLY_NONCE_PRESENT) != 0) {
         std::memcpy(ret.reply_nonce, buf + 1 + HS_NONCE_SIZE, HS_NONCE_SIZE);
     }
 }
@@ -327,7 +333,12 @@ void parse_handshake(const unsigned char* buf, HS_nonce_t& ret) {
 // ---------------------------------------------------------------------------
 
 uint64_t current_time_ms() {
-    return static_cast<uint64_t>(std::time(nullptr)) * 1000ULL;
+    // Auth encodes expiration as Unix-epoch milliseconds. A steady_clock
+    // timestamp has a different epoch and cannot be compared with these values.
+    return static_cast<uint64_t>(
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch())
+            .count());
 }
 
 // @return true when abs_validity_ms is still in the future.
@@ -436,20 +447,23 @@ int handshake_decrypt(const unsigned char* buf, unsigned int buf_length,
         CIPHER_KEY_SIZE, s_key.enc_mode, USE_HMAC, ret);
 }
 
-// Builds SKEY_HANDSHAKE_1: key_id (8) + Enc(indicator (1) + entity_nonce (8)).
-Bytes parse_handshake_1(const session_key_t& s_key,
-                        unsigned char* entity_nonce) {
+// SKEY_HANDSHAKE_1 payload: sessionKeyId (8) + Enc(handshake_flags + nonce).
+// Preserve the C API's compact 9-byte body; no replyNonce slot is sent here.
+Bytes make_handshake_1_payload(const session_key_t& s_key,
+                               unsigned char* entity_nonce) {
     if (Crypto::generate_nonce(HS_NONCE_SIZE, entity_nonce) < 0) {
-        throw SST_Exception("Failed to generate entity nonce.");
+        throw SST_Exception("Failed to generate entity nonce.",
+                            SST_ErrorCode::Crypto);
     }
-    unsigned char indicator_entity_nonce[1 + HS_NONCE_SIZE];
-    indicator_entity_nonce[0] = 1;
-    std::memcpy(indicator_entity_nonce + 1, entity_nonce, HS_NONCE_SIZE);
+    unsigned char handshake_body[1 + HS_NONCE_SIZE];
+    handshake_body[0] = HS_NONCE_PRESENT;
+    std::memcpy(handshake_body + 1, entity_nonce, HS_NONCE_SIZE);
 
     Bytes encrypted;
-    if (handshake_encrypt(indicator_entity_nonce, 1 + HS_NONCE_SIZE, s_key,
-                          encrypted) < 0) {
-        throw SST_Exception("Failed to encrypt handshake 1.");
+    if (handshake_encrypt(handshake_body, 1 + HS_NONCE_SIZE, s_key, encrypted) <
+        0) {
+        throw SST_Exception("Failed to encrypt handshake 1.",
+                            SST_ErrorCode::Crypto);
     }
     Bytes ret;
     ret.reserve(SESSION_KEY_ID_SIZE + encrypted.size());
@@ -466,27 +480,31 @@ Bytes check_handshake_2_send_handshake_3(const unsigned char* data_buf,
     LOG_DBG << "Received session key handshake2!";
     Bytes decrypted;
     if (handshake_decrypt(data_buf, data_buf_length, s_key, decrypted) < 0 ||
-        decrypted.size() < HS_INDICATOR_SIZE) {
-        throw SST_Exception("Error during decryption in checking handshake2.");
+        decrypted.size() < HS_NONCE_FIELDS_SIZE) {
+        throw SST_Exception("Error during decryption in checking handshake2.",
+                            SST_ErrorCode::Crypto);
     }
     HS_nonce_t hs;
-    parse_handshake(decrypted.data(), hs);
+    parse_handshake_body(decrypted.data(), hs);
 
     if (std::memcmp(hs.reply_nonce, entity_nonce, HS_NONCE_SIZE) != 0) {
         throw SST_Exception(
             "Comm init failed: server NOT verified, nonce NOT matched, "
-            "disconnecting...");
+            "disconnecting...",
+            SST_ErrorCode::Protocol);
     }
     LOG_DBG << "Server authenticated/authorized by solving nonce!";
 
-    unsigned char buf[HS_INDICATOR_SIZE];
-    std::memset(buf, 0, HS_INDICATOR_SIZE);
-    if (serialize_handshake(entity_nonce, hs.nonce, buf) < 0) {
-        throw SST_Exception("Failed serialize_handshake().");
+    unsigned char buf[HS_NONCE_FIELDS_SIZE];
+    std::memset(buf, 0, HS_NONCE_FIELDS_SIZE);
+    if (serialize_handshake_body(entity_nonce, hs.nonce, buf) < 0) {
+        throw SST_Exception("Failed serialize_handshake_body().",
+                            SST_ErrorCode::Protocol);
     }
     Bytes ret;
-    if (handshake_encrypt(buf, HS_INDICATOR_SIZE, s_key, ret) < 0) {
-        throw SST_Exception("Error during encryption while send_handshake_3.");
+    if (handshake_encrypt(buf, HS_NONCE_FIELDS_SIZE, s_key, ret) < 0) {
+        throw SST_Exception("Error during encryption while send_handshake_3.",
+                            SST_ErrorCode::Crypto);
     }
     return ret;
 }
@@ -497,33 +515,36 @@ Bytes check_handshake1_send_handshake2(const unsigned char* received_buf,
                                        unsigned char* server_nonce,
                                        const session_key_t& s_key) {
     if (received_buf_length <= SESSION_KEY_ID_SIZE) {
-        throw SST_Exception("Handshake 1 too short.");
+        throw SST_Exception("Handshake 1 too short.", SST_ErrorCode::Protocol);
     }
     Bytes decrypted;
     if (handshake_decrypt(received_buf + SESSION_KEY_ID_SIZE,
                           received_buf_length - SESSION_KEY_ID_SIZE, s_key,
                           decrypted) < 0 ||
         decrypted.size() < 1 + HS_NONCE_SIZE) {
-        throw SST_Exception("Error during decrypting handshake1.");
+        throw SST_Exception("Error during decrypting handshake1.",
+                            SST_ErrorCode::Crypto);
     }
     HS_nonce_t hs;
-    parse_handshake(decrypted.data(), hs);
-    LOG_DBG << "Client's nonce:" << to_hex(hs.nonce, HS_NONCE_SIZE);
+    parse_handshake_body(decrypted.data(), hs);
+    LOG_DBG << "Client's nonce: " << to_hex(hs.nonce, HS_NONCE_SIZE);
 
     if (Crypto::generate_nonce(HS_NONCE_SIZE, server_nonce) < 0) {
-        throw SST_Exception("Failed to generate server nonce.");
+        throw SST_Exception("Failed to generate server nonce.",
+                            SST_ErrorCode::Crypto);
     }
-    LOG_DBG << "Server's nonce:" << to_hex(server_nonce, HS_NONCE_SIZE);
+    LOG_DBG << "Server's nonce: " << to_hex(server_nonce, HS_NONCE_SIZE);
 
-    unsigned char buf[HS_INDICATOR_SIZE];
-    std::memset(buf, 0, HS_INDICATOR_SIZE);
-    if (serialize_handshake(server_nonce, hs.nonce, buf) < 0) {
-        throw SST_Exception("Failed serialize_handshake().");
+    unsigned char buf[HS_NONCE_FIELDS_SIZE];
+    std::memset(buf, 0, HS_NONCE_FIELDS_SIZE);
+    if (serialize_handshake_body(server_nonce, hs.nonce, buf) < 0) {
+        throw SST_Exception("Failed serialize_handshake_body().",
+                            SST_ErrorCode::Protocol);
     }
     Bytes ret;
-    if (handshake_encrypt(buf, HS_INDICATOR_SIZE, s_key, ret) < 0) {
-        throw SST_Exception(
-            "Error during encryption while sending handshake2.");
+    if (handshake_encrypt(buf, HS_NONCE_FIELDS_SIZE, s_key, ret) < 0) {
+        throw SST_Exception("Error during encryption while sending handshake2.",
+                            SST_ErrorCode::Crypto);
     }
     return ret;
 }
@@ -538,7 +559,8 @@ void parse_distribution_key(distribution_key_t& parsed,
                             const unsigned char* buf, size_t buf_length) {
     size_t cur_index = 0;
     if (buf_length < DIST_KEY_EXPIRATION_TIME_SIZE + 1) {
-        throw SST_Exception("Distribution key buffer too short.");
+        throw SST_Exception("Distribution key buffer too short.",
+                            SST_ErrorCode::Protocol);
     }
     parsed.abs_validity =
         read_unsigned_long_int_BE(buf, DIST_KEY_EXPIRATION_TIME_SIZE);
@@ -548,7 +570,8 @@ void parse_distribution_key(distribution_key_t& parsed,
     cur_index += 1;
     if (cipher_key_size > MAX_CIPHER_KEY_SIZE ||
         cur_index + cipher_key_size + 1 > buf_length) {
-        throw SST_Exception("Invalid distribution cipher key size.");
+        throw SST_Exception("Invalid distribution cipher key size.",
+                            SST_ErrorCode::Protocol);
     }
     parsed.cipher_key_size = cipher_key_size;
     std::memcpy(parsed.cipher_key, buf + cur_index, cipher_key_size);
@@ -557,7 +580,8 @@ void parse_distribution_key(distribution_key_t& parsed,
     unsigned int mac_key_size = buf[cur_index];
     cur_index += 1;
     if (mac_key_size > MAC_KEY_SIZE || cur_index + mac_key_size > buf_length) {
-        throw SST_Exception("Invalid distribution MAC key size.");
+        throw SST_Exception("Invalid distribution MAC key size.",
+                            SST_ErrorCode::Protocol);
     }
     parsed.mac_key_size = mac_key_size;
     std::memcpy(parsed.mac_key, buf + cur_index, mac_key_size);
@@ -571,8 +595,9 @@ int connect_to_auth(const config_t& config) {
     int sock = connect_as_client(config.auth_ip_addr, config.auth_port_num);
     if (sock < 0) {
         throw SST_Exception(std::string("Failed to connect to Auth at ") +
-                            config.auth_ip_addr + ":" +
-                            std::to_string(config.auth_port_num));
+                                config.auth_ip_addr + ":" +
+                                std::to_string(config.auth_port_num),
+                            SST_ErrorCode::Network);
     }
     return sock;
 }
@@ -582,7 +607,8 @@ int connect_to_auth(const config_t& config) {
 IoTSPMessage receive_from_auth(int sock) {
     IoTSPMessage msg = IoTSPMessage::receive(sock, MAX_AUTH_COMM_LENGTH);
     if (msg.get_type() == MessageType::AUTH_ALERT) {
-        throw SST_Exception(message::AuthAlertMessage(msg).describe());
+        throw SST_Exception(message::AuthAlertMessage(msg).describe(),
+                            SST_ErrorCode::AuthRejected);
     }
     return msg;
 }
@@ -592,15 +618,18 @@ message::AuthHelloMessage receive_auth_hello(int sock, int expected_auth_id) {
     message::AuthHelloMessage hello(receive_from_auth(sock));
     if (hello.get_auth_id() != static_cast<uint32_t>(expected_auth_id)) {
         throw SST_Exception("Auth ID NOT matched. Received " +
-                            std::to_string(hello.get_auth_id()) +
-                            ", expected " + std::to_string(expected_auth_id));
+                                std::to_string(hello.get_auth_id()) +
+                                ", expected " +
+                                std::to_string(expected_auth_id),
+                            SST_ErrorCode::Protocol);
     }
     return hello;
 }
 
 void send_to_auth(int sock, const Bytes& wire) {
     if (write_bytes_to_socket(sock, wire) < 0) {
-        throw SST_Exception("Failed to send request to Auth.");
+        throw SST_Exception("Failed to send request to Auth.",
+                            SST_ErrorCode::Network);
     }
 }
 
@@ -611,7 +640,8 @@ void send_to_auth(int sock, const Bytes& wire) {
 void copy_config_value(char* dest, size_t dest_size, const std::string& value,
                        const std::string& key) {
     if (value.size() + 1 > dest_size) {
-        throw SST_Exception("Config value too long for " + key + ": " + value);
+        throw SST_Exception("Config value too long for " + key + ": " + value,
+                            SST_ErrorCode::Configuration);
     }
     std::memcpy(dest, value.c_str(), value.size() + 1);
 }
@@ -626,29 +656,37 @@ AES_encryption_mode_t parse_enc_mode(const std::string& v,
     if (v == "1") return AES_128_CTR;
     if (v == "2") return AES_128_GCM;
     throw SST_Exception("Wrong input for " + key +
-                        ". Please type \"AES_128_CBC\", \"AES_128_CTR\" or "
-                        "\"AES_128_GCM\".");
+                            ". Please type \"AES_128_CBC\", \"AES_128_CTR\" or "
+                            "\"AES_128_GCM\".",
+                        SST_ErrorCode::Configuration);
 }
 
 bool parse_on_off(const std::string& v, const std::string& key) {
     if (v == "on" || v == "1") return true;
     if (v == "off" || v == "0") return false;
     throw SST_Exception("Wrong input for " + key +
-                        ". Please type \"on\"/\"1\" or \"off\"/\"0\".");
+                            ". Please type \"on\"/\"1\" or \"off\"/\"0\".",
+                        SST_ErrorCode::Configuration);
 }
 
 int parse_int(const std::string& v, const std::string& key) {
     try {
-        return std::stoi(v);
+        size_t consumed = 0;
+        int parsed = std::stoi(v, &consumed);
+        if (consumed != v.size())
+            throw std::invalid_argument("trailing characters");
+        return parsed;
     } catch (const std::exception&) {
-        throw SST_Exception("Invalid integer for " + key + ": " + v);
+        throw SST_Exception("Invalid integer for " + key + ": " + v,
+                            SST_ErrorCode::Configuration);
     }
 }
 
 int parse_port(const std::string& v, const std::string& key) {
     int port = parse_int(v, key);
     if (port < 0 || port > 65535) {
-        throw SST_Exception("Invalid port number for " + key + ": " + v);
+        throw SST_Exception("Invalid port number for " + key + ": " + v,
+                            SST_ErrorCode::Configuration);
     }
     return port;
 }
@@ -660,6 +698,94 @@ std::string trim(const std::string& s) {
     return s.substr(start, end - start + 1);
 }
 
+template <auto Field, auto Parse>
+void set_config_value(config_t& config, const std::string& value,
+                      const std::string& key) {
+    config.*Field = Parse(value, key);
+}
+
+template <auto Field>
+void set_config_string(config_t& config, const std::string& value,
+                       const std::string& key) {
+    auto& destination = config.*Field;
+    copy_config_value(destination, sizeof(destination), value, key);
+}
+
+template <int Index>
+void set_config_purpose(config_t& config, const std::string& value,
+                        const std::string& key) {
+    copy_config_value(config.purpose[Index], sizeof(config.purpose[Index]),
+                      value, key);
+}
+
+unsigned short parse_purpose_index(const std::string& value,
+                                   const std::string& key) {
+    int index = parse_int(value, key);
+    if (index < 0 || index > 1) {
+        throw SST_Exception("purpose_index must be 0 or 1, got " + value,
+                            SST_ErrorCode::Configuration);
+    }
+    return static_cast<unsigned short>(index);
+}
+
+hmac_mode_t parse_hmac_mode(const std::string& value, const std::string& key) {
+    return parse_on_off(value, key) ? USE_HMAC : NO_HMAC;
+}
+
+perm_dist_key_mode_t parse_perm_dist_key_mode(const std::string& value,
+                                              const std::string& key) {
+    return parse_on_off(value, key) ? USE_PERMANENT_DIST_KEY
+                                    : NO_PERMANENT_DIST_KEY;
+}
+
+struct ConfigField {
+    const char* name;
+    const char* alias;
+    void (*set)(config_t&, const std::string&, const std::string&);
+};
+
+// Each alias uses the same destination and validator as its canonical name.
+const ConfigField config_fields[] = {
+    {"entityInfo.name", "name", set_config_string<&config_t::name>},
+    {"purpose[0]", nullptr, set_config_purpose<0>},
+    {"purpose[1]", nullptr, set_config_purpose<1>},
+    {"purpose_index", nullptr,
+     set_config_value<&config_t::purpose_index, parse_purpose_index>},
+    {"entityInfo.number_key", "numkey",
+     set_config_value<&config_t::numkey, parse_int>},
+    {"sessionKey.encryptionMode", "session_key_enc_mode",
+     set_config_value<&config_t::session_key_enc_mode, parse_enc_mode>},
+    {"distKey.encryptionMode", "dist_key_enc_mode",
+     set_config_value<&config_t::dist_key_enc_mode, parse_enc_mode>},
+    {"HmacMode", "hmac_mode",
+     set_config_value<&config_t::hmac_mode, parse_hmac_mode>},
+    {"PermanentDistKeyMode", "perm_dist_key_mode",
+     set_config_value<&config_t::perm_dist_key_mode, parse_perm_dist_key_mode>},
+    {"authInfo.id", "auth_id", set_config_value<&config_t::auth_id, parse_int>},
+    {"authInfo.pubkey.path", "auth_pubkey_path",
+     set_config_string<&config_t::auth_pubkey_path>},
+    {"entityInfo.privkey.path", "entity_privkey_path",
+     set_config_string<&config_t::entity_privkey_path>},
+    {"auth.ip.address", "auth_ip_addr",
+     set_config_string<&config_t::auth_ip_addr>},
+    {"auth.port.number", "auth_port_num",
+     set_config_value<&config_t::auth_port_num, parse_port>},
+    {"entity.server.ip.address", "entity_server_ip_addr",
+     set_config_string<&config_t::entity_server_ip_addr>},
+    {"entity.server.port.number", "entity_server_port_num",
+     set_config_value<&config_t::entity_server_port_num, parse_port>},
+    {"network.protocol", nullptr,
+     set_config_string<&config_t::network_protocol>},
+    {"fileSystemManager.ip.address", nullptr,
+     set_config_string<&config_t::file_system_manager_ip_addr>},
+    {"fileSystemManager.port.number", nullptr,
+     set_config_value<&config_t::file_system_manager_port_num, parse_port>},
+    {"distKey.cipherkey.path", nullptr,
+     set_config_string<&config_t::dist_cipher_key_path>},
+    {"distkey.mackey.path", nullptr,
+     set_config_string<&config_t::dist_mac_key_path>},
+};
+
 // Parses the SST config file. Accepts the C API key names
 // (entityInfo.name=...) and, for compatibility, the earlier C++ key names
 // (name = ...).
@@ -667,12 +793,15 @@ void load_config(config_t& c, const std::string& path) {
     std::ifstream file(path);
     if (!file.is_open()) {
         if (errno == ENOENT) {
-            throw SST_Exception("SST Config file not found on path " + path);
+            throw SST_Exception("SST Config file not found on path " + path,
+                                SST_ErrorCode::Configuration);
         } else if (errno == EACCES) {
-            throw SST_Exception("SST Config file permission denied on path " +
-                                path);
+            throw SST_Exception(
+                "SST Config file permission denied on path " + path,
+                SST_ErrorCode::Configuration);
         }
-        throw SST_Exception("SST Config file open failed on path " + path);
+        throw SST_Exception("SST Config file open failed on path " + path,
+                            SST_ErrorCode::Configuration);
     }
     c = config_t{};
     unsigned short purpose_count = 0;
@@ -691,105 +820,39 @@ void load_config(config_t& c, const std::string& path) {
         if (trimmed.empty() || trimmed[0] == '#') continue;
         size_t eq_pos = trimmed.find('=');
         if (eq_pos == std::string::npos) {
-            throw SST_Exception("Config line without '=': " + trimmed);
+            throw SST_Exception("Config line without '=': " + trimmed,
+                                SST_ErrorCode::Configuration);
         }
         std::string key = trim(trimmed.substr(0, eq_pos));
         std::string value = trim(trimmed.substr(eq_pos + 1));
         if (value.empty()) {
-            throw SST_Exception("Config value does not exist for " + key);
+            throw SST_Exception("Config value does not exist for " + key,
+                                SST_ErrorCode::Configuration);
         }
 
-        if (key == "entityInfo.name" || key == "name") {
-            LOG_DBG << "Name: " << value;
-            copy_config_value(c.name, sizeof(c.name), value, key);
-        } else if (key == "entityInfo.purpose") {
-            if (purpose_count <= 1) {
-                LOG_DBG << "Purpose #" << (purpose_count + 1) << ": " << value;
-                copy_config_value(c.purpose[purpose_count],
-                                  sizeof(c.purpose[purpose_count]), value, key);
-                purpose_count += 1;
-            } else {
-                LOG_DBG << "Error for wrong number of purpose.";
+        // Repeated purpose entries are ordered; all other fields are
+        // table-driven.
+        if (key == "entityInfo.purpose") {
+            if (purpose_count >= 2) {
+                throw SST_Exception(
+                    "At most two entityInfo.purpose entries are supported.",
+                    SST_ErrorCode::Configuration);
             }
-            c.purpose_index = static_cast<unsigned short>(purpose_count - 1);
-        } else if (key.rfind("purpose[", 0) == 0 && key.back() == ']') {
-            int idx = parse_int(key.substr(8, key.size() - 9), key);
-            if (idx < 0 || idx > 1) {
-                throw SST_Exception("Purpose index out of range: " + key);
-            }
-            copy_config_value(c.purpose[idx], sizeof(c.purpose[idx]), value,
-                              key);
-        } else if (key == "purpose_index") {
-            int idx = parse_int(value, key);
-            if (idx < 0 || idx > 1) {
-                throw SST_Exception("purpose_index must be 0 or 1, got " +
-                                    value);
-            }
-            c.purpose_index = static_cast<unsigned short>(idx);
-        } else if (key == "entityInfo.number_key" || key == "numkey") {
-            LOG_DBG << "Numkey: " << value;
-            c.numkey = parse_int(value, key);
-        } else if (key == "sessionKey.encryptionMode" ||
-                   key == "session_key_enc_mode") {
-            LOG_DBG << "Session key encryption mode: " << value;
-            c.session_key_enc_mode = parse_enc_mode(value, key);
-        } else if (key == "HmacMode" || key == "hmac_mode") {
-            c.hmac_mode = parse_on_off(value, key) ? USE_HMAC : NO_HMAC;
-        } else if (key == "PermanentDistKeyMode" ||
-                   key == "perm_dist_key_mode") {
-            c.perm_dist_key_mode = parse_on_off(value, key)
-                                       ? USE_PERMANENT_DIST_KEY
-                                       : NO_PERMANENT_DIST_KEY;
-        } else if (key == "authInfo.id" || key == "auth_id") {
-            LOG_DBG << "Auth ID: " << value;
-            c.auth_id = parse_int(value, key);
-        } else if (key == "authInfo.pubkey.path" || key == "auth_pubkey_path") {
-            LOG_DBG << "Pubkey path of Auth: " << value;
-            copy_config_value(c.auth_pubkey_path, sizeof(c.auth_pubkey_path),
-                              value, key);
-        } else if (key == "entityInfo.privkey.path" ||
-                   key == "entity_privkey_path") {
-            LOG_DBG << "Privkey path of Entity: " << value;
-            copy_config_value(c.entity_privkey_path,
-                              sizeof(c.entity_privkey_path), value, key);
-        } else if (key == "auth.ip.address" || key == "auth_ip_addr") {
-            LOG_DBG << "IP address of Auth: " << value;
-            copy_config_value(c.auth_ip_addr, sizeof(c.auth_ip_addr), value,
-                              key);
-        } else if (key == "auth.port.number" || key == "auth_port_num") {
-            c.auth_port_num = parse_port(value, key);
-        } else if (key == "entity.server.ip.address" ||
-                   key == "entity_server_ip_addr") {
-            LOG_DBG << "IP address of entity server: " << value;
-            copy_config_value(c.entity_server_ip_addr,
-                              sizeof(c.entity_server_ip_addr), value, key);
-        } else if (key == "entity.server.port.number" ||
-                   key == "entity_server_port_num") {
-            LOG_DBG << "Port number of entity server: " << value;
-            c.entity_server_port_num = parse_port(value, key);
-        } else if (key == "network.protocol") {
-            LOG_DBG << "Network Protocol: " << value;
-            copy_config_value(c.network_protocol, sizeof(c.network_protocol),
-                              value, key);
-        } else if (key == "fileSystemManager.ip.address") {
-            copy_config_value(c.file_system_manager_ip_addr,
-                              sizeof(c.file_system_manager_ip_addr), value,
-                              key);
-        } else if (key == "fileSystemManager.port.number") {
-            c.file_system_manager_port_num = parse_port(value, key);
-        } else if (key == "distKey.cipherkey.path") {
-            copy_config_value(c.dist_cipher_key_path,
-                              sizeof(c.dist_cipher_key_path), value, key);
-        } else if (key == "distkey.mackey.path") {
-            copy_config_value(c.dist_mac_key_path, sizeof(c.dist_mac_key_path),
-                              value, key);
-        } else if (key == "distKey.encryptionMode" ||
-                   key == "dist_key_enc_mode") {
-            LOG_DBG << "Distribution key encryption mode: " << value;
-            c.dist_key_enc_mode = parse_enc_mode(value, key);
-        } else {
-            throw SST_Exception("Unknown config type " + key + ".");
+            copy_config_value(c.purpose[purpose_count],
+                              sizeof(c.purpose[purpose_count]), value, key);
+            c.purpose_index = purpose_count++;
+            continue;
         }
+        const auto* field = std::find_if(
+            std::begin(config_fields), std::end(config_fields),
+            [&key](const ConfigField& entry) {
+                return key == entry.name || (entry.alias && key == entry.alias);
+            });
+        if (field == std::end(config_fields)) {
+            throw SST_Exception("Unknown config type " + key + ".",
+                                SST_ErrorCode::Configuration);
+        }
+        field->set(c, value, key);
     }
 
     if (c.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
@@ -797,7 +860,8 @@ void load_config(config_t& c, const std::string& path) {
             std::strlen(c.dist_mac_key_path) > 0) {
             throw SST_Exception(
                 "PermanentDistKeyMode is turned off, but dist_key path(s) are "
-                "provided.");
+                "provided.",
+                SST_ErrorCode::Configuration);
         }
     }
 }
@@ -839,6 +903,35 @@ int SessionKeyList::find(uint64_t key_id) const {
     return -1;
 }
 
+const session_key_t& SessionKeyList::at(size_t index) const {
+    if (index >= static_cast<size_t>(num_key)) {
+        throw SST_Exception("Session key index out of range.",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    int slot = (rear_idx - num_key + static_cast<int>(MAX_SESSION_KEY) +
+                static_cast<int>(index)) %
+               static_cast<int>(MAX_SESSION_KEY);
+    return s_key[static_cast<size_t>(slot)];
+}
+
+session_key_t& SessionKeyList::at(size_t index) {
+    return const_cast<session_key_t&>(std::as_const(*this).at(index));
+}
+
+const session_key_t& SessionKeyList::at_slot(int slot) const {
+    const int max = static_cast<int>(MAX_SESSION_KEY);
+    if (slot < 0 || slot >= max ||
+        (slot - rear_idx + num_key + max) % max >= num_key) {
+        throw SST_Exception("Session key slot is not active.",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    return s_key[static_cast<size_t>(slot)];
+}
+
+session_key_t& SessionKeyList::at_slot(int slot) {
+    return const_cast<session_key_t&>(std::as_const(*this).at_slot(slot));
+}
+
 int SessionKeyList::add(const session_key_t& key) {
     num_key++;
     if (num_key > static_cast<int>(MAX_SESSION_KEY)) {
@@ -853,6 +946,11 @@ int SessionKeyList::add(const session_key_t& key) {
 }
 
 void SessionKeyList::append(const SessionKeyList& src) {
+    if (this == &src) {
+        const SessionKeyList snapshot = src;
+        append(snapshot);
+        return;
+    }
     const int max = static_cast<int>(MAX_SESSION_KEY);
     if (num_key + src.num_key > max) {
         int lost = num_key + src.num_key - max;
@@ -868,6 +966,10 @@ void SessionKeyList::append(const SessionKeyList& src) {
 }
 
 bool SessionKeyList::addable(int requested_num_key) {
+    if (requested_num_key < 0 ||
+        requested_num_key > static_cast<int>(MAX_SESSION_KEY)) {
+        return false;
+    }
     const int max = static_cast<int>(MAX_SESSION_KEY);
     int deficit = requested_num_key - (max - num_key);
     if (deficit <= 0) {
@@ -910,28 +1012,45 @@ void SST_Session::shutdown() {
 }
 
 int SST_Session::send_secure_message(const std::string& msg) {
-    return send_secure_message(
+    return send_secure_message_result(msg).legacy_value();
+}
+
+int SST_Session::send_secure_message(const unsigned char* msg,
+                                     unsigned int length) {
+    return send_secure_message_result(msg, length).legacy_value();
+}
+
+int SST_Session::read_secure_message(unsigned char* plaintext,
+                                     unsigned int capacity) {
+    return read_secure_message_result(plaintext, capacity).legacy_value();
+}
+
+SST_IOResult SST_Session::send_secure_message_result(const std::string& msg) {
+    if (msg.size() > MAX_PAYLOAD_LENGTH) {
+        return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
+    }
+    return send_secure_message_result(
         reinterpret_cast<const unsigned char*>(msg.data()),
         static_cast<unsigned int>(msg.size()));
 }
 
-int SST_Session::send_secure_message(const unsigned char* msg,
-                                     unsigned int msg_length) {
+SST_IOResult SST_Session::send_secure_message_result(const unsigned char* msg,
+                                                     unsigned int msg_length) {
     std::lock_guard<std::mutex> lock(send_mutex_);
-    if (msg_length > MAX_PAYLOAD_LENGTH) {
-        LOG_ERR << "Message too long: " << msg_length << " > "
-                << MAX_PAYLOAD_LENGTH;
-        return -1;
+    if (msg_length > MAX_PAYLOAD_LENGTH || (!msg && msg_length != 0)) {
+        LOG_ERR << "Invalid message buffer or length: " << msg_length;
+        return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
     }
     if (!is_session_key_valid(s_key_)) {
         LOG_ERR << "Session key expired!";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::KeyExpired);
     }
     // Encrypt the sequence number with the payload so authentication also
     // protects message ordering. Each direction has its own counter.
     Bytes buf(SEQ_NUM_SIZE + msg_length, 0);
     write_in_n_bytes(sent_seq_num_, SEQ_NUM_SIZE, buf.data());
-    std::memcpy(buf.data() + SEQ_NUM_SIZE, msg, msg_length);
+    if (msg_length != 0)
+        std::memcpy(buf.data() + SEQ_NUM_SIZE, msg, msg_length);
 
     unsigned int expected_length = Crypto::get_expected_encrypted_total_length(
         static_cast<unsigned int>(buf.size()), AES_128_IV_SIZE,
@@ -942,7 +1061,7 @@ int SST_Session::send_secure_message(const unsigned char* msg,
             s_key_, buf.data(), static_cast<unsigned int>(buf.size()),
             encrypted.data(), &encrypted_length) < 0) {
         LOG_ERR << "Failed to encrypt_buf_with_session_key().";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Crypto);
     }
     sent_seq_num_++;
     encrypted.resize(encrypted_length);
@@ -952,29 +1071,26 @@ int SST_Session::send_secure_message(const unsigned char* msg,
     int bytes_written = write_bytes_to_socket(sock_, sender);
     if (bytes_written < 0) {
         LOG_ERR << "Failed sst_write_to_socket().";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Network);
     }
-    return bytes_written;
+    return SST_IOResult::success(static_cast<unsigned int>(bytes_written));
 }
 
-int SST_Session::read_secure_message(unsigned char* plaintext,
-                                     unsigned int plaintext_capacity) {
+SST_IOResult SST_Session::read_secure_message_result(
+    unsigned char* plaintext, unsigned int plaintext_capacity) {
     std::lock_guard<std::mutex> lock(recv_mutex_);
+    if (!plaintext && plaintext_capacity != 0) {
+        return SST_IOResult::failure(SST_ErrorCode::InvalidArgument);
+    }
     MessageType message_type;
     Bytes received;
-    int bytes_read = IoTSPMessage::read(sock_, MAX_SECURE_COMM_MSG_LENGTH,
-                                        message_type, received);
-    if (bytes_read == 0) {
-        LOG_DBG << "Socket was disconnected while reading secure message.";
-        return 0;
-    } else if (bytes_read < 0) {
-        LOG_ERR << "Failed to read a secure message.";
-        return -1;
-    }
+    SST_IOResult frame = IoTSPMessage::read_result(
+        sock_, MAX_SECURE_COMM_MSG_LENGTH, message_type, received);
+    if (!frame.ok()) return frame;
     if (message_type != MessageType::SECURE_COMM_MSG) {
         LOG_ERR << "Wrong message type " << message::to_string(message_type)
                 << ", expected SECURE_COMM_MSG.";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     }
     Bytes decrypted;
     if (symmetric_decrypt_authenticate(
@@ -982,22 +1098,22 @@ int SST_Session::read_secure_message(unsigned char* plaintext,
             s_key_.mac_key, MAC_KEY_SIZE, s_key_.cipher_key, CIPHER_KEY_SIZE,
             s_key_.enc_mode, s_key_.hmac_mode, decrypted) < 0) {
         LOG_ERR << "Failed to decrypt received message.";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Crypto);
     }
     if (decrypted.size() < SEQ_NUM_SIZE) {
         LOG_ERR << "Decrypted message shorter than the sequence number.";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     }
     unsigned int received_seq_num =
         read_unsigned_int_BE(decrypted.data(), SEQ_NUM_SIZE);
     if (received_seq_num != received_seq_num_) {
         LOG_ERR << "Wrong sequence number expected. Got " << received_seq_num
                 << ", expected " << received_seq_num_;
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     }
     if (!is_session_key_valid(s_key_)) {
         LOG_ERR << "Session key expired!";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::KeyExpired);
     }
     received_seq_num_++;
     LOG_DBG << "Received seq_num: " << received_seq_num << ".";
@@ -1007,10 +1123,13 @@ int SST_Session::read_secure_message(unsigned char* plaintext,
     if (plaintext_length > plaintext_capacity) {
         LOG_ERR << "Plaintext buffer too small: need " << plaintext_length
                 << ", have " << plaintext_capacity;
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::BufferTooSmall);
     }
-    std::memcpy(plaintext, decrypted.data() + SEQ_NUM_SIZE, plaintext_length);
-    return static_cast<int>(plaintext_length);
+    if (plaintext_length != 0) {
+        std::memcpy(plaintext, decrypted.data() + SEQ_NUM_SIZE,
+                    plaintext_length);
+    }
+    return SST_IOResult::success(plaintext_length);
 }
 
 void SST_Session::receive_loop() {
@@ -1041,21 +1160,23 @@ SST_API::SST_API(const std::string& config_path)
     OPENSSL_init_crypto(OPENSSL_INIT_NO_ATEXIT, nullptr);
 
     load_config(config_, config_path);
-    purpose_for_requesting_key_ = config_.purpose[config_.purpose_index];
 
     if (config_.perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
         pub_key_.reset(Crypto::load_auth_public_key(config_.auth_pubkey_path));
         if (!pub_key_) {
             throw SST_Exception(
                 std::string("Failed load_auth_public_key(). Given path: ") +
-                config_.auth_pubkey_path + ", config_path: " + config_path);
+                    config_.auth_pubkey_path + ", config_path: " + config_path,
+                SST_ErrorCode::KeyLoad);
         }
         priv_key_.reset(
             Crypto::load_entity_private_key(config_.entity_privkey_path));
         if (!priv_key_) {
             throw SST_Exception(
                 std::string("Failed load_entity_private_key(). Given path: ") +
-                config_.entity_privkey_path + ", config_path: " + config_path);
+                    config_.entity_privkey_path +
+                    ", config_path: " + config_path,
+                SST_ErrorCode::KeyLoad);
         }
         // abs_validity 0 makes the distribution key invalid until Auth sends
         // one.
@@ -1078,21 +1199,24 @@ void SST_API::load_permanent_distribution_key() {
         std::strlen(config_.dist_mac_key_path) == 0) {
         throw SST_Exception(
             "PermanentDistKeyMode is on, so both distKey.cipherkey.path and "
-            "distkey.mackey.path must be set.");
+            "distkey.mackey.path must be set.",
+            SST_ErrorCode::Configuration);
     }
     {
         std::ifstream fp(config_.dist_cipher_key_path, std::ios::binary);
         if (!fp.is_open()) {
             throw SST_Exception(
                 std::string("Failed to open dist_cipher_key_path: ") +
-                config_.dist_cipher_key_path);
+                    config_.dist_cipher_key_path,
+                SST_ErrorCode::KeyLoad);
         }
         fp.read(reinterpret_cast<char*>(dist_key_.cipher_key), CIPHER_KEY_SIZE);
         if (static_cast<unsigned int>(fp.gcount()) != CIPHER_KEY_SIZE) {
             throw SST_Exception(
                 std::string("Failed to read CIPHER_KEY_SIZE bytes from "
                             "dist_cipher_key_path: ") +
-                config_.dist_cipher_key_path);
+                    config_.dist_cipher_key_path,
+                SST_ErrorCode::KeyLoad);
         }
         dist_key_.cipher_key_size = CIPHER_KEY_SIZE;
     }
@@ -1101,14 +1225,16 @@ void SST_API::load_permanent_distribution_key() {
         if (!fp.is_open()) {
             throw SST_Exception(
                 std::string("Failed to open dist_mac_key_path: ") +
-                config_.dist_mac_key_path);
+                    config_.dist_mac_key_path,
+                SST_ErrorCode::KeyLoad);
         }
         fp.read(reinterpret_cast<char*>(dist_key_.mac_key), MAC_KEY_SIZE);
         if (static_cast<unsigned int>(fp.gcount()) != MAC_KEY_SIZE) {
             throw SST_Exception(
                 std::string("Failed to read MAC_KEY_SIZE bytes from "
                             "dist_mac_key_path: ") +
-                config_.dist_mac_key_path);
+                    config_.dist_mac_key_path,
+                SST_ErrorCode::KeyLoad);
         }
         dist_key_.mac_key_size = MAC_KEY_SIZE;
     }
@@ -1118,32 +1244,33 @@ void SST_API::load_permanent_distribution_key() {
 // SST_API: session key requests
 // ---------------------------------------------------------------------------
 
-SessionKeyList SST_API::request_session_keys_locked(int purpose_index) {
+namespace {
+
+const char* configured_purpose(const config_t& config, int purpose_index) {
     if (purpose_index < 0 || purpose_index > 1) {
-        throw SST_Exception("Purpose index out of range.");
+        throw SST_Exception("Purpose index out of range.",
+                            SST_ErrorCode::InvalidArgument);
     }
-    purpose_for_requesting_key_ = config_.purpose[purpose_index];
-    if (std::strcmp(config_.network_protocol, "TCP") != 0) {
-        throw SST_Exception(std::string("Unsupported network protocol: ") +
-                            config_.network_protocol);
-    }
-    return send_session_key_req_via_TCP();
+    return config.purpose[purpose_index];
 }
+
+}  // namespace
 
 SessionKeyList SST_API::get_session_key_with_index(int purpose_index) {
     std::lock_guard<std::mutex> lock(mutex_);
-    return request_session_keys_locked(purpose_index);
+    return request_session_keys_locked(
+        configured_purpose(config_, purpose_index));
 }
 
 void SST_API::get_session_key_with_index(int purpose_index,
                                          SessionKeyList& existing_s_key_list) {
     std::lock_guard<std::mutex> lock(mutex_);
+    const char* purpose = configured_purpose(config_, purpose_index);
     if (!existing_s_key_list.addable(config_.numkey)) {
         LOG_WRN << "The session key list is not addable.";
         return;
     }
-    SessionKeyList earned = request_session_keys_locked(purpose_index);
-    existing_s_key_list.append(earned);
+    existing_s_key_list.append(request_session_keys_locked(purpose));
 }
 
 SessionKeyList SST_API::get_session_key() {
@@ -1160,48 +1287,16 @@ session_key_t* SST_API::get_session_key_by_ID(
     std::lock_guard<std::mutex> lock(mutex_);
     uint64_t target_id =
         convert_skid_buf_to_int(target_session_key_id, SESSION_KEY_ID_SIZE);
-
-    // If the entity already has the session key, no request to Auth is
-    // needed.
     int session_key_idx = existing_s_key_list.find(target_id);
     if (session_key_idx >= 0) {
-        return &existing_s_key_list.s_key[static_cast<size_t>(session_key_idx)];
+        return &existing_s_key_list.at_slot(session_key_idx);
     }
 
-    purpose_for_requesting_key_ =
-        "{\"keyId\":" + std::to_string(target_id) + "}";
-    SessionKeyList s_key_list;
-    try {
-        s_key_list =
-            send_session_key_request_check_protocol(target_session_key_id);
-    } catch (...) {
-        purpose_for_requesting_key_ = config_.purpose[config_.purpose_index];
-        throw;
-    }
-    // Restore the original purpose after the key has been fetched.
-    purpose_for_requesting_key_ = config_.purpose[config_.purpose_index];
-
-    int index = existing_s_key_list.add(s_key_list.s_key[0]);
-    return &existing_s_key_list.s_key[static_cast<size_t>(index)];
-}
-
-SessionKeyList SST_API::send_session_key_request_check_protocol(
-    const unsigned char* target_key_id) {
-    if (std::strcmp(config_.network_protocol, "TCP") != 0) {
-        throw SST_Exception(std::string("Invalid network protocol name: ") +
-                            config_.network_protocol);
-    }
-    SessionKeyList s_key_list = send_session_key_req_via_TCP();
-    LOG_DBG << "Received " << s_key_list.num_key << " keys.";
-    if (s_key_list.empty()) {
-        throw SST_Exception("Auth returned no session key.");
-    }
-    if (std::memcmp(s_key_list.s_key[0].key_id, target_key_id,
-                    SESSION_KEY_ID_SIZE) != 0) {
-        throw SST_Exception("Session key id is NOT as expected.");
-    }
-    LOG_DBG << "Session key id is as expected.";
-    return s_key_list;
+    // Purpose is local to this request, including when Auth rejects it.
+    SessionKeyList keys = request_session_keys_locked(
+        "{\"keyId\":" + std::to_string(target_id) + "}", target_session_key_id);
+    int index = existing_s_key_list.add(keys.at(0));
+    return &existing_s_key_list.at_slot(index);
 }
 
 void SST_API::save_distribution_key(const Bytes& encrypted_dist_key) {
@@ -1212,7 +1307,8 @@ void SST_API::save_distribution_key(const Bytes& encrypted_dist_key) {
     if (Crypto::sha256_verify(data_buf, static_cast<unsigned int>(key_size),
                               data_buf + key_size, key_size,
                               pub_key_.get()) < 0) {
-        throw SST_Exception("Failed sha256_verify() of distribution key.");
+        throw SST_Exception("Failed sha256_verify() of distribution key.",
+                            SST_ErrorCode::Crypto);
     }
     LOG_DBG << "Auth signature verified.";
 
@@ -1221,7 +1317,8 @@ void SST_API::save_distribution_key(const Bytes& encrypted_dist_key) {
     if (Crypto::private_decrypt(data_buf, key_size, RSA_PKCS1_OAEP_PADDING,
                                 priv_key_.get(), decrypted.data(),
                                 &decrypted_length) < 0) {
-        throw SST_Exception("Failed private_decrypt() of distribution key.");
+        throw SST_Exception("Failed private_decrypt() of distribution key.",
+                            SST_ErrorCode::Crypto);
     }
     parse_distribution_key(dist_key_, decrypted.data(), decrypted_length);
     dist_key_.enc_mode = config_.dist_key_enc_mode;
@@ -1237,63 +1334,73 @@ void SST_API::decrypt_auth_response(message::EntityRespMessage& resp,
         save_distribution_key(resp.get_encrypted_distribution_key());
     }
     resp.decrypt_and_parse(dist_key_, config_.session_key_enc_mode);
-    LOG_DBG << "Reply nonce in response:"
+    LOG_DBG << "Reply nonce in response: "
             << to_hex(resp.get_entity_nonce().data(), NONCE_SIZE);
     if (std::memcmp(resp.get_entity_nonce().data(), entity_nonce, NONCE_SIZE) !=
         0) {
-        throw SST_Exception("Auth nonce NOT verified.");
+        throw SST_Exception(
+            "Entity nonce in Auth response does not match the request.",
+            SST_ErrorCode::Protocol);
     }
-    LOG_DBG << "Auth nonce verified!";
+    LOG_DBG << "Entity nonce in Auth response verified.";
 }
 
-SessionKeyList SST_API::send_session_key_req_via_TCP() {
+template <class Request, class Response, class... Args>
+Response SST_API::request_auth_locked(Args&&... args) {
+    if (std::strcmp(config_.network_protocol, "TCP") != 0) {
+        throw SST_Exception(std::string("Unsupported network protocol: ") +
+                                config_.network_protocol,
+                            SST_ErrorCode::Configuration);
+    }
     FdGuard guard(connect_to_auth(config_));
-    int sock = guard.get();
-
-    message::AuthHelloMessage hello = receive_auth_hello(sock, config_.auth_id);
+    message::AuthHelloMessage hello =
+        receive_auth_hello(guard.get(), config_.auth_id);
     unsigned char entity_nonce[NONCE_SIZE];
     if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
-        throw SST_Exception("Failed to generate entity nonce.");
+        throw SST_Exception("Failed to generate entity nonce.",
+                            SST_ErrorCode::Crypto);
     }
-    message::SessionKeyReqMessage req(
-        entity_nonce, hello.get_auth_nonce().data(), config_.numkey,
-        config_.name, purpose_for_requesting_key_);
-    send_to_auth(sock, req.serialize_and_encrypt(dist_key_, pub_key_.get(),
-                                                 priv_key_.get()));
-
-    message::SessionKeyRespMessage resp(receive_from_auth(sock),
-                                        entity_rsa_key_size());
+    Request req(entity_nonce, hello.get_auth_nonce().data(),
+                std::forward<Args>(args)...);
+    send_to_auth(guard.get(), req.serialize_and_encrypt(
+                                  dist_key_, pub_key_.get(), priv_key_.get()));
+    Response resp(receive_from_auth(guard.get()), entity_rsa_key_size());
     decrypt_auth_response(resp, entity_nonce);
+    return resp;
+}
 
-    SessionKeyList session_key_list = resp.get_session_keys();
-    // The key modes are not on the wire; they come from the config.
-    for (int i = 0; i < session_key_list.num_key; i++) {
-        session_key_t& key = session_key_list.s_key[static_cast<size_t>(i)];
+SessionKeyList SST_API::request_session_keys_locked(
+    const std::string& purpose, const unsigned char* expected_key_id) {
+    auto resp = request_auth_locked<message::SessionKeyReqMessage,
+                                    message::SessionKeyRespMessage>(
+        config_.numkey, config_.name, purpose);
+    SessionKeyList keys = resp.get_session_keys();
+    if (expected_key_id) {
+        if (keys.empty()) {
+            throw SST_Exception("Auth returned no session key.",
+                                SST_ErrorCode::Protocol);
+        }
+        if (std::memcmp(keys.at(0).key_id, expected_key_id,
+                        SESSION_KEY_ID_SIZE) != 0) {
+            throw SST_Exception("Session key id is NOT as expected.",
+                                SST_ErrorCode::Protocol);
+        }
+    }
+    // Key modes come from the config, not the serialized SessionKey fields.
+    for (int i = 0; i < keys.size(); i++) {
+        session_key_t& key = keys.at(static_cast<size_t>(i));
         key.enc_mode = config_.session_key_enc_mode;
         key.hmac_mode = config_.hmac_mode;
         key.perm_dist_key_mode = config_.perm_dist_key_mode;
     }
-    return session_key_list;
+    return keys;
 }
 
 void SST_API::send_add_reader_req_via_TCP(const std::string& add_reader) {
     std::lock_guard<std::mutex> lock(mutex_);
-    FdGuard guard(connect_to_auth(config_));
-    int sock = guard.get();
-
-    message::AuthHelloMessage hello = receive_auth_hello(sock, config_.auth_id);
-    unsigned char entity_nonce[NONCE_SIZE];
-    if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
-        throw SST_Exception("Failed to generate entity nonce.");
-    }
-    message::AddReaderReqMessage req(
-        entity_nonce, hello.get_auth_nonce().data(), config_.name, add_reader);
-    send_to_auth(sock, req.serialize_and_encrypt(dist_key_, pub_key_.get(),
-                                                 priv_key_.get()));
-
-    message::AddReaderRespMessage resp(receive_from_auth(sock),
-                                       entity_rsa_key_size());
-    decrypt_auth_response(resp, entity_nonce);
+    request_auth_locked<message::AddReaderReqMessage,
+                        message::AddReaderRespMessage>(config_.name,
+                                                       add_reader);
     LOG_INF << "Add a file reader to the database.";
 }
 
@@ -1308,8 +1415,9 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server(
     if (sock < 0) {
         throw SST_Exception(
             std::string("Failed to connect to entity server at ") +
-            config_.entity_server_ip_addr + ":" +
-            std::to_string(config_.entity_server_port_num));
+                config_.entity_server_ip_addr + ":" +
+                std::to_string(config_.entity_server_port_num),
+            SST_ErrorCode::Network);
     }
     return secure_connect_to_server_with_socket(s_key, sock);
 }
@@ -1320,12 +1428,13 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
 
     // Send handshake 1.
     unsigned char entity_nonce[HS_NONCE_SIZE];
-    Bytes parsed = parse_handshake_1(s_key, entity_nonce);
+    Bytes parsed = make_handshake_1_payload(s_key, entity_nonce);
     Bytes sender_HS_1 =
         IoTSPMessage(MessageType::SKEY_HANDSHAKE_1, std::move(parsed))
             .serialize();
     if (write_bytes_to_socket(sock, sender_HS_1) < 0) {
-        throw SST_Exception("Failed to send handshake 1.");
+        throw SST_Exception("Failed to send handshake 1.",
+                            SST_ErrorCode::Network);
     }
 
     // Receive handshake 2.
@@ -1335,16 +1444,19 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
         IoTSPMessage::read(sock, MAX_HS_BUF_LENGTH, message_type, received);
     if (data_buf_length < 0) {
         throw SST_Exception(
-            "Socket read error in secure_connect_to_server_with_socket().");
+            "Socket read error in secure_connect_to_server_with_socket().",
+            SST_ErrorCode::Network);
     } else if (data_buf_length == 0) {
         throw SST_Exception(
             "Socket disconnected during handshake2 in "
-            "secure_connect_to_server_with_socket().");
+            "secure_connect_to_server_with_socket().",
+            SST_ErrorCode::PeerClosed);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_2) {
         throw SST_Exception(
             "Comm init failed: expected SKEY_HANDSHAKE_2, got " +
-            message::to_string(message_type));
+                message::to_string(message_type),
+            SST_ErrorCode::Protocol);
     }
 
     // Send handshake 3.
@@ -1354,7 +1466,8 @@ std::unique_ptr<SST_Session> SST_API::secure_connect_to_server_with_socket(
     Bytes sender_HS_3 =
         IoTSPMessage(MessageType::SKEY_HANDSHAKE_3, std::move(hs3)).serialize();
     if (write_bytes_to_socket(sock, sender_HS_3) < 0) {
-        throw SST_Exception("Failed to send handshake 3.");
+        throw SST_Exception("Failed to send handshake 3.",
+                            SST_ErrorCode::Network);
     }
     update_validity(s_key);
     LOG_DBG << "Switching to IN_COMM.";
@@ -1371,19 +1484,22 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     int data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
                                              message_type, received);
     if (data_buf_length < 0) {
-        throw SST_Exception("Socket read error in server_secure_comm_setup().");
+        throw SST_Exception("Socket read error in server_secure_comm_setup().",
+                            SST_ErrorCode::Network);
     } else if (data_buf_length == 0) {
         throw SST_Exception(
             "Socket disconnected during handshake1 in "
-            "server_secure_comm_setup().");
+            "server_secure_comm_setup().",
+            SST_ErrorCode::PeerClosed);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_1) {
         throw SST_Exception(
             "Error during comm init: expected SKEY_HANDSHAKE_1, got " +
-            message::to_string(message_type));
+                message::to_string(message_type),
+            SST_ErrorCode::Protocol);
     }
     if (received.size() < SESSION_KEY_ID_SIZE) {
-        throw SST_Exception("Handshake 1 too short.");
+        throw SST_Exception("Handshake 1 too short.", SST_ErrorCode::Protocol);
     }
     LOG_DBG << "Received session key handshake1.";
 
@@ -1400,7 +1516,8 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     Bytes sender =
         IoTSPMessage(MessageType::SKEY_HANDSHAKE_2, std::move(hs2)).serialize();
     if (write_bytes_to_socket(clnt_sock, sender) < 0) {
-        throw SST_Exception("Failed to send handshake 2.");
+        throw SST_Exception("Failed to send handshake 2.",
+                            SST_ErrorCode::Network);
     }
     LOG_DBG << "Switching to HANDSHAKE_2_SENT.";
 
@@ -1408,32 +1525,37 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     data_buf_length = IoTSPMessage::read(clnt_sock, MAX_HS_BUF_LENGTH,
                                          message_type, received);
     if (data_buf_length < 0) {
-        throw SST_Exception("Socket read error in server_secure_comm_setup().");
+        throw SST_Exception("Socket read error in server_secure_comm_setup().",
+                            SST_ErrorCode::Network);
     } else if (data_buf_length == 0) {
         throw SST_Exception(
             "Socket disconnected during handshake3 in "
-            "server_secure_comm_setup().");
+            "server_secure_comm_setup().",
+            SST_ErrorCode::PeerClosed);
     }
     if (message_type != MessageType::SKEY_HANDSHAKE_3) {
         throw SST_Exception(
             "Error during comm init: expected SKEY_HANDSHAKE_3, got " +
-            message::to_string(message_type));
+                message::to_string(message_type),
+            SST_ErrorCode::Protocol);
     }
     LOG_DBG << "Received session key handshake3!";
     Bytes decrypted;
     if (handshake_decrypt(received.data(),
                           static_cast<unsigned int>(received.size()), *s_key,
                           decrypted) < 0 ||
-        decrypted.size() < HS_INDICATOR_SIZE) {
+        decrypted.size() < HS_NONCE_FIELDS_SIZE) {
         throw SST_Exception(
-            "Error during decryption in HANDSHAKE_2_SENT state.");
+            "Error during decryption in HANDSHAKE_2_SENT state.",
+            SST_ErrorCode::Crypto);
     }
     HS_nonce_t hs;
-    parse_handshake(decrypted.data(), hs);
+    parse_handshake_body(decrypted.data(), hs);
     if (std::memcmp(hs.reply_nonce, server_nonce, HS_NONCE_SIZE) != 0) {
         throw SST_Exception(
             "Comm init failed: client NOT verified, nonce NOT matched, "
-            "disconnecting...");
+            "disconnecting...",
+            SST_ErrorCode::Protocol);
     }
     LOG_DBG << "Client authenticated/authorized by solving nonce!";
     update_validity(*s_key);

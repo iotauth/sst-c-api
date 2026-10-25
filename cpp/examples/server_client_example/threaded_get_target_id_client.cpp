@@ -46,7 +46,7 @@ int main(int argc, char* argv[]) {
             return 1;
         }
         for (size_t i = 0; i < 3; i++) {
-            if (!write_session_key_id_to_file(s_key_list.s_key[i],
+            if (!write_session_key_id_to_file(s_key_list.at(i),
                                               file_paths[i])) {
                 return 1;
             }

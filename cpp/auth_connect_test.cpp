@@ -40,7 +40,7 @@ int main(int argc, char* argv[]) {
         for (int i = 0; i < keys.size(); ++i) {
             std::cout << "    Key " << i << " ID: [";
             for (unsigned int j = 0; j < sst::SESSION_KEY_ID_SIZE; ++j) {
-                std::printf("%02x", keys.s_key[i].key_id[j]);
+                std::printf("%02x", keys.at(i).key_id[j]);
             }
             std::cout << "]" << std::endl;
         }

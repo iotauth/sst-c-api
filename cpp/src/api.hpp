@@ -80,14 +80,65 @@ constexpr unsigned int MAX_SECURE_COMM_MSG_LENGTH =
     MAC_KEY_SIZE;
 
 // ---------------------------------------------------------------------------
-// Exception
+// Errors and message results
 // ---------------------------------------------------------------------------
 
-/** @brief Exception thrown by the SST API on failure. */
+/** @brief Stable error categories shared by setup exceptions and message I/O.
+ */
+enum class SST_ErrorCode {
+    None,
+    Unspecified,
+    InvalidArgument,
+    Configuration,
+    KeyLoad,
+    Network,
+    Protocol,
+    Crypto,
+    KeyExpired,
+    BufferTooSmall,
+    AuthRejected,
+    PeerClosed,
+    Io,
+};
+
+enum class SST_IOStatus { Success, PeerClosed, Error };
+
+/**
+ * @brief Result of one message operation. bytes is meaningful on Success:
+ * framed bytes for sends, plaintext bytes for receives. An empty plaintext
+ * is a successful receive, distinct from PeerClosed.
+ */
+struct SST_IOResult {
+    SST_IOStatus status;
+    unsigned int bytes;
+    SST_ErrorCode error;
+
+    bool ok() const { return status == SST_IOStatus::Success; }
+    int legacy_value() const {
+        return status == SST_IOStatus::Error ? -1 : static_cast<int>(bytes);
+    }
+    static SST_IOResult success(unsigned int bytes) {
+        return {SST_IOStatus::Success, bytes, SST_ErrorCode::None};
+    }
+    static SST_IOResult closed() {
+        return {SST_IOStatus::PeerClosed, 0, SST_ErrorCode::PeerClosed};
+    }
+    static SST_IOResult failure(SST_ErrorCode error) {
+        return {SST_IOStatus::Error, 0, error};
+    }
+};
+
+/** @brief Setup/Auth failure with a stable category and a diagnostic message.
+ */
 class SST_Exception : public std::runtime_error {
    public:
-    explicit SST_Exception(const std::string& message)
-        : std::runtime_error(message) {}
+    explicit SST_Exception(const std::string& message,
+                           SST_ErrorCode code = SST_ErrorCode::Unspecified)
+        : std::runtime_error(message), code_(code) {}
+    SST_ErrorCode code() const noexcept { return code_; }
+
+   private:
+    SST_ErrorCode code_;
 };
 
 // ---------------------------------------------------------------------------
@@ -103,7 +154,7 @@ enum perm_dist_key_mode_t {
 /** @brief Session key with all cryptographic parameters. */
 struct session_key_t {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    uint64_t abs_validity;  ///< Expiration time in milliseconds since Unix epoch.
+    uint64_t abs_validity;  ///< Unix-epoch expiration in milliseconds.
     uint64_t rel_validity;  ///< Lifetime in milliseconds after a handshake.
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
@@ -120,7 +171,7 @@ struct distribution_key_t {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    uint64_t abs_validity;  ///< Expiration time in milliseconds since Unix epoch.
+    uint64_t abs_validity;  ///< Unix-epoch expiration in milliseconds.
     AES_encryption_mode_t enc_mode;
 };
 
@@ -159,11 +210,16 @@ struct config_t {
  * `num_key` is the number of keys in the list and `rear_idx` points to the
  * slot the next key is written to. The storage is a fixed-size array, so the
  * list never allocates.
+ *
+ * Lists have no internal mutex. Use one thread per list, or hold a caller-owned
+ * lock for the entire operation (including API calls and borrowed key access).
  */
 class SessionKeyList {
    public:
     SessionKeyList() = default;
 
+    // Legacy storage retained for source compatibility. Prefer add/append/at;
+    // direct writes must preserve the ring invariant.
     int num_key = 0;
     int rear_idx = 0;
     std::array<session_key_t, MAX_SESSION_KEY> s_key{};
@@ -179,6 +235,16 @@ class SessionKeyList {
      * @return Index of the key, or -1 if not found.
      */
     int find(uint64_t key_id) const;
+
+    /** @brief Key at index in oldest-to-newest order; throws on an invalid
+     * index. */
+    session_key_t& at(size_t index);
+    const session_key_t& at(size_t index) const;
+
+    /** @brief Active storage slot returned by find() or add(); throws if
+     * inactive. */
+    session_key_t& at_slot(int slot);
+    const session_key_t& at_slot(int slot) const;
 
     /**
      * @brief Appends a key at rear_idx. When the list is full the oldest key
@@ -253,6 +319,14 @@ class SST_Session {
      */
     int read_secure_message(unsigned char* plaintext,
                             unsigned int plaintext_capacity);
+
+    /** @brief Typed alternatives to the legacy int-returning message methods.
+     */
+    SST_IOResult send_secure_message_result(const unsigned char* msg,
+                                            unsigned int msg_length);
+    SST_IOResult send_secure_message_result(const std::string& msg);
+    SST_IOResult read_secure_message_result(unsigned char* plaintext,
+                                            unsigned int plaintext_capacity);
 
     /**
      * @brief Reads and logs messages until the peer closes the connection or
@@ -420,12 +494,6 @@ class SST_API {
     std::mutex& get_mutex() { return mutex_; }
 
    private:
-    // Auth session key request state machine (send_session_key_req_via_TCP).
-    SessionKeyList send_session_key_req_via_TCP();
-    // Requests a key by ID and checks the returned ID
-    // (send_session_key_request_check_protocol).
-    SessionKeyList send_session_key_request_check_protocol(
-        const unsigned char* target_key_id);
     // Verifies Auth's signature over the encrypted distribution key from a
     // response, decrypts it with the entity's private key and stores it.
     void save_distribution_key(
@@ -438,12 +506,15 @@ class SST_API {
     size_t entity_rsa_key_size() const;
     // Loads the permanent distribution key files named in the config.
     void load_permanent_distribution_key();
-    // Requests keys for the purpose at `purpose_index`; mutex_ must be held.
-    SessionKeyList request_session_keys_locked(int purpose_index);
+    // Auth exchanges mutate the distribution key; mutex_ must be held.
+    template <class Request, class Response, class... Args>
+    Response request_auth_locked(Args&&... args);
+    SessionKeyList request_session_keys_locked(
+        const std::string& purpose,
+        const unsigned char* expected_key_id = nullptr);
 
     config_t config_{};
     distribution_key_t dist_key_{};
-    std::string purpose_for_requesting_key_;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key_;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key_;
     std::mutex mutex_;

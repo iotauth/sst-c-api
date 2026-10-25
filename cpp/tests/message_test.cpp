@@ -152,6 +152,30 @@ void test_iotsp_message_serialize_and_read() {
     std::printf("**** PASSED: test_iotsp_message_serialize_and_read.\n");
 }
 
+void test_typed_frame_results() {
+    int fds[2];
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds) == 0);
+    // An empty framed payload is distinct from EOF in the typed API.
+    const unsigned char empty[] = {34, 0};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], empty, sizeof(empty)) ==
+          2);
+    MessageType type;
+    Bytes payload;
+    auto result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.ok() && result.bytes == 0 &&
+          type == MessageType::FIN_SECURE_COMM);
+    const unsigned char malformed[] = {33, 0x80, 0x80, 0x80, 0x80, 0x80};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], malformed,
+                                             sizeof(malformed)) == 6);
+    result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Protocol);
+    ::close(fds[0]);
+    CHECK(IoTSPMessage::read_result(fds[1], 100, type, payload).status ==
+          sst::SST_IOStatus::PeerClosed);
+    ::close(fds[1]);
+}
+
 void test_auth_hello_message() {
     std::printf("**** STARTING test_auth_hello_message.\n");
     Bytes payload = {0, 0, 0, 101};
@@ -344,6 +368,7 @@ void test_add_reader_resp_message() {
 int main() {
     std::printf("===== Running SST C++ message tests =====\n\n");
     test_iotsp_message_serialize_and_read();
+    test_typed_frame_results();
     test_auth_hello_message();
     test_auth_alert_message();
     test_session_key_req_message();

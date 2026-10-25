@@ -5,7 +5,7 @@
  * C++ counterpart of org.iot.auth.message.AddReaderRespMessage. Auth
  * serializes and encrypts it; the entity decrypts and parses it.
  * <pre>
- * AddReaderResp Format (after decryption, see EntityRespMessage)
+ * AddReaderResp plaintext body (after decryption, see EntityRespMessage)
  * {
  *      entityNonce: /Buffer/, (ENTITY_NONCE_SIZE)
  * } </pre>
@@ -26,7 +26,7 @@ class AddReaderRespMessage : public EntityRespMessage {
     AddReaderRespMessage(const IoTSPMessage& message, size_t rsa_key_size);
 
    protected:
-    /** @brief The payload holds only the entity nonce. */
+    /** @brief The plaintext body holds only the entity nonce. */
     void parse_fields(const Bytes& plaintext, size_t offset) override;
 };
 

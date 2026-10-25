@@ -6,14 +6,15 @@
  * AddReaderRespMessage each prepend the encrypted distribution key and
  * encrypt the payload with it. On the entity side that handling is the same
  * for both responses, so it lives here once.
+ * IoTSP payload layout (outer msgType/payloadLen omitted):
  * <pre>
- * With a distribution key (dist_key_type):
+ * With a new distribution key (dist_key_type):
  *      encryptedDistKey: /Buffer/, (Enc_entityPubKey(distKey) +
  *                                   Sign_authPrivKey(...), 2 x RSA key size)
- *      Enc_distKey(payload)
- * Without (type):
- *      Enc_distKey(payload)
- * payload always starts with entityNonce (ENTITY_NONCE_SIZE).
+ *      Enc_distKey(plaintextBody)
+ * Without a new distribution key (type):
+ *      Enc_distKey(plaintextBody)
+ * plaintextBody starts with entityNonce (ENTITY_NONCE_SIZE).
  * </pre>
  * Decryption takes two steps, mirroring Auth where the caller handles the
  * public key cryptography: the caller verifies and decrypts

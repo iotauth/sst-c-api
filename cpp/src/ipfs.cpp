@@ -42,7 +42,7 @@ float seconds_since(Clock::time_point start) {
 std::vector<unsigned char> read_file(const std::string& path) {
     std::ifstream in(path, std::ios::binary);
     if (!in.is_open()) {
-        throw SST_Exception("Cannot read the file: " + path);
+        throw SST_Exception("Cannot read the file: " + path, SST_ErrorCode::Io);
     }
     return std::vector<unsigned char>(std::istreambuf_iterator<char>(in),
                                       std::istreambuf_iterator<char>());
@@ -52,12 +52,13 @@ void write_file(const std::string& path, const unsigned char* data,
                 size_t length) {
     std::ofstream out(path, std::ios::binary);
     if (!out.is_open()) {
-        throw SST_Exception("Cannot open file for writing: " + path);
+        throw SST_Exception("Cannot open file for writing: " + path,
+                            SST_ErrorCode::Io);
     }
     out.write(reinterpret_cast<const char*>(data),
               static_cast<std::streamsize>(length));
     if (!out.good()) {
-        throw SST_Exception("Failed to write file: " + path);
+        throw SST_Exception("Failed to write file: " + path, SST_ErrorCode::Io);
     }
 }
 
@@ -79,13 +80,15 @@ std::string run_process(const std::vector<std::string>& argv,
 
     int pipefd[2] = {-1, -1};
     if (stdout_file.empty() && ::pipe(pipefd) < 0) {
-        throw SST_Exception("pipe() failed: " +
-                            std::string(std::strerror(errno)));
+        throw SST_Exception(
+            "pipe() failed: " + std::string(std::strerror(errno)),
+            SST_ErrorCode::Io);
     }
     pid_t pid = ::fork();
     if (pid < 0) {
-        throw SST_Exception("fork() failed: " +
-                            std::string(std::strerror(errno)));
+        throw SST_Exception(
+            "fork() failed: " + std::string(std::strerror(errno)),
+            SST_ErrorCode::Io);
     }
     if (pid == 0) {
         // Child: route stdout, then exec. Only async-signal-safe calls here.
@@ -124,11 +127,12 @@ std::string run_process(const std::vector<std::string>& argv,
     }
     int status = 0;
     if (::waitpid(pid, &status, 0) < 0) {
-        throw SST_Exception("waitpid() failed: " +
-                            std::string(std::strerror(errno)));
+        throw SST_Exception(
+            "waitpid() failed: " + std::string(std::strerror(errno)),
+            SST_ErrorCode::Io);
     }
     if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
-        throw SST_Exception("Command failed: " + display);
+        throw SST_Exception("Command failed: " + display, SST_ErrorCode::Io);
     }
     size_t end = output.find_first_of("\r\n");
     if (end != std::string::npos) {
@@ -144,7 +148,8 @@ std::string extract_cid(const std::string& command) {
     const std::string prefix = "ipfs cat ";
     if (command.compare(0, prefix.size(), prefix) != 0) {
         throw SST_Exception(
-            "Unexpected download command from the file system manager.");
+            "Unexpected download command from the file system manager.",
+            SST_ErrorCode::Protocol);
     }
     size_t start = prefix.size();
     size_t end = start;
@@ -153,7 +158,8 @@ std::string extract_cid(const std::string& command) {
         end++;
     }
     if (end == start) {
-        throw SST_Exception("Missing CID in the download command.");
+        throw SST_Exception("Missing CID in the download command.",
+                            SST_ErrorCode::Protocol);
     }
     return command.substr(start, end - start);
 }
@@ -180,7 +186,8 @@ std::string file_duplication_check(const std::string& file_name,
         return candidate;
     }
     throw SST_Exception(
-        "Cannot save the file as file name's suffix number exceeds max.");
+        "Cannot save the file as file name's suffix number exceeds max.",
+        SST_ErrorCode::Io);
 }
 
 std::string execute_command_and_save_result(const std::string& file_name,
@@ -188,7 +195,8 @@ std::string execute_command_and_save_result(const std::string& file_name,
     auto start = Clock::now();
     std::string cid = run_process({"ipfs", "add", "--quiet", file_name}, "");
     if (cid.empty()) {
-        throw SST_Exception("Failed to read CID from ipfs output.");
+        throw SST_Exception("Failed to read CID from ipfs output.",
+                            SST_ErrorCode::Io);
     }
     estimate_time.up_download_time = seconds_since(start);
     return cid;
@@ -202,7 +210,7 @@ std::string file_encrypt_upload(const session_key_t& s_key, const SST_API& api,
 
     unsigned char iv[AES_128_CBC_IV_SIZE];
     if (Crypto::generate_nonce(AES_128_CBC_IV_SIZE, iv) < 0) {
-        throw SST_Exception("Failed generate_nonce().");
+        throw SST_Exception("Failed generate_nonce().", SST_ErrorCode::Crypto);
     }
     // Room for CBC padding and a GCM tag.
     std::vector<unsigned char> encrypted(
@@ -213,7 +221,7 @@ std::string file_encrypt_upload(const session_key_t& s_key, const SST_API& api,
                             static_cast<unsigned int>(file_buf.size()),
                             s_key.cipher_key, iv, s_key.enc_mode,
                             encrypted.data(), &encrypted_length) < 0) {
-        throw SST_Exception("Encryption failed!");
+        throw SST_Exception("Encryption failed!", SST_ErrorCode::Crypto);
     }
     LOG_INF << "File encryption was successful.";
 
@@ -239,12 +247,14 @@ std::string file_decrypt_save(const session_key_t& s_key,
                               const std::string& file_name) {
     std::vector<unsigned char> file_buf = read_file(file_name);
     if (file_buf.size() < 2) {
-        throw SST_Exception("Encrypted file too short: " + file_name);
+        throw SST_Exception("Encrypted file too short: " + file_name,
+                            SST_ErrorCode::Protocol);
     }
     unsigned int owner_name_len = file_buf[0];
     size_t iv_offset = 1 + owner_name_len + 1;
     if (file_buf.size() < iv_offset + AES_128_CBC_IV_SIZE) {
-        throw SST_Exception("Encrypted file too short: " + file_name);
+        throw SST_Exception("Encrypted file too short: " + file_name,
+                            SST_ErrorCode::Protocol);
     }
     unsigned char iv[AES_128_CBC_IV_SIZE];
     std::memcpy(iv, file_buf.data() + iv_offset, AES_128_CBC_IV_SIZE);
@@ -257,7 +267,8 @@ std::string file_decrypt_save(const session_key_t& s_key,
     if (Crypto::decrypt_aes(file_buf.data() + enc_offset, enc_length,
                             s_key.cipher_key, iv, s_key.enc_mode, ret.data(),
                             &ret_length) < 0) {
-        throw SST_Exception("Error while decrypting " + file_name);
+        throw SST_Exception("Error while decrypting " + file_name,
+                            SST_ErrorCode::Crypto);
     }
     std::string result_file_name =
         file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION);
@@ -270,7 +281,7 @@ std::vector<unsigned char> make_upload_req_buffer(
     const session_key_t& s_key, const SST_API& api,
     const std::string& hash_value) {
     if (hash_value.size() > 255) {
-        throw SST_Exception("CID too long.");
+        throw SST_Exception("CID too long.", SST_ErrorCode::InvalidArgument);
     }
     std::vector<unsigned char> buf;
     buf.push_back(UPLOAD_INDEX);
@@ -296,7 +307,8 @@ void upload_to_file_system_manager(const session_key_t& s_key,
     int sock = internal::connect_as_client(config.file_system_manager_ip_addr,
                                            config.file_system_manager_port_num);
     if (sock < 0) {
-        throw SST_Exception("Failed to connect to the file system manager.");
+        throw SST_Exception("Failed to connect to the file system manager.",
+                            SST_ErrorCode::Network);
     }
     std::vector<unsigned char> data =
         make_upload_req_buffer(s_key, api, hash_value);
@@ -304,7 +316,8 @@ void upload_to_file_system_manager(const session_key_t& s_key,
         sock, data.data(), static_cast<unsigned int>(data.size()));
     ::close(sock);
     if (written < 0) {
-        throw SST_Exception("Failed to send to the file system manager.");
+        throw SST_Exception("Failed to send to the file system manager.",
+                            SST_ErrorCode::Network);
     }
     LOG_INF << "Sent the data such as session key id, hash value for file.";
 }
@@ -314,17 +327,21 @@ std::string download_file(const unsigned char* received_buf,
                           unsigned char* skey_id_out) {
     // [type][key_id_size][key_id][command_size][command "ipfs cat <cid> > "]
     if (received_buf_length < 3 + SESSION_KEY_ID_SIZE) {
-        throw SST_Exception("Download response too short.");
+        throw SST_Exception("Download response too short.",
+                            SST_ErrorCode::Protocol);
     }
     if (received_buf[0] != DOWNLOAD_RESP) {
-        throw SST_Exception("Not a download response.");
+        throw SST_Exception("Not a download response.",
+                            SST_ErrorCode::Protocol);
     }
     if (received_buf[1] != SESSION_KEY_ID_SIZE) {
-        throw SST_Exception("Unexpected session key ID size in response.");
+        throw SST_Exception("Unexpected session key ID size in response.",
+                            SST_ErrorCode::Protocol);
     }
     unsigned int command_size = received_buf[2 + SESSION_KEY_ID_SIZE];
     if (received_buf_length < 3 + SESSION_KEY_ID_SIZE + command_size) {
-        throw SST_Exception("Download response truncated.");
+        throw SST_Exception("Download response truncated.",
+                            SST_ErrorCode::Protocol);
     }
     std::memcpy(skey_id_out, received_buf + 2, SESSION_KEY_ID_SIZE);
     std::string cid = extract_cid(std::string(
@@ -345,13 +362,15 @@ std::string receive_data_and_download_file(unsigned char* skey_id_out,
     int sock = internal::connect_as_client(config.file_system_manager_ip_addr,
                                            config.file_system_manager_port_num);
     if (sock < 0) {
-        throw SST_Exception("Failed to connect to the file system manager.");
+        throw SST_Exception("Failed to connect to the file system manager.",
+                            SST_ErrorCode::Network);
     }
     std::vector<unsigned char> data = make_download_req_buffer(api);
     if (internal::sst_write_to_socket(
             sock, data.data(), static_cast<unsigned int>(data.size())) < 0) {
         ::close(sock);
-        throw SST_Exception("Failed to send to the file system manager.");
+        throw SST_Exception("Failed to send to the file system manager.",
+                            SST_ErrorCode::Network);
     }
     // The response is length-prefixed field by field, so read each field
     // exactly rather than trusting a single read() to return it all:
@@ -376,7 +395,8 @@ std::string receive_data_and_download_file(unsigned char* skey_id_out,
     }
     ::close(sock);
     if (!ok) {
-        throw SST_Exception("Failed to read from the file system manager.");
+        throw SST_Exception("Failed to read from the file system manager.",
+                            SST_ErrorCode::Network);
     }
     LOG_INF << "Received the information for file.";
     estimate_time.filemanager_time = seconds_since(filemanager_start);

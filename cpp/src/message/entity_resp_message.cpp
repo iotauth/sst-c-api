@@ -12,13 +12,15 @@ EntityRespMessage::EntityRespMessage(const IoTSPMessage& message,
     if (type_ == dist_key_type) {
         if (rsa_key_size == 0) {
             throw SST_Exception("Received message type " + to_string(type_) +
-                                " with a distribution key, but no private "
-                                "key is loaded.");
+                                    " with a distribution key, but no private "
+                                    "key is loaded.",
+                                SST_ErrorCode::Protocol);
         }
         size_t dist_key_size = rsa_key_size * 2;
         if (payload_.size() <= dist_key_size) {
-            throw SST_Exception("Message type " + to_string(type_) +
-                                " too short.");
+            throw SST_Exception(
+                "Message type " + to_string(type_) + " too short.",
+                SST_ErrorCode::Protocol);
         }
         encrypted_distribution_key_.assign(
             payload_.begin(),
@@ -29,8 +31,9 @@ EntityRespMessage::EntityRespMessage(const IoTSPMessage& message,
     } else if (type_ == type) {
         encrypted_payload_ = payload_;
     } else {
-        throw SST_Exception("Unexpected message type " + to_string(type_) +
-                            " from Auth.");
+        throw SST_Exception(
+            "Unexpected message type " + to_string(type_) + " from Auth.",
+            SST_ErrorCode::Protocol);
     }
 }
 
@@ -43,11 +46,14 @@ void EntityRespMessage::decrypt_and_parse(const distribution_key_t& dist_key,
             dist_key.mac_key, dist_key.mac_key_size, dist_key.cipher_key,
             dist_key.cipher_key_size, enc_mode, USE_HMAC, plaintext) < 0) {
         throw SST_Exception("Failed to decrypt message type " +
-                            to_string(type_) + " with the distribution key.");
+                                to_string(type_) +
+                                " with the distribution key.",
+                            SST_ErrorCode::Crypto);
     }
     if (plaintext.size() < ENTITY_NONCE_SIZE) {
-        throw SST_Exception("Message type " + to_string(type_) +
-                            " has no entity nonce.");
+        throw SST_Exception(
+            "Message type " + to_string(type_) + " has no entity nonce.",
+            SST_ErrorCode::Protocol);
     }
     std::memcpy(entity_nonce_.data(), plaintext.data(), ENTITY_NONCE_SIZE);
     parse_fields(plaintext, ENTITY_NONCE_SIZE);

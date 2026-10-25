@@ -2,7 +2,7 @@
 
 Run these commands from `entity/c/cpp/` in the iotauth checkout, or `cpp/` in
 an sst-c-api checkout. A C++17 compiler, CMake 3.19 or newer, OpenSSL development
-headers, and the pinned spdlog dependency are required; see [README.md](README.md).
+headers, and spdlog are required; see [README.md](README.md).
 
 ## Unit tests
 
@@ -12,10 +12,11 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Use a Debug build to keep the assertion-based checks enabled. The four suites
-are `crypto_test`, `socket_test`, `api_test`, and `message_test`. They do not
-require Auth or IPFS. Socket tests bind IPv4 and IPv6 loopback addresses on
-OS-selected ports.
+Use a Debug build to keep the assertion-based checks enabled. The five suites
+are `crypto_test`, `socket_test`, `api_test`, `message_test`, and `protocol_test`.
+They do not require Auth or IPFS services. Socket tests bind IPv4 and IPv6
+loopback addresses on OS-selected ports. The protocol test also binds a local
+port for an Auth stand-in and checks the handshake wire format.
 
 ## Auth integration
 

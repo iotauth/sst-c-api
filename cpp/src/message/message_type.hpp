@@ -1,6 +1,6 @@
 /**
  * @file message_type.hpp
- * @brief Message types exchanged between entities and Auth.
+ * @brief Outer msgType codes for Auth and entity-to-entity messages.
  *
  * C++ counterpart of org.iot.auth.message.MessageType in the Auth server.
  */
@@ -13,7 +13,7 @@
 namespace sst {
 namespace message {
 
-/** @brief Message type byte of an IoTSP message. */
+/** @brief The first byte (msgType) of an IoTSP frame. */
 enum class MessageType : unsigned char {
     AUTH_HELLO = 0,
     ENTITY_HELLO = 1,
@@ -23,7 +23,7 @@ enum class MessageType : unsigned char {
     /** Includes distribution key as well as session keys. */
     SESSION_KEY_RESP_WITH_DIST_KEY = 21,
     SESSION_KEY_REQ = 22,
-    /** Distribution message including session keys. */
+    /** Session keys encrypted with an existing distribution key. */
     SESSION_KEY_RESP = 23,
     SESSION_KEY_RESP_FOR_DELEGATION = 24,
     SESSION_KEY_RESP_FOR_DELEGATION_WITH_DIST_KEY = 25,

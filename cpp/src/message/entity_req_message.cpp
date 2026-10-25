@@ -21,7 +21,7 @@ Bytes encrypt_and_sign(const Bytes& buf, EVP_PKEY* pub_key,
     if (Crypto::public_encrypt(buf.data(), buf.size(), RSA_PKCS1_OAEP_PADDING,
                                pub_key, encrypted.data(),
                                &encrypted_length) < 0) {
-        throw SST_Exception("Failed public_encrypt().");
+        throw SST_Exception("Failed public_encrypt().", SST_ErrorCode::Crypto);
     }
     encrypted.resize(encrypted_length);
 
@@ -30,7 +30,7 @@ Bytes encrypt_and_sign(const Bytes& buf, EVP_PKEY* pub_key,
     if (Crypto::sha256_sign(encrypted.data(),
                             static_cast<unsigned int>(encrypted.size()),
                             priv_key, signature.data(), &sig_length) < 0) {
-        throw SST_Exception("Failed sha256_sign().");
+        throw SST_Exception("Failed sha256_sign().", SST_ErrorCode::Crypto);
     }
     signature.resize(sig_length);
 
@@ -49,7 +49,8 @@ Bytes encrypt_with_distribution_key(const Bytes& buf,
             dist_key.cipher_key_size, dist_key.enc_mode, USE_HMAC,
             encrypted) < 0) {
         throw SST_Exception(
-            "Error during encryption with the distribution key.");
+            "Error during encryption with the distribution key.",
+            SST_ErrorCode::Crypto);
     }
     Bytes ret;
     ret.reserve(1 + name.size() + encrypted.size());
@@ -87,7 +88,8 @@ Bytes EntityReqMessage::serialize_and_encrypt(
                    "distribution key as well...";
         if (auth_pub_key == nullptr || entity_priv_key == nullptr) {
             throw SST_Exception(
-                "Distribution key expired but no public/private key loaded.");
+                "Distribution key expired but no public/private key loaded.",
+                SST_ErrorCode::KeyLoad);
         }
         type_ = pub_enc_type_;
         payload_ = encrypt_and_sign(plain, auth_pub_key, entity_priv_key);

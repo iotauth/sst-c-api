@@ -16,7 +16,8 @@ unsigned int parse_session_key(session_key_t& ret, const unsigned char* buf,
                                unsigned int buf_length) {
     if (buf_length <
         SESSION_KEY_ID_SIZE + ABS_VALIDITY_SIZE + REL_VALIDITY_SIZE + 1) {
-        throw SST_Exception("Session key buffer too short.");
+        throw SST_Exception("Session key buffer too short.",
+                            SST_ErrorCode::Protocol);
     }
     std::memcpy(ret.key_id, buf, SESSION_KEY_ID_SIZE);
     unsigned int cur_idx = SESSION_KEY_ID_SIZE;
@@ -32,7 +33,8 @@ unsigned int parse_session_key(session_key_t& ret, const unsigned char* buf,
     cur_idx += 1;
     if (ret.cipher_key_size > MAX_CIPHER_KEY_SIZE ||
         cur_idx + ret.cipher_key_size + 1 > buf_length) {
-        throw SST_Exception("Invalid session cipher key size.");
+        throw SST_Exception("Invalid session cipher key size.",
+                            SST_ErrorCode::Protocol);
     }
     std::memcpy(ret.cipher_key, buf + cur_idx, ret.cipher_key_size);
     cur_idx += ret.cipher_key_size;
@@ -41,7 +43,8 @@ unsigned int parse_session_key(session_key_t& ret, const unsigned char* buf,
     cur_idx += 1;
     if (ret.mac_key_size > MAC_KEY_SIZE ||
         cur_idx + ret.mac_key_size > buf_length) {
-        throw SST_Exception("Invalid session MAC key size.");
+        throw SST_Exception("Invalid session MAC key size.",
+                            SST_ErrorCode::Protocol);
     }
     std::memcpy(ret.mac_key, buf + cur_idx, ret.mac_key_size);
     cur_idx += ret.mac_key_size;
@@ -68,7 +71,8 @@ void SessionKeyRespMessage::parse_fields(const Bytes& plaintext,
                                     &crypto_spec_len, &var_len_int_buf_size);
     if (var_len_int_buf_size == 0) {
         throw SST_Exception(
-            "Buffer size of the variable length integer cannot be 0.");
+            "Buffer size of the variable length integer cannot be 0.",
+            SST_ErrorCode::Protocol);
     }
     unsigned int prefix_len = static_cast<unsigned int>(var_len_int_buf_size);
     // Both subtractions are safe: prefix_len <= buf_length - buf_idx by
@@ -77,7 +81,8 @@ void SessionKeyRespMessage::parse_fields(const Bytes& plaintext,
     if (crypto_spec_len > buf_length - buf_idx - prefix_len ||
         buf_length - buf_idx - prefix_len - crypto_spec_len <
             SESSION_KEY_COUNT_SIZE) {
-        throw SST_Exception("Session key response truncated.");
+        throw SST_Exception("Session key response truncated.",
+                            SST_ErrorCode::Protocol);
     }
     crypto_spec_.assign(
         reinterpret_cast<const char*>(buf + buf_idx + prefix_len),
@@ -89,16 +94,15 @@ void SessionKeyRespMessage::parse_fields(const Bytes& plaintext,
     buf_idx += SESSION_KEY_COUNT_SIZE;
     if (session_key_count > MAX_SESSION_KEY) {
         throw SST_Exception("Too many session keys in response: " +
-                            std::to_string(session_key_count));
+                                std::to_string(session_key_count),
+                            SST_ErrorCode::Protocol);
     }
     session_keys_ = SessionKeyList();
     for (unsigned int i = 0; i < session_key_count; i++) {
-        buf_idx += parse_session_key(session_keys_.s_key[i], buf + buf_idx,
-                                     buf_length - buf_idx);
+        session_key_t key{};
+        buf_idx += parse_session_key(key, buf + buf_idx, buf_length - buf_idx);
+        session_keys_.add(key);
     }
-    session_keys_.num_key = static_cast<int>(session_key_count);
-    session_keys_.rear_idx =
-        session_keys_.num_key % static_cast<int>(MAX_SESSION_KEY);
 }
 
 }  // namespace message

@@ -3,6 +3,10 @@
  * @brief Base class for IoTSP (IoT Secure Protocol) messages.
  *
  * C++ counterpart of org.iot.auth.message.IoTSPMessage in the Auth server.
+ * Every frame starts with the one-byte msgType, followed by payloadLen and
+ * payload. A handshake payload contains an encrypted body whose first byte
+ * is a separate field-presence bitmask; it is not the outer msgType.
+ * See https://iotauth.github.io/docs/message-types#iotsp-framing.
  * <pre>
  * IoTSP Message Format
  * {
@@ -52,6 +56,11 @@ class IoTSPMessage {
     static int read(int sock, unsigned int max_payload_length,
                     MessageType& type, Bytes& payload);
 
+    // Distinguishes an empty payload from peer closure and classifies errors.
+    // On success, bytes is the payload length (excluding msgType/payloadLen).
+    static SST_IOResult read_result(int sock, unsigned int max_payload_length,
+                                    MessageType& type, Bytes& payload);
+
     /**
      * @brief Reads one message from the socket.
      * @throws SST_Exception when the peer closed the connection or on error.
@@ -61,10 +70,6 @@ class IoTSPMessage {
    protected:
     MessageType type_;
     Bytes payload_;
-
-   private:
-    static int read_impl(int sock, unsigned int max_payload_length,
-                         MessageType& type, Bytes& payload, bool& closed);
 };
 
 }  // namespace message

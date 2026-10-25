@@ -6,11 +6,13 @@ namespace message {
 AuthAlertMessage::AuthAlertMessage(const IoTSPMessage& message)
     : IoTSPMessage(message) {
     if (type_ != MessageType::AUTH_ALERT) {
-        throw SST_Exception("Expected AUTH_ALERT, got message type " +
-                            to_string(type_) + ".");
+        throw SST_Exception(
+            "Expected AUTH_ALERT, got message type " + to_string(type_) + ".",
+            SST_ErrorCode::Protocol);
     }
     if (payload_.size() < AUTH_ALERT_CODE_SIZE) {
-        throw SST_Exception("AUTH_ALERT without an alert code.");
+        throw SST_Exception("AUTH_ALERT without an alert code.",
+                            SST_ErrorCode::Protocol);
     }
     auth_alert_code_ = static_cast<AuthAlertCode>(payload_[0]);
 }

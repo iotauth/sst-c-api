@@ -31,7 +31,7 @@ int main(int argc, char* argv[]) {
             std::fprintf(stderr, "No file system manager session key.\n");
             return 1;
         }
-        auto session = api.secure_connect_to_server(s_key_list_0.s_key[0]);
+        auto session = api.secure_connect_to_server(s_key_list_0.at(0));
         ::sleep(3);
         std::vector<unsigned char> download_req =
             sst::ipfs::make_download_req_buffer(api);

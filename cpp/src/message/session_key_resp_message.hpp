@@ -5,11 +5,11 @@
  * C++ counterpart of org.iot.auth.message.SessionKeyRespMessage. Auth
  * serializes and encrypts it; the entity decrypts and parses it.
  * <pre>
- * SessionKeyResp Format (after decryption, see EntityRespMessage)
+ * SessionKeyResp plaintext body (after decryption, see EntityRespMessage)
  * {
  *      entityNonce:    /Buffer/, (ENTITY_NONCE_SIZE)
- *      cryptoSpec:     /JSON/, (e.g., {cipher: 'AES-128-CBC', mac: 'SHA256'})
- *      sessionKeyList: /UInt32BE for length and List of SessionKey's/
+ *      cryptoSpec:     /BufferedString containing JSON/,
+ *      sessionKeyList: /UInt32BE key count followed by SessionKey records/
  * }
  * SessionKey Format
  * {
