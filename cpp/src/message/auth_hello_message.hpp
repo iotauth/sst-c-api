@@ -5,10 +5,10 @@
  * C++ counterpart of org.iot.auth.message.AuthHelloMessage. Auth serializes
  * it; the entity parses it.
  * <pre>
- * AuthHello Format
+ * AUTH_HELLO payload (after the outer msgType/payloadLen)
  * {
  *      authId: /UInt32BE/,    // identifier of auth (when auths are replicated)
- *      nonce: /Buffer/        (AUTH_NONCE_SIZE)
+ *      authNonce: /Buffer/        (AUTH_NONCE_SIZE)
  * } </pre>
  */
 

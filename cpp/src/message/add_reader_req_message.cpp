@@ -5,6 +5,14 @@
 namespace sst {
 namespace message {
 
+AddReaderReqMessage::AddReaderReqMessage(const EntityNonce& entity_nonce,
+                                         const AuthNonce& auth_nonce,
+                                         std::string entity_name,
+                                         std::string purpose)
+    : EntityReqMessage(MessageType::ADD_READER_REQ_IN_PUB_ENC,
+                       MessageType::ADD_READER_REQ, entity_nonce, auth_nonce,
+                       std::move(entity_name), std::move(purpose)) {}
+
 AddReaderReqMessage::AddReaderReqMessage(const unsigned char* entity_nonce,
                                          const unsigned char* auth_nonce,
                                          std::string entity_name,

@@ -22,7 +22,11 @@
 #include <openssl/pem.h>
 #include <openssl/rsa.h>
 #include <openssl/x509.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
+#include <array>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -31,7 +35,9 @@
 #include <string>
 #include <vector>
 
-// CHECK() is compiled out in Release builds (NDEBUG), so use a check that is
+#include "temporary_directory.hpp"
+
+// assert() is compiled out in Release builds (NDEBUG), so use a check that is
 // always active.
 #define CHECK(cond)                                                    \
     do {                                                               \
@@ -49,8 +55,8 @@ using sst::SST_Exception;
 
 namespace {
 
-const std::filesystem::path kTmpDir =
-    std::filesystem::temp_directory_path() / "sst_cpp_api_test";
+const sst::test::TemporaryDirectory temporary_directory{"sst_cpp_api_test_"};
+const std::filesystem::path kTmpDir = temporary_directory.path();
 
 // Writes a self-signed X.509 certificate (for the "Auth public key") and a
 // private key, both PEM, so that SST_API can be constructed offline.
@@ -428,13 +434,180 @@ void test_update_validity() {
     std::printf("**** PASSED: test_update_validity.\n");
 }
 
+void test_config_aliases_and_validation() {
+    const std::string cert = (kTmpDir / "auth_cert.pem").string();
+    const std::string key = (kTmpDir / "entity_key.pem").string();
+    const std::string aliases =
+        "name=legacy.client\nnumkey=2\nauth_id=102\n"
+        "session_key_enc_mode=1\ndist_key_enc_mode=2\nhmac_mode=off\n"
+        "perm_dist_key_mode=off\nauth_pubkey_path=" +
+        cert +
+        "\n"
+        "entity_privkey_path=" +
+        key +
+        "\nauth_ip_addr=127.0.0.2\n"
+        "auth_port_num=1234\nentity_server_ip_addr=127.0.0.3\n"
+        "entity_server_port_num=5678\npurpose[0]=first\npurpose[1]=second\n"
+        "purpose_index=1\nfileSystemManager.ip.address=127.0.0.4\n"
+        "fileSystemManager.port.number=9999\n";
+    SST_API api(write_config((kTmpDir / "aliases.config").string(), cert, key,
+                             aliases));
+    const auto& config = api.get_config();
+    CHECK(std::strcmp(config.name, "legacy.client") == 0);
+    CHECK(config.numkey == 2 && config.auth_id == 102);
+    CHECK(config.session_key_enc_mode == sst::AES_128_CTR);
+    CHECK(config.dist_key_enc_mode == sst::AES_128_GCM);
+    CHECK(config.hmac_mode == sst::NO_HMAC);
+    CHECK(config.perm_dist_key_mode == sst::NO_PERMANENT_DIST_KEY);
+    CHECK(std::strcmp(config.auth_pubkey_path, cert.c_str()) == 0);
+    CHECK(std::strcmp(config.entity_privkey_path, key.c_str()) == 0);
+    CHECK(std::strcmp(config.auth_ip_addr, "127.0.0.2") == 0);
+    CHECK(std::strcmp(config.entity_server_ip_addr, "127.0.0.3") == 0);
+    CHECK(config.auth_port_num == 1234 &&
+          config.entity_server_port_num == 5678);
+    CHECK(std::strcmp(config.purpose[0], "first") == 0);
+    CHECK(std::strcmp(config.purpose[1], "second") == 0 &&
+          config.purpose_index == 1);
+    CHECK(std::strcmp(config.file_system_manager_ip_addr, "127.0.0.4") == 0);
+    CHECK(config.file_system_manager_port_num == 9999);
+
+    for (const std::string& bad :
+         {"auth_port_num=123junk\n", "auth.port.number=65536\n", "numkey=3.5\n",
+          "purpose[0junk]=test\n", "purpose[2]=test\n", "hmac_mode=maybe\n",
+          "session_key_enc_mode=9\n",
+          "entityInfo.purpose=second\nentityInfo.purpose=third\n"}) {
+        bool caught = false;
+        try {
+            SST_API invalid(write_config((kTmpDir / "invalid.config").string(),
+                                         cert, key, bad));
+        } catch (const SST_Exception& error) {
+            caught = true;
+            CHECK(error.code() == sst::SST_ErrorCode::Configuration);
+        }
+        CHECK(caught);
+    }
+}
+
+void test_millisecond_validity() {
+    auto now_ms = [] {
+        return static_cast<uint64_t>(
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::system_clock::now().time_since_epoch())
+                .count());
+    };
+    session_key_t key = make_session_key(1, 1);
+    key.rel_validity = 250;
+    uint64_t before = now_ms();
+    sst::update_validity(key);
+    uint64_t after = now_ms();
+    CHECK(key.abs_validity >= before + 250 && key.abs_validity <= after + 250);
+    key.abs_validity = now_ms() - 1;
+    CHECK(!sst::is_session_key_valid(key));
+}
+
+void test_session_key_access() {
+    SessionKeyList list;
+    CHECK(!list.addable(-1));
+    for (unsigned int i = 0; i < sst::MAX_SESSION_KEY + 2; ++i) {
+        list.add(make_session_key(i, UINT64_MAX));
+    }
+    CHECK(sst::convert_skid_buf_to_int(list.at(0).key_id, 8) == 2);
+    CHECK(sst::convert_skid_buf_to_int(list.at_slot(list.find(2)).key_id, 8) ==
+          2);
+    CHECK(sst::convert_skid_buf_to_int(list.at(list.size() - 1).key_id, 8) ==
+          11);
+    const SessionKeyList& read_only = list;
+    CHECK(&read_only.at(0) == &read_only.at_slot(list.find(2)));
+    list.at(0).rel_validity = 123;
+    CHECK(read_only.at_slot(list.find(2)).rel_validity == 123);
+    list.at_slot(list.find(2)).rel_validity = 456;
+    CHECK(read_only.at(0).rel_validity == 456);
+
+    auto expect_invalid_access = [](auto access) {
+        bool caught = false;
+        try {
+            access();
+        } catch (const SST_Exception& error) {
+            caught = true;
+            CHECK(error.code() == sst::SST_ErrorCode::InvalidArgument);
+        }
+        CHECK(caught);
+    };
+    expect_invalid_access([&list] { list.at(list.size()); });
+    expect_invalid_access([&read_only] { read_only.at(read_only.size()); });
+    for (int slot : {-1, static_cast<int>(sst::MAX_SESSION_KEY)}) {
+        expect_invalid_access([&list, slot] { list.at_slot(slot); });
+        expect_invalid_access([&read_only, slot] { read_only.at_slot(slot); });
+    }
+
+    SessionKeyList partial;
+    partial.add(make_session_key(1, 1));
+    partial.add(make_session_key(2, UINT64_MAX));
+    CHECK(partial.addable(sst::MAX_SESSION_KEY - 1));
+    const SessionKeyList& read_only_partial = partial;
+    expect_invalid_access([&partial] { partial.at_slot(0); });
+    expect_invalid_access(
+        [&read_only_partial] { read_only_partial.at_slot(0); });
+    partial.append(partial);
+    CHECK(partial.size() == 2);
+    CHECK(sst::convert_skid_buf_to_int(partial.at(0).key_id, 8) == 2);
+    CHECK(sst::convert_skid_buf_to_int(partial.at(1).key_id, 8) == 2);
+}
+
+void test_typed_message_results() {
+    using sst::SST_ErrorCode;
+    using sst::SST_IOStatus;
+    session_key_t key = make_session_key(42, UINT64_MAX);
+    std::array<int, 2> sockets{};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+    sst::SST_Session sender(sockets[0], key);
+    sst::SST_Session receiver(sockets[1], key);
+    std::array<unsigned char, 64> plaintext{};
+    CHECK(sender.send_secure_message_result("").ok());
+    auto empty =
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size());
+    CHECK(empty.ok() && empty.bytes == 0);
+    CHECK(sender.send_secure_message("legacy") > 0);
+    CHECK(receiver.read_secure_message(plaintext.data(), plaintext.size()) ==
+          6);
+    CHECK(sender.send_secure_message_result("typed").ok());
+    auto result =
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size());
+    CHECK(result.ok() && result.bytes == 5 &&
+          result.error == SST_ErrorCode::None);
+    CHECK(std::memcmp(plaintext.data(), "typed", 5) == 0);
+    CHECK(sender.send_secure_message_result("too large").ok());
+    CHECK(receiver.read_secure_message_result(plaintext.data(), 1).error ==
+          SST_ErrorCode::BufferTooSmall);
+    CHECK(sender.send_secure_message_result(nullptr, 1).error ==
+          SST_ErrorCode::InvalidArgument);
+    CHECK(receiver.read_secure_message_result(nullptr, 1).error ==
+          SST_ErrorCode::InvalidArgument);
+    sender.shutdown();
+    CHECK(
+        receiver.read_secure_message_result(plaintext.data(), plaintext.size())
+            .status == SST_IOStatus::PeerClosed);
+    CHECK(receiver.read_secure_message(plaintext.data(), plaintext.size()) ==
+          0);
+
+    sst::SST_Session invalid(-1, key);
+    CHECK(invalid.send_secure_message_result("test").error ==
+          SST_ErrorCode::Network);
+    CHECK(invalid.read_secure_message_result(plaintext.data(), plaintext.size())
+              .error == SST_ErrorCode::Network);
+    key.abs_validity = 1;
+    sst::SST_Session expired(-1, key);
+    CHECK(expired.send_secure_message_result("test").error ==
+          SST_ErrorCode::KeyExpired);
+    CHECK(expired.send_secure_message("test") == -1);
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
 
 int main() {
     std::printf("===== Running SST C++ API tests =====\n\n");
-    std::filesystem::create_directories(kTmpDir);
     generate_test_credentials((kTmpDir / "auth_cert.pem").string(),
                               (kTmpDir / "entity_key.pem").string());
 
@@ -445,14 +618,17 @@ int main() {
     test_api_init_permanent_dist_key_requires_both_paths();
     test_api_init_success();
     test_api_init_two_purposes();
+    test_config_aliases_and_validation();
     test_session_key_list_add_find();
     test_session_key_list_append();
     test_session_key_list_addable();
     test_encrypt_decrypt_buf_with_session_key();
     test_convert_skid_buf_to_int();
     test_update_validity();
+    test_millisecond_validity();
+    test_session_key_access();
+    test_typed_message_results();
 
-    std::filesystem::remove_all(kTmpDir);
     std::printf("\n===== All SST C++ API tests passed. =====\n");
     return 0;
 }

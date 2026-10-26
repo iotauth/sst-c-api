@@ -5,13 +5,13 @@
  * C++ counterpart of org.iot.auth.message.SessionKeyReqMessage. The entity
  * serializes and encrypts it; Auth decrypts and parses it.
  * <pre>
- * SessionKeyReq Format
+ * SessionKeyReq plaintext body (inside the encrypted payload)
  * {
  *      entityNonce: /Buffer/, (ENTITY_NONCE_SIZE)
  *      authNonce:   /Buffer/, (AUTH_NONCE_SIZE)
  *      numKeys: /UInt32BE/,
- *      sender: /string/, (senderLen UInt8)
- *      purpose: JSON
+ *      sender: /BufferedString/, (variable-length byte count + UTF-8 bytes)
+ *      purpose: /BufferedString/ containing JSON
  * } </pre>
  * Sent as SESSION_KEY_REQ, or SESSION_KEY_REQ_IN_PUB_ENC when the
  * distribution key is expired (see EntityReqMessage).
@@ -31,6 +31,13 @@ class SessionKeyReqMessage : public EntityReqMessage {
    public:
     static constexpr unsigned int NUM_KEYS_SIZE = 4;
 
+    // num_keys must be in [1, MAX_SESSION_KEY], the response-list capacity.
+    SessionKeyReqMessage(const EntityNonce& entity_nonce,
+                         const AuthNonce& auth_nonce, int num_keys,
+                         std::string entity_name, std::string purpose);
+
+    // Compatibility overload: each nonce pointer must address 8 readable bytes.
+    // Prefer the fixed-size overload; null pointers throw InvalidArgument.
     SessionKeyReqMessage(const unsigned char* entity_nonce,
                          const unsigned char* auth_nonce, int num_keys,
                          std::string entity_name, std::string purpose);

@@ -21,7 +21,7 @@ graph TD
     LOG_CRL["LOG_CRL macro"] --> Log
     Log --> LogManager["LogManager singleton\nspdlog::rotating_logger_mt"]
     LogManager --> FileSink["Rotating file sink\n50 MB × 10 backups"]
-    LogManager --> Console["Optional console sink\ncontrolled by verbose flag"]
+    Log --> Console["Optional stdout/stderr output\ncontrolled by verbose flag"]
 ```
 
 ### `LogManager` — Singleton Logger
@@ -29,8 +29,8 @@ graph TD
 A process-wide singleton wrapping a `spdlog::rotating_logger_mt`. Provides:
 
 - **`Initialize(name, path, verbose, maxSizeBytes, maxFiles)`** — Creates the logger with a rotating file sink. Automatically creates parent directories if they don't exist.
-  - Default rotation: 50 MB per file × 10 backups (≈500 MB raw).
-  - Rotated files are named `<name>.1.log`, `<name>.2.log`, etc.; the active file keeps its original name so external tooling and `logrotate(8)` keep working.
+  - Default rotation: 50 MiB per file, with up to 10 backups plus the active file.
+  - A path such as `sst.log` produces backups `sst.1.log`, `sst.2.log`, etc.; the active file keeps its original path.
 - **`SetLogFilePath(name, path, maxSizeBytes, maxFiles)`** — Drops the existing logger and creates a new one at a different path (useful for reconfiguration without restart).
 - **`GetLogger()`** — Returns a reference to the underlying `spdlog::logger`. If no logger has been initialized, returns a default stdout color logger.
 - **`IsVerbose()`** — Returns whether console output is enabled alongside file logging.
@@ -50,14 +50,14 @@ Each log entry includes:
 
 ### Logging Macros
 
-| Macro | Level | Console Color |
+| Macro | Level | Verbose output |
 |---|---|---|
-| `LOG_INF` | info | — |
-| `LOG_ERR` | error | red (stderr) |
-| `LOG_DBG` | debug | — |
-| `LOG_TRA` | trace | — |
-| `LOG_WRN` | warn | yellow |
-| `LOG_CRL` | critical | red (stderr) |
+| `LOG_INF` | info | stdout |
+| `LOG_ERR` | error | stderr |
+| `LOG_DBG` | debug | stdout |
+| `LOG_TRA` | trace | stdout |
+| `LOG_WRN` | warn | stdout |
+| `LOG_CRL` | critical | stderr |
 
 Usage:
 ```cpp
@@ -73,11 +73,11 @@ LOG_ERR << "Failed to connect: " << strerror(errno);
 
 ## Build-time Behavior
 
-When `GIT_VERSION` is defined at compile time (typically for production builds), **`Log` message dispatch and file-logger setup are disabled**. The `Log` constructor and destructor bodies are empty, but `operator<<` remains active. The stream insertion operator still builds strings and evaluates its arguments, so this does not guarantee zero runtime overhead. A release build alone does not define `GIT_VERSION`.
+When `GIT_VERSION` is defined at compile time, **`Log` message dispatch and file-logger setup are disabled**. The `Log` constructor and destructor bodies are empty, but `operator<<` remains active. The stream insertion operator still builds strings and evaluates its arguments, so this does not guarantee zero runtime overhead. A release build alone does not define `GIT_VERSION`.
 
 ## Pitfalls
 
 1. **Always initialize before use**: Call `LogManager::Initialize()` early (e.g., at program startup). If you don't, `GetLogger()` returns a default stdout logger — logs will still appear but won't be written to your configured file.
 2. **`GIT_VERSION` strips logging**: In production builds with this macro defined, the `Log` destructor does not dispatch messages. Don't rely on logging for critical error handling or side effects — use proper return values and exceptions instead.
-3. **Thread safety**: The `LogManager` logger is thread-safe (`rotating_logger_mt`). However, the `_log_mutex` in the `Log` destructor serializes all log dispatches globally — this is intentional but can be a bottleneck under extreme concurrency.
+3. **Thread safety**: The `Log` destructor serializes message dispatch with a mutex. Logger setup and reconfiguration do not acquire that mutex; configure logging before starting worker threads.
 4. **File path directory creation**: Both `Initialize()` and `SetLogFilePath()` create parent directories automatically, so you don't need to pre-create them. But if the process lacks write permissions on the target directory, filesystem or spdlog setup can throw an exception; these setup functions do not catch it. `SetLogFilePath()` only reconfigures an already initialized logger.

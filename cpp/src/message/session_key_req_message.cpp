@@ -5,6 +5,29 @@
 namespace sst {
 namespace message {
 
+namespace {
+
+int validate_num_keys(int num_keys) {
+    if (num_keys < 1 || static_cast<uint64_t>(num_keys) > MAX_SESSION_KEY) {
+        throw SST_Exception("Requested key count must be between 1 and " +
+                                std::to_string(MAX_SESSION_KEY) + ".",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    return num_keys;
+}
+
+}  // namespace
+
+SessionKeyReqMessage::SessionKeyReqMessage(const EntityNonce& entity_nonce,
+                                           const AuthNonce& auth_nonce,
+                                           int num_keys,
+                                           std::string entity_name,
+                                           std::string purpose)
+    : EntityReqMessage(MessageType::SESSION_KEY_REQ_IN_PUB_ENC,
+                       MessageType::SESSION_KEY_REQ, entity_nonce, auth_nonce,
+                       std::move(entity_name), std::move(purpose)),
+      num_keys_(validate_num_keys(num_keys)) {}
+
 SessionKeyReqMessage::SessionKeyReqMessage(const unsigned char* entity_nonce,
                                            const unsigned char* auth_nonce,
                                            int num_keys,
@@ -13,7 +36,7 @@ SessionKeyReqMessage::SessionKeyReqMessage(const unsigned char* entity_nonce,
     : EntityReqMessage(MessageType::SESSION_KEY_REQ_IN_PUB_ENC,
                        MessageType::SESSION_KEY_REQ, entity_nonce, auth_nonce,
                        std::move(entity_name), std::move(purpose)),
-      num_keys_(num_keys) {}
+      num_keys_(validate_num_keys(num_keys)) {}
 
 Bytes SessionKeyReqMessage::serialize_payload() const {
     Bytes buf;

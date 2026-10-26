@@ -15,21 +15,9 @@
 
 namespace sst {
 
-// Centralized OpenSSL initialization — no-op for OpenSSL 3.0+
-// (SSL_library_init/SSL_load_error_strings/OpenSSL_add_all_algorithms were
-// required in OpenSSL 1.x but removed in 3.0; modern OpenSSL initializes
-// everything automatically.)
-static void ensure_openssl_initialized() {
-    // Intentionally empty: OpenSSL 3.0+ handles initialization
-    // automatically. No library functions need to be invoked.
-}
-
 // ---- Internal helpers (private) ----
 
 void Crypto::print_crypto_error(const std::string& msg) {
-    // Ensure OpenSSL is initialized before using its functions
-    ensure_openssl_initialized();
-
     std::string err(MAX_ERROR_MESSAGE_LENGTH, '\0');
     const char* err_str = ERR_error_string(ERR_get_error(), nullptr);
     if (err_str != nullptr) {
@@ -399,7 +387,8 @@ int Crypto::get_symmetric_encrypt_authenticate_buffer(
     unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
     unsigned int expected_encrypted_total_length, unsigned char* ret,
     unsigned int* ret_length) {
-    // ret = IV (16) + encrypted(IV+buf) + (optional) HMAC(IV + encrypted) (32)
+    // Wire layout: IV || ciphertext (including a GCM tag) || optional HMAC.
+    // The HMAC covers both the IV and ciphertext.
     if (generate_nonce(iv_size, ret) < 0) {
         std::fprintf(stderr, "ERROR: Failed generate_nonce().\n");
         return -1;
@@ -443,7 +432,7 @@ int Crypto::get_symmetric_decrypt_authenticate_buffer(
     unsigned int iv_size, AES_encryption_mode_t enc_mode, hmac_mode_t hmac_mode,
     unsigned int expected_decrypted_total_length, unsigned char* ret,
     unsigned int* ret_length) {
-    // encrypted = iv (16) + encrypted (plaintext) + HMAC (IV + encrypted)(32)
+    // Verify the HMAC over IV || ciphertext before attempting decryption.
     unsigned int encrypted_length = buf_length - iv_size;
     if (hmac_mode == USE_HMAC) {
         // Fixed-size stack buffer (no allocation); HMAC-SHA256 fits in 32 B.
@@ -472,8 +461,7 @@ int Crypto::get_symmetric_decrypt_authenticate_buffer(
         if (expected_decrypted_total_length != *ret_length) {
             if (enc_mode == AES_128_CBC &&
                 expected_decrypted_total_length > *ret_length) {
-                // Fine: the exact decrypted length of a block cipher (CBC) is
-                // only known after decryption; the estimate is an upper bound.
+                // CBC padding makes the estimated length an upper bound.
             } else {
                 std::fprintf(
                     stderr,
@@ -488,7 +476,7 @@ int Crypto::get_symmetric_decrypt_authenticate_buffer(
     return 0;
 }
 
-// ---- Symmetric encrypt-then-authenticate (public, zero allocation) ----
+// ---- Symmetric encrypt-then-authenticate ----
 
 int Crypto::symmetric_encrypt_authenticate(
     const unsigned char* buf, unsigned int buf_length,

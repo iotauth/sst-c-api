@@ -9,10 +9,11 @@ AuthHelloMessage::AuthHelloMessage(const IoTSPMessage& message)
     : IoTSPMessage(message) {
     if (type_ != MessageType::AUTH_HELLO) {
         throw SST_Exception("Expected AUTH_HELLO from Auth, got message type " +
-                            to_string(type_) + ".");
+                                to_string(type_) + ".",
+                            SST_ErrorCode::Protocol);
     }
     if (payload_.size() < AUTH_ID_SIZE + AUTH_NONCE_SIZE) {
-        throw SST_Exception("AUTH_HELLO too short.");
+        throw SST_Exception("AUTH_HELLO too short.", SST_ErrorCode::Protocol);
     }
     auth_id_ = internal::read_unsigned_int_BE(payload_.data(), AUTH_ID_SIZE);
     std::memcpy(auth_nonce_.data(), payload_.data() + AUTH_ID_SIZE,

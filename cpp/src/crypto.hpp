@@ -4,7 +4,6 @@
 #include <openssl/evp.h>
 #include <openssl/rsa.h>
 
-#include <array>
 #include <cstddef>
 #include <string>
 
@@ -16,12 +15,8 @@
 // points are static methods; helpers used only internally are private static
 // methods.
 //
-// Design note: NO DYNAMIC ALLOCATION.
-// Every routine writes its result into a caller-provided buffer (typically a
-// stack std::array at the call site), and all internal temporaries are
-// fixed-size stack buffers. No new/malloc/std::vector is used anywhere in this
-// module. (EVP_PKEY* key objects are still owned by OpenSSL, which manages its
-// own memory internally; the caller frees them with EVP_PKEY_free.)
+// Callers provide the output buffers. OpenSSL allocates keys and operation
+// contexts internally; callers free loaded keys with EVP_PKEY_free.
 //
 // The crypto routines are stateless, so the public methods are `static`: the
 // class is used as a namespace/grouping rather than something to instantiate.
@@ -56,14 +51,6 @@ enum hmac_mode_t {
     NO_HMAC,
 };
 
-// Holds an RSA-sized data block together with its RSA signature. Both members
-// are fixed-size std::array, so a SignedData lives entirely on the stack.
-class SignedData {
-   public:
-    std::array<unsigned char, RSA_KEY_SIZE> data{};
-    std::array<unsigned char, RSA_KEY_SIZE> sign{};
-};
-
 class Crypto {
    public:
     // ---- Key loading ----
@@ -83,7 +70,7 @@ class Crypto {
     // ---- Public key encryption / decryption ----
 
     // Encrypts a message with an RSA public key, writing into a caller-provided
-    // buffer (no allocation).
+    // buffer.
     // @param data message to encrypt.
     // @param data_len length of the message.
     // @param padding RSA padding mode (e.g. RSA_PKCS1_OAEP_PADDING).
@@ -98,7 +85,7 @@ class Crypto {
                               unsigned char* ret, size_t* ret_len);
 
     // Decrypts a message with an RSA private key, writing into a
-    // caller-provided buffer (no allocation).
+    // caller-provided buffer.
     // @param enc_data encrypted message.
     // @param enc_data_len length of the encrypted message.
     // @param padding RSA padding mode (must match the encryption padding).
@@ -115,7 +102,7 @@ class Crypto {
     // ---- Digital signature ----
 
     // Digests the message with SHA-256 and signs it with an RSA private key,
-    // writing into a caller-provided buffer (no allocation).
+    // writing into a caller-provided buffer.
     // @param encrypted message to sign.
     // @param encrypted_length length of the message.
     // @param priv_key private key used to sign.
@@ -202,7 +189,7 @@ class Crypto {
         unsigned int mac_key_size, AES_encryption_mode_t enc_mode,
         hmac_mode_t hmac_mode);
 
-    // ---- Symmetric encrypt-then-authenticate (zero allocation) ----
+    // ---- Symmetric encrypt-then-authenticate ----
     // The caller provides `ret`, sized via the get_expected_* helpers above
     // (a stack std::array works well).
 

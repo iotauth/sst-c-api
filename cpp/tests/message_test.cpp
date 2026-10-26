@@ -9,10 +9,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <limits>
 #include <string>
+#include <type_traits>
 
 #include "../src/message/add_reader_req_message.hpp"
 #include "../src/message/add_reader_resp_message.hpp"
@@ -56,6 +59,16 @@ bool throws(F f) {
     return false;
 }
 
+template <class F>
+bool throws_code(sst::SST_ErrorCode code, F f) {
+    try {
+        f();
+    } catch (const SST_Exception& error) {
+        return error.code() == code;
+    }
+    return false;
+}
+
 sst::distribution_key_t make_dist_key() {
     sst::distribution_key_t key{};
     key.mac_key_size = sst::MAC_KEY_SIZE;
@@ -71,9 +84,10 @@ Bytes decrypt_with(const sst::distribution_key_t& key, const unsigned char* buf,
                    size_t len) {
     Bytes plain;
     CHECK(sst::internal::symmetric_decrypt_authenticate(
-              buf, static_cast<unsigned int>(len), key.mac_key,
-              key.mac_key_size, key.cipher_key, key.cipher_key_size,
-              key.enc_mode, sst::USE_HMAC, plain) == 0);
+              buf, static_cast<unsigned int>(len),
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
+              plain) == 0);
     return plain;
 }
 
@@ -81,8 +95,9 @@ Bytes encrypt_with(const sst::distribution_key_t& key, const Bytes& plain) {
     Bytes enc;
     CHECK(sst::internal::symmetric_encrypt_authenticate(
               plain.data(), static_cast<unsigned int>(plain.size()),
-              key.mac_key, key.mac_key_size, key.cipher_key,
-              key.cipher_key_size, key.enc_mode, sst::USE_HMAC, enc) == 0);
+              {key.mac_key, key.mac_key_size, key.cipher_key,
+               key.cipher_key_size, key.enc_mode, sst::USE_HMAC},
+              enc) == 0);
     return enc;
 }
 
@@ -150,6 +165,45 @@ void test_iotsp_message_serialize_and_read() {
     CHECK(throws([&] { IoTSPMessage::receive(fds[1], 1024); }));
     ::close(fds[1]);
     std::printf("**** PASSED: test_iotsp_message_serialize_and_read.\n");
+}
+
+void test_typed_frame_results() {
+    std::array<int, 2> fds{};
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds.data()) == 0);
+    // An empty framed payload is distinct from EOF in the typed API.
+    const std::array<unsigned char, 2> empty = {34, 0};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], empty.data(),
+                                             empty.size()) == 2);
+    MessageType type;
+    Bytes payload;
+    auto result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.ok() && result.bytes == 0 &&
+          type == MessageType::FIN_SECURE_COMM);
+    const std::array<unsigned char, 6> malformed = {33,   0x80, 0x80,
+                                                    0x80, 0x80, 0x80};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], malformed.data(),
+                                             malformed.size()) == 6);
+    result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Protocol);
+    ::close(fds[0]);
+    CHECK(IoTSPMessage::read_result(fds[1], 100, type, payload).status ==
+          sst::SST_IOStatus::PeerClosed);
+    ::close(fds[1]);
+
+    CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, fds.data()) == 0);
+    const std::array<unsigned char, 3> truncated = {33, 2, 0xAA};
+    CHECK(sst::internal::sst_write_to_socket(fds[0], truncated.data(),
+                                             truncated.size()) == 3);
+    ::close(fds[0]);
+    result = IoTSPMessage::read_result(fds[1], 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Protocol);
+    ::close(fds[1]);
+
+    result = IoTSPMessage::read_result(-1, 100, type, payload);
+    CHECK(result.status == sst::SST_IOStatus::Error);
+    CHECK(result.error == sst::SST_ErrorCode::Network);
 }
 
 void test_auth_hello_message() {
@@ -261,6 +315,94 @@ void test_add_reader_req_message() {
     std::printf("**** PASSED: test_add_reader_req_message.\n");
 }
 
+void test_request_input_validation() {
+    using sst::SST_ErrorCode;
+    using EntityNonce = sst::message::EntityReqMessage::EntityNonce;
+    using AuthNonce = sst::message::EntityReqMessage::AuthNonce;
+    using ShortNonce = std::array<unsigned char, 7>;
+    using LongNonce = std::array<unsigned char, 9>;
+    static_assert(
+        !std::is_constructible_v<SessionKeyReqMessage, ShortNonce, AuthNonce,
+                                 int, std::string, std::string>);
+    static_assert(
+        !std::is_constructible_v<SessionKeyReqMessage, EntityNonce, LongNonce,
+                                 int, std::string, std::string>);
+    static_assert(
+        !std::is_constructible_v<AddReaderReqMessage, ShortNonce, AuthNonce,
+                                 std::string, std::string>);
+    static_assert(
+        !std::is_constructible_v<AddReaderReqMessage, EntityNonce, LongNonce,
+                                 std::string, std::string>);
+
+    EntityNonce entity_nonce{1, 2, 3, 4, 5, 6, 7, 8};
+    AuthNonce auth_nonce{8, 7, 6, 5, 4, 3, 2, 1};
+    SessionKeyReqMessage keys(entity_nonce, auth_nonce, 1, "entity", "purpose");
+    AddReaderReqMessage reader(entity_nonce, auth_nonce, "entity", "reader");
+    CHECK(keys.get_entity_nonce() == entity_nonce);
+    CHECK(reader.get_auth_nonce() == auth_nonce);
+    entity_nonce.fill(0);
+    auth_nonce.fill(0);
+    CHECK(keys.get_entity_nonce()[0] == 1 && keys.get_auth_nonce()[0] == 8);
+    CHECK(reader.get_entity_nonce()[0] == 1 && reader.get_auth_nonce()[0] == 8);
+
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument, [] {
+        SessionKeyReqMessage(nullptr, kAuthNonce, 1, "entity", "purpose");
+    }));
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument, [] {
+        SessionKeyReqMessage(kEntityNonce, nullptr, 1, "entity", "purpose");
+    }));
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument, [] {
+        AddReaderReqMessage(nullptr, kAuthNonce, "entity", "reader");
+    }));
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument, [] {
+        AddReaderReqMessage(kEntityNonce, nullptr, "entity", "reader");
+    }));
+
+    const auto dist_key = make_dist_key();
+    const std::string max_name(255, 'n');
+    for (int count : {1, static_cast<int>(sst::MAX_SESSION_KEY)}) {
+        SessionKeyReqMessage req(entity_nonce, auth_nonce, count, max_name,
+                                 "p");
+        req.serialize_and_encrypt(dist_key, nullptr, nullptr);
+        const auto& payload = req.get_payload();
+        CHECK(payload[0] == 255);
+        const auto plain =
+            decrypt_with(dist_key, payload.data() + 256, payload.size() - 256);
+        CHECK(sst::internal::read_unsigned_int_BE(plain.data() + 16, 4) ==
+              static_cast<unsigned int>(count));
+        size_t offset = 20;
+        CHECK(read_buffered_string(plain, offset) == max_name);
+        CHECK(read_buffered_string(plain, offset) == "p");
+        CHECK(offset == plain.size());
+    }
+    AddReaderReqMessage max_reader(entity_nonce, auth_nonce, max_name, "r");
+    max_reader.serialize_and_encrypt(dist_key, nullptr, nullptr);
+    CHECK(max_reader.get_payload()[0] == 255);
+
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument,
+                      [&entity_nonce, &auth_nonce] {
+                          SessionKeyReqMessage(entity_nonce, auth_nonce, 1,
+                                               std::string(256, 'n'), "p");
+                      }));
+    CHECK(throws_code(SST_ErrorCode::InvalidArgument, [] {
+        AddReaderReqMessage(kEntityNonce, kAuthNonce, std::string(256, 'n'),
+                            "r");
+    }));
+    for (int count : {std::numeric_limits<int>::min(), -1, 0,
+                      static_cast<int>(sst::MAX_SESSION_KEY) + 1,
+                      std::numeric_limits<int>::max()}) {
+        CHECK(throws_code(SST_ErrorCode::InvalidArgument, [count] {
+            SessionKeyReqMessage(kEntityNonce, kAuthNonce, count, "entity",
+                                 "p");
+        }));
+        CHECK(throws_code(SST_ErrorCode::InvalidArgument,
+                          [&entity_nonce, &auth_nonce, count] {
+                              SessionKeyReqMessage(entity_nonce, auth_nonce,
+                                                   count, "entity", "p");
+                          }));
+    }
+}
+
 void test_session_key_resp_message() {
     std::printf("**** STARTING test_session_key_resp_message.\n");
     sst::distribution_key_t dist_key = make_dist_key();
@@ -327,6 +469,33 @@ void test_session_key_resp_message() {
                                 0);
         r.decrypt_and_parse(dist_key, sst::AES_128_CBC);
     }));
+
+    // Reject trailing bytes even when the ciphertext and MAC are valid.
+    Bytes trailing = plain;
+    trailing.push_back(0x42);
+    CHECK(throws_code(sst::SST_ErrorCode::Protocol, [&dist_key, &trailing] {
+        SessionKeyRespMessage r(IoTSPMessage(MessageType::SESSION_KEY_RESP,
+                                             encrypt_with(dist_key, trailing)),
+                                0);
+        r.decrypt_and_parse(dist_key, sst::AES_128_CBC);
+    }));
+    Bytes empty_keys(kEntityNonce, kEntityNonce + 8);
+    append_buffered_string(empty_keys, "{}");
+    empty_keys.insert(empty_keys.end(), {0, 0, 0, 0});
+    SessionKeyRespMessage empty_response(
+        IoTSPMessage(MessageType::SESSION_KEY_RESP,
+                     encrypt_with(dist_key, empty_keys)),
+        0);
+    empty_response.decrypt_and_parse(dist_key, sst::AES_128_CBC);
+    CHECK(empty_response.get_session_keys().empty());
+    empty_keys.push_back(0x42);
+    CHECK(throws_code(sst::SST_ErrorCode::Protocol, [&dist_key, &empty_keys] {
+        SessionKeyRespMessage r(
+            IoTSPMessage(MessageType::SESSION_KEY_RESP,
+                         encrypt_with(dist_key, empty_keys)),
+            0);
+        r.decrypt_and_parse(dist_key, sst::AES_128_CBC);
+    }));
     std::printf("**** PASSED: test_session_key_resp_message.\n");
 }
 
@@ -344,10 +513,12 @@ void test_add_reader_resp_message() {
 int main() {
     std::printf("===== Running SST C++ message tests =====\n\n");
     test_iotsp_message_serialize_and_read();
+    test_typed_frame_results();
     test_auth_hello_message();
     test_auth_alert_message();
     test_session_key_req_message();
     test_add_reader_req_message();
+    test_request_input_validation();
     test_session_key_resp_message();
     test_add_reader_resp_message();
     std::printf("\n===== All SST C++ message tests passed. =====\n");

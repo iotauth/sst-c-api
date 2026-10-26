@@ -80,18 +80,69 @@ constexpr unsigned int MAX_SECURE_COMM_MSG_LENGTH =
     MAC_KEY_SIZE;
 
 // ---------------------------------------------------------------------------
-// Exception
+// Errors and message results
 // ---------------------------------------------------------------------------
 
-/** @brief Exception thrown by the SST API on failure. */
+/** @brief Stable error categories shared by setup exceptions and message I/O.
+ */
+enum class SST_ErrorCode {
+    None,
+    Unspecified,
+    InvalidArgument,
+    Configuration,
+    KeyLoad,
+    Network,
+    Protocol,
+    Crypto,
+    KeyExpired,
+    BufferTooSmall,
+    AuthRejected,
+    PeerClosed,
+    Io,
+};
+
+enum class SST_IOStatus { Success, PeerClosed, Error };
+
+/**
+ * @brief Result of one message operation. bytes is meaningful on Success:
+ * framed bytes for sends, plaintext bytes for receives. An empty plaintext
+ * is a successful receive, distinct from PeerClosed.
+ */
+struct SST_IOResult {
+    SST_IOStatus status;
+    unsigned int bytes;
+    SST_ErrorCode error;
+
+    bool ok() const { return status == SST_IOStatus::Success; }
+    int legacy_value() const {
+        return status == SST_IOStatus::Error ? -1 : static_cast<int>(bytes);
+    }
+    static SST_IOResult success(unsigned int bytes) {
+        return {SST_IOStatus::Success, bytes, SST_ErrorCode::None};
+    }
+    static SST_IOResult closed() {
+        return {SST_IOStatus::PeerClosed, 0, SST_ErrorCode::PeerClosed};
+    }
+    static SST_IOResult failure(SST_ErrorCode error) {
+        return {SST_IOStatus::Error, 0, error};
+    }
+};
+
+/** @brief Setup/Auth failure with a stable category and a diagnostic message.
+ */
 class SST_Exception : public std::runtime_error {
    public:
-    explicit SST_Exception(const std::string& message)
-        : std::runtime_error(message) {}
+    explicit SST_Exception(const std::string& message,
+                           SST_ErrorCode code = SST_ErrorCode::Unspecified)
+        : std::runtime_error(message), code_(code) {}
+    SST_ErrorCode code() const noexcept { return code_; }
+
+   private:
+    SST_ErrorCode code_;
 };
 
 // ---------------------------------------------------------------------------
-// Plain data types (binary compatible with the C API structs)
+// Data types corresponding to the C API; wire fields are serialized explicitly.
 // ---------------------------------------------------------------------------
 
 /** @brief Whether a permanent (pre-shared) distribution key is used. */
@@ -103,8 +154,8 @@ enum perm_dist_key_mode_t {
 /** @brief Session key with all cryptographic parameters. */
 struct session_key_t {
     unsigned char key_id[SESSION_KEY_ID_SIZE];
-    uint64_t abs_validity;
-    uint64_t rel_validity;
+    uint64_t abs_validity;  ///< Unix-epoch expiration in milliseconds.
+    uint64_t rel_validity;  ///< Lifetime in milliseconds after a handshake.
     unsigned char mac_key[MAC_KEY_SIZE];
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
@@ -120,7 +171,7 @@ struct distribution_key_t {
     unsigned int mac_key_size;
     unsigned char cipher_key[MAX_CIPHER_KEY_SIZE];
     unsigned int cipher_key_size;
-    uint64_t abs_validity;
+    uint64_t abs_validity;  ///< Unix-epoch expiration in milliseconds.
     AES_encryption_mode_t enc_mode;
 };
 
@@ -159,11 +210,16 @@ struct config_t {
  * `num_key` is the number of keys in the list and `rear_idx` points to the
  * slot the next key is written to. The storage is a fixed-size array, so the
  * list never allocates.
+ *
+ * Lists have no internal mutex. Use one thread per list, or hold a caller-owned
+ * lock for the entire operation (including API calls and borrowed key access).
  */
 class SessionKeyList {
    public:
     SessionKeyList() = default;
 
+    // Legacy storage retained for source compatibility. Prefer add/append/at;
+    // direct writes must preserve the ring invariant.
     int num_key = 0;
     int rear_idx = 0;
     std::array<session_key_t, MAX_SESSION_KEY> s_key{};
@@ -179,6 +235,16 @@ class SessionKeyList {
      * @return Index of the key, or -1 if not found.
      */
     int find(uint64_t key_id) const;
+
+    /** @brief Key at index in oldest-to-newest order; throws on an invalid
+     * index. */
+    session_key_t& at(size_t index);
+    const session_key_t& at(size_t index) const;
+
+    /** @brief Active storage slot returned by find() or add(); throws if
+     * inactive. */
+    session_key_t& at_slot(int slot);
+    const session_key_t& at_slot(int slot) const;
 
     /**
      * @brief Appends a key at rear_idx. When the list is full the oldest key
@@ -209,7 +275,8 @@ class SessionKeyList {
  *
  * Owns the TCP socket: it is closed when the session is destroyed. Sending
  * and receiving are each guarded by a mutex, so one thread can send while
- * another one receives.
+ * another one receives. Call shutdown() and join those threads before
+ * destroying the session.
  */
 class SST_Session {
    public:
@@ -253,6 +320,14 @@ class SST_Session {
     int read_secure_message(unsigned char* plaintext,
                             unsigned int plaintext_capacity);
 
+    /** @brief Typed alternatives to the legacy int-returning message methods.
+     */
+    SST_IOResult send_secure_message_result(const unsigned char* msg,
+                                            unsigned int msg_length);
+    SST_IOResult send_secure_message_result(const std::string& msg);
+    SST_IOResult read_secure_message_result(unsigned char* plaintext,
+                                            unsigned int plaintext_capacity);
+
     /**
      * @brief Reads and logs messages until the peer closes the connection or
      * an error occurs (equivalent to receive_thread_read_one_each()).
@@ -260,14 +335,16 @@ class SST_Session {
     void receive_loop();
 
     /**
-     * @brief Shuts down the socket for reading and writing. A thread blocked
-     * in read_secure_message() then returns 0, which lets a receiver thread
-     * be joined cleanly.
+     * @brief Shuts down both directions to unblock I/O before joining threads.
+     * An interrupted read returns 0 at a frame boundary or -1 for a truncated
+     * frame. The descriptor remains owned until the session is destroyed.
      */
     void shutdown();
 
+    /** @brief Borrows the socket descriptor; the session retains ownership. */
     int get_sock() const { return sock_; }
     const session_key_t& get_session_key() const { return s_key_; }
+    // Read counters only when no send/receive operation is running.
     unsigned int get_sent_seq_num() const { return sent_seq_num_; }
     unsigned int get_received_seq_num() const { return received_seq_num_; }
 
@@ -289,8 +366,9 @@ class SST_Session {
  * SST_ctx_t and the top-level functions of c_api.h).
  *
  * All methods that talk to Auth are serialized with an internal mutex, so an
- * SST_API instance can be shared between threads (see the
- * threaded_get_target_id_server example).
+ * SST_API instance can be shared between threads. Callers must separately
+ * synchronize direct access to borrowed config/key references and key lists
+ * that may be modified by another thread.
  */
 class SST_API {
    public:
@@ -336,7 +414,8 @@ class SST_API {
      * @brief Returns the session key with the given 8-byte ID. If the key is
      * not in `existing_s_key_list`, it is requested from Auth by ID and added
      * to the list.
-     * @return Pointer to the key inside `existing_s_key_list`.
+     * @return Borrowed pointer into `existing_s_key_list`. Later additions can
+     * overwrite that slot; copy the key if it must outlive changes to the list.
      * @throws SST_Exception on failure.
      */
     session_key_t* get_session_key_by_ID(
@@ -407,16 +486,14 @@ class SST_API {
     const config_t& get_config() const { return config_; }
     const distribution_key_t& get_dist_key() const { return dist_key_; }
 
-    /** @brief Mutex serializing all Auth communication of this context. */
+    /**
+     * @brief Mutex for inspecting shared state while Auth requests may run.
+     * Do not hold it while calling methods that communicate with Auth: those
+     * methods acquire the same non-recursive mutex internally.
+     */
     std::mutex& get_mutex() { return mutex_; }
 
    private:
-    // Auth session key request state machine (send_session_key_req_via_TCP).
-    SessionKeyList send_session_key_req_via_TCP();
-    // Requests a key by ID and checks the returned ID
-    // (send_session_key_request_check_protocol).
-    SessionKeyList send_session_key_request_check_protocol(
-        const unsigned char* target_key_id);
     // Verifies Auth's signature over the encrypted distribution key from a
     // response, decrypts it with the entity's private key and stores it.
     void save_distribution_key(
@@ -429,12 +506,15 @@ class SST_API {
     size_t entity_rsa_key_size() const;
     // Loads the permanent distribution key files named in the config.
     void load_permanent_distribution_key();
-    // Requests keys for the purpose at `purpose_index`; mutex_ must be held.
-    SessionKeyList request_session_keys_locked(int purpose_index);
+    // Auth exchanges mutate the distribution key; mutex_ must be held.
+    template <class Request, class Response, class... Args>
+    Response request_auth_locked(Args&&... args);
+    SessionKeyList request_session_keys_locked(
+        const std::string& purpose,
+        const unsigned char* expected_key_id = nullptr);
 
     config_t config_{};
     distribution_key_t dist_key_{};
-    std::string purpose_for_requesting_key_;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> pub_key_;
     std::unique_ptr<EVP_PKEY, decltype(&EVP_PKEY_free)> priv_key_;
     std::mutex mutex_;

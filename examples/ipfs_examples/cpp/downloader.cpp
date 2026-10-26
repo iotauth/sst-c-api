@@ -106,8 +106,7 @@ int main(int argc, char* argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    if (digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]),
-                               filesize, hash_of_file.data(),
+    if (digest_message_SHA_256(file_data.data(), filesize, hash_of_file.data(),
                                &hash_length) < 0) {
         SST_print_error_exit("Failed digest_message_SHA_256().");
     }

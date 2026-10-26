@@ -63,7 +63,7 @@ int main(int argc, char* argv[]) {
 
         // First connection with the first session key.
         {
-            auto session = api.secure_connect_to_server(s_key_list.s_key[0]);
+            auto session = api.secure_connect_to_server(s_key_list.at(0));
             std::this_thread::sleep_for(seconds(1));
             std::thread receiver(receive_messages, std::ref(*session));
             send_or_exit(*session, "Hello server");
@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
 
         // Second connection with the second session key.
         {
-            auto session = api.secure_connect_to_server(s_key_list.s_key[1]);
+            auto session = api.secure_connect_to_server(s_key_list.at(1));
             std::thread receiver(receive_messages, std::ref(*session));
             send_or_exit(*session, "Hello server 2");
             std::this_thread::sleep_for(seconds(1));

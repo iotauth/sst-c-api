@@ -23,29 +23,34 @@ Bytes IoTSPMessage::serialize() const {
     return buf;
 }
 
-int IoTSPMessage::read_impl(int sock, unsigned int max_payload_length,
-                            MessageType& type, Bytes& payload, bool& closed) {
-    closed = false;
+SST_IOResult IoTSPMessage::read_result(int sock,
+                                       unsigned int max_payload_length,
+                                       MessageType& type, Bytes& payload) {
+    payload.clear();
     unsigned char header[MSG_TYPE_SIZE + internal::MAX_PAYLOAD_BUF_SIZE];
     int ret = internal::read_exact(sock, header, MSG_TYPE_SIZE);
-    if (ret < 0) {
+    if (ret == -1) {
         LOG_ERR << "Socket read error while reading the message type.";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Network);
+    } else if (ret < 0) {
+        LOG_ERR << "Truncated message type.";
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     } else if (ret == 0) {
         LOG_INF << "End of file. Disconnected from socket " << sock;
-        closed = true;
-        return 0;
+        return SST_IOResult::closed();
     }
     type = static_cast<MessageType>(header[0]);
 
-    // Variable length payload size: continue while the high bit is set.
+    // Read the length one byte at a time: TCP can split any field across reads
+    // or coalesce adjacent frames. The high bit marks a continuation byte.
     unsigned int var_length_buf_size = 0;
     while (var_length_buf_size < internal::MAX_PAYLOAD_BUF_SIZE) {
         ret = internal::read_exact(
             sock, header + MSG_TYPE_SIZE + var_length_buf_size, 1);
         if (ret <= 0) {
             LOG_ERR << "Failed to read variable length header.";
-            return -1;
+            return SST_IOResult::failure(ret == -1 ? SST_ErrorCode::Network
+                                                   : SST_ErrorCode::Protocol);
         }
         var_length_buf_size++;
         if ((header[MSG_TYPE_SIZE + var_length_buf_size - 1] & 128) == 0) {
@@ -60,38 +65,43 @@ int IoTSPMessage::read_impl(int sock, unsigned int max_payload_length,
     if (static_cast<unsigned int>(var_length_buf_size_checked) !=
         var_length_buf_size) {
         LOG_ERR << "Wrong header calculation.";
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     }
     if (payload_length > max_payload_length) {
         LOG_ERR << "Larger buffer size required. Payload: " << payload_length
                 << ", maximum: " << max_payload_length;
-        return -1;
+        return SST_IOResult::failure(SST_ErrorCode::Protocol);
     }
+    // Bound the peer-supplied length before allocating the payload buffer.
     payload.assign(payload_length, 0);
-    if (payload_length > 0 &&
-        internal::read_exact(sock, payload.data(), payload_length) <= 0) {
-        LOG_ERR << "Failed to read from socket while reading the payload.";
-        return -1;
+    if (payload_length > 0) {
+        ret = internal::read_exact(sock, payload.data(), payload_length);
+        if (ret <= 0) {
+            LOG_ERR << "Failed to read from socket while reading the payload.";
+            return SST_IOResult::failure(ret == -1 ? SST_ErrorCode::Network
+                                                   : SST_ErrorCode::Protocol);
+        }
     }
-    return static_cast<int>(payload_length);
+    return SST_IOResult::success(payload_length);
 }
 
 int IoTSPMessage::read(int sock, unsigned int max_payload_length,
                        MessageType& type, Bytes& payload) {
-    bool closed;
-    return read_impl(sock, max_payload_length, type, payload, closed);
+    return read_result(sock, max_payload_length, type, payload).legacy_value();
 }
 
 IoTSPMessage IoTSPMessage::receive(int sock, unsigned int max_payload_length) {
     MessageType type = MessageType::AUTH_ALERT;
     Bytes payload;
-    bool closed;
-    if (read_impl(sock, max_payload_length, type, payload, closed) < 0) {
+    SST_IOResult result = read_result(sock, max_payload_length, type, payload);
+    if (result.status == SST_IOStatus::Error) {
         throw SST_Exception("Failed to read a message from socket " +
-                            std::to_string(sock) + ".");
+                                std::to_string(sock) + ".",
+                            result.error);
     }
-    if (closed) {
-        throw SST_Exception("Connection closed by the peer.");
+    if (result.status == SST_IOStatus::PeerClosed) {
+        throw SST_Exception("Connection closed by the peer.",
+                            SST_ErrorCode::PeerClosed);
     }
     return IoTSPMessage(type, std::move(payload));
 }

@@ -39,11 +39,11 @@ int main(int argc, char* argv[]) {
             sst::ipfs::estimate_time_t t;
             t.keygenerate_time = i == 0 ? keygen_time : 0;
             std::string hash_value = sst::ipfs::file_encrypt_upload(
-                s_key_list.s_key[static_cast<size_t>(i)], api, argv[2], t);
+                s_key_list.at(static_cast<size_t>(i)), api, argv[2], t);
             ::sleep(1);
             auto fm_start = Clock::now();
             sst::ipfs::upload_to_file_system_manager(
-                s_key_list.s_key[static_cast<size_t>(i)], api, hash_value);
+                s_key_list.at(static_cast<size_t>(i)), api, hash_value);
             t.filemanager_time =
                 std::chrono::duration<float>(Clock::now() - fm_start).count();
 
