@@ -447,6 +447,123 @@ void test_empty_handshake_frames() {
     empty_handshake3.join();
 }
 
+void test_handshake_body_validation() {
+    Credentials credentials;
+    sst::SST_API api(credentials.config(0));
+    sst::session_key_t key{};
+    key.key_id[7] = 42;
+    key.abs_validity = UINT64_MAX;
+    key.rel_validity = 60000;
+    key.cipher_key_size = 16;
+    key.mac_key_size = 32;
+    key.enc_mode = sst::AES_128_CBC;
+    key.hmac_mode = sst::USE_HMAC;
+    sst::distribution_key_t crypto{};
+    crypto.cipher_key_size = key.cipher_key_size;
+    crypto.mac_key_size = key.mac_key_size;
+    crypto.enc_mode = key.enc_mode;
+    sst::SessionKeyList keys;
+    // Server retrieves the key locally, without contacting Auth.
+    keys.add(key);
+
+    const auto first_payload = [&key, &crypto](const Bytes& body) {
+        Bytes payload(key.key_id, key.key_id + sst::SESSION_KEY_ID_SIZE);
+        const auto encrypted = encrypt(crypto, body);
+        payload.insert(payload.end(), encrypted.begin(), encrypted.end());
+        return payload;
+    };
+    const auto reject_first = [&api, &keys, &first_payload](const Bytes& body) {
+        std::array<int, 2> sockets{};
+        CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+        SocketOwner peer{sockets[1]};
+        send_frame(peer.get(), 30, first_payload(body));
+        CHECK(::shutdown(peer.get(), SHUT_WR) == 0);
+        expect_error(sst::SST_ErrorCode::Protocol, [&api, &keys, &sockets] {
+            api.server_secure_comm_setup(sockets[0], keys);
+        });
+    };
+    const auto reject_second = [&key, &crypto](const Bytes& body) {
+        std::array<int, 2> sockets{};
+        CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+        std::thread server([&sockets, &crypto, &body] {
+            SocketOwner peer{sockets[1]};
+            IoTSPMessage::receive(peer.get(), 256);
+            send_frame(peer.get(), 31, encrypt(crypto, body));
+        });
+        expect_error(sst::SST_ErrorCode::Protocol, [&key, &sockets] {
+            sst::SST_API::secure_connect_to_server_with_socket(key, sockets[0]);
+        });
+        server.join();
+    };
+    const auto exchange_with_server = [&api, &keys, &crypto, &first_payload](
+                                          size_t first_size,
+                                          const Bytes& last_body, bool valid) {
+        std::array<int, 2> sockets{};
+        CHECK(::socketpair(AF_UNIX, SOCK_STREAM, 0, sockets.data()) == 0);
+        std::thread client(
+            [&sockets, &crypto, &first_payload, first_size, &last_body] {
+                SocketOwner peer{sockets[1]};
+                Bytes first(first_size, 0x55);
+                first[0] = 0x01;
+                send_frame(peer.get(), 30, first_payload(first));
+                const auto frame = IoTSPMessage::receive(peer.get(), 256);
+                CHECK(frame.get_type() == MessageType::SKEY_HANDSHAKE_2);
+                const auto second = decrypt(crypto, frame.get_payload());
+                CHECK(second.size() == 17 && second[0] == 0x03);
+                CHECK(std::memcmp(second.data() + 9, first.data() + 1, 8) == 0);
+                Bytes third = last_body;
+                if (third.size() >= 17) {
+                    // replyNonce occupies bytes 9..16 even with flag 0x02
+                    // alone.
+                    std::memcpy(third.data() + 9, second.data() + 1, 8);
+                }
+                send_frame(peer.get(), 32, encrypt(crypto, third));
+            });
+        if (valid) {
+            const auto session = api.server_secure_comm_setup(sockets[0], keys);
+            CHECK(session &&
+                  sst::is_session_key_valid(session->get_session_key()));
+        } else {
+            expect_error(sst::SST_ErrorCode::Protocol, [&api, &keys, &sockets] {
+                api.server_secure_comm_setup(sockets[0], keys);
+            });
+        }
+        client.join();
+    };
+
+    // These malformed plaintexts are encrypted and correctly MACed so they
+    // reach the parser; rejecting an invalid MAC would not exercise this bug.
+    for (size_t length = 0; length < 17; ++length) {
+        Bytes body(length, 0x55);
+        if (!body.empty()) body[0] = 0x03;
+        reject_first(body);
+        reject_second(body);
+        exchange_with_server(9, body, false);
+        if (!body.empty()) body[0] = 0x02;
+        reject_first(body);
+        exchange_with_server(9, body, false);
+        if (length < 9) {
+            if (!body.empty()) body[0] = 0x01;
+            reject_first(body);
+        }
+    }
+    reject_first(Bytes(17, 0));
+    Bytes missing_reply(17, 0);
+    missing_reply[0] = 0x01;
+    reject_second(missing_reply);
+    exchange_with_server(9, missing_reply, false);
+
+    // Preserve both C's compact handshake 1 and Node's full-sized one, and
+    // both the two-nonce (C) and reply-only (Node) forms of handshake 3.
+    for (size_t first_size : {9, 17}) {
+        Bytes third(17, 0x55);
+        third[0] = 0x03;
+        exchange_with_server(first_size, third, true);
+        third[0] = 0x02;
+        exchange_with_server(first_size, third, true);
+    }
+}
+
 }  // namespace
 
 int main() {
@@ -454,5 +571,6 @@ int main() {
     test_auth_exchanges();
     test_handshake_msg_type_and_flags();
     test_empty_handshake_frames();
+    test_handshake_body_validation();
     std::puts("All protocol regression tests passed.");
 }

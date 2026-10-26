@@ -3,6 +3,7 @@
 #include <openssl/rsa.h>
 
 #include <cstring>
+#include <limits>
 #include <utility>
 
 #include "log/log_manager.hpp"
@@ -11,6 +12,17 @@ namespace sst {
 namespace message {
 
 namespace {
+
+template <size_t Size>
+std::array<unsigned char, Size> copy_nonce(const unsigned char* nonce) {
+    if (nonce == nullptr) {
+        throw SST_Exception("Request nonce must not be null.",
+                            SST_ErrorCode::InvalidArgument);
+    }
+    std::array<unsigned char, Size> result{};
+    std::memcpy(result.data(), nonce, Size);
+    return result;
+}
 
 // Enc_authPubKey(buf) (RSA-OAEP) followed by the entity's SHA-256 RSA
 // signature over the ciphertext.
@@ -64,17 +76,33 @@ Bytes encrypt_with_distribution_key(const Bytes& buf,
 
 EntityReqMessage::EntityReqMessage(MessageType pub_enc_type,
                                    MessageType dist_key_type,
-                                   const unsigned char* entity_nonce,
-                                   const unsigned char* auth_nonce,
+                                   const EntityNonce& entity_nonce,
+                                   const AuthNonce& auth_nonce,
                                    std::string entity_name, std::string purpose)
     : IoTSPMessage(pub_enc_type),
       pub_enc_type_(pub_enc_type),
       dist_key_type_(dist_key_type),
+      entity_nonce_(entity_nonce),
+      auth_nonce_(auth_nonce),
       entity_name_(std::move(entity_name)),
       purpose_(std::move(purpose)) {
-    std::memcpy(entity_nonce_.data(), entity_nonce, ENTITY_NONCE_SIZE);
-    std::memcpy(auth_nonce_.data(), auth_nonce, AUTH_NONCE_SIZE);
+    // The distribution-key envelope uses a single byte for the sender length.
+    // Check at construction so switching encryption modes cannot truncate it.
+    if (entity_name_.size() > std::numeric_limits<uint8_t>::max()) {
+        throw SST_Exception("Entity name exceeds the 255-byte wire limit.",
+                            SST_ErrorCode::InvalidArgument);
+    }
 }
+
+EntityReqMessage::EntityReqMessage(MessageType pub_enc_type,
+                                   MessageType dist_key_type,
+                                   const unsigned char* entity_nonce,
+                                   const unsigned char* auth_nonce,
+                                   std::string entity_name, std::string purpose)
+    : EntityReqMessage(pub_enc_type, dist_key_type,
+                       copy_nonce<ENTITY_NONCE_SIZE>(entity_nonce),
+                       copy_nonce<AUTH_NONCE_SIZE>(auth_nonce),
+                       std::move(entity_name), std::move(purpose)) {}
 
 Bytes EntityReqMessage::serialize_and_encrypt(
     const distribution_key_t& dist_key, EVP_PKEY* auth_pub_key,

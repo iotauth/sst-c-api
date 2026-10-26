@@ -28,6 +28,12 @@ namespace message {
 
 class AddReaderReqMessage : public EntityReqMessage {
    public:
+    AddReaderReqMessage(const EntityNonce& entity_nonce,
+                        const AuthNonce& auth_nonce, std::string entity_name,
+                        std::string purpose);
+
+    // Compatibility overload: each nonce pointer must address 8 readable bytes.
+    // Prefer the fixed-size overload; null pointers throw InvalidArgument.
     AddReaderReqMessage(const unsigned char* entity_nonce,
                         const unsigned char* auth_nonce,
                         std::string entity_name, std::string purpose);

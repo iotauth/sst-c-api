@@ -31,6 +31,13 @@ class SessionKeyReqMessage : public EntityReqMessage {
    public:
     static constexpr unsigned int NUM_KEYS_SIZE = 4;
 
+    // num_keys must be in [1, MAX_SESSION_KEY], the response-list capacity.
+    SessionKeyReqMessage(const EntityNonce& entity_nonce,
+                         const AuthNonce& auth_nonce, int num_keys,
+                         std::string entity_name, std::string purpose);
+
+    // Compatibility overload: each nonce pointer must address 8 readable bytes.
+    // Prefer the fixed-size overload; null pointers throw InvalidArgument.
     SessionKeyReqMessage(const unsigned char* entity_nonce,
                          const unsigned char* auth_nonce, int num_keys,
                          std::string entity_name, std::string purpose);

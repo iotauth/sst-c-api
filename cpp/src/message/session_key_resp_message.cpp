@@ -103,6 +103,11 @@ void SessionKeyRespMessage::parse_fields(const Bytes& plaintext,
         buf_idx += parse_session_key(key, buf + buf_idx, buf_length - buf_idx);
         session_keys_.add(key);
     }
+    if (buf_idx != buf_length) {
+        throw SST_Exception(
+            "Unexpected trailing bytes in session key response.",
+            SST_ErrorCode::Protocol);
+    }
 }
 
 }  // namespace message

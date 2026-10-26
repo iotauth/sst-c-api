@@ -314,17 +314,17 @@ Response SST_API::request_auth_locked(Args&&... args) {
     FdGuard guard(connect_to_auth(config_));
     message::AuthHelloMessage hello =
         receive_auth_hello(guard.get(), config_.auth_id);
-    unsigned char entity_nonce[NONCE_SIZE];
-    if (Crypto::generate_nonce(NONCE_SIZE, entity_nonce) < 0) {
+    message::EntityReqMessage::EntityNonce entity_nonce{};
+    if (Crypto::generate_nonce(entity_nonce.size(), entity_nonce.data()) < 0) {
         throw SST_Exception("Failed to generate entity nonce.",
                             SST_ErrorCode::Crypto);
     }
-    Request req(entity_nonce, hello.get_auth_nonce().data(),
+    Request req(entity_nonce, hello.get_auth_nonce(),
                 std::forward<Args>(args)...);
     send_to_auth(guard.get(), req.serialize_and_encrypt(
                                   dist_key_, pub_key_.get(), priv_key_.get()));
     Response resp(receive_from_auth(guard.get()), entity_rsa_key_size());
-    decrypt_auth_response(resp, entity_nonce);
+    decrypt_auth_response(resp, entity_nonce.data());
     return resp;
 }
 

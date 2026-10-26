@@ -62,16 +62,39 @@ int serialize_handshake_body(const unsigned char* nonce,
     return 0;
 }
 
-void parse_handshake_body(const unsigned char* buf, HS_nonce_t& ret) {
-    ret = {};
+HS_nonce_t parse_handshake_body(const Bytes& buf, std::byte required_flags) {
+    if (buf.empty()) {
+        throw SST_Exception("Handshake body has no flags.",
+                            SST_ErrorCode::Protocol);
+    }
     const auto handshake_flags = static_cast<std::byte>(buf[0]);
+    if ((handshake_flags & required_flags) != required_flags) {
+        throw SST_Exception("Handshake is missing a required nonce.",
+                            SST_ErrorCode::Protocol);
+    }
+    // Fields have fixed offsets: replyNonce occupies bytes 9..16 even when
+    // the nonce flag is clear. Accept the C API's compact
+    // 9-byte nonce-only body as well as Node's full 17-byte nonce-only body.
+    size_t required_size = 1;
     if ((handshake_flags & HS_NONCE_PRESENT) != std::byte{0}) {
-        std::memcpy(ret.nonce.data(), buf + 1, HS_NONCE_SIZE);
+        required_size = 1 + HS_NONCE_SIZE;
     }
     if ((handshake_flags & HS_REPLY_NONCE_PRESENT) != std::byte{0}) {
-        std::memcpy(ret.reply_nonce.data(), buf + 1 + HS_NONCE_SIZE,
+        required_size = HS_NONCE_FIELDS_SIZE;
+    }
+    if (buf.size() < required_size) {
+        throw SST_Exception("Handshake nonce fields are truncated.",
+                            SST_ErrorCode::Protocol);
+    }
+    HS_nonce_t ret;
+    if ((handshake_flags & HS_NONCE_PRESENT) != std::byte{0}) {
+        std::memcpy(ret.nonce.data(), buf.data() + 1, HS_NONCE_SIZE);
+    }
+    if ((handshake_flags & HS_REPLY_NONCE_PRESENT) != std::byte{0}) {
+        std::memcpy(ret.reply_nonce.data(), buf.data() + 1 + HS_NONCE_SIZE,
                     HS_NONCE_SIZE);
     }
+    return ret;
 }
 
 // Session key handshake messages are always encrypted with CBC-sized IV and
@@ -126,13 +149,12 @@ Bytes check_handshake_2_send_handshake_3(const unsigned char* data_buf,
                                          const session_key_t& s_key) {
     LOG_DBG << "Received session key handshake2!";
     Bytes decrypted;
-    if (handshake_decrypt(data_buf, data_buf_length, s_key, decrypted) < 0 ||
-        decrypted.size() < HS_NONCE_FIELDS_SIZE) {
+    if (handshake_decrypt(data_buf, data_buf_length, s_key, decrypted) < 0) {
         throw SST_Exception("Error during decryption in checking handshake2.",
                             SST_ErrorCode::Crypto);
     }
-    HS_nonce_t hs;
-    parse_handshake_body(decrypted.data(), hs);
+    const auto hs = parse_handshake_body(
+        decrypted, HS_NONCE_PRESENT | HS_REPLY_NONCE_PRESENT);
 
     if (std::memcmp(hs.reply_nonce.data(), entity_nonce, HS_NONCE_SIZE) != 0) {
         throw SST_Exception(
@@ -167,13 +189,11 @@ Bytes check_handshake1_send_handshake2(const unsigned char* received_buf,
     Bytes decrypted;
     if (handshake_decrypt(received_buf + SESSION_KEY_ID_SIZE,
                           received_buf_length - SESSION_KEY_ID_SIZE, s_key,
-                          decrypted) < 0 ||
-        decrypted.size() < 1 + HS_NONCE_SIZE) {
+                          decrypted) < 0) {
         throw SST_Exception("Error during decrypting handshake1.",
                             SST_ErrorCode::Crypto);
     }
-    HS_nonce_t hs;
-    parse_handshake_body(decrypted.data(), hs);
+    const auto hs = parse_handshake_body(decrypted, HS_NONCE_PRESENT);
     LOG_DBG << "Client's nonce: " << to_hex(hs.nonce.data(), HS_NONCE_SIZE);
 
     if (Crypto::generate_nonce(HS_NONCE_SIZE, server_nonce) < 0) {
@@ -342,14 +362,12 @@ std::unique_ptr<SST_Session> SST_API::server_secure_comm_setup(
     Bytes decrypted;
     if (handshake_decrypt(received.data(),
                           static_cast<unsigned int>(received.size()), *s_key,
-                          decrypted) < 0 ||
-        decrypted.size() < HS_NONCE_FIELDS_SIZE) {
+                          decrypted) < 0) {
         throw SST_Exception(
             "Error during decryption in HANDSHAKE_2_SENT state.",
             SST_ErrorCode::Crypto);
     }
-    HS_nonce_t hs;
-    parse_handshake_body(decrypted.data(), hs);
+    const auto hs = parse_handshake_body(decrypted, HS_REPLY_NONCE_PRESENT);
     if (std::memcmp(hs.reply_nonce.data(), server_nonce.data(),
                     HS_NONCE_SIZE) != 0) {
         throw SST_Exception(

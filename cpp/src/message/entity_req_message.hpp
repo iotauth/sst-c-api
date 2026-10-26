@@ -6,6 +6,7 @@
  * AddReaderReqMessage each hold the same nonce, name and purpose fields, and
  * the encryption lives in its connection handler. On the entity side both
  * requests are encrypted the same way, so that code lives here once.
+ * Entity names must fit the one-byte sender length (at most 255 bytes).
  *
  * IoTSP payload layout after encryption (outer msgType/payloadLen omitted):
  * <pre>
@@ -33,6 +34,9 @@ namespace message {
 
 class EntityReqMessage : public IoTSPMessage {
    public:
+    using EntityNonce = std::array<unsigned char, ENTITY_NONCE_SIZE>;
+    using AuthNonce = std::array<unsigned char, AUTH_NONCE_SIZE>;
+
     /**
      * @brief Encrypts the payload and returns the wire bytes. Sets the
      * message type to the distribution key or public key variant.
@@ -54,6 +58,14 @@ class EntityReqMessage : public IoTSPMessage {
     const std::string& get_purpose() const { return purpose_; }
 
    protected:
+    EntityReqMessage(MessageType pub_enc_type, MessageType dist_key_type,
+                     const EntityNonce& entity_nonce,
+                     const AuthNonce& auth_nonce, std::string entity_name,
+                     std::string purpose);
+
+    // Compatibility overload: both pointers must address at least 8 readable
+    // bytes. Null pointers are rejected; their allocation sizes cannot be
+    // checked at runtime. Prefer the fixed-size nonce overload above.
     EntityReqMessage(MessageType pub_enc_type, MessageType dist_key_type,
                      const unsigned char* entity_nonce,
                      const unsigned char* auth_nonce, std::string entity_name,
