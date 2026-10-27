@@ -22,10 +22,21 @@
 #include <openssl/rsa.h>
 
 #include <array>
-#include <cassert>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <string>
+
+// assert() is compiled out in Release builds (NDEBUG), so use a check that is
+// always active.
+#define CHECK(cond)                                                    \
+    do {                                                               \
+        if (!(cond)) {                                                 \
+            std::fprintf(stderr, "CHECK failed: %s at %s:%d\n", #cond, \
+                         __FILE__, __LINE__);                          \
+            std::abort();                                              \
+        }                                                              \
+    } while (0)
 
 using sst::Crypto;
 
@@ -74,9 +85,9 @@ void AES_test_common(sst::AES_encryption_mode_t mode) {
     }
     std::printf("Decrypted Length: %u, Decrypted: %s\n", decrypted_length,
                 decrypted);
-    assert(decrypted_length == plaintext.size());
-    assert(std::strncmp(reinterpret_cast<const char*>(decrypted),
-                        plaintext.c_str(), decrypted_length) == 0);
+    CHECK(decrypted_length == plaintext.size());
+    CHECK(std::strncmp(reinterpret_cast<const char*>(decrypted),
+                       plaintext.c_str(), decrypted_length) == 0);
     std::printf("\n");
 }
 
@@ -110,7 +121,7 @@ void symmetric_encrypt_decrypt_authenticate_common(
         Crypto::get_expected_encrypted_total_length(
             plaintext.size(), sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE,
             enc_mode, hmac_mode);
-    assert(estimate_encrypted_length <= TEST_BUF_SIZE);
+    CHECK(estimate_encrypted_length <= TEST_BUF_SIZE);
 
     std::array<unsigned char, TEST_BUF_SIZE> encrypted{};
     unsigned int encrypted_length = 0;
@@ -119,7 +130,7 @@ void symmetric_encrypt_decrypt_authenticate_common(
         plaintext.size(), mac_key, sst::MAC_KEY_SHA256_SIZE, cipher_key,
         sst::AES_128_KEY_SIZE_IN_BYTES, sst::AES_128_IV_SIZE, enc_mode,
         hmac_mode, encrypted.data(), &encrypted_length);
-    assert(s == 0);
+    CHECK(s == 0);
     std::printf("Cipher Length: %u, Cipher Text:", encrypted_length);
     print_buf(encrypted.data(), encrypted_length);
 
@@ -127,7 +138,7 @@ void symmetric_encrypt_decrypt_authenticate_common(
         Crypto::get_expected_decrypted_maximum_length(
             encrypted_length, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE,
             enc_mode, hmac_mode);
-    assert(estimate_decrypted_length <= TEST_BUF_SIZE);
+    CHECK(estimate_decrypted_length <= TEST_BUF_SIZE);
 
     std::array<unsigned char, TEST_BUF_SIZE> decrypted{};
     unsigned int decrypted_length = 0;
@@ -135,12 +146,12 @@ void symmetric_encrypt_decrypt_authenticate_common(
         encrypted.data(), encrypted_length, mac_key, sst::MAC_KEY_SHA256_SIZE,
         cipher_key, sst::AES_128_KEY_SIZE_IN_BYTES, sst::AES_128_IV_SIZE,
         enc_mode, hmac_mode, decrypted.data(), &decrypted_length);
-    assert(s == 0);
+    CHECK(s == 0);
     std::printf("Decrypted Length: %u, Decrypted: %.*s\n", decrypted_length,
                 static_cast<int>(decrypted_length), decrypted.data());
-    assert(decrypted_length == plaintext.size());
-    assert(std::strncmp(reinterpret_cast<const char*>(decrypted.data()),
-                        plaintext.c_str(), decrypted_length) == 0);
+    CHECK(decrypted_length == plaintext.size());
+    CHECK(std::strncmp(reinterpret_cast<const char*>(decrypted.data()),
+                       plaintext.c_str(), decrypted_length) == 0);
     std::printf("\n");
 }
 
@@ -160,11 +171,11 @@ void symmetric_encrypt_decrypt_authenticate_test() {
 // Generates an in-memory 2048-bit RSA key pair for the sign/verify test.
 EVP_PKEY* generate_rsa_key_pair() {
     EVP_PKEY_CTX* ctx = EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, nullptr);
-    assert(ctx != nullptr);
-    assert(EVP_PKEY_keygen_init(ctx) > 0);
-    assert(EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) > 0);
+    CHECK(ctx != nullptr);
+    CHECK(EVP_PKEY_keygen_init(ctx) > 0);
+    CHECK(EVP_PKEY_CTX_set_rsa_keygen_bits(ctx, 2048) > 0);
     EVP_PKEY* pkey = nullptr;
-    assert(EVP_PKEY_keygen(ctx, &pkey) > 0);
+    CHECK(EVP_PKEY_keygen(ctx, &pkey) > 0);
     EVP_PKEY_CTX_free(ctx);
     return pkey;
 }
@@ -179,10 +190,10 @@ void digest_and_sign_verify_test() {
     unsigned char md1[sst::SHA256_DIGEST_SIZE];
     unsigned char md2[sst::SHA256_DIGEST_SIZE];
     unsigned int md1_len = 0, md2_len = 0;
-    assert(Crypto::digest_message_sha256(msg, msg_len, md1, &md1_len) == 0);
-    assert(Crypto::digest_message_sha256(msg, msg_len, md2, &md2_len) == 0);
-    assert(md1_len == sst::SHA256_DIGEST_SIZE);
-    assert(std::memcmp(md1, md2, md1_len) == 0);
+    CHECK(Crypto::digest_message_sha256(msg, msg_len, md1, &md1_len) == 0);
+    CHECK(Crypto::digest_message_sha256(msg, msg_len, md2, &md2_len) == 0);
+    CHECK(md1_len == sst::SHA256_DIGEST_SIZE);
+    CHECK(std::memcmp(md1, md2, md1_len) == 0);
 
     EVP_PKEY* pkey = generate_rsa_key_pair();
 
@@ -190,17 +201,17 @@ void digest_and_sign_verify_test() {
     // sig_len is in/out: set it to the buffer capacity before calling.
     std::array<unsigned char, sst::RSA_KEY_SIZE> sig{};
     size_t sig_len = sig.size();
-    assert(Crypto::sha256_sign(msg, msg_len, pkey, sig.data(), &sig_len) == 0);
+    CHECK(Crypto::sha256_sign(msg, msg_len, pkey, sig.data(), &sig_len) == 0);
     std::printf("Signature Length: %zu\n", sig_len);
 
     // Correct signature verifies.
-    assert(Crypto::sha256_verify(msg, msg_len, sig.data(), sig_len, pkey) == 0);
+    CHECK(Crypto::sha256_verify(msg, msg_len, sig.data(), sig_len, pkey) == 0);
 
     // Tampered message must fail verification.
     const std::string tampered = "Sign and verify me?";
-    assert(Crypto::sha256_verify(
-               reinterpret_cast<const unsigned char*>(tampered.data()),
-               tampered.size(), sig.data(), sig_len, pkey) == -1);
+    CHECK(Crypto::sha256_verify(
+              reinterpret_cast<const unsigned char*>(tampered.data()),
+              tampered.size(), sig.data(), sig_len, pkey) == -1);
 
     EVP_PKEY_free(pkey);
     std::printf("Sign/verify round-trip passed.\n\n");

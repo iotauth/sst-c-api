@@ -244,6 +244,9 @@ $ctest --test-dir build --output-on-failure
     ```
     Both commands operate on all `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, and `.hh` files, excluding the `build/` directory and `embedded/lib/`.
 
--   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the same integration tests with the C++ API.
+-   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the C++ unit tests and the same integration tests with the C++ API.
+    -   Both workflows build in Release mode, which compiles `assert()` out, so test checks must use an always-on check (see the `CHECK` macro in the C++ tests).
+    -   On pushes and pull requests to this repository, both jobs use the commit under test, and `ci.yml` also runs the entity integration tests of [iotauth](https://github.com/iotauth/iotauth) against it through their `sst-c-api-ref` input.
+    -   The iotauth repository calls both workflows from its `sst-c-api-tests.yml` and `sst-c-api-cpp-tests.yml` with an `iotauth-ref` input. In that case the unit test jobs check out this repository's `main`, while the integration test jobs check out iotauth at `iotauth-ref` with its submodules, so they use the commit of this repository pinned by iotauth's `entity/c` submodule.
 
-*Last updated on September 24, 2026*
+*Last updated on October 26, 2026*
