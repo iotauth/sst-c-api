@@ -7,12 +7,14 @@ headers, and spdlog are required; see [README.md](README.md).
 ## Unit tests
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-Use a Debug build to keep the assertion-based checks enabled. The five suites
+The checks in the test suites are always enabled, so they run in Release builds
+(which CI uses) as well as in Debug builds; new tests must not rely on `assert()`,
+which Release builds compile out. The five suites
 are `crypto_test`, `socket_test`, `api_test`, `message_test`, and `protocol_test`.
 They do not require Auth or IPFS services. Socket tests bind IPv4 and IPv6
 loopback addresses on OS-selected ports. The protocol test also binds a local
