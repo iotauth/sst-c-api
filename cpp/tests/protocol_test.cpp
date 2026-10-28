@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -241,9 +242,9 @@ void serve_exchange(int listener, const Credentials& credentials,
     }
     CHECK(plain.size() >= 16);
     CHECK(std::memcmp(plain.data() + 8, auth_nonce.data(), 8) == 0);
-    Bytes expected_body(plain.begin(), plain.begin() + 8);
-    expected_body.insert(expected_body.end(), auth_nonce.begin(),
-                         auth_nonce.end());
+    Bytes expected_body(16);
+    std::copy_n(plain.begin(), 8, expected_body.begin());
+    std::copy(auth_nonce.begin(), auth_nonce.end(), expected_body.begin() + 8);
     bool key_request =
         expected.request_type == 20 || expected.request_type == 22;
     if (key_request) number(expected_body, 10, 4);
@@ -372,9 +373,9 @@ void test_handshake_msg_type_and_flags() {
         Bytes body = decrypt(crypto, Bytes(first.get_payload().begin() + 8,
                                            first.get_payload().end()));
         CHECK(body.size() == 9 && body[0] == 0x01);  // inner nonce-present flag
-        Bytes reply{0x03};
-        reply.insert(reply.end(), 8, 0x55);
-        reply.insert(reply.end(), body.begin() + 1, body.end());
+        Bytes reply(17, 0x55);
+        reply[0] = 0x03;
+        std::copy(body.begin() + 1, body.end(), reply.begin() + 9);
         send_frame(peer.get(), 31, encrypt(crypto, reply));
         auto third = IoTSPMessage::receive(peer.get(), 256);
         CHECK(static_cast<unsigned char>(third.get_type()) == 32);
@@ -428,8 +429,8 @@ void test_empty_handshake_frames() {
 
     keys.add(key);
     Bytes handshake1(key.key_id, key.key_id + sst::SESSION_KEY_ID_SIZE);
-    Bytes body{0x01};
-    body.insert(body.end(), 8, 0x55);
+    Bytes body(9, 0x55);
+    body[0] = 0x01;
     Bytes encrypted = encrypt(crypto, body);
     handshake1.insert(handshake1.end(), encrypted.begin(), encrypted.end());
 
