@@ -6,6 +6,7 @@
 #include "../../src/c_api.h"
 #include "../../src/c_common.h"
 #include "physical_options.h"
+#include "qr_io.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -146,6 +147,9 @@ int main(int argc, char* argv[]) {
     // Runs first since it needs no peer entity to be reachable. A benchmark
     // run skips it, so it cannot change the key state RETRIEVE_ITEM starts
     // from.
+    // Whether Auth granted this robot a camera (read from the GRIP_ITEM plan's
+    // effectiveCapabilities), gating the QR scan below.
+    int camera_granted = 0;
     if (!opts.benchmark) {
         session_key_list_t* grip_s_key_list =
             get_session_key_with_index(ctx, 0, NULL);
@@ -154,6 +158,10 @@ int main(int argc, char* argv[]) {
                 "Failed get_session_key_with_index() for GRIP_ITEM.");
         }
         SST_print_log("Received authorization for GRIP_ITEM successfully!");
+        camera_granted =
+            opts.scan_qr && plan_grants_capability(
+                                grip_s_key_list->s_key[0].challenge,
+                                "requester", "CAMERA");
         action_evidence grip_evidence;
         if (action_evidence_init(&grip_evidence, "GRIP_ITEM",
                                  &grip_s_key_list->s_key[0])) {
@@ -173,8 +181,24 @@ int main(int argc, char* argv[]) {
     // Case 2: interactive action, targeting a specific locker identified at
     // runtime (not known ahead of time, so it can't live in a static config
     // purpose slot). The purpose is built dynamically with the scanned ID.
-    const char* target_locker = scan_locker_id_from_qr_code();
-    SST_print_log("Scanned locker ID: %s", target_locker);
+    static char scanned_id[MAX_ENTITY_NAME_LENGTH + 1];
+    const char* target_locker;
+    if (camera_granted &&
+        qr_scan_entity_id(scanned_id, sizeof(scanned_id)) == 0) {
+        target_locker = scanned_id;
+        SST_print_log(
+            "Scanned locker ID from camera QR (Auth-granted Camera): %s",
+            target_locker);
+    } else {
+        if (opts.scan_qr && !camera_granted)
+            SST_print_log(
+                "QR scan requested but Auth did not grant Camera; using "
+                "default locker ID.");
+        else if (opts.scan_qr)
+            SST_print_error("QR scan failed; using default locker ID.");
+        target_locker = scan_locker_id_from_qr_code();
+        SST_print_log("Locker ID: %s", target_locker);
+    }
 
     char retrieve_purpose[MAX_PURPOSE_LENGTH + 1];
     snprintf(retrieve_purpose, sizeof(retrieve_purpose),

@@ -20,6 +20,8 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/hk.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo.c
   ${CMAKE_CURRENT_LIST_DIR}/ultrasonic_com/ultrasonic_echo_plan.c
+  ${CMAKE_CURRENT_LIST_DIR}/ambient_audio_com/ambient_audio.c
+  ${CMAKE_CURRENT_LIST_DIR}/ambient_audio_com/ambient_audio_plan.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/rssi_check.c
   ${CMAKE_CURRENT_LIST_DIR}/uwb_com/uwb_range.c
   ${CMAKE_CURRENT_LIST_DIR}/bluetooth_com/ble_adv_rssi.c)
@@ -130,6 +132,26 @@ add_executable(benchmark_test ${CMAKE_CURRENT_SOURCE_DIR}/examples/physical_pres
 target_link_libraries(benchmark_test PRIVATE sst-c-api)
 target_compile_options(benchmark_test PRIVATE -UNDEBUG)
 add_test(NAME benchmark_test COMMAND benchmark_test)
+
+# Standalone BLE connection-based timing test (Linux + BlueZ only; needs root
+# at run time). Uses the real LE L2CAP link (bt_link.c) and ble_timing.c, with
+# a fixed shared key, to measure the connection challenge--response RTT.
+find_library(BLUETOOTH_LIB_TIMING bluetooth)
+find_path(BLUETOOTH_INCLUDE_TIMING bluetooth/l2cap.h)
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BLUETOOTH_LIB_TIMING AND BLUETOOTH_INCLUDE_TIMING)
+  add_executable(ble_timing_test
+    ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/ble_timing_test.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/ble_timing.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/bt_link.c)
+  target_link_libraries(ble_timing_test PRIVATE sst-c-api ${BLUETOOTH_LIB_TIMING})
+  target_compile_options(ble_timing_test PRIVATE -UNDEBUG)
+
+  # BLE<->TCP byte-pump relay for the BLE timing relay experiment (keyless).
+  add_executable(ble_relay_pump
+    ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/ble_relay_pump.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/bluetooth_com/bt_link.c)
+  target_link_libraries(ble_relay_pump PRIVATE ${BLUETOOTH_LIB_TIMING})
+endif()
 
 add_executable(uwb_range_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_range_test.c)
 target_link_libraries(uwb_range_test PRIVATE sst-c-api)
