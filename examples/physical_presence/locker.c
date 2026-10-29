@@ -7,6 +7,7 @@
 
 #include "../../src/c_api.h"
 #include "physical_options.h"
+#include "qr_io.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -90,6 +91,12 @@ int main(int argc, char* argv[]) {
     benchmark_trace bench;
     physical_benchmark_init(&bench, &opts, ctx, 0);
     bench_arm(&bench);
+
+    // Show this locker's own ID as a QR on the framebuffer, so the robot's
+    // camera can scan it to discover the target before requesting the session.
+    if (opts.show_qr) {
+        qr_display_entity_id(ctx->config.name);
+    }
 
     int serv_sock = -1;
     int clnt_sock = -1;

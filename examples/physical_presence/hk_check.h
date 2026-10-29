@@ -3,6 +3,7 @@
 #include <stdarg.h>
 #include <string.h>
 
+#include "../../ambient_audio_com/ambient_audio.h"
 #include "../../bluetooth_com/ble_adv_rssi.h"
 #include "../../physical_com/freshness.h"
 #include "../../physical_com/hk.h"
@@ -23,9 +24,13 @@
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ultrasonic_audio.h"
 #endif
+#ifdef HAVE_AMBIENT_AUDIO
+#include "../../ambient_audio_com/ambient_audio_device.h"
+#endif
 
 typedef struct {
-    /* NULL, "IR", "LIFI", "ULTRASOUND", "BLE_RSSI", "WIFI_RSSI" or "UWB":
+    /* NULL, "IR", "LIFI", "ULTRASOUND", "AMBIENT_AUDIO", "BLE_RSSI",
+     * "WIFI_RSSI" or "UWB":
      * when set, a
      * plan that selects anything else (including DUMMY) fails, so a stale
      * catalog cannot make an intended hardware test appear successful. Never
@@ -67,6 +72,10 @@ typedef union {
         ultrasonic_echo_config config;
         ultrasonic_echo_identity identity;
     } echo;
+    struct {
+        ambient_audio_config config;
+        ambient_audio_identity identity;
+    } ambient;
     rssi_config rssi; /* WIFI_RSSI */
     ble_adv_rssi_config ble;
     uwb_range_config uwb;
@@ -253,6 +262,76 @@ static int verify_ultrasound_echo(SST_session_ctx_t* session, int initiator,
     SST_print_error(
         "Auth requires the ultrasound echo, but this build has no "
         "ggwave/ALSA support.");
+    return -1;
+#endif
+}
+
+/* Sound-Proof-inspired passive co-location: both sides record the same
+ * wall-clock window, exchange recordings over the session, and each compares
+ * its own against the peer's with the Python ambient_audio tool. */
+static int verify_ambient_audio(SST_session_ctx_t* session, int initiator,
+                                const co_location_options* o,
+                                const ambient_audio_config* c,
+                                const ambient_audio_identity* id,
+                                physical_evidence* ev) {
+    int names_ok = initiator ? !strcmp(id->requester, o->local_name) &&
+                                   o->expected_peer &&
+                                   !strcmp(id->target, o->expected_peer)
+                             : !strcmp(id->target, o->local_name);
+    if (!names_ok) {
+        SST_print_error(
+            "Ambient audio: Auth plan names requester=%s target=%s, which "
+            "doesn't match this %s (%s).",
+            id->requester, id->target, initiator ? "requester" : "target",
+            o->local_name);
+        return -1;
+    }
+    SST_print_log(
+        "AMBIENT AUDIO: role=%s requester=%s target=%s recording_ms=%u "
+        "threshold_milli=%u max_lag_ms=%u min_power_dbfs=%d mic=%s",
+        initiator ? "initiator" : "responder", id->requester, id->target,
+        c->recording_ms, c->similarity_threshold_milli, c->max_lag_ms,
+        c->min_power_dbfs, o->mic_device);
+#ifdef HAVE_AMBIENT_AUDIO
+    if (session->sock < 0) {
+        SST_print_error(
+            "Ambient audio needs the TCP SST session; use --comm_type tcp.");
+        return -1;
+    }
+    ambient_audio_device* dev = ambient_audio_device_open(o->mic_device);
+    if (!dev) return -1;
+    ambient_audio_io io;
+    ambient_audio_device_bind(dev, &io);
+    ambient_audio_result r;
+    int rc = ambient_audio_run(session, c, initiator, &io, &r);
+    ambient_audio_device_close(dev);
+    SST_print_log(
+        "AMBIENT AUDIO: similarity_milli=%d inputs_valid=%d accepted=%d "
+        "local_power_dbfs=%d peer_power_dbfs=%d failure=%s",
+        r.similarity_milli, r.inputs_valid, r.accepted, r.local_power_dbfs,
+        r.peer_power_dbfs, ambient_audio_failure_name(r.failure));
+    SST_print_log("AMBIENT AUDIO: local=%s result=%s",
+                  r.local_pass ? "PASS" : "FAIL", run_result_name(rc));
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"AMBIENT_AUDIO\", \"role\": \"%s\", "
+            "\"recording_ms\": %u, \"similarity_milli\": %d, "
+            "\"threshold_milli\": %u, \"max_lag_ms\": %u, "
+            "\"min_power_dbfs\": %d, \"inputs_valid\": %s, \"accepted\": %s, "
+            "\"local_power_dbfs\": %d, \"peer_power_dbfs\": %d, "
+            "\"failure\": \"%s\"}",
+            initiator ? "initiator" : "responder", c->recording_ms,
+            r.similarity_milli, c->similarity_threshold_milli, c->max_lag_ms,
+            c->min_power_dbfs, r.inputs_valid ? "true" : "false",
+            r.accepted ? "true" : "false", r.local_power_dbfs,
+            r.peer_power_dbfs, ambient_audio_failure_name(r.failure));
+    return rc;
+#else
+    (void)session;
+    (void)ev;
+    SST_print_error(
+        "Auth requires ambient audio, but this build has no ALSA support.");
     return -1;
 #endif
 }
@@ -529,6 +608,10 @@ static int select_echo(const char* plan, co_location_config* c) {
     return ultrasonic_echo_plan_config(plan, &c->echo.config,
                                        &c->echo.identity);
 }
+static int select_ambient(const char* plan, co_location_config* c) {
+    return ambient_audio_plan_config(plan, &c->ambient.config,
+                                     &c->ambient.identity);
+}
 static int select_ble(const char* plan, co_location_config* c) {
     return ble_adv_rssi_plan_config(plan, &c->ble);
 }
@@ -554,6 +637,12 @@ static int run_echo(SST_session_ctx_t* s, int initiator,
     return verify_ultrasound_echo(s, initiator, o, &c->echo.config,
                                   &c->echo.identity, ev);
 }
+static int run_ambient(SST_session_ctx_t* s, int initiator,
+                       const co_location_options* o, const co_location_config* c,
+                       physical_evidence* ev) {
+    return verify_ambient_audio(s, initiator, o, &c->ambient.config,
+                                &c->ambient.identity, ev);
+}
 static int run_ble(SST_session_ctx_t* s, int initiator,
                    const co_location_options* o, const co_location_config* c,
                    physical_evidence* ev) {
@@ -574,6 +663,7 @@ static const co_location_method CO_LOCATION_METHODS[] = {
     {"IR", select_ir, run_ir},
     {"LIFI", select_lifi, run_lifi},
     {"ULTRASOUND", select_echo, run_echo},
+    {"AMBIENT_AUDIO", select_ambient, run_ambient},
     {"BLE_RSSI", select_ble, run_ble},
     {"WIFI_RSSI", select_wifi, run_wifi},
     {"UWB", select_uwb, run_uwb},

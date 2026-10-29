@@ -47,6 +47,20 @@ else()
   message(STATUS "ggwave/ALSA not found (or not on Linux): --comm_type ultrasound will report as unsupported.")
 endif()
 
+# Ambient-audio (Sound-Proof-inspired) CO_LOCATION check. Its protocol logic
+# lives in sst-c-api; this adds the device layer, which captures with ALSA
+# `arecord` and compares with the Python ambient_audio tool, both invoked at
+# run time (no link-time dependency). Linux only.
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  message(STATUS "Building AMBIENT_AUDIO CO_LOCATION support (needs arecord + python ambient_audio at run time).")
+  foreach(target robot locker)
+    target_sources(${target} PRIVATE ../../ambient_audio_com/ambient_audio_device.c)
+    target_compile_definitions(${target} PRIVATE HAVE_AMBIENT_AUDIO)
+  endforeach()
+else()
+  message(STATUS "Not on Linux: AMBIENT_AUDIO will report as unsupported.")
+endif()
+
 # Optional pigpio-based IR handshake transport (Linux only, direct GPIO
 # access, and requires root at runtime). pigpio is not an apt package on
 # current Raspberry Pi OS -- see ../../ir_com/run_ir_test.sh for install

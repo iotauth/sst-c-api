@@ -36,6 +36,11 @@ typedef struct {
      * gate, so the evidence ages by it. Never changes a bound or skips a
      * check. */
     unsigned action_test_delay_ms;
+    /* QR robot--locker discovery: the robot scans the locker's QR with its
+     * camera (only if Auth's plan grants it "Camera"); the locker shows its own
+     * ID as a QR on the framebuffer. */
+    int scan_qr; /* robot */
+    int show_qr; /* locker */
     /* --benchmark: one measured run of the protected operation only (no
      * GRIP_ITEM, no messaging after the gate), recorded as JSON. */
     int benchmark;
@@ -52,8 +57,10 @@ static void physical_options_usage(const char* program, int robot) {
         "[--comm_type tcp|ir|lifi|ultrasound|bluetooth|wifi] "
         "[--mic <alsa_device>] [--spk <alsa_device>] %s"
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
-        "| --require-ble-rssi | --require-wifi-rssi | --require-uwb] "
+        "| --require-ambient-audio | --require-ble-rssi | --require-wifi-rssi "
+        "| --require-uwb] "
         "[--uwb-dev <serial_port>] [--wifi-iface <iface>] "
+        "[--scan-qr (robot)] [--show-qr (locker)] "
         "[--ultrasound-echo-test-delay-ms N] [--action-test-delay-ms N] "
         "[--benchmark --benchmark-run-id ID --benchmark-output FILE] "
         "[--lifi-tx-gpio N] [--lifi-rx-gpio N] [--lifi-led-active-low]",
@@ -84,6 +91,7 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     } require_flags[] = {{"--require-ir-hk", "IR"},
                          {"--require-lifi-hk", "LIFI"},
                          {"--require-ultrasound-echo", "ULTRASOUND"},
+                         {"--require-ambient-audio", "AMBIENT_AUDIO"},
                          {"--require-ble-rssi", "BLE_RSSI"},
                          {"--require-wifi-rssi", "WIFI_RSSI"},
                          {"--require-uwb", "UWB"}};
@@ -122,6 +130,8 @@ static void physical_options_parse(int argc, char* argv[], int robot,
         }
         /* Relay experiment: IR/LiFi HK control over the TCP session. */
         if (!strcmp(a, "--hk-control-tcp")) o->co.hk_control_over_tcp = 1;
+        if (!strcmp(a, "--scan-qr")) o->scan_qr = 1;
+        if (!strcmp(a, "--show-qr")) o->show_qr = 1;
         if (!strcmp(a, "--benchmark")) o->benchmark = 1;
         if (!v) continue;
         if (!strcmp(a, "--comm_type"))
