@@ -123,6 +123,20 @@ EOF
     echo "AP up: $IFACE ${AP_ADDR%/*}"
     ;;
 sta)
+    # Relay experiment only: wait (bounded) for a go-file before associating, so
+    # the harness can bring the relay path up first; and pin a specific AP BSSID
+    # so this station joins the intended AP when several share one SSID. Both are
+    # set via the environment, so the endpoint binaries need no change.
+    if [ -n "${WIFI_WAIT_FILE:-}" ]; then
+        echo "Waiting for go-file $WIFI_WAIT_FILE before associating..."
+        for _ in $(seq 1 120); do [ -f "$WIFI_WAIT_FILE" ] && break; sleep 0.5; done
+        if [ ! -f "$WIFI_WAIT_FILE" ]; then
+            echo "go-file $WIFI_WAIT_FILE never appeared." >&2
+            exit 1
+        fi
+    fi
+    BSSID_LINE=""
+    if [ -n "${WIFI_BSSID:-}" ]; then BSSID_LINE="    bssid=$WIFI_BSSID"; fi
     load_creds
     prepare
     sudo tee "$RUN_DIR/wpa.conf" > /dev/null <<EOF
@@ -132,6 +146,7 @@ network={
     ssid="$SSID"
     psk="$PASSPHRASE"
     key_mgmt=WPA-PSK
+$BSSID_LINE
 }
 EOF
     sudo wpa_supplicant -B -i "$IFACE" -c "$RUN_DIR/wpa.conf" \
