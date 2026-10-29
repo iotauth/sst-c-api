@@ -6,6 +6,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -225,6 +226,11 @@ int wifi_measure_listen(const char* iface, int port, int* listen_fd) {
 int wifi_measure_accept(int listen_fd, char* peer_ip, size_t n) {
     int fd = accept(listen_fd, NULL, NULL);
     if (fd < 0) return -1;
+    /* The timing exchange sends one small frame at a time and waits for the
+     * reply, so disable Nagle: otherwise a direction switch hits a ~40 ms
+     * delayed-ACK/Nagle stall that dominates one round's response time. */
+    int one = 1;
+    setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
     if (wifi_rssi_socket_peer(fd, peer_ip, n)) {
         close(fd);
         return -1;
@@ -246,6 +252,8 @@ int wifi_measure_connect(const char* host, int port, int retries, char* peer_ip,
         int fd = socket(AF_INET, SOCK_STREAM, 0);
         if (fd < 0) return -1;
         if (connect(fd, (struct sockaddr*)&addr, sizeof(addr)) == 0) {
+            int one = 1; /* disable Nagle; see wifi_measure_accept */
+            setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, &one, sizeof(one));
             if (wifi_rssi_socket_peer(fd, peer_ip, n)) {
                 close(fd);
                 return -1;
