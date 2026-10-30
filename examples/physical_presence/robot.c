@@ -65,6 +65,53 @@ static bool execute_check(const char* challenge, const char* check_id) {
         return true;
     }
 
+    // Requester-local camera person check: capture one frame and run the
+    // OpenCV person detector (entity/python/human_presence). Fail-closed: a
+    // missing person, or any detector/camera error, denies the action.
+    if (strcmp(method, "CAMERA_PERSON") == 0) {
+        char min_conf[32] = {0};
+        if (parse_json_string_value(check_obj, "min_confidence", min_conf,
+                                    sizeof(min_conf)) != 0)
+            snprintf(min_conf, sizeof(min_conf), "0.5");
+        const char* base = getenv("HUMAN_PRESENCE_CMD");
+        if (!base || !*base) base = "python3 -m human_presence";
+        char cmd[512];
+        snprintf(cmd, sizeof(cmd), "%s --capture --min-confidence %s", base,
+                 min_conf);
+        FILE* p = popen(cmd, "r");
+        if (!p) {
+            SST_print_error("%s: could not run the person detector.", check_id);
+            return false;
+        }
+        char line[256];
+        int present = 0, got = 0;
+        double confidence = 0.0;
+        while (fgets(line, sizeof(line), p)) {
+            int pr, cnt;
+            double cf;
+            if (sscanf(line, "PERSON present=%d count=%d confidence=%lf", &pr,
+                       &cnt, &cf) == 3) {
+                present = pr;
+                confidence = cf;
+                got = 1;
+            }
+        }
+        int status = pclose(p);
+        if (!got || status != 0) {
+            SST_print_error("%s: person detector failed (fail-closed).",
+                            check_id);
+            return false;
+        }
+        // Safety requirement HumanAbsent: the action may proceed only when no
+        // person is in the camera-observed region, so a detected person fails.
+        int pass = !present;
+        SST_print_log(
+            "%s: CAMERA_PERSON person_present=%d confidence=%.3f min=%s "
+            "requires=absent local=%s",
+            check_id, present, confidence, min_conf, pass ? "PASS" : "FAIL");
+        return pass ? true : false;
+    }
+
     SST_print_error(
         "%s: verification method %s is not implemented in this demo.", check_id,
         method);
