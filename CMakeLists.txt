@@ -24,12 +24,14 @@ add_library(sst-c-api STATIC
   ${CMAKE_CURRENT_LIST_DIR}/ambient_audio_com/ambient_audio_plan.c
   ${CMAKE_CURRENT_LIST_DIR}/physical_com/rssi_check.c
   ${CMAKE_CURRENT_LIST_DIR}/uwb_com/uwb_range.c
+  ${CMAKE_CURRENT_LIST_DIR}/uwb_com/uwb_locate.c
   ${CMAKE_CURRENT_LIST_DIR}/bluetooth_com/ble_adv_rssi.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
-# Statically link OpenSSL into sst-c-api
-target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads)
+# Statically link OpenSSL into sst-c-api. libm (m) is needed by the plan
+# tokenizer and the UWB trilateration; PUBLIC so dependents link it too.
+target_link_libraries(sst-c-api PUBLIC OpenSSL::Crypto OpenSSL::SSL Threads::Threads m)
 
 target_include_directories(sst-c-api PUBLIC
   $<INSTALL_INTERFACE:include>
@@ -157,3 +159,8 @@ add_executable(uwb_range_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_range_test
 target_link_libraries(uwb_range_test PRIVATE sst-c-api)
 target_compile_options(uwb_range_test PRIVATE -UNDEBUG)
 add_test(NAME uwb_range_test COMMAND uwb_range_test)
+
+add_executable(uwb_locate_test ${CMAKE_CURRENT_SOURCE_DIR}/uwb_com/uwb_locate_test.c)
+target_link_libraries(uwb_locate_test PRIVATE sst-c-api)
+target_compile_options(uwb_locate_test PRIVATE -UNDEBUG)
+add_test(NAME uwb_locate_test COMMAND uwb_locate_test)

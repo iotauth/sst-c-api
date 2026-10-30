@@ -10,6 +10,7 @@
 #include "../../physical_com/rssi_check.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
 #include "../../uwb_com/uwb_cli_dev.h"
+#include "../../uwb_com/uwb_locate.h"
 #include "../../wifi_com/wifi_rssi.h"
 #include "../../wifi_com/wifi_timing.h"
 #ifdef HAVE_BT_TRANSPORT
@@ -42,6 +43,11 @@ typedef struct {
     const char* expected_peer;   /* initiator: the target it asked Auth for */
     unsigned echo_test_delay_ms; /* timing tests only: delays our answers */
     const char* uwb_device;      /* UWB board's serial port, NULL: auto */
+    /* UWB_POSITION only: the target's anchor boards, one serial port each, in
+     * the same order as the plan's anchor coordinates. The requester uses just
+     * uwb_device (its single tag). */
+    const char* uwb_anchor_devices[UWB_LOCATE_MAX_ANCHORS];
+    int uwb_anchor_count;
     const char* wifi_iface;      /* the Wi-Fi dongle's direct link */
     /* IR/LiFi only: send the HK preparation control messages (INIT/READY)
      * over the TCP session, keeping just the timed rounds optical. For the
@@ -79,6 +85,7 @@ typedef union {
     rssi_config rssi; /* WIFI_RSSI */
     ble_adv_rssi_config ble;
     uwb_range_config uwb;
+    uwb_locate_config locate; /* UWB_POSITION */
 } co_location_config;
 
 static const char* run_result_name(int rc) {
@@ -586,6 +593,76 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
     return rc;
 }
 
+/* Localizes the requester against the target's fixed anchors. The requester
+ * (initiator) ranges every anchor with its one tag, trilaterates and judges;
+ * the target (responder) drives its anchor boards and takes the requester's
+ * authenticated verdict as its own evidence. */
+static int verify_uwb_position(SST_session_ctx_t* session, int initiator,
+                               const co_location_options* o,
+                               const uwb_locate_config* c,
+                               physical_evidence* ev) {
+    SST_print_log(
+        "UWB POSITION: role=%s anchors=%d expected=(%d,%d) tolerance_cm=%u "
+        "samples=%u timeout_ms=%u",
+        initiator ? "tag" : "anchors", c->n_anchors, c->expected_x_cm,
+        c->expected_y_cm, c->tolerance_cm, c->samples, c->timeout_ms);
+    if (session->sock < 0) {
+        SST_print_error(
+            "UWB position needs the TCP SST session; use --comm_type tcp.");
+        return -1;
+    }
+    uwb_locate_result r;
+    int rc;
+    if (initiator) {
+        uwb_cli* cli = uwb_cli_open(o->uwb_device);
+        if (!cli) return -1;
+        uwb_range_radio radio;
+        uwb_cli_bind(cli, &radio);
+        rc = uwb_locate_run_tag(session, c, &radio, &r);
+        uwb_cli_close(cli);
+    } else {
+        if (o->uwb_anchor_count != c->n_anchors) {
+            SST_print_error(
+                "UWB position: plan needs %d anchor devices, %d given "
+                "(--uwb-anchor-dev).",
+                c->n_anchors, o->uwb_anchor_count);
+            return -1;
+        }
+        uwb_cli* cli[UWB_LOCATE_MAX_ANCHORS] = {0};
+        const uwb_range_radio* radios[UWB_LOCATE_MAX_ANCHORS];
+        static uwb_range_radio radio[UWB_LOCATE_MAX_ANCHORS];
+        int opened = 0, ok = 1;
+        for (; opened < c->n_anchors; ++opened) {
+            cli[opened] = uwb_cli_open(o->uwb_anchor_devices[opened]);
+            if (!cli[opened]) {
+                ok = 0;
+                break;
+            }
+            uwb_cli_bind(cli[opened], &radio[opened]);
+            radios[opened] = &radio[opened];
+        }
+        rc = ok ? uwb_locate_run_anchors(session, c, radios, &r) : -1;
+        for (int i = 0; i < opened; ++i) uwb_cli_close(cli[i]);
+        if (!ok) return -1;
+    }
+    SST_print_log(
+        "UWB POSITION: role=%s solved=%d position=(%d,%d) error_cm=%d "
+        "tolerance_cm=%u local=%s result=%s",
+        initiator ? "tag" : "anchors", r.solved, r.x_cm, r.y_cm, r.error_cm,
+        c->tolerance_cm, r.local_pass ? "PASS" : "FAIL", run_result_name(rc));
+    set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"UWB_POSITION\", \"role\": \"%s\", "
+            "\"anchors\": %d, \"solved\": %s, \"x_cm\": %d, \"y_cm\": %d, "
+            "\"error_cm\": %d, \"tolerance_cm\": %u, \"expected_x_cm\": %d, "
+            "\"expected_y_cm\": %d}",
+            initiator ? "tag" : "anchors", c->n_anchors,
+            r.solved ? "true" : "false", r.x_cm, r.y_cm, r.error_cm,
+            c->tolerance_cm, c->expected_x_cm, c->expected_y_cm);
+    return rc;
+}
+
 /* Every CO_LOCATION method an endpoint can run: how to read its settings
  * from the plan (1 selected, 0 absent/DUMMY, -1 malformed or another
  * method), and how to run it once selected (1 pass, 0 fail, -1 aborted,
@@ -620,6 +697,9 @@ static int select_wifi(const char* plan, co_location_config* c) {
 }
 static int select_uwb(const char* plan, co_location_config* c) {
     return uwb_range_plan_config(plan, &c->uwb);
+}
+static int select_uwb_position(const char* plan, co_location_config* c) {
+    return uwb_locate_plan_config(plan, &c->locate);
 }
 static int run_ir(SST_session_ctx_t* s, int initiator,
                   const co_location_options* o, const co_location_config* c,
@@ -658,6 +738,11 @@ static int run_uwb(SST_session_ctx_t* s, int initiator,
                    physical_evidence* ev) {
     return verify_uwb(s, initiator, o, &c->uwb, ev);
 }
+static int run_uwb_position(SST_session_ctx_t* s, int initiator,
+                            const co_location_options* o,
+                            const co_location_config* c, physical_evidence* ev) {
+    return verify_uwb_position(s, initiator, o, &c->locate, ev);
+}
 
 static const co_location_method CO_LOCATION_METHODS[] = {
     {"IR", select_ir, run_ir},
@@ -667,6 +752,7 @@ static const co_location_method CO_LOCATION_METHODS[] = {
     {"BLE_RSSI", select_ble, run_ble},
     {"WIFI_RSSI", select_wifi, run_wifi},
     {"UWB", select_uwb, run_uwb},
+    {"UWB_POSITION", select_uwb_position, run_uwb_position},
 };
 
 /* Called after handshake for every transport; Auth's verificationPlan alone

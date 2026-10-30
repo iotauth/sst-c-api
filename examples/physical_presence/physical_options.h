@@ -61,8 +61,10 @@ static void physical_options_usage(const char* program, int robot) {
         "[--mic <alsa_device>] [--spk <alsa_device>] %s"
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
         "| --require-ambient-audio | --require-ble-rssi | --require-wifi-rssi "
-        "| --require-uwb] "
-        "[--uwb-dev <serial_port>] [--temp-dev <serial_port> (locker)] "
+        "| --require-uwb | --require-uwb-position] "
+        "[--uwb-dev <serial_port>] "
+        "[--uwb-anchor-dev <serial_port> (locker, repeatable)] "
+        "[--temp-dev <serial_port> (locker)] "
         "[--wifi-iface <iface>] "
         "[--scan-qr (robot)] [--show-qr (locker)] "
         "[--ultrasound-echo-test-delay-ms N] [--action-test-delay-ms N] "
@@ -98,7 +100,8 @@ static void physical_options_parse(int argc, char* argv[], int robot,
                          {"--require-ambient-audio", "AMBIENT_AUDIO"},
                          {"--require-ble-rssi", "BLE_RSSI"},
                          {"--require-wifi-rssi", "WIFI_RSSI"},
-                         {"--require-uwb", "UWB"}};
+                         {"--require-uwb", "UWB"},
+                         {"--require-uwb-position", "UWB_POSITION"}};
     memset(o, 0, sizeof(*o));
     o->comm_type = "tcp";
     o->lifi_tx_gpio = 23;
@@ -147,6 +150,12 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->co.spk_device = v;
         else if (!strcmp(a, "--uwb-dev"))
             o->co.uwb_device = v;
+        else if (!strcmp(a, "--uwb-anchor-dev")) {
+            /* Repeatable (locker): one anchor serial port per use, in the plan's
+             * anchor-coordinate order. */
+            if (o->co.uwb_anchor_count < UWB_LOCATE_MAX_ANCHORS)
+                o->co.uwb_anchor_devices[o->co.uwb_anchor_count++] = v;
+        }
         else if (!strcmp(a, "--temp-dev"))
             o->temp_dev = v;
         else if (robot && !strcmp(a, "--bt-peer"))
