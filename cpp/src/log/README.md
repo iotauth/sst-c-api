@@ -20,7 +20,7 @@ graph TD
     LOG_WRN["LOG_WRN macro"] --> Log
     LOG_CRL["LOG_CRL macro"] --> Log
     Log --> LogManager["LogManager singleton\nspdlog::rotating_logger_mt"]
-    LogManager --> FileSink["Rotating file sink\n50 MB × 10 backups"]
+    LogManager --> FileSink["Rotating file sink\n50 MiB × 10 backups"]
     Log --> Console["Optional stdout/stderr output\ncontrolled by verbose flag"]
 ```
 
