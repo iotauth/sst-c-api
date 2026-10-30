@@ -13,6 +13,7 @@
 #include "../../uwb_com/uwb_locate.h"
 #include "../../wifi_com/wifi_rssi.h"
 #include "../../wifi_com/wifi_timing.h"
+#include "benchmark.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_adv_radio.h"
 #endif
@@ -775,7 +776,7 @@ static const char* const COOPERATIVE_REQUIREMENTS[] = {
 static int verify_requirement(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts,
                               action_evidence* evidence, const char* requirement,
-                              const char** ran_method) {
+                              const char** ran_method, benchmark_trace* bench) {
     const co_location_method* selected = NULL;
     co_location_config config;
     int malformed = 0;
@@ -800,7 +801,10 @@ static int verify_requirement(SST_session_ctx_t* session, int initiator,
     }
     if (ran_method) *ran_method = selected->id;
     physical_evidence ev = {0};
+    int tidx = bench_check_begin(bench, requirement, selected->id,
+                                 "cooperative");
     int rc = selected->verify(session, initiator, opts, &config, &ev);
+    bench_check_end(bench, tidx, rc >= 0, rc == 1);
     SST_print_log(
         "%s evidence: method=%s complete=%d local_pass=%d "
         "observation_time_known=%d observed_not_before_us=%llu "
@@ -823,14 +827,14 @@ static int verify_requirement(SST_session_ctx_t* session, int initiator,
  * @return 1 when every cooperative requirement that ran passed, 0 otherwise. */
 static int verify_cooperative(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts,
-                              action_evidence* evidence) {
+                              action_evidence* evidence, benchmark_trace* bench) {
     int all_passed = 1, require_met = opts->require_method == NULL;
     for (size_t r = 0;
          r < sizeof(COOPERATIVE_REQUIREMENTS) / sizeof(*COOPERATIVE_REQUIREMENTS);
          ++r) {
         const char* ran = NULL;
         int rc = verify_requirement(session, initiator, opts, evidence,
-                                    COOPERATIVE_REQUIREMENTS[r], &ran);
+                                    COOPERATIVE_REQUIREMENTS[r], &ran, bench);
         if (rc < 0) all_passed = 0;
         if (ran && opts->require_method && !strcmp(ran, opts->require_method))
             require_met = 1;

@@ -21,6 +21,19 @@
 #include "../../src/c_common.h"
 
 #define BENCH_OBSERVATIONS_SIZE 8192
+#define BENCH_MAX_CHECKS 12
+
+/* One verification's own execution interval, on this endpoint's clock. Covers
+ * both cooperative requirements (PROXIMITY, ...) and single-device checks
+ * (TEMPERATURE_CHECK, HUMIDITY_CHECK, HUMAN_PRESENCE). start/end are 0 when not
+ * recorded; completed is rc>=0, accepted is rc==1. */
+typedef struct {
+    char check[40];
+    char method[40];
+    const char* kind; /* "cooperative" or "single_device" */
+    uint64_t start_us, end_us;
+    int completed, accepted;
+} bench_check_timing;
 
 typedef struct {
     int enabled;
@@ -35,6 +48,9 @@ typedef struct {
     uint64_t authorization_start_us, authorization_end_us;
     uint64_t peer_handshake_start_us, peer_handshake_end_us;
     uint64_t cooperative_start_us, cooperative_end_us;
+    /* Per-check execution intervals, in the order they ran. */
+    bench_check_timing checks[BENCH_MAX_CHECKS];
+    int check_count;
     uint64_t action_callback_start_us;
     int callback_started;
     int gate_ran;
@@ -81,6 +97,33 @@ static void bench_stage(benchmark_trace* b, const char* stage) {
     if (b && b->enabled) b->stage = stage;
 }
 
+/* Starts timing one check (cooperative requirement or single-device check),
+ * returning its slot index, or -1 when off/full. The slot's start is recorded
+ * now; bench_check_end fills the rest. */
+static int bench_check_begin(benchmark_trace* b, const char* check,
+                             const char* method, const char* kind) {
+    if (!b || !b->enabled || b->check_count >= BENCH_MAX_CHECKS) return -1;
+    int i = b->check_count++;
+    bench_check_timing* t = &b->checks[i];
+    memset(t, 0, sizeof(*t));
+    snprintf(t->check, sizeof(t->check), "%s", check ? check : "");
+    snprintf(t->method, sizeof(t->method), "%s", method ? method : "");
+    t->kind = kind;
+    bench_mark(b, &t->start_us);
+    return i;
+}
+
+/* Ends the check at `idx`: records its end time and outcome (completed = rc>=0,
+ * accepted = rc==1). A no-op for idx<0. */
+static void bench_check_end(benchmark_trace* b, int idx, int completed,
+                            int accepted) {
+    if (!b || !b->enabled || idx < 0 || idx >= b->check_count) return;
+    bench_check_timing* t = &b->checks[idx];
+    bench_mark(b, &t->end_us);
+    t->completed = completed;
+    t->accepted = accepted;
+}
+
 /* A value that may legitimately be 0, present only when `has`. */
 static void json_opt_u64(FILE* f, const char* name, int has, uint64_t v,
                          int last) {
@@ -118,30 +161,48 @@ static void json_str(FILE* f, const char* name, const char* v, int last) {
         fprintf(f, "  \"%s\": null%s\n", name, last ? "" : ",");
 }
 
-/* The raw text of CO_LOCATION's selectedMethod.parameters in the plan, or
- * NULL. It is Auth's JSON, already tokenized and bounded. */
+/* The cooperative requirements, so the benchmark can summarize the first one
+ * present for the legacy single-value fields; per-requirement data is in the
+ * checks[] array. */
+static const char* const BENCH_COOP_CHECKS[] = {
+    "PROXIMITY", "POSITION_IN_REGION", "SHARED_ACOUSTIC_ENVIRONMENT"};
+static int bench_is_coop(const char* check) {
+    for (size_t i = 0; i < sizeof(BENCH_COOP_CHECKS) / sizeof(*BENCH_COOP_CHECKS);
+         ++i)
+        if (!strcmp(check, BENCH_COOP_CHECKS[i])) return 1;
+    return 0;
+}
+
+/* The raw text of the first present cooperative requirement's
+ * selectedMethod.parameters, or NULL. Auth's JSON, already tokenized. */
 static int bench_plan_parameters(const char* plan, const char** start,
                                  int* len) {
     static plan_json j;
     if (!plan || plan_json_parse(plan, &j)) return -1;
     int checks = plan_json_field(&j, 0, "verificationPlan");
-    int co = plan_json_field(&j, checks, "CO_LOCATION");
-    int sel = plan_json_field(&j, co, "selectedMethod");
-    int params = plan_json_field(&j, sel, "parameters");
-    if (params < 0 || j.t[params].type != '{') return -1;
-    *start = j.t[params].start;
-    *len = (int)(j.t[params].end - j.t[params].start);
-    return 0;
+    if (checks < 0) return -1;
+    for (size_t k = 0; k < sizeof(BENCH_COOP_CHECKS) / sizeof(*BENCH_COOP_CHECKS);
+         ++k) {
+        int co = plan_json_field(&j, checks, BENCH_COOP_CHECKS[k]);
+        int sel = co < 0 ? -1 : plan_json_field(&j, co, "selectedMethod");
+        int params = sel < 0 ? -1 : plan_json_field(&j, sel, "parameters");
+        if (params >= 0 && j.t[params].type == '{') {
+            *start = j.t[params].start;
+            *len = (int)(j.t[params].end - j.t[params].start);
+            return 0;
+        }
+    }
+    return -1;
 }
 
 static const char* bench_outcome(const action_evidence* e) {
     if (!e) return NULL;
     for (unsigned i = 0; i < e->count; ++i) {
-        if (strcmp(e->entries[i].check, "CO_LOCATION")) continue;
+        if (!bench_is_coop(e->entries[i].check)) continue;
         const physical_evidence* ev = &e->entries[i].ev;
         return !ev->complete ? "ABORT" : ev->local_pass ? "PASS" : "FAIL";
     }
-    return NULL; /* the mechanism never ran (or never got that far) */
+    return NULL; /* no cooperative requirement ran (or never got that far) */
 }
 
 /* Writes the run's JSON to b->output (via a temporary file, then rename).
@@ -174,7 +235,7 @@ static int bench_write(benchmark_trace* b) {
     int plan_ok = b->key && !freshness_plan_parse(b->key->challenge, &plan);
     const freshness_check* co = NULL;
     for (unsigned i = 0; plan_ok && i < plan.count; ++i)
-        if (!strcmp(plan.checks[i].check, "CO_LOCATION")) co = &plan.checks[i];
+        if (!co && bench_is_coop(plan.checks[i].check)) co = &plan.checks[i];
 
     char key_id[2 * SESSION_KEY_ID_SIZE + 1] = {0};
     for (int i = 0; b->key && i < SESSION_KEY_ID_SIZE; ++i)
@@ -216,7 +277,7 @@ static int bench_write(benchmark_trace* b) {
     /* The CO_LOCATION evidence and its requirement's gate result. */
     const physical_evidence* ev = NULL;
     for (unsigned i = 0; b->evidence && i < b->evidence->count; ++i)
-        if (!strcmp(b->evidence->entries[i].check, "CO_LOCATION"))
+        if (!ev && bench_is_coop(b->evidence->entries[i].check))
             ev = &b->evidence->entries[i].ev;
     json_u64(f, "observed_not_before_us", ev ? ev->observed_not_before_us : 0,
              0);
@@ -231,7 +292,8 @@ static int bench_write(benchmark_trace* b) {
     uint64_t age = 0;
     int has_age = 0;
     for (unsigned i = 0; b->gate_ran && i < b->gate.count; ++i) {
-        if (strcmp(b->gate.checks[i].plan.check, "CO_LOCATION")) continue;
+        if (verification || !bench_is_coop(b->gate.checks[i].plan.check))
+            continue;
         verification =
             b->gate.checks[i].decision == GATE_ALLOW ? "PASS" : "FAIL";
         /* The gate computes an age only once the evidence passed and its
@@ -275,6 +337,28 @@ static int bench_write(benchmark_trace* b) {
                     ? "null"
                     : gate_decision_name(b->gate.checks[i].decision),
                 b->gate.checks[i].decision == GATE_ALLOW ? "" : "\"");
+    }
+    fprintf(f, "],\n");
+    /* Per-check execution intervals, measured around each verification call on
+     * this endpoint's clock. Cooperative requirements and single-device checks
+     * are tagged by "kind"; durations null when an endpoint did not time. */
+    fprintf(f, "  \"check_timings\": [");
+    for (int i = 0; i < b->check_count; ++i) {
+        const bench_check_timing* t = &b->checks[i];
+        int tbad = 0;
+        uint64_t dur = bench_span(t->start_us, t->end_us, &tbad);
+        fprintf(f,
+                "%s{\"check\": \"%s\", \"method\": \"%s\", \"kind\": \"%s\", "
+                "\"start_us\": %llu, \"end_us\": %llu, \"duration_us\": ",
+                i ? ", " : "", t->check, t->method, t->kind ? t->kind : "",
+                (unsigned long long)t->start_us, (unsigned long long)t->end_us);
+        if (dur)
+            fprintf(f, "%llu", (unsigned long long)dur);
+        else
+            fprintf(f, "null");
+        fprintf(f, ", \"completed\": %s, \"accepted\": %s}",
+                t->completed ? "true" : "false",
+                t->accepted ? "true" : "false");
     }
     fprintf(f, "],\n");
     fprintf(f, "  \"observations\": %s,\n",

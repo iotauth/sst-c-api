@@ -216,7 +216,7 @@ int main(int argc, char* argv[]) {
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
     int co_passed =
-        verify_cooperative(session_ctx, 0, &opts.co, &open_evidence);
+        verify_cooperative(session_ctx, 0, &opts.co, &open_evidence, &bench);
     bench_mark(&bench, &bench.cooperative_end_us);
     physical_wifi_measure_cleanup(&opts);
     if (!co_passed) {
@@ -226,11 +226,24 @@ int main(int argc, char* argv[]) {
     // USB serial), so it enforces TEMPERATURE_CHECK itself before opening. Auth
     // provisions the threshold in the plan but keeps it out of requiredChecks,
     // so this does not burden the sensor-less requester. Fail-closed.
-    if (!verify_temperature_local(session_ctx->s_key.challenge, opts.temp_dev)) {
+    // The benchmark times each single-device check; the analyzer reads these
+    // only from the single-device (S0) configuration, where they are required.
+    bench_stage(&bench, "single_device_verification");
+    int bench_temp = bench_check_begin(&bench, "TEMPERATURE_CHECK",
+                                       "THERMOMETER", "single_device");
+    int temp_ok = verify_temperature_local(session_ctx->s_key.challenge,
+                                           opts.temp_dev);
+    bench_check_end(&bench, bench_temp, 1, temp_ok);
+    if (!temp_ok) {
         SST_print_error_exit(
             "LOCKER_OPEN denied: temperature local verification failed.");
     }
-    if (!verify_humidity_local(session_ctx->s_key.challenge, opts.temp_dev)) {
+    int bench_hum =
+        bench_check_begin(&bench, "HUMIDITY_CHECK", "HUMIDITY", "single_device");
+    int hum_ok =
+        verify_humidity_local(session_ctx->s_key.challenge, opts.temp_dev);
+    bench_check_end(&bench, bench_hum, 1, hum_ok);
+    if (!hum_ok) {
         SST_print_error_exit(
             "LOCKER_OPEN denied: humidity local verification failed.");
     }

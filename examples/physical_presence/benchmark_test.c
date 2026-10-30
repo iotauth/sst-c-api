@@ -21,8 +21,8 @@ static session_key_t key_with_bound(unsigned bound_ms) {
     memset(k.key_id, 0xab, SESSION_KEY_ID_SIZE);
     k.abs_validity = UINT64_MAX;
     snprintf(k.challenge, sizeof(k.challenge),
-             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"freshness_ms\":%u,"
+             "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{"
+             "\"PROXIMITY\":{\"topology\":\"MUTUAL\",\"freshness_ms\":%u,"
              "\"selectedMethod\":{\"method\":\"UWB\",\"parameters\":{"
              "\"samples\":20,\"timeout_ms\":10000}}}}}",
              bound_ms);
@@ -72,7 +72,7 @@ static gate_decision run(benchmark_trace* b, const session_key_t* k,
     bench_mark(b, &b->cooperative_start_us);
     assert(action_evidence_init(e, b->action, k) == 0);
     physical_evidence ev = {1, 1, 1, 2100, 4900};
-    assert(action_evidence_record(e, "CO_LOCATION", "UWB", &ev) == 0);
+    assert(action_evidence_record(e, "PROXIMITY", "UWB", &ev) == 0);
     fake_now = 5000;
     bench_mark(b, &b->cooperative_end_us);
     b->key = k;

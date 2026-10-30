@@ -274,7 +274,13 @@ int main(int argc, char* argv[]) {
 
     // Local checks can run before the handshake; mutual IR verification must
     // wait until both entities have authenticated with the same session key.
-    if (!execute_check(s_key_list->s_key[0].challenge, "HUMAN_PRESENCE")) {
+    // The benchmark times the camera check (read only from the S0 config).
+    int bench_cam = bench_check_begin(&bench, "HUMAN_PRESENCE", "CAMERA_PERSON",
+                                      "single_device");
+    int human_ok =
+        execute_check(s_key_list->s_key[0].challenge, "HUMAN_PRESENCE");
+    bench_check_end(&bench, bench_cam, 1, human_ok);
+    if (!human_ok) {
         SST_print_error_exit("HUMAN_PRESENCE verification failed.");
     }
 
@@ -395,7 +401,7 @@ int main(int argc, char* argv[]) {
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
     int co_passed =
-        verify_cooperative(session_ctx, 1, &opts.co, &retrieve_evidence);
+        verify_cooperative(session_ctx, 1, &opts.co, &retrieve_evidence, &bench);
     bench_mark(&bench, &bench.cooperative_end_us);
     physical_wifi_measure_cleanup(&opts);
     if (!co_passed) {
