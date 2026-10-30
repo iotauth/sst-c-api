@@ -1,6 +1,7 @@
 #include "c_api.h"
 
 #include <openssl/rand.h>
+#include <unistd.h>
 
 #include "c_common.h"
 #include "c_crypto.h"
@@ -130,6 +131,7 @@ SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
         secure_connect_to_server_with_socket(s_key, sock);
     if (session_ctx == NULL) {
         SST_print_error("Failed secure_connect_to_server_with_socket().");
+        close(sock);
         return NULL;
     }
     return session_ctx;
@@ -137,11 +139,6 @@ SST_session_ctx_t* secure_connect_to_server(session_key_t* s_key,
 
 SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
                                                         int sock) {
-    // Initialize SST_session_ctx_t
-    SST_session_ctx_t* session_ctx = malloc(sizeof(SST_session_ctx_t));
-    session_ctx->received_seq_num = 0;
-    session_ctx->sent_seq_num = 0;
-
     unsigned char entity_nonce[HS_NONCE_SIZE];
     unsigned int parsed_buf_length;
     unsigned char* parsed_buf =
@@ -156,11 +153,11 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
                     sender_HS_1, &sender_HS_1_length);
     int bytes_written =
         sst_write_to_socket(sock, sender_HS_1, sender_HS_1_length);
+    free(parsed_buf);
     if (bytes_written < 0) {
         SST_print_error("Failed sst_write_to_socket().");
         return NULL;
     }
-    free(parsed_buf);
     int entity_client_state = HANDSHAKE_1_SENT;
 
     // received handshake 2
@@ -177,6 +174,10 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
         SST_print_error(
             "Socket disconnected during handshake2 in "
             "secure_connect_to_server_with_socket()");
+        return NULL;
+    }
+    if (message_type != SKEY_HANDSHAKE_2) {
+        SST_print_error("Unexpected handshake message type.");
         return NULL;
     }
     unsigned char* data_buf = received_buf;
@@ -200,15 +201,17 @@ SST_session_ctx_t* secure_connect_to_server_with_socket(session_key_t* s_key,
                         sender_HS_2, &sender_HS_2_length);
         int bytes_written =
             sst_write_to_socket(sock, sender_HS_2, sender_HS_2_length);
+        free(parsed_buf);
         if (bytes_written < 0) {
             SST_print_error("Failed sst_write_to_socket().");
             return NULL;
         }
-        free(parsed_buf);
         update_validity(s_key);
         SST_print_debug("Switching to IN_COMM.");
         entity_client_state = IN_COMM;
     }
+    SST_session_ctx_t* session_ctx = calloc(1, sizeof(*session_ctx));
+    if (session_ctx == NULL) return NULL;
     memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
     session_ctx->sock = sock;
     return session_ctx;
@@ -267,13 +270,6 @@ session_key_t* get_session_key_by_ID(unsigned char* target_session_key_id,
 
 SST_session_ctx_t* server_secure_comm_setup(
     SST_ctx_t* ctx, int clnt_sock, session_key_list_t* existing_s_key_list) {
-    // Initialize SST_session_ctx_t
-    SST_session_ctx_t* session_ctx = malloc(sizeof(SST_session_ctx_t));
-
-    session_ctx->received_seq_num = 0;
-    session_ctx->sent_seq_num = 0;
-    session_ctx->sock = clnt_sock;
-
     int entity_server_state = IDLE;
     unsigned char server_nonce[HS_NONCE_SIZE];
 
@@ -307,6 +303,7 @@ SST_session_ctx_t* server_secure_comm_setup(
             SST_print_debug("Switching to HANDSHAKE_1_RECEIVED state.");
             entity_server_state = HANDSHAKE_1_RECEIVED;
             unsigned char target_session_key_id[SESSION_KEY_ID_SIZE];
+            if (data_buf_length < SESSION_KEY_ID_SIZE) return NULL;
             memcpy(target_session_key_id, data_buf, SESSION_KEY_ID_SIZE);
 
             s_key = get_session_key_by_ID(target_session_key_id, ctx,
@@ -336,11 +333,11 @@ SST_session_ctx_t* server_secure_comm_setup(
                             sender, &sender_length);
             int bytes_written =
                 sst_write_to_socket(clnt_sock, sender, sender_length);
+            free(parsed_buf);
             if (bytes_written < 0) {
                 SST_print_error("Failed sst_write_to_socket().");
                 return NULL;
             }
-            free(parsed_buf);
             SST_print_debug("Switching to HANDSHAKE_2_SENT.");
             entity_server_state = HANDSHAKE_2_SENT;
         }
@@ -399,6 +396,9 @@ SST_session_ctx_t* server_secure_comm_setup(
             update_validity(s_key);
             SST_print_debug("Switching to IN_COMM.");
             entity_server_state = IN_COMM;
+            SST_session_ctx_t* session_ctx = calloc(1, sizeof(*session_ctx));
+            if (session_ctx == NULL) return NULL;
+            session_ctx->sock = clnt_sock;
             memcpy(&session_ctx->s_key, s_key, sizeof(session_key_t));
             return session_ctx;
         }
@@ -689,8 +689,10 @@ int generate_random_nonce(int length, unsigned char* buf) {
 }
 
 void free_session_key_list_t(session_key_list_t* session_key_list) {
-    free(session_key_list->s_key);
-    free(session_key_list);
+    if (session_key_list != NULL) {
+        free(session_key_list->s_key);
+        free(session_key_list);
+    }
 }
 
 void free_session_ctx(SST_session_ctx_t* session_ctx) { free(session_ctx); }

@@ -122,33 +122,31 @@ int load_config(config_t* c, const char* path) {
         AES_128_CBC;                     // Default session key encryption mode.
     c->dist_key_enc_mode = AES_128_CBC;  // Default dist encryption mode.
     SST_print_debug("-----SST configuration of %s.-----", path);
-    while (!feof(fp)) {
-        pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
+    while ((pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp)) != NULL) {
         char* ptr = strtok(pline, "=");
-        while (ptr != NULL) {
+        if (ptr != NULL) {
             config_type_t config = get_key_value(ptr);
             if (config == UNKNOWN_CONFIG) {
                 SST_print_error("Unknown config type %s.", ptr);
-                return -1;
+                goto fail;
             }
             ptr = strtok(NULL, delimiters);
             if (ptr == NULL) {
                 SST_print_error("Config value does not exist.");
-                return -1;
+                goto fail;
             }
             switch (config) {
                 case UNKNOWN_CONFIG:
                     SST_print_error(
                         "This line must not be reached. UNKNOWN_CONFIG");
-                    return -1;
-                    break;
+                    goto fail;
                 case ENTITY_INFO_NAME:
                     SST_print_debug("Name: %s", ptr);
                     if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) <
                         0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() ENTITY_INFO_NAME");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case ENTITY_INFO_PURPOSE:
@@ -157,11 +155,11 @@ int load_config(config_t* c, const char* path) {
                                         ptr);
                         if (safe_config_value_copy(
                                 c->purpose[purpose_count], ptr,
-                                sizeof(c->purpose[purpose_count])) < -1) {
+                                sizeof(c->purpose[purpose_count])) < 0) {
                             SST_print_error(
                                 "Failed safe_config_value_copy() "
                                 "ENTITY_INFO_PURPOSE");
-                            return -1;
+                            goto fail;
                         }
                         purpose_count += 1;
                     } else {
@@ -195,7 +193,7 @@ int load_config(config_t* c, const char* path) {
                             "\"off\" or \"0\" to not use HMAC mode.\n Please "
                             "type "
                             "\"on\" or \"1\" to use HMAC mode.");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case PERMANENT_DIST_KEY_MODE:
@@ -213,7 +211,7 @@ int load_config(config_t* c, const char* path) {
                             "type "
                             "\"on\" or \"1\" to use permanent distribution "
                             "key.");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case AUTH_ID:
@@ -228,7 +226,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "AUTH_INFO_PUBKEY_PATH");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case ENTITY_INFO_PRIVKEY_PATH:
@@ -239,7 +237,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "ENTITY_INFO_PRIVKEY_PATH");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case AUTH_INFO_IP_ADDRESS:
@@ -249,14 +247,14 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "AUTH_INFO_IP_ADDRESS");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case AUTH_INFO_PORT:
                     c->auth_port_num = atoi(ptr);
                     if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
                         SST_print_error("Error: Invalid Auth port number.");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case ENTITY_SERVER_INFO_IP_ADDRESS:
@@ -267,7 +265,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "ENTITY_SERVER_INFO_IP_ADDRESS");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case ENTITY_SERVER_INFO_PORT_NUMBER:
@@ -276,7 +274,7 @@ int load_config(config_t* c, const char* path) {
                     if (c->entity_server_port_num < 0 ||
                         c->entity_server_port_num > 65535) {
                         SST_print_error("Error: Invalid server port number.");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case NETWORK_PROTOCOL:
@@ -286,7 +284,7 @@ int load_config(config_t* c, const char* path) {
                         0) {
                         SST_print_error(
                             "Failed safe_config_value_copy() NETWORK_PROTOCOL");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
@@ -298,7 +296,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
@@ -308,7 +306,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Error: Invalid file system manager port "
                             "number.");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case DIST_CIPHER_KEY_PATH:
@@ -320,7 +318,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "DIST_CIPHER_KEY_PATH");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case DIST_MAC_KEY_PATH:
@@ -332,7 +330,7 @@ int load_config(config_t* c, const char* path) {
                         SST_print_error(
                             "Failed safe_config_value_copy() "
                             "DIST_MAC_KEY_PATH");
-                        return -1;
+                        goto fail;
                     }
                     break;
                 case DIST_ENCRYPTION_MODE:
@@ -350,13 +348,13 @@ int load_config(config_t* c, const char* path) {
                             "type "
                             "\"AES_128_CBC\" or \"AES_128_CTR\" or "
                             "\"AES_128_GCM\".");
-                        return -1;
+                        goto fail;
                     }
                     break;
             }
-            break;
         }
     }
+    if (ferror(fp)) goto fail;
     fclose(fp);
 
     if (c->perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
@@ -370,4 +368,8 @@ int load_config(config_t* c, const char* path) {
     }
 
     return 0;
+
+fail:
+    fclose(fp);
+    return -1;
 }

@@ -10,7 +10,7 @@ extern "C" {
 #include "../../src/c_api.h"
 }
 
-volatile int active_clients = 0;
+int active_clients = 0;  // All accesses are protected by count_mutex.
 volatile sig_atomic_t stop_server = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 

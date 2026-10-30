@@ -19,7 +19,7 @@ launch_terminal() {
 }
 
 # Parameters check
-if [ $# -lt 1 ]; then
+if [[ $# -lt 1 ]]; then
   echo "Usage: $0 <number-of-clients> [-p|--password <password>]"
   exit 1
 fi
@@ -78,7 +78,7 @@ echo
 echo "Generating the graph file"
 cd "$SCRIPT_DIR"
 command -v node >/dev/null || { echo "Node.js not found"; exit 1; }
-[ -f graph_generator.js ] || { echo "graph_generator.js not found"; exit 1; }
+[[ -f graph_generator.js ]] || { echo "graph_generator.js not found"; exit 1; }
 node graph_generator.js "$COUNT"
 
 # 2) Use the graph
@@ -118,7 +118,7 @@ echo "Generating client configs"
 cd "$SCRIPT_DIR"
 
 # ensure the directory is correct
-[ -f config_generator.js ] || { echo "config_generator.js not found in $SCRIPT_DIR"; exit 1; }
+[[ -f config_generator.js ]] || { echo "config_generator.js not found in $SCRIPT_DIR"; exit 1; }
 
 # run the generator with the count argument
 node config_generator.js "$COUNT"

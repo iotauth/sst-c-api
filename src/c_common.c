@@ -116,16 +116,16 @@ void write_in_n_bytes(uint64_t num, int n, unsigned char* buf) {
 unsigned int read_unsigned_int_BE(unsigned char* buf, int byte_length) {
     unsigned int num = 0;
     for (int i = 0; i < byte_length; i++) {
-        num |= buf[i] << 8 * (byte_length - 1 - i);
+        // Unsigned arithmetic keeps the low-order bytes for wider fields.
+        num = (num << 8) | buf[i];
     }
     return num;
 }
 
 uint64_t read_unsigned_long_int_BE(unsigned char* buf, int byte_length) {
-    uint64_t num_valid = 1ULL;
+    uint64_t num_valid = 0;
     for (int i = 0; i < byte_length; i++) {
-        uint64_t num = 1ULL << 8 * (byte_length - 1 - i);
-        num_valid |= num * buf[i];
+        num_valid = (num_valid << 8) | buf[i];
     }
     return num_valid;
 }

@@ -17,7 +17,7 @@ launch_terminal() {
   fi
 }
 
-if [ $# -ne 2 ]; then
+if [[ $# -ne 2 ]]; then
   echo "Usage: $0 <number-of-instances> <csv-file>"
   exit 1
 fi
@@ -28,7 +28,7 @@ SERVER_BIN="../build/server"
 CLIENT_BIN="../build/client"
 
 for bin in "$SERVER_BIN" "$CLIENT_BIN"; do
-  if [ ! -x "$bin" ]; then
+  if [[ ! -x "$bin" ]]; then
     echo "Executable not found or not runnable at $bin"
     exit 1
   fi

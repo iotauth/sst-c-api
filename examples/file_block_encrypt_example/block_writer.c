@@ -67,6 +67,7 @@ int main(int argc, char* argv[]) {
             if (temp_buf_length != 0) {
                 memcpy(plaintext_block_buf, temp_buf, temp_buf_length);
                 total_block_size += temp_buf_length;
+                temp_buf_length = 0;
             }
 
             // Create random key value buffers.
@@ -75,11 +76,16 @@ int main(int argc, char* argv[]) {
                 int plaintext_buf_length =
                     secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
 
-                // This buffer contains a single key_value.
-                unsigned char
-                    plaintext_buf[plaintext_buf_length];  // Variable Length
-                                                          // Arrays work from
-                                                          // C99
+                if (plaintext_buf_length < MIN_KEY_VALUE_SIZE ||
+                    plaintext_buf_length > MAX_KEY_VALUE_SIZE) {
+                    SST_print_error_exit("Failed to choose a key-value size.");
+                }
+                unsigned char plaintext_buf[MAX_KEY_VALUE_SIZE];
+                if (generate_random_nonce(plaintext_buf_length, plaintext_buf) <
+                    0) {
+                    SST_print_error_exit(
+                        "Failed to generate a key-value buffer.");
+                }
 
                 // If the block size exceeds MAX_PLAINTEXT_BLOCK_SIZE after
                 // adding the next block, it should be saved to the next block.

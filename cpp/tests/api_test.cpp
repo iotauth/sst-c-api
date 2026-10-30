@@ -417,7 +417,7 @@ void test_encrypt_decrypt_buf_with_session_key() {
     std::printf("**** STARTING test_encrypt_decrypt_buf_with_session_key.\n");
     session_key_t key = make_session_key(42, UINT64_MAX);
     const char msg[] = "Hello from the SST C++ API";
-    const unsigned int msg_len = static_cast<unsigned int>(std::strlen(msg));
+    const unsigned int msg_len = sizeof(msg) - 1;
 
     unsigned int enc_cap = sst::Crypto::get_expected_encrypted_total_length(
         msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE, key.enc_mode,

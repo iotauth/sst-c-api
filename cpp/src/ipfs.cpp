@@ -6,6 +6,7 @@
 #include "ipfs.hpp"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -98,8 +99,13 @@ std::string run_process(const std::vector<std::string>& argv,
             ::close(pipefd[1]);
         } else {
             int fd =
-                ::open(stdout_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+                ::open(stdout_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0600);
             if (fd < 0) {
+                ::_exit(127);
+            }
+            // Also restrict a file that already existed before open().
+            if (::fchmod(fd, S_IRUSR | S_IWUSR) < 0) {
+                ::close(fd);
                 ::_exit(127);
             }
             ::dup2(fd, STDOUT_FILENO);
