@@ -193,7 +193,14 @@ static int parse_config_value(config_t* c, config_type_t type,
             return safe_config_value_copy(c->dist_mac_key_path, value,
                                           sizeof(c->dist_mac_key_path));
         case DIST_ENCRYPTION_MODE:
-            return parse_encryption_mode(value, &c->dist_key_enc_mode);
+            if (parse_encryption_mode(value, &c->dist_key_enc_mode) < 0) {
+                SST_print_error(
+                    "Invalid %s value '%s'. Supported modes: AES_128_CBC, "
+                    "AES_128_CTR, AES_128_GCM.",
+                    dist_encryption_mode_label, value);
+                return -1;
+            }
+            return 0;
         case UNKNOWN_CONFIG:
             return -1;
     }

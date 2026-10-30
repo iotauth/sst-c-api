@@ -67,7 +67,7 @@ standalone tests under `sst-build/`.
 | `multi_thread_get_session_key_test` | Five concurrent requests sharing one C context after an initial distribution-key request |
 | `encrypt_buf_with_session_key_without_malloc_execution_time_test` | Benchmark caller-buffer encryption and decryption with Auth-issued keys |
 
-The last two programs are optional stress/benchmark runs:
+To run the shared-context stress test and encryption benchmark manually:
 
 ```sh
 ./multi_thread_get_session_key_test ../test_configs/client.config
@@ -84,6 +84,8 @@ executables with CTest **without their required config argument**. Run them
 directly as shown above; an unfiltered `ctest` in `tests/build/` is not a working
 integration-test command. Use the root build for the standalone CTest suite.
 
-The [C CI workflow](../.github/workflows/ci.yml) runs the password save/load test
-alongside the server/client, block-encryption and IPFS examples. It does not
-currently run the optional multithreaded test or encryption benchmark.
+The [C CI workflow](../.github/workflows/ci.yml) runs both the password save/load
+test and `multi_thread_get_session_key_test`, alongside the server/client,
+block-encryption and IPFS examples. The shared-context test remains enabled
+despite the nondeterministic behavior described above; only the encryption
+benchmark command is commented out.

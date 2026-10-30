@@ -7,18 +7,13 @@ This is a repository for the C and C++ APIs of **[SST (Secure Swarm Toolkit)](ht
 
 # Prerequisites
 
--   OpenSSL:
-    SST uses the APIs from OpenSSL for encryption and decryption. OpenSSL 3.0 and above is required to run SST.
-    -   On macOS, OpenSSL can be installed using `brew install openssl`.
-    -   The following environment variables need to be set before running `make`. The exact variable values can be found from the output of `brew install openssl`.
-    -   Add two lines below by using `vi ~/.zshrc`
-        -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
-        -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
-    -   Alternatively, point CMake at Homebrew's OpenSSL with `export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"`.
-
-    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation.
+-   OpenSSL 3.0 or later, including development headers and libraries.
+    On macOS with Homebrew, install `openssl@3` and, if CMake cannot find it,
+    set `export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"` before configuring.
+-   A POSIX environment (Linux or macOS) and a C compiler.
 -   CMake 3.19 or later.
--   For the C++ API, a C++17 compiler (clang or gcc).
+-   For the C++ API, a C++17 compiler (clang or gcc) and spdlog; see the
+    [C++ requirements](cpp/README.md#requirements) for dependency setup.
 
 # Repository Layout
 

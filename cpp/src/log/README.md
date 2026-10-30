@@ -30,8 +30,8 @@ A process-wide singleton wrapping a `spdlog::rotating_logger_mt`. Provides:
 
 - **`Initialize(name, path, verbose, maxSizeBytes, maxFiles)`** — Creates the logger with a rotating file sink. Automatically creates parent directories if they don't exist.
   - Default rotation: 50 MiB per file, with up to 10 backups plus the active file.
-  - A path such as `sst.log` produces backups `sst.1.log`, `sst.2.log`, etc.; the active file keeps its original path.
-- **`SetLogFilePath(name, path, maxSizeBytes, maxFiles)`** — Drops the existing logger and creates a new one at a different path (useful for reconfiguration without restart).
+  - A path such as `logs/sst.log` produces backups `logs/sst.1.log`, `logs/sst.2.log`, etc.; the active file keeps its original path. Supply a parent directory, since setup passes it to `std::filesystem::create_directories`.
+- **`SetLogFilePath(name, path, maxSizeBytes, maxFiles)`** — Recreates an already initialized logger at a different path. Reuse the original logger name.
 - **`GetLogger()`** — Returns a reference to the underlying `spdlog::logger`. If no logger has been initialized, returns a default stdout color logger.
 - **`IsVerbose()`** — Returns whether console output is enabled alongside file logging.
 
@@ -64,7 +64,7 @@ Usage:
 #include "log/log_manager.hpp"
 
 // Initialize once at startup
-LogManager::Initialize("sst", "/var/log/sst.log", true);
+LogManager::Initialize("sst", "logs/sst.log", true);
 
 // Use anywhere in the codebase
 LOG_INF << "Session established with entity " << entity_name;
@@ -81,3 +81,4 @@ When `GIT_VERSION` is defined at compile time, **`Log` message dispatch and file
 2. **`GIT_VERSION` strips logging**: In production builds with this macro defined, the `Log` destructor does not dispatch messages. Don't rely on logging for critical error handling or side effects — use proper return values and exceptions instead.
 3. **Thread safety**: The `Log` destructor serializes message dispatch with a mutex. Logger setup and reconfiguration do not acquire that mutex; configure logging before starting worker threads.
 4. **File path directory creation**: Both `Initialize()` and `SetLogFilePath()` create parent directories automatically, so you don't need to pre-create them. But if the process lacks write permissions on the target directory, filesystem or spdlog setup can throw an exception; these setup functions do not catch it. `SetLogFilePath()` only reconfigures an already initialized logger.
+5. **Dispatch failures**: The `Log` destructor catches logging exceptions to avoid terminating the process. A failed log write is dropped; it is not an application error-reporting mechanism.
