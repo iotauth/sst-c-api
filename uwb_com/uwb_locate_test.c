@@ -145,8 +145,8 @@ static const char* plan_with(const char* topology, const char* method,
     static char plan[1024];
     snprintf(plan, sizeof(plan),
              "{\"requester\":\"net1.robot1\",\"targets\":[\"net1.locker1\"],"
-             "\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"%s\",\"selectedMethod\":{"
+             "\"requiredChecks\":[\"POSITION_IN_REGION\"],\"verificationPlan\":{"
+             "\"POSITION_IN_REGION\":{\"topology\":\"%s\",\"selectedMethod\":{"
              "\"method\":\"%s\",\"parameters\":%s}}}}",
              topology, method, params);
     return plan;

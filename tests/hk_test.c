@@ -139,8 +139,8 @@ static void exchange(endpoint e[2]) {
 static void plan_tests(void) {
     char fmt[512];
     snprintf(fmt, sizeof(fmt), "%s%s%s",
-             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"selectedMethod\":{"
+             "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{"
+             "\"PROXIMITY\":{\"topology\":\"MUTUAL\",\"selectedMethod\":{"
              "\"method\":\"",
              medium->method, "\",\"parameters\":{%s}}}}}");
     char plan[1024];
@@ -163,7 +163,7 @@ static void plan_tests(void) {
         assert(hk_plan_config(plan, medium, &c) == -1);
     }
     assert(hk_plan_config(
-               "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{}}",
+               "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{}}",
                medium, &c) == -1);
     assert(hk_plan_config("{\"requiredChecks\":[],\"verificationPlan\":{}}",
                           medium, &c) == 0);

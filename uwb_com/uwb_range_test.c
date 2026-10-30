@@ -120,8 +120,8 @@ static const char* plan_in(const char* topology, const char* method,
     static char plan[1024];
     snprintf(plan, sizeof(plan),
              "{\"requester\":\"net1.robot1\",\"targets\":[\"net1.locker1\"],"
-             "\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"%s\",\"selectedMethod\":{"
+             "\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{"
+             "\"PROXIMITY\":{\"topology\":\"%s\",\"selectedMethod\":{"
              "\"method\":\"%s\",\"parameters\":%s}}}}",
              topology, method, params);
     return plan;
@@ -197,8 +197,8 @@ static void start_action(void* ctx) {
 static gate_decision gate_requester(const endpoint* e, unsigned bound_ms) {
     session_key_t key = e->session.s_key;
     snprintf(key.challenge, sizeof(key.challenge),
-             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":"
-             "{\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"freshness_ms\":%u,"
+             "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":"
+             "{\"PROXIMITY\":{\"topology\":\"MUTUAL\",\"freshness_ms\":%u,"
              "\"selectedMethod\":{\"method\":\"UWB\",\"parameters\":{}}}}}",
              bound_ms);
     action_evidence ev;
@@ -206,7 +206,7 @@ static gate_decision gate_requester(const endpoint* e, unsigned bound_ms) {
     physical_evidence pe = {e->rc >= 0, e->rc == 1, 1,
                             e->result.observed_not_before_us,
                             e->result.collection_completed_us};
-    assert(action_evidence_record(&ev, "CO_LOCATION", "UWB", &pe) == 0);
+    assert(action_evidence_record(&ev, "PROXIMITY", "UWB", &pe) == 0);
     return action_gate_run(&key, "RETRIEVE_ITEM", &ev, NULL, start_action,
                            NULL, NULL);
 }

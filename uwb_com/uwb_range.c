@@ -23,7 +23,7 @@ int uwb_range_plan_config(const char* plan, uwb_range_config* c) {
     plan_json j;
     int params;
     if (!c) return -1;
-    int rc = plan_co_location(plan, "UWB", &j, &params);
+    int rc = plan_check(plan, "PROXIMITY", "UWB", "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
     long distance, samples, timeout;

@@ -20,7 +20,7 @@ int rssi_plan_config(const char* plan, const char* method, rssi_config* c) {
     plan_json j;
     int params;
     if (!c) return -1;
-    int rc = plan_co_location(plan, method, &j, &params);
+    int rc = plan_check(plan, "PROXIMITY", method, "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
     long min_rssi, samples, interval;

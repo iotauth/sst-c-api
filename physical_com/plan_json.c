@@ -153,26 +153,27 @@ int plan_json_parse(const char* plan, plan_json* j) {
     return *j->p || j->t[0].type != '{' ? -1 : 0;
 }
 
-int plan_co_location(const char* plan, const char* method, plan_json* j,
-                     int* params) {
-    if (!method || !params || plan_json_parse(plan, j)) return -1;
-    int required = plan_json_field(j, 0, "requiredChecks"), required_co = 0;
+int plan_check(const char* plan, const char* check, const char* method,
+               const char* topology, plan_json* j, int* params) {
+    if (!check || !method || !topology || !params || plan_json_parse(plan, j))
+        return -1;
+    int required = plan_json_field(j, 0, "requiredChecks"), is_required = 0;
     if (required < 0 || j->t[required].type != '[') return -1;
     for (int i = required + 1; i < j->t[required].next; i = j->t[i].next) {
         if (j->t[i].type != '"') return -1;
-        if (eq(&j->t[i], "CO_LOCATION")) required_co = 1;
+        if (eq(&j->t[i], check)) is_required = 1;
     }
     int checks = plan_json_field(j, 0, "verificationPlan");
     if (checks < 0 || j->t[checks].type != '{') return -1;
-    int co = plan_json_field(j, checks, "CO_LOCATION");
-    if (co == -1 && !required_co) return 0;
+    int co = plan_json_field(j, checks, check);
+    if (co == -1 && !is_required) return 0;
     if (co < 0) return -1;
     int selected = plan_json_field(j, co, "selectedMethod");
     int m = plan_json_field(j, selected, "method");
     if (m < 0) return -1;
     if (eq(&j->t[m], "DUMMY")) return 0;
-    int topology = plan_json_field(j, co, "topology");
-    if (!eq(&j->t[m], method) || topology < 0 || !eq(&j->t[topology], "MUTUAL"))
+    int top = plan_json_field(j, co, "topology");
+    if (!eq(&j->t[m], method) || top < 0 || !eq(&j->t[top], topology))
         return -1;
     *params = plan_json_field(j, selected, "parameters");
     return 1;

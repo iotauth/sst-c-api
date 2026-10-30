@@ -8,7 +8,7 @@ int ultrasonic_echo_plan_config(const char* plan, ultrasonic_echo_config* c,
     plan_json j;
     int params;
     if (!c || !id) return -1;
-    int rc = plan_co_location(plan, "ULTRASOUND", &j, &params);
+    int rc = plan_check(plan, "PROXIMITY", "ULTRASOUND", "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
     /* The old ULTRASOUND entry's round/delay fields are not echo settings;

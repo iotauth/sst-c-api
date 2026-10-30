@@ -36,7 +36,7 @@ int hk_plan_config(const char* plan, const hk_medium* medium, hk_config* c) {
     plan_json j;
     int params;
     if (!medium || !c) return -1;
-    int rc = plan_co_location(plan, medium->method, &j, &params);
+    int rc = plan_check(plan, "PROXIMITY", medium->method, "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (plan_json_scaled(&j, plan_json_field(&j, params, "rounds"), 1,
                          &c->rounds) ||

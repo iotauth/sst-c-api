@@ -1,5 +1,5 @@
-/* Reads the AMBIENT_AUDIO CO_LOCATION method from Auth's verification plan
- * (see physical_com/plan_json.h). */
+/* Reads the AMBIENT_AUDIO method of the SHARED_ACOUSTIC_ENVIRONMENT requirement
+ * from Auth's verification plan (see physical_com/plan_json.h). */
 #include "../physical_com/plan_json.h"
 #include "ambient_audio.h"
 
@@ -8,7 +8,8 @@ int ambient_audio_plan_config(const char* plan, ambient_audio_config* c,
     plan_json j;
     int params;
     if (!c || !id) return -1;
-    int rc = plan_co_location(plan, "AMBIENT_AUDIO", &j, &params);
+    int rc = plan_check(plan, "SHARED_ACOUSTIC_ENVIRONMENT", "AMBIENT_AUDIO",
+                        "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
     long recording_ms, threshold_milli, max_lag_ms, min_power_dbfs;

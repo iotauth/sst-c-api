@@ -395,11 +395,11 @@ int main(int argc, char* argv[]) {
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
     int co_passed =
-        verify_co_location(session_ctx, 1, &opts.co, &retrieve_evidence);
+        verify_cooperative(session_ctx, 1, &opts.co, &retrieve_evidence);
     bench_mark(&bench, &bench.cooperative_end_us);
     physical_wifi_measure_cleanup(&opts);
     if (!co_passed) {
-        SST_print_log("Robot: CO_LOCATION did not pass here.");
+        SST_print_log("Robot: cooperative verification did not pass here.");
     }
     // The gate alone decides, over every check the plan requires.
     bench_stage(&bench, "action_gate");

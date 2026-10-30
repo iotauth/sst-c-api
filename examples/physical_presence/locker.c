@@ -216,11 +216,11 @@ int main(int argc, char* argv[]) {
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
     int co_passed =
-        verify_co_location(session_ctx, 0, &opts.co, &open_evidence);
+        verify_cooperative(session_ctx, 0, &opts.co, &open_evidence);
     bench_mark(&bench, &bench.cooperative_end_us);
     physical_wifi_measure_cleanup(&opts);
     if (!co_passed) {
-        SST_print_log("Locker: CO_LOCATION did not pass here.");
+        SST_print_log("Locker: cooperative verification did not pass here.");
     }
     // Target-local verification: the locker owns the thermometer (ESP32 on its
     // USB serial), so it enforces TEMPERATURE_CHECK itself before opening. Auth

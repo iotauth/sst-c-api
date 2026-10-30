@@ -21,7 +21,7 @@ int ble_adv_rssi_plan_config(const char* plan, ble_adv_rssi_config* c) {
     plan_json j;
     int params;
     if (!c) return -1;
-    int rc = plan_co_location(plan, "BLE_RSSI", &j, &params);
+    int rc = plan_check(plan, "PROXIMITY", "BLE_RSSI", "MUTUAL", &j, &params);
     if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
     long min_rssi, samples, timeout;

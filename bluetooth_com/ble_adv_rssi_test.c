@@ -137,8 +137,8 @@ static void exchange(endpoint e[2]) {
 static const char* plan_with(const char* params) {
     static char plan[1024];
     snprintf(plan, sizeof(plan),
-             "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"MUTUAL\",\"freshness_ms\":1000,"
+             "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{"
+             "\"PROXIMITY\":{\"topology\":\"MUTUAL\",\"freshness_ms\":1000,"
              "\"selectedMethod\":{\"method\":\"BLE_RSSI\",\"parameters\":%s}}}"
              "}",
              params);

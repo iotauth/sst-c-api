@@ -663,11 +663,14 @@ static int verify_uwb_position(SST_session_ctx_t* session, int initiator,
     return rc;
 }
 
-/* Every CO_LOCATION method an endpoint can run: how to read its settings
- * from the plan (1 selected, 0 absent/DUMMY, -1 malformed or another
- * method), and how to run it once selected (1 pass, 0 fail, -1 aborted,
- * with its evidence). */
+/* Every cooperative method an endpoint can run: the physical requirement it
+ * verifies (e.g. "PROXIMITY"), its method id, how to read its settings from the
+ * plan (1 selected, 0 absent/DUMMY, -1 malformed or another method of the same
+ * requirement), and how to run it once selected (1 pass, 0 fail, -1 aborted,
+ * with its evidence). Several methods can share a requirement; Auth selects one
+ * per requirement, so the others return -1 and the runner tries the next. */
 typedef struct {
+    const char* requirement;
     const char* id;
     int (*select)(const char* plan, co_location_config* c);
     int (*verify)(SST_session_ctx_t* session, int initiator,
@@ -744,72 +747,100 @@ static int run_uwb_position(SST_session_ctx_t* s, int initiator,
     return verify_uwb_position(s, initiator, o, &c->locate, ev);
 }
 
-static const co_location_method CO_LOCATION_METHODS[] = {
-    {"IR", select_ir, run_ir},
-    {"LIFI", select_lifi, run_lifi},
-    {"ULTRASOUND", select_echo, run_echo},
-    {"AMBIENT_AUDIO", select_ambient, run_ambient},
-    {"BLE_RSSI", select_ble, run_ble},
-    {"WIFI_RSSI", select_wifi, run_wifi},
-    {"UWB", select_uwb, run_uwb},
-    {"UWB_POSITION", select_uwb_position, run_uwb_position},
+/* Candidate methods grouped by physical requirement. Methods of the same
+ * requirement are alternatives (Auth selects one); different requirements are
+ * verified and recorded independently and never substitute for one another. */
+static const co_location_method COOPERATIVE_METHODS[] = {
+    {"PROXIMITY", "IR", select_ir, run_ir},
+    {"PROXIMITY", "LIFI", select_lifi, run_lifi},
+    {"PROXIMITY", "ULTRASOUND", select_echo, run_echo},
+    {"PROXIMITY", "BLE_RSSI", select_ble, run_ble},
+    {"PROXIMITY", "WIFI_RSSI", select_wifi, run_wifi},
+    {"PROXIMITY", "UWB", select_uwb, run_uwb},
+    {"POSITION_IN_REGION", "UWB_POSITION", select_uwb_position, run_uwb_position},
+    {"SHARED_ACOUSTIC_ENVIRONMENT", "AMBIENT_AUDIO", select_ambient,
+     run_ambient},
 };
 
-/* Called after handshake for every transport; Auth's verificationPlan alone
- * decides which CO_LOCATION method runs. Never substitute DUMMY when the
- * selected medium is unavailable. The result goes into this operation's
- * `evidence` (any earlier CO_LOCATION evidence is dropped first); only the
- * action gate decides whether it still allows the action.
- * @return 1 when the selected method passed here, 0 otherwise (including
- * an absent or DUMMY check, which leaves no evidence). */
-static int verify_co_location(SST_session_ctx_t* session, int initiator,
+/* The distinct cooperative requirements, in execution order. Both endpoints
+ * iterate this same order so their sequential exchanges stay aligned. */
+static const char* const COOPERATIVE_REQUIREMENTS[] = {
+    "PROXIMITY", "POSITION_IN_REGION", "SHARED_ACOUSTIC_ENVIRONMENT"};
+
+/* Runs one cooperative requirement: selects the single method Auth chose for it
+ * (other candidates of the same requirement return -1), runs it, and records the
+ * result under the requirement id. @return 1 passed, 0 nothing to run (absent or
+ * DUMMY), -1 required but unsupported/malformed or the run did not pass.
+ * *ran_method, when non-NULL and a method ran, receives its id. */
+static int verify_requirement(SST_session_ctx_t* session, int initiator,
                               const co_location_options* opts,
-                              action_evidence* evidence) {
+                              action_evidence* evidence, const char* requirement,
+                              const char** ran_method) {
     const co_location_method* selected = NULL;
     co_location_config config;
     int malformed = 0;
-    action_evidence_invalidate(evidence, "CO_LOCATION");
+    action_evidence_invalidate(evidence, requirement);
     for (size_t i = 0;
-         i < sizeof(CO_LOCATION_METHODS) / sizeof(*CO_LOCATION_METHODS); ++i) {
+         i < sizeof(COOPERATIVE_METHODS) / sizeof(*COOPERATIVE_METHODS); ++i) {
+        if (strcmp(COOPERATIVE_METHODS[i].requirement, requirement)) continue;
         co_location_config c;
-        int rc = CO_LOCATION_METHODS[i].select(session->s_key.challenge, &c);
+        int rc = COOPERATIVE_METHODS[i].select(session->s_key.challenge, &c);
         if (rc == 1 && !selected) {
-            selected = &CO_LOCATION_METHODS[i];
+            selected = &COOPERATIVE_METHODS[i];
             config = c;
         }
-        /* Each parser returns -1 for the others' methods. */
-        malformed |= rc < 0;
-    }
-    if (!selected && malformed) {
-        SST_print_error("Invalid or unsupported Auth CO_LOCATION plan.");
-        return 0;
-    }
-    if (opts->require_method &&
-        (!selected || strcmp(selected->id, opts->require_method))) {
-        SST_print_error("%s required for this run, but Auth selected %s.",
-                        opts->require_method,
-                        selected ? selected->id : "a different plan");
-        return 0;
+        malformed |= rc < 0; /* -1 for the other methods of this requirement */
     }
     if (!selected) {
-        SST_print_log(
-            "CO_LOCATION: no IR/LiFi/ultrasound/BLE/Wi-Fi/UWB check selected "
-            "(absent or demo DUMMY); no evidence recorded.");
-        return 0;
+        if (malformed) {
+            SST_print_error("Invalid or unsupported Auth %s plan.", requirement);
+            return -1;
+        }
+        return 0; /* requirement absent or DUMMY: nothing to run */
     }
+    if (ran_method) *ran_method = selected->id;
     physical_evidence ev = {0};
     int rc = selected->verify(session, initiator, opts, &config, &ev);
     SST_print_log(
-        "CO_LOCATION evidence: method=%s complete=%d local_pass=%d "
+        "%s evidence: method=%s complete=%d local_pass=%d "
         "observation_time_known=%d observed_not_before_us=%llu "
         "collection_completed_us=%llu",
-        selected->id, ev.complete, ev.local_pass, ev.observation_time_known,
-        (unsigned long long)ev.observed_not_before_us,
+        requirement, selected->id, ev.complete, ev.local_pass,
+        ev.observation_time_known, (unsigned long long)ev.observed_not_before_us,
         (unsigned long long)ev.collection_completed_us);
-    if (action_evidence_record(evidence, "CO_LOCATION", selected->id, &ev)) {
-        SST_print_error("CO_LOCATION: could not store the evidence.");
+    if (action_evidence_record(evidence, requirement, selected->id, &ev)) {
+        SST_print_error("%s: could not store the evidence.", requirement);
+        return -1;
+    }
+    return rc == 1 ? 1 : -1;
+}
+
+/* Called after handshake for every transport; Auth's verificationPlan decides
+ * which cooperative requirements run. Each present requirement is executed in
+ * COOPERATIVE_REQUIREMENTS order and recorded under its own id; a requirement is
+ * never substituted by another. The action gate separately enforces which of
+ * these this action requires and their freshness.
+ * @return 1 when every cooperative requirement that ran passed, 0 otherwise. */
+static int verify_cooperative(SST_session_ctx_t* session, int initiator,
+                              const co_location_options* opts,
+                              action_evidence* evidence) {
+    int all_passed = 1, require_met = opts->require_method == NULL;
+    for (size_t r = 0;
+         r < sizeof(COOPERATIVE_REQUIREMENTS) / sizeof(*COOPERATIVE_REQUIREMENTS);
+         ++r) {
+        const char* ran = NULL;
+        int rc = verify_requirement(session, initiator, opts, evidence,
+                                    COOPERATIVE_REQUIREMENTS[r], &ran);
+        if (rc < 0) all_passed = 0;
+        if (ran && opts->require_method && !strcmp(ran, opts->require_method))
+            require_met = 1;
+    }
+    if (opts->require_method && !require_met) {
+        SST_print_error(
+            "%s required for this run, but Auth did not select it.",
+            opts->require_method);
         return 0;
     }
-    return rc == 1;
+    return all_passed;
 }
 #endif

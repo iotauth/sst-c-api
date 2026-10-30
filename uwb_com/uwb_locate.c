@@ -36,32 +36,14 @@ static int coord(const plan_json* j, int object, const char* name, int* out) {
 
 int uwb_locate_plan_config(const char* plan, uwb_locate_config* c) {
     plan_json j;
+    int params;
     if (!c) return -1;
     memset(c, 0, sizeof(*c));
-    if (plan_json_parse(plan, &j)) return -1;
-
-    /* CO_LOCATION required? (mirrors plan_co_location, but this method ranges
-     * only one way, so the topology is ANCHORED, not MUTUAL.) */
-    int required = plan_json_field(&j, 0, "requiredChecks"), required_co = 0;
-    if (required < 0 || j.t[required].type != '[') return -1;
-    for (int i = required + 1; i < j.t[required].next; i = j.t[i].next) {
-        if (j.t[i].type != '"') return -1;
-        if (plan_json_is(&j, i, "CO_LOCATION")) required_co = 1;
-    }
-    int checks = plan_json_field(&j, 0, "verificationPlan");
-    if (checks < 0 || j.t[checks].type != '{') return -1;
-    int co = plan_json_field(&j, checks, "CO_LOCATION");
-    if (co == -1 && !required_co) return 0;
-    if (co < 0) return -1;
-    int selected = plan_json_field(&j, co, "selectedMethod");
-    int m = plan_json_field(&j, selected, "method");
-    if (m < 0) return -1;
-    if (plan_json_is(&j, m, "DUMMY")) return 0;
-    int topology = plan_json_field(&j, co, "topology");
-    if (!plan_json_is(&j, m, "UWB_POSITION") || topology < 0 ||
-        !plan_json_is(&j, topology, "ANCHORED"))
-        return -1;
-    int params = plan_json_field(&j, selected, "parameters");
+    /* POSITION_IN_REGION is the requirement; UWB_POSITION ranges one way, so
+     * the topology is ANCHORED rather than the mutual proximity topology. */
+    int rc = plan_check(plan, "POSITION_IN_REGION", "UWB_POSITION", "ANCHORED",
+                        &j, &params);
+    if (rc != 1) return rc;
     if (params < 0 || j.t[params].type != '{') return -1;
 
     int anchors = plan_json_field(&j, params, "anchors");

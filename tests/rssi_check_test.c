@@ -70,8 +70,8 @@ static const char* plan_in(const char* topology, const char* method,
     static char plan[1024];
     snprintf(plan, sizeof(plan),
              "{\"requester\":\"net1.robot1\",\"targets\":[\"net1.locker1\"],"
-             "\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{"
-             "\"CO_LOCATION\":{\"topology\":\"%s\",\"selectedMethod\":{"
+             "\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{"
+             "\"PROXIMITY\":{\"topology\":\"%s\",\"selectedMethod\":{"
              "\"method\":\"%s\",\"parameters\":%s}}}}",
              topology, method, params);
     return plan;
@@ -113,7 +113,7 @@ static void plan_tests(const char* method, const char* other) {
         assert(rssi_plan_config(plan_with(method, bad[i]), method, &c) == -1);
     /* Required but missing, and a non-mutual topology, both reject. */
     assert(rssi_plan_config(
-               "{\"requiredChecks\":[\"CO_LOCATION\"],\"verificationPlan\":{}}",
+               "{\"requiredChecks\":[\"PROXIMITY\"],\"verificationPlan\":{}}",
                method, &c) == -1);
     assert(rssi_plan_config(plan_in("LOCAL", method, good), method, &c) == -1);
 }

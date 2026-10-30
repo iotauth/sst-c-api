@@ -42,13 +42,17 @@ int plan_json_name(const plan_json* j, int i, char* out, size_t capacity);
  * than MAX_CHALLENGE_LENGTH. @return 0, or -1 when malformed. */
 int plan_json_parse(const char* plan, plan_json* j);
 
-/* Parses `plan` into `j` and finds the CO_LOCATION check:
- *   1: its selected method is `method` with MUTUAL topology; *params is
+/* Parses `plan` into `j` and finds the requirement `check` (e.g. "PROXIMITY"):
+ *   1: its selected method is `method` with topology `topology`; *params is
  *      that method's "parameters" object token;
- *   0: CO_LOCATION is absent and not required, or the method is DUMMY;
- *  -1: malformed plan, CO_LOCATION required but missing, another method,
- *      or a non-MUTUAL topology. */
-int plan_co_location(const char* plan, const char* method, plan_json* j,
-                     int* params);
+ *   0: `check` is absent and not required, or the method is DUMMY;
+ *  -1: malformed plan, `check` required but missing, another method,
+ *      or a different topology.
+ * A verification requirement names what must hold (PROXIMITY,
+ * POSITION_IN_REGION, SHARED_ACOUSTIC_ENVIRONMENT, ...); each endpoint runs the
+ * one method Auth selected for it, so a candidate for a different method of the
+ * same requirement returns -1 and the caller tries the next candidate. */
+int plan_check(const char* plan, const char* check, const char* method,
+               const char* topology, plan_json* j, int* params);
 
 #endif

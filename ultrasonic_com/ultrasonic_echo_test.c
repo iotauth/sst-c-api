@@ -118,7 +118,7 @@ static void exchange(endpoint e[2]) {
 static void plan_tests(void) {
     const char* fmt =
         "{\"requester\":\"net1.robot1\",\"targets\":[%s],\"requiredChecks\":"
-        "[\"CO_LOCATION\"],\"verificationPlan\":{\"CO_LOCATION\":{"
+        "[\"PROXIMITY\"],\"verificationPlan\":{\"PROXIMITY\":{"
         "\"topology\":\"%s\",\"selectedMethod\":{\"method\":\"%s\","
         "\"parameters\":{%s}}}}}";
     const char* ok = "\"max_response_us\":2000000,\"response_timeout_ms\":5000";
@@ -191,12 +191,12 @@ static void plan_tests(void) {
     assert(ultrasonic_echo_plan_config(
                "{\"requiredChecks\":[],\"verificationPlan\":{}}", &c, &id) ==
            0);
-    assert(ultrasonic_echo_plan_config("{\"requiredChecks\":[\"CO_LOCATION\"],"
+    assert(ultrasonic_echo_plan_config("{\"requiredChecks\":[\"PROXIMITY\"],"
                                        "\"verificationPlan\":{}}",
                                        &c, &id) == -1);
     snprintf(plan, sizeof(plan),
              "{\"targets\":[\"net1.locker1\"],\"requiredChecks\":"
-             "[\"CO_LOCATION\"],\"verificationPlan\":{\"CO_LOCATION\":{"
+             "[\"PROXIMITY\"],\"verificationPlan\":{\"PROXIMITY\":{"
              "\"topology\":\"MUTUAL\",\"selectedMethod\":{\"method\":"
              "\"ULTRASOUND\",\"parameters\":{%s}}}}}",
              ok);
