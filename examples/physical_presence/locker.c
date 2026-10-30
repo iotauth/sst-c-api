@@ -230,6 +230,10 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit(
             "LOCKER_OPEN denied: temperature local verification failed.");
     }
+    if (!verify_humidity_local(session_ctx->s_key.challenge, opts.temp_dev)) {
+        SST_print_error_exit(
+            "LOCKER_OPEN denied: humidity local verification failed.");
+    }
 
     bench_stage(&bench, "action_gate");
     gate_decision decision = physical_action_gate(
