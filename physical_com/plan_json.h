@@ -9,7 +9,7 @@
  * only in their owning object, never by substring search, and a duplicated
  * key is an error. */
 
-#define PLAN_JSON_MAX_TOKENS 256
+#define PLAN_JSON_MAX_TOKENS 512
 
 typedef struct {
     const char *start, *end; /* the value's text, quotes included */
