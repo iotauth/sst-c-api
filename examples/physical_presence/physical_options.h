@@ -41,6 +41,9 @@ typedef struct {
      * ID as a QR on the framebuffer. */
     int scan_qr; /* robot */
     int show_qr; /* locker */
+    /* Locker-side target-local temperature check: serial device of the ESP32
+     * thermometer that streams "TEMP=<c>" (see temp_sensor.h). */
+    const char* temp_dev;
     /* --benchmark: one measured run of the protected operation only (no
      * GRIP_ITEM, no messaging after the gate), recorded as JSON. */
     int benchmark;
@@ -59,7 +62,8 @@ static void physical_options_usage(const char* program, int robot) {
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
         "| --require-ambient-audio | --require-ble-rssi | --require-wifi-rssi "
         "| --require-uwb] "
-        "[--uwb-dev <serial_port>] [--wifi-iface <iface>] "
+        "[--uwb-dev <serial_port>] [--temp-dev <serial_port> (locker)] "
+        "[--wifi-iface <iface>] "
         "[--scan-qr (robot)] [--show-qr (locker)] "
         "[--ultrasound-echo-test-delay-ms N] [--action-test-delay-ms N] "
         "[--benchmark --benchmark-run-id ID --benchmark-output FILE] "
@@ -107,6 +111,7 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     o->co.wifi_timing_deadline_us = 0;
     o->co.wifi_timing_recv_timeout_us = 500000;
     o->co.wifi_measure_sock = -1;
+    o->temp_dev = "/dev/ttyUSB0";
     o->wifi_peer = "192.168.77.1";
     o->wifi_link_script = NULL;
     o->wifi_link_minutes = 15;
@@ -142,6 +147,8 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->co.spk_device = v;
         else if (!strcmp(a, "--uwb-dev"))
             o->co.uwb_device = v;
+        else if (!strcmp(a, "--temp-dev"))
+            o->temp_dev = v;
         else if (robot && !strcmp(a, "--bt-peer"))
             o->bt_peer = v;
         else if (robot && !strcmp(a, "--wifi-peer"))
