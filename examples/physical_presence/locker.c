@@ -8,6 +8,7 @@
 #include "../../src/c_api.h"
 #include "physical_options.h"
 #include "qr_io.h"
+#include "temp_sensor.h"
 
 #ifdef HAVE_GGWAVE_TRANSPORT
 #include "../../ultrasonic_com/ggwave_sst_handshake.h"
@@ -221,6 +222,15 @@ int main(int argc, char* argv[]) {
     if (!co_passed) {
         SST_print_log("Locker: CO_LOCATION did not pass here.");
     }
+    // Target-local verification: the locker owns the thermometer (ESP32 on its
+    // USB serial), so it enforces TEMPERATURE_CHECK itself before opening. Auth
+    // provisions the threshold in the plan but keeps it out of requiredChecks,
+    // so this does not burden the sensor-less requester. Fail-closed.
+    if (!verify_temperature_local(session_ctx->s_key.challenge, opts.temp_dev)) {
+        SST_print_error_exit(
+            "LOCKER_OPEN denied: temperature local verification failed.");
+    }
+
     bench_stage(&bench, "action_gate");
     gate_decision decision = physical_action_gate(
         &opts, &session_ctx->s_key, "LOCKER_OPEN", &open_evidence, &bench);
