@@ -244,7 +244,8 @@ void serve_exchange(int listener, const Credentials& credentials,
     CHECK(std::memcmp(plain.data() + 8, auth_nonce.data(), 8) == 0);
     Bytes expected_body(16);
     std::copy_n(plain.begin(), 8, expected_body.begin());
-    std::copy(auth_nonce.begin(), auth_nonce.end(), expected_body.begin() + 8);
+    std::copy_n(auth_nonce.begin(), auth_nonce.size(),
+                expected_body.begin() + 8);
     bool key_request =
         expected.request_type == 20 || expected.request_type == 22;
     if (key_request) number(expected_body, 10, 4);

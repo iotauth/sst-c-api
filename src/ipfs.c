@@ -109,32 +109,41 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value,
     return cid_len;
 }
 
-int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
-                        char* my_file_path, unsigned char* hash_value,
-                        estimate_time_t* estimate_time) {
-    struct timeval encrypt_start, encrypt_end;
-    gettimeofday(&encrypt_start, NULL);
-    FILE* fin = fopen(my_file_path, "r");
-    if (fin == NULL) return -1;
+// Shared by encryption and decryption so all read failures close the stream.
+static unsigned char* read_file_contents(const char* path, int64_t* size) {
+    FILE* fin = fopen(path, "r");
+    if (fin == NULL) return NULL;
     int64_t bufsize = file_size_return(fin);
     if (bufsize < 0) {
         SST_print_error("Failed file_size_return()");
         fclose(fin);
-        return -1;
+        return NULL;
     }
     unsigned char* file_buf = NULL;
     file_buf = malloc(sizeof(char) * (bufsize + 1));
     if (file_buf == NULL) {
         fclose(fin);
-        return -1;
+        return NULL;
     }
     if (get_file_content(fin, file_buf, bufsize) < 0) {
         SST_print_error("Failed get_file_content()");
         free(file_buf);
         fclose(fin);
-        return -1;
+        return NULL;
     }
     fclose(fin);
+    *size = bufsize;
+    return file_buf;
+}
+
+int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
+                        char* my_file_path, unsigned char* hash_value,
+                        estimate_time_t* estimate_time) {
+    struct timeval encrypt_start, encrypt_end;
+    gettimeofday(&encrypt_start, NULL);
+    int64_t bufsize;
+    unsigned char* file_buf = read_file_contents(my_file_path, &bufsize);
+    if (file_buf == NULL) return -1;
 
     unsigned char iv[AES_128_CBC_IV_SIZE];
     int provider_len = sizeof(ctx->config.name);
@@ -204,27 +213,9 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
 }
 
 int file_decrypt_save(session_key_t s_key, char* file_name) {
-    FILE* fin = fopen(file_name, "r");
-    if (fin == NULL) return -1;
-    int64_t bufsize = file_size_return(fin);
-    if (bufsize < 0) {
-        SST_print_error("Failed file_size_return()");
-        fclose(fin);
-        return -1;
-    }
-    unsigned char* file_buf = NULL;
-    file_buf = malloc(sizeof(char) * (bufsize + 1));
-    if (file_buf == NULL) {
-        fclose(fin);
-        return -1;
-    }
-    if (get_file_content(fin, file_buf, bufsize) < 0) {
-        SST_print_error("Failed get_file_content()");
-        free(file_buf);
-        fclose(fin);
-        return -1;
-    }
-    fclose(fin);
+    int64_t bufsize;
+    unsigned char* file_buf = read_file_contents(file_name, &bufsize);
+    if (file_buf == NULL) return -1;
 
     if (bufsize < 2 + AES_128_CBC_IV_SIZE ||
         file_buf[0] > bufsize - 2 - AES_128_CBC_IV_SIZE) {

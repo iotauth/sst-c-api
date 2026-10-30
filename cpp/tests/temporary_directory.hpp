@@ -1,6 +1,8 @@
 #ifndef SST_TEST_TEMPORARY_DIRECTORY_HPP
 #define SST_TEST_TEMPORARY_DIRECTORY_HPP
 
+#include <unistd.h>
+
 #include <cerrno>
 #include <cstdlib>
 #include <filesystem>

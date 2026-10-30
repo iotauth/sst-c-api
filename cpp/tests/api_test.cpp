@@ -357,7 +357,7 @@ void test_session_key_list_addable() {
 }
 
 void test_session_key_list_wrapped_expiration() {
-    const int capacity = static_cast<int>(sst::MAX_SESSION_KEY);
+    const auto capacity = static_cast<int>(sst::MAX_SESSION_KEY);
     SessionKeyList list;
     const auto check_order = [&list](uint64_t oldest_id, int count) {
         CHECK(list.size() == count);

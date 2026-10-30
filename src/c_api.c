@@ -72,10 +72,13 @@ SST_ctx_t* init_SST(const char* config_path) {
 }
 
 session_key_list_t* init_empty_session_key_list(void) {
-    session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
-    session_key_list->num_key = 0;
-    session_key_list->rear_idx = 0;
-    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
+    session_key_list_t* session_key_list = calloc(1, sizeof(*session_key_list));
+    if (session_key_list == NULL) return NULL;
+    session_key_list->s_key = calloc(MAX_SESSION_KEY, sizeof(session_key_t));
+    if (session_key_list->s_key == NULL) {
+        free(session_key_list);
+        return NULL;
+    }
     return session_key_list;
 }
 

@@ -437,7 +437,7 @@ void test_session_key_resp_message() {
 
     // WITH_DIST_KEY: the encrypted distribution key comes first.
     Bytes with_dist(512 + enc.size(), 0x33);
-    std::copy(enc.begin(), enc.end(), with_dist.begin() + 512);
+    std::copy_n(enc.begin(), enc.size(), with_dist.begin() + 512);
     SessionKeyRespMessage resp2(
         IoTSPMessage(MessageType::SESSION_KEY_RESP_WITH_DIST_KEY, with_dist),
         256);

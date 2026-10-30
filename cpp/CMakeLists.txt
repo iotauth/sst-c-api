@@ -106,6 +106,11 @@ target_link_libraries(protocol_test PRIVATE ${PROJECT_NAME} Threads::Threads)
 add_test(NAME protocol_test COMMAND protocol_test)
 set_tests_properties(protocol_test PROPERTIES TIMEOUT 30)
 
+add_executable(ipfs_test tests/ipfs_test.cpp)
+target_link_libraries(ipfs_test PRIVATE ${PROJECT_NAME})
+add_test(NAME ipfs_test COMMAND ipfs_test)
+set_tests_properties(ipfs_test PROPERTIES TIMEOUT 10)
+
 # Manual integration probe; requires a configured, running Auth server.
 add_executable(auth_connect_test EXCLUDE_FROM_ALL auth_connect_test.cpp)
 target_link_libraries(auth_connect_test PRIVATE ${PROJECT_NAME})
