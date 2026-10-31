@@ -237,27 +237,28 @@ static int physical_wifi_measure_parse(const char* challenge,
                                        const char* fallback_host,
                                        int fallback_port,
                                        wifi_measure_cfg* out) {
-    char co_obj[1024], method[64] = {0}, port_str[16] = {0};
+    char port_str[16] = {0};
     memset(out, 0, sizeof(*out));
     snprintf(out->host, sizeof(out->host), "%s",
              fallback_host ? fallback_host : "");
     out->port = fallback_port;
-    if (extract_json_object_value(challenge, "CO_LOCATION", co_obj,
-                                  sizeof(co_obj)) != 0 ||
-        parse_json_string_value(co_obj, "method", method, sizeof(method)) !=
-            0 ||
-        strcmp(method, "WIFI_RSSI"))
+    /* WIFI_RSSI is a PROXIMITY/MUTUAL method; its Auth-provisioned ssid/password
+     * live in the selected method's parameters in the verification plan. */
+    plan_json j;
+    int params = -1;
+    if (plan_check(challenge, "PROXIMITY", "WIFI_RSSI", "MUTUAL", &j, &params) !=
+            1 ||
+        params < 0)
         return -1;
-    char host[INET_ADDRSTRLEN] = {0};
-    if (parse_json_string_value(co_obj, "peer_host", host, sizeof(host)) == 0)
-        snprintf(out->host, sizeof(out->host), "%s", host);
-    if (parse_json_string_value(co_obj, "peer_port", port_str,
-                                sizeof(port_str)) == 0)
+    int host = plan_json_field(&j, params, "peer_host");
+    if (host >= 0) plan_json_name(&j, host, out->host, sizeof(out->host));
+    int port = plan_json_field(&j, params, "peer_port");
+    if (port >= 0 && plan_json_name(&j, port, port_str, sizeof(port_str)) == 0)
         out->port = atoi(port_str);
-    if (parse_json_string_value(co_obj, "ssid", out->ssid, sizeof(out->ssid)) !=
-            0 ||
-        parse_json_string_value(co_obj, "password", out->password,
-                                sizeof(out->password)) != 0 ||
+    if (plan_json_name(&j, plan_json_field(&j, params, "ssid"), out->ssid,
+                       sizeof(out->ssid)) != 0 ||
+        plan_json_name(&j, plan_json_field(&j, params, "password"),
+                       out->password, sizeof(out->password)) != 0 ||
         !out->ssid[0] || !out->password[0])
         return -1;
     return 0;
