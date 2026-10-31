@@ -114,6 +114,14 @@ static void physical_options_parse(int argc, char* argv[], int robot,
     o->co.wifi_timing_deadline_us = 0;
     o->co.wifi_timing_recv_timeout_us = 500000;
     o->co.wifi_measure_sock = -1;
+    o->co.ble_timing_mode = BLE_TIMING_MODE_DISABLED;
+    o->co.ble_timing_rounds = 20;
+    o->co.ble_timing_deadline_us = 0; /* set from measured BLE RTTs, not Wi-Fi's */
+    o->co.ble_timing_recv_timeout_us = 2000000;
+    o->co.ble_timing_psm = BT_LINK_DEFAULT_PSM;
+    o->co.ble_timing_interval_units = 6; /* 6 * 1.25 ms = 7.5 ms (requested) */
+    o->co.ble_measure_sock = -1;
+    o->co.ble_timing_negotiated_units = 0;
     o->temp_dev = "/dev/ttyUSB0";
     o->wifi_peer = "192.168.77.1";
     o->wifi_link_script = NULL;
@@ -181,6 +189,21 @@ static void physical_options_parse(int argc, char* argv[], int robot,
             o->co.wifi_timing_deadline_us = (uint64_t)strtoull(v, NULL, 10);
         else if (!strcmp(a, "--wifi-timing-recv-timeout-us"))
             o->co.wifi_timing_recv_timeout_us = (uint64_t)strtoull(v, NULL, 10);
+        else if (!strcmp(a, "--ble-timing-mode"))
+            o->co.ble_timing_mode =
+                !strcmp(v, "enforce")   ? BLE_TIMING_MODE_ENFORCE
+                : !strcmp(v, "measure") ? BLE_TIMING_MODE_MEASURE
+                                        : BLE_TIMING_MODE_DISABLED;
+        else if (!strcmp(a, "--ble-timing-rounds"))
+            o->co.ble_timing_rounds = (unsigned)atoi(v);
+        else if (!strcmp(a, "--ble-timing-deadline-us"))
+            o->co.ble_timing_deadline_us = (uint64_t)strtoull(v, NULL, 10);
+        else if (!strcmp(a, "--ble-timing-recv-timeout-us"))
+            o->co.ble_timing_recv_timeout_us = (uint64_t)strtoull(v, NULL, 10);
+        else if (!strcmp(a, "--ble-timing-psm"))
+            o->co.ble_timing_psm = (unsigned)strtoul(v, NULL, 0);
+        else if (!strcmp(a, "--ble-timing-interval-units"))
+            o->co.ble_timing_interval_units = (unsigned)atoi(v);
         else if (!strcmp(a, "--ultrasound-echo-test-delay-ms"))
             o->co.echo_test_delay_ms = (unsigned)atoi(v);
         else if (!strcmp(a, "--action-test-delay-ms")) {
@@ -417,6 +440,131 @@ static void physical_wifi_measure_cleanup(physical_options* o) {
     if (o->wifi_creds_file[0]) {
         unlink(o->wifi_creds_file);
         o->wifi_creds_file[0] = '\0';
+    }
+}
+
+/* True when this run requires BLE_RSSI with a timing mode other than disabled,
+ * so the separate BLE L2CAP measurement link must be established before the
+ * check. RSSI-only BLE_RSSI (disabled) needs no measurement link. */
+static int physical_requires_ble_timing(const physical_options* o) {
+    return o->co.require_method && !strcmp(o->co.require_method, "BLE_RSSI") &&
+           o->co.ble_timing_mode != BLE_TIMING_MODE_DISABLED;
+}
+
+/* BLE-measurement-link coordination over the authenticated control session,
+ * analogous to the Wi-Fi AP-ready handshake: the locker starts advertising and
+ * accepting an LE L2CAP channel and signals the robot; the robot then connects
+ * to the locker's LE address. The BLE link is kept separate from the
+ * handshake/control transport, so a relay bridging it adds its forwarding delay
+ * to the timing exchange. Establishing the link is not itself proximity or peer
+ * authentication; only the authenticated timing exchange over it counts. */
+#ifdef HAVE_BT_TRANSPORT
+#define PHYS_BLE_READY_PREFIX {'B', 'R', 'D', 'Y'}
+static int physical_ble_send_ready(SST_session_ctx_t* session) {
+    unsigned char msg[] = PHYS_BLE_READY_PREFIX;
+    return session_ctl_send(session, msg, sizeof(msg));
+}
+static int physical_ble_wait_ready(SST_session_ctx_t* session,
+                                   unsigned timeout_ms) {
+    static const unsigned char prefix[] = PHYS_BLE_READY_PREFIX;
+    unsigned char msg[sizeof(prefix)];
+    session_ctl_timeout saved;
+    if (session_ctl_timeout_set(session->sock, timeout_ms, &saved)) return -1;
+    int rc = session_ctl_recv(session, prefix, sizeof(prefix), msg, sizeof(msg),
+                              "ble ready");
+    session_ctl_timeout_restore(session->sock, &saved);
+    return rc;
+}
+#endif
+
+/* Locker: signal the robot over the control session, then advertise and accept
+ * the BLE L2CAP measurement link. Sets o->co.ble_measure_sock. @return 0/-1. */
+static int physical_ble_measure_setup_locker(physical_options* o,
+                                             SST_session_ctx_t* session) {
+#ifndef HAVE_BT_TRANSPORT
+    (void)o;
+    (void)session;
+    SST_print_error("BLE timing needs BlueZ support (HAVE_BT_TRANSPORT).");
+    return -1;
+#else
+    SST_print_log(
+        "BLE RSSI: advertising BLE L2CAP measurement link on PSM 0x%02x; "
+        "signaling the robot.",
+        o->co.ble_timing_psm);
+    if (physical_ble_send_ready(session)) {
+        SST_print_error("BLE RSSI: failed to send the BLE-ready signal.");
+        return -1;
+    }
+    int sock = bt_link_accept(o->co.ble_timing_psm);
+    if (sock < 0) {
+        SST_print_error("BLE RSSI: failed to accept the BLE measurement link.");
+        return -1;
+    }
+    SST_print_log("BLE RSSI: BLE measurement link accepted.");
+    o->co.ble_measure_sock = sock;
+    return 0;
+#endif
+}
+
+/* Robot: wait for the locker's BLE-ready signal, connect the BLE L2CAP
+ * measurement link to the locker's LE address (--bt-peer), request the
+ * connection interval, and record the negotiated value. @return 0/-1. */
+static int physical_ble_measure_setup_robot(physical_options* o,
+                                            SST_session_ctx_t* session) {
+#ifndef HAVE_BT_TRANSPORT
+    (void)o;
+    (void)session;
+    SST_print_error("BLE timing needs BlueZ support (HAVE_BT_TRANSPORT).");
+    return -1;
+#else
+    if (!o->bt_peer) {
+        SST_print_error(
+            "BLE RSSI: timing needs the locker's LE address (--bt-peer).");
+        return -1;
+    }
+    SST_print_log("BLE RSSI: waiting for the locker's BLE-ready signal.");
+    if (physical_ble_wait_ready(session, 60000)) {
+        SST_print_error("BLE RSSI: no BLE-ready signal from the locker.");
+        return -1;
+    }
+    int sock = -1;
+    for (int attempt = 0; attempt < 20 && sock < 0; ++attempt) {
+        sock = bt_link_connect(o->bt_peer, o->co.ble_timing_psm);
+        if (sock < 0) session_ctl_sleep_ms(500);
+    }
+    if (sock < 0) {
+        SST_print_error(
+            "BLE RSSI: failed to connect the BLE measurement link to %s.",
+            o->bt_peer);
+        return -1;
+    }
+    SST_print_log("BLE RSSI: BLE measurement link connected to %s.", o->bt_peer);
+    uint16_t got = 0;
+    if (ble_timing_request_interval(
+            sock, (uint16_t)o->co.ble_timing_interval_units, &got) == 0) {
+        o->co.ble_timing_negotiated_units = got;
+        SST_print_log(
+            "BLE RSSI: conn interval requested_units=%u negotiated_units=%u "
+            "requested_ms=%.2f negotiated_ms=%.2f",
+            o->co.ble_timing_interval_units, got,
+            o->co.ble_timing_interval_units * 1.25, got * 1.25);
+    } else {
+        o->co.ble_timing_negotiated_units = 0;
+        SST_print_log(
+            "BLE RSSI: conn interval requested_units=%u negotiated=unknown "
+            "(update/readback failed)",
+            o->co.ble_timing_interval_units);
+    }
+    o->co.ble_measure_sock = sock;
+    return 0;
+#endif
+}
+
+/* Closes the BLE measurement link. */
+static void physical_ble_measure_cleanup(physical_options* o) {
+    if (o->co.ble_measure_sock >= 0) {
+        close(o->co.ble_measure_sock);
+        o->co.ble_measure_sock = -1;
     }
 }
 

@@ -212,6 +212,12 @@ int main(int argc, char* argv[]) {
         physical_wifi_measure_setup_locker(&opts, session_ctx)) {
         SST_print_error_exit("Failed to set up the measurement Wi-Fi link.");
     }
+    // BLE_RSSI with timing: advertise/accept the separate BLE L2CAP measurement
+    // link and signal the robot (separate from the TCP handshake/control).
+    if (physical_requires_ble_timing(&opts) &&
+        physical_ble_measure_setup_locker(&opts, session_ctx)) {
+        SST_print_error_exit("Failed to set up the BLE measurement link.");
+    }
 
     bench_stage(&bench, "cooperative_verification");
     bench_mark(&bench, &bench.cooperative_start_us);
@@ -219,6 +225,7 @@ int main(int argc, char* argv[]) {
         verify_cooperative(session_ctx, 0, &opts.co, &open_evidence, &bench);
     bench_mark(&bench, &bench.cooperative_end_us);
     physical_wifi_measure_cleanup(&opts);
+    physical_ble_measure_cleanup(&opts);
     if (!co_passed) {
         SST_print_log("Locker: cooperative verification did not pass here.");
     }

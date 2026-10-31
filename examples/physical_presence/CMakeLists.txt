@@ -103,7 +103,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND BLUETOOTH_LIB AND BLUETOOTH_INCLUDE)
   foreach(target robot locker)
     target_sources(${target} PRIVATE ../../bluetooth_com/bt_link.c
                                      ../../bluetooth_com/bt_sst_handshake.c
-                                     ../../bluetooth_com/bt_adv_radio.c)
+                                     ../../bluetooth_com/bt_adv_radio.c
+                                     ../../bluetooth_com/ble_timing.c)
     target_compile_definitions(${target} PRIVATE HAVE_BT_TRANSPORT)
     target_link_libraries(${target} ${BLUETOOTH_LIB})
   endforeach()

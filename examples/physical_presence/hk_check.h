@@ -5,6 +5,8 @@
 
 #include "../../ambient_audio_com/ambient_audio.h"
 #include "../../bluetooth_com/ble_adv_rssi.h"
+#include "../../bluetooth_com/ble_timing.h"
+#include "../../bluetooth_com/bt_link.h"
 #include "../../physical_com/freshness.h"
 #include "../../physical_com/hk.h"
 #include "../../physical_com/rssi_check.h"
@@ -66,6 +68,27 @@ typedef struct {
      * brings the link up and establishes it (locker accepts, robot connects)
      * before the check. < 0 means no measurement link was set up. */
     int wifi_measure_sock;
+    /* BLE_RSSI only: an authenticated response-time challenge--response over a
+     * separate BLE LE L2CAP measurement link, added after the advertising-RSSI
+     * sampling (see ble_timing.h). mode 0 = disabled (default, unchanged
+     * behavior). Mirrors the Wi-Fi timing options; these parameters come from
+     * the command line, consistent with the Wi-Fi timing path (not yet from the
+     * plan). The BLE deadline must be set from measured BLE response times, not
+     * copied from the Wi-Fi deadline. */
+    int ble_timing_mode;
+    unsigned ble_timing_rounds;
+    uint64_t ble_timing_deadline_us;
+    uint64_t ble_timing_recv_timeout_us;
+    unsigned ble_timing_psm;            /* LE L2CAP PSM for the measurement link */
+    unsigned ble_timing_interval_units; /* requested conn interval, 1.25 ms units */
+    /* BLE_RSSI only, set at run time (not from the plan): the BLE L2CAP
+     * measurement link's socket, separate from the handshake/control transport.
+     * The caller establishes it (locker accepts/advertises, robot connects to
+     * the locker's bdaddr) before the check. < 0 means none was set up. The BLE
+     * link being established is NOT by itself proximity or peer authentication;
+     * only the authenticated timing exchange over it counts. */
+    int ble_measure_sock;
+    uint16_t ble_timing_negotiated_units; /* negotiated conn interval; 0 unknown */
     /* Benchmark only: when set, the selected method writes its own
      * observations here as one JSON object, after its exchange. */
     char* observations;
@@ -436,6 +459,51 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
                   peer_report_name(r.peer_reported, r.peer_reported_pass),
                   run_result_name(rc));
     set_evidence(ev, rc, r.observed_not_before_us, r.collection_completed_us);
+    /* Optional authenticated response-time check over a separate BLE LE L2CAP
+     * measurement link, added after the advertising-RSSI sampling. In enforce
+     * mode it is ANDed with the RSSI outcome; in measure mode it is recorded
+     * only. The measurement link is established by the caller and is independent
+     * of the handshake/control transport, so a relay bridging the BLE link adds
+     * its forwarding delay here. The RSSI observation window is kept as-is: the
+     * timing ran after it and must not make the RSSI look more recent. */
+    ble_timing_result tr;
+    memset(&tr, 0, sizeof(tr));
+    int trc = 1; /* disabled: no timing constraint on the verdict */
+    const char* tmode = o->ble_timing_mode == BLE_TIMING_MODE_ENFORCE ? "enforce"
+                        : o->ble_timing_mode == BLE_TIMING_MODE_MEASURE
+                            ? "measure"
+                            : "disabled";
+    if (o->ble_timing_mode != BLE_TIMING_MODE_DISABLED) {
+        if (o->ble_measure_sock < 0) {
+            SST_print_error(
+                "BLE RSSI: timing is required but no BLE measurement link was "
+                "established; refusing (no silent RSSI-only fallback).");
+            set_evidence(ev, -1, r.observed_not_before_us,
+                         r.collection_completed_us);
+            return -1;
+        }
+        ble_timing_config tc = {o->ble_timing_mode, o->ble_timing_rounds,
+                                o->ble_timing_deadline_us,
+                                o->ble_timing_recv_timeout_us, 0};
+        trc = ble_timing_run(o->ble_measure_sock, &session->s_key, initiator,
+                             initiator ? "initiator" : "responder", &tc, &tr);
+        SST_print_log(
+            "BLE TIMING: mode=%s rounds=%u valid=%u within_deadline=%u "
+            "median_rtt_us=%llu deadline_us=%llu negotiated_interval_units=%u "
+            "local=%s result=%s",
+            tmode, o->ble_timing_rounds, tr.valid, tr.within_deadline,
+            (unsigned long long)tr.median_rtt_us,
+            (unsigned long long)o->ble_timing_deadline_us,
+            o->ble_timing_negotiated_units, tr.local_pass ? "PASS" : "FAIL",
+            run_result_name(trc));
+        if (o->ble_timing_mode == BLE_TIMING_MODE_ENFORCE) {
+            int combined =
+                (rc < 0 || trc < 0) ? -1 : (rc == 1 && trc == 1) ? 1 : 0;
+            set_evidence(ev, combined, r.observed_not_before_us,
+                         r.collection_completed_us);
+            rc = combined;
+        }
+    }
     size_t off = 0;
     obs_add(o, &off,
             "{\"mechanism\": \"BLE_RSSI\", \"role\": \"%s\", "
@@ -443,11 +511,20 @@ static int verify_ble_rssi(SST_session_ctx_t* session, int initiator,
             "\"median_rssi_dbm\": %.1f, \"min_rssi_dbm\": %d, "
             "\"timeout_ms\": %u, \"nominal_advertising_interval_ms\": 100, "
             "\"peer_reported\": %s, \"peer_reported_pass\": %s, "
-            "\"peer_median_rssi_dbm\": %d}",
+            "\"peer_median_rssi_dbm\": %d, \"timing_mode\": \"%s\", "
+            "\"timing_rounds\": %u, \"timing_valid\": %u, "
+            "\"timing_within_deadline\": %u, \"timing_median_rtt_us\": %llu, "
+            "\"timing_deadline_us\": %llu, "
+            "\"timing_negotiated_interval_units\": %u, "
+            "\"timing_result\": \"%s\"}",
             initiator ? "initiator" : "responder", c->samples, r.samples,
             r.median_rssi_dbm, c->min_rssi_dbm, c->timeout_ms,
             r.peer_reported ? "true" : "false",
-            r.peer_reported_pass ? "true" : "false", r.peer_median_rssi_dbm);
+            r.peer_reported_pass ? "true" : "false", r.peer_median_rssi_dbm,
+            tmode, o->ble_timing_rounds, tr.valid, tr.within_deadline,
+            (unsigned long long)tr.median_rtt_us,
+            (unsigned long long)o->ble_timing_deadline_us,
+            o->ble_timing_negotiated_units, run_result_name(trc));
     return rc;
 #else
     (void)session;
@@ -594,10 +671,10 @@ static int verify_uwb(SST_session_ctx_t* session, int initiator,
     return rc;
 }
 
-/* Localizes the requester against the target's fixed anchors. The requester
- * (initiator) ranges every anchor with its one tag, trilaterates and judges;
- * the target (responder) drives its anchor boards and takes the requester's
- * authenticated verdict as its own evidence. */
+/* Localizes the requester against the target's fixed anchors. The target
+ * initiates DS-TWR from each anchor board against the requester's tag (which
+ * responds), collects the per-anchor distances, trilaterates and judges; the
+ * requester takes the target's authenticated verdict as its own evidence. */
 static int verify_uwb_position(SST_session_ctx_t* session, int initiator,
                                const co_location_options* o,
                                const uwb_locate_config* c,
