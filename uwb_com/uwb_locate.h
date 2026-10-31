@@ -10,14 +10,19 @@
  * TCP SST session after its handshake. Unlike the mutual UWB proximity check,
  * this localizes the requester: the target carries several fixed anchors (one
  * UWB radio each, at known coordinates) and the requester carries one tag.
- * The requester ranges to every anchor by FiRa DS-TWR, trilaterates its own
- * (x, y) in the anchors' plane, and PASSES only when that position is within
- * tolerance of the expected point Auth put in the plan.
  *
- * Only the requester measures and judges; the target just makes its anchors
- * respond. Each anchor uses a FiRa session ID and static-STS vupper64 derived
- * from the SST session key and the anchor index, so an anchor ranges only with
- * a tag holding the same session key.
+ * The target measures and judges: each of its anchors initiates FiRa DS-TWR
+ * against the requester's tag (which responds), so the target obtains the
+ * per-anchor distances on its own boards, trilaterates the requester's (x, y)
+ * in the anchors' plane, and PASSES only when that position is within tolerance
+ * of the expected point Auth put in the plan. The requester never measures or
+ * judges; it takes the target's authenticated verdict as its own evidence. The
+ * target thus verifies the position from its own observations rather than
+ * trusting a value the requester computed.
+ *
+ * Each anchor uses a FiRa session ID and static-STS vupper64 derived from the
+ * SST session key and the anchor index, so an anchor ranges only with a tag
+ * holding the same session key.
  *
  * Portable: the radios are passed in, so this builds without the hardware. */
 
@@ -62,17 +67,18 @@ int uwb_locate_session_params(const session_key_t* key, unsigned anchor_index,
 int uwb_locate_trilaterate(const uwb_locate_config* c, const int* dist_cm,
                            int* x_cm, int* y_cm);
 
-/* Requester side: ranges every anchor over `tag_radio`, trilaterates, and
- * reports its verdict to the target. @return 1 pass, 0 completed without
- * passing, -1 aborted. */
+/* Requester side: responds over `tag_radio` to each anchor in turn while the
+ * target ranges it, then takes the target's authenticated verdict and solved
+ * position from the DONE report into *r (only `solved`, `local_pass`, `x_cm`,
+ * `y_cm`, `error_cm` and the observation window are filled; this side does not
+ * measure). @return 1 when the target reported a pass, 0 completed without one,
+ * -1 aborted. */
 int uwb_locate_run_tag(SST_session_ctx_t* session, const uwb_locate_config* c,
                        const uwb_range_radio* tag_radio, uwb_locate_result* r);
-/* Target side: makes anchor i respond over anchor_radios[i] while the
- * requester ranges it, then takes the requester's authenticated verdict and
- * solved position from its DONE report into *r (only `solved`, `local_pass`,
- * `x_cm`, `y_cm`, `error_cm` and the observation window are filled; this side
- * does not measure). @return 1 when the requester reported a pass, 0 when it
- * completed without one, -1 on abort. */
+/* Target side: for each anchor, has the tag respond, ranges it over
+ * anchor_radios[i], collects the per-anchor medians, trilaterates and judges,
+ * then reports its verdict and solved position to the requester. @return 1
+ * pass, 0 completed without passing, -1 aborted. */
 int uwb_locate_run_anchors(SST_session_ctx_t* session,
                            const uwb_locate_config* c,
                            const uwb_range_radio* const* anchor_radios,

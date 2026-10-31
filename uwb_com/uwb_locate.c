@@ -125,9 +125,15 @@ int uwb_locate_trilaterate(const uwb_locate_config* c, const int* dist_cm,
 }
 
 /* Control messages inside secure messages: 'U' 'P' version type | body.
- * START/READY carry no body; DONE carries verdict | x | y | error (i32 BE). */
-enum { MSG_START = 1, MSG_READY = 2, MSG_DONE = 3 };
+ * The target (anchors) drives the sequence and measures: for each anchor it
+ * asks the tag to respond (START), waits until the tag is listening (READY),
+ * ranges that anchor from its own board, then releases the tag (NEXT). After
+ * the last anchor it trilaterates and sends its verdict and solved point
+ * (DONE). START/READY/NEXT carry the anchor index (1 byte); DONE carries
+ * verdict | x | y | error (i32 BE). */
+enum { MSG_START = 1, MSG_READY = 2, MSG_NEXT = 3, MSG_DONE = 4 };
 #define MSG_HEADER 4
+#define MSG_IDX_SIZE (MSG_HEADER + 1)
 #define MSG_DONE_SIZE (MSG_HEADER + 1 + 4 + 4 + 4)
 /* Beyond the ranging windows: radio start-up and control I/O. */
 #define CONTROL_SLACK_MS 15000u
@@ -156,6 +162,14 @@ static int recv_ctl(SST_session_ctx_t* s, unsigned char type, unsigned char* m,
                                               type};
     return session_ctl_recv(s, prefix, sizeof(prefix), m, len, "UWB locate");
 }
+/* Like recv_ctl but also matches the anchor index, so a message meant for one
+ * anchor cannot be mistaken for another's. */
+static int recv_ctl_idx(SST_session_ctx_t* s, unsigned char type,
+                        unsigned char idx, unsigned char* m, unsigned len) {
+    const unsigned char prefix[MSG_IDX_SIZE] = {'U', 'P', UWB_LOCATE_VERSION,
+                                                type, idx};
+    return session_ctl_recv(s, prefix, sizeof(prefix), m, len, "UWB locate");
+}
 
 static int cmp_int(const void* a, const void* b) {
     int x = *(const int*)a, y = *(const int*)b;
@@ -167,56 +181,47 @@ int uwb_locate_run_tag(SST_session_ctx_t* session, const uwb_locate_config* c,
     if (!r) return -1;
     memset(r, 0, sizeof(*r));
     if (!session || session->sock < 0 || !uwb_locate_config_valid(c) || !tag ||
-        !tag->initiate || !tag->stop)
+        !tag->respond || !tag->stop)
         return -1;
+    /* Each NEXT follows one anchor's whole ranging window, so a single read on
+     * the session may wait that long. */
     session_ctl_timeout saved;
-    if (session_ctl_timeout_set(session->sock, CONTROL_SLACK_MS, &saved))
+    if (session_ctl_timeout_set(session->sock, c->timeout_ms + CONTROL_SLACK_MS,
+                                &saved))
         return -1;
     int rc = -1;
-    if (send_ctl(session, MSG_START, NULL, 0)) goto out;
-    unsigned char m[MSG_DONE_SIZE];
-    if (recv_ctl(session, MSG_READY, m, MSG_HEADER)) goto out;
-
     if (freshness_now_us(&r->observed_not_before_us)) goto out;
-    int all_ranged = 1;
+    /* The tag only responds: for each anchor it starts responding, tells the
+     * target it is listening (READY), and keeps responding until the target has
+     * finished ranging that anchor (NEXT). It never measures or judges. */
     for (int i = 0; i < c->n_anchors; ++i) {
         uwb_range_session params;
-        int dist[UWB_RANGE_MAX_SAMPLES];
-        if (uwb_locate_session_params(&session->s_key, (unsigned)i, &params))
+        unsigned char idx = (unsigned char)i, m[MSG_IDX_SIZE];
+        if (recv_ctl_idx(session, MSG_START, idx, m, MSG_IDX_SIZE) ||
+            uwb_locate_session_params(&session->s_key, (unsigned)i, &params))
             goto out;
-        int n = tag->initiate(tag->ctx, &params, c->samples, c->timeout_ms,
-                              dist);
+        if (tag->respond(tag->ctx, &params)) {
+            SST_print_error("UWB locate: tag could not respond for anchor %d.",
+                            i);
+            goto out;
+        }
+        int bad = send_ctl(session, MSG_READY, &idx, 1) ||
+                  recv_ctl_idx(session, MSG_NEXT, idx, m, MSG_IDX_SIZE);
         tag->stop(tag->ctx);
-        if (n < 0 || n > (int)c->samples) {
-            SST_print_error("UWB locate: ranging anchor %d failed.", i);
-            goto out;
-        }
-        if (n == (int)c->samples) {
-            qsort(dist, (size_t)n, sizeof(*dist), cmp_int);
-            r->dist_cm[i] = n % 2 ? dist[n / 2]
-                                  : (dist[n / 2 - 1] + dist[n / 2]) / 2;
-            r->ranged[i] = 1;
-        } else {
-            all_ranged = 0;
-        }
+        if (bad) goto out;
     }
+    unsigned char d[MSG_DONE_SIZE];
+    if (recv_ctl(session, MSG_DONE, d, MSG_DONE_SIZE)) goto out;
     if (freshness_now_us(&r->collection_completed_us)) goto out;
-
-    if (all_ranged &&
-        uwb_locate_trilaterate(c, r->dist_cm, &r->x_cm, &r->y_cm) == 0) {
-        r->solved = 1;
-        double dx = r->x_cm - c->expected_x_cm, dy = r->y_cm - c->expected_y_cm;
-        r->error_cm = (int)lround(sqrt(dx * dx + dy * dy));
-        r->local_pass = r->error_cm <= (int)c->tolerance_cm;
-    }
-
-    unsigned char body[1 + 4 + 4 + 4] = {(unsigned char)r->local_pass};
-    put_i32(body + 1, r->x_cm);
-    put_i32(body + 5, r->y_cm);
-    put_i32(body + 9, r->error_cm);
-    if (send_ctl(session, MSG_DONE, body, sizeof(body))) goto out;
-    rc = r->local_pass ? 1 : 0;
+    /* The target's authenticated verdict and solved position. */
+    r->local_pass = d[MSG_HEADER] ? 1 : 0;
+    r->x_cm = get_i32(d + MSG_HEADER + 1);
+    r->y_cm = get_i32(d + MSG_HEADER + 5);
+    r->error_cm = get_i32(d + MSG_HEADER + 9);
+    r->solved = r->local_pass; /* a pass implies the target solved a point */
+    rc = r->local_pass;
 out:
+    tag->stop(tag->ctx);
     session_ctl_timeout_restore(session->sock, &saved);
     return rc;
 }
@@ -231,44 +236,59 @@ int uwb_locate_run_anchors(SST_session_ctx_t* session,
         !anchor_radios)
         return -1;
     for (int i = 0; i < c->n_anchors; ++i)
-        if (!anchor_radios[i] || !anchor_radios[i]->respond ||
+        if (!anchor_radios[i] || !anchor_radios[i]->initiate ||
             !anchor_radios[i]->stop)
             return -1;
-    /* The tag ranges every anchor in turn before reporting, so this side may
-     * wait that whole span for DONE. */
+    /* Each anchor ranges for up to timeout_ms; READY from the tag is quick. */
     session_ctl_timeout saved;
-    if (session_ctl_timeout_set(session->sock,
-                                c->timeout_ms * (unsigned)c->n_anchors +
-                                    CONTROL_SLACK_MS,
+    if (session_ctl_timeout_set(session->sock, c->timeout_ms + CONTROL_SLACK_MS,
                                 &saved))
         return -1;
-    int rc = -1, started = 0;
-    unsigned char m[MSG_DONE_SIZE];
-    if (recv_ctl(session, MSG_START, m, MSG_HEADER)) goto out;
+    int rc = -1, all_ranged = 1;
     if (freshness_now_us(&r->observed_not_before_us)) goto out;
-    for (; started < c->n_anchors; ++started) {
+    /* This side measures: for each anchor it asks the tag to respond (START),
+     * waits until the tag is listening (READY), initiates DS-TWR from that
+     * anchor's own board, then releases the tag (NEXT). */
+    for (int i = 0; i < c->n_anchors; ++i) {
         uwb_range_session params;
-        const uwb_range_radio* a = anchor_radios[started];
-        if (uwb_locate_session_params(&session->s_key, (unsigned)started,
-                                      &params) ||
-            a->respond(a->ctx, &params)) {
-            SST_print_error("UWB locate: anchor %d could not respond.", started);
+        int dist[UWB_RANGE_MAX_SAMPLES];
+        const uwb_range_radio* a = anchor_radios[i];
+        unsigned char idx = (unsigned char)i, m[MSG_IDX_SIZE];
+        if (uwb_locate_session_params(&session->s_key, (unsigned)i, &params) ||
+            send_ctl(session, MSG_START, &idx, 1) ||
+            recv_ctl_idx(session, MSG_READY, idx, m, MSG_IDX_SIZE))
+            goto out;
+        int n = a->initiate(a->ctx, &params, c->samples, c->timeout_ms, dist);
+        a->stop(a->ctx);
+        if (n < 0 || n > (int)c->samples) {
+            SST_print_error("UWB locate: ranging anchor %d failed.", i);
             goto out;
         }
+        if (n == (int)c->samples) {
+            qsort(dist, (size_t)n, sizeof(*dist), cmp_int);
+            r->dist_cm[i] = n % 2 ? dist[n / 2]
+                                  : (dist[n / 2 - 1] + dist[n / 2]) / 2;
+            r->ranged[i] = 1;
+        } else {
+            all_ranged = 0;
+        }
+        if (send_ctl(session, MSG_NEXT, &idx, 1)) goto out;
     }
-    if (send_ctl(session, MSG_READY, NULL, 0) ||
-        recv_ctl(session, MSG_DONE, m, MSG_DONE_SIZE))
-        goto out;
     if (freshness_now_us(&r->collection_completed_us)) goto out;
-    /* The requester's authenticated verdict and solved position. */
-    r->local_pass = m[MSG_HEADER] ? 1 : 0;
-    r->x_cm = get_i32(m + MSG_HEADER + 1);
-    r->y_cm = get_i32(m + MSG_HEADER + 5);
-    r->error_cm = get_i32(m + MSG_HEADER + 9);
-    r->solved = r->local_pass; /* a pass implies the requester solved a point */
-    rc = r->local_pass;
+    if (all_ranged &&
+        uwb_locate_trilaterate(c, r->dist_cm, &r->x_cm, &r->y_cm) == 0) {
+        r->solved = 1;
+        double dx = r->x_cm - c->expected_x_cm, dy = r->y_cm - c->expected_y_cm;
+        r->error_cm = (int)lround(sqrt(dx * dx + dy * dy));
+        r->local_pass = r->error_cm <= (int)c->tolerance_cm;
+    }
+    unsigned char body[1 + 4 + 4 + 4] = {(unsigned char)r->local_pass};
+    put_i32(body + 1, r->x_cm);
+    put_i32(body + 5, r->y_cm);
+    put_i32(body + 9, r->error_cm);
+    if (send_ctl(session, MSG_DONE, body, sizeof(body))) goto out;
+    rc = r->local_pass ? 1 : 0;
 out:
-    for (int i = 0; i < started; ++i) anchor_radios[i]->stop(anchor_radios[i]->ctx);
     session_ctl_timeout_restore(session->sock, &saved);
     return rc;
 }

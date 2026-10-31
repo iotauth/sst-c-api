@@ -14,12 +14,13 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-/* Shared "air": each responding anchor registers its FiRa params and the
- * distance the tag should measure to it. */
+/* Shared "air": the tag registers the FiRa params it is currently listening
+ * with; each anchor that initiates matches those params and ranges at its own
+ * fixed distance to the (chosen) true tag position. */
 typedef struct {
     pthread_mutex_t lock;
-    int in_use[UWB_LOCATE_MAX_ANCHORS];
-    uwb_range_session params[UWB_LOCATE_MAX_ANCHORS];
+    int tag_listening;
+    uwb_range_session tag_params;
     int distance_cm[UWB_LOCATE_MAX_ANCHORS];
     int fail_initiate, fail_respond, short_anchor; /* -1 = none */
 } air;
@@ -31,41 +32,44 @@ typedef struct {
 
 static air shared_air;
 
-static int anchor_respond(void* ctx, const uwb_range_session* s) {
-    radio_ctx* rc = ctx;
-    if (rc->air->fail_respond) return -1;
-    pthread_mutex_lock(&rc->air->lock);
-    rc->air->params[rc->index] = *s;
-    rc->air->in_use[rc->index] = 1;
-    pthread_mutex_unlock(&rc->air->lock);
+/* Tag side: responds, registering the params it is now listening with. */
+static int tag_respond(void* ctx, const uwb_range_session* s) {
+    air* a = ctx;
+    if (a->fail_respond) return -1;
+    pthread_mutex_lock(&a->lock);
+    a->tag_params = *s;
+    a->tag_listening = 1;
+    pthread_mutex_unlock(&a->lock);
     return 0;
 }
-static int anchor_stop(void* ctx) {
-    radio_ctx* rc = ctx;
-    pthread_mutex_lock(&rc->air->lock);
-    rc->air->in_use[rc->index] = 0;
-    pthread_mutex_unlock(&rc->air->lock);
+static int tag_stop(void* ctx) {
+    air* a = ctx;
+    pthread_mutex_lock(&a->lock);
+    a->tag_listening = 0;
+    pthread_mutex_unlock(&a->lock);
     return 0;
 }
 
-static int tag_initiate(void* ctx, const uwb_range_session* s, unsigned samples,
-                        unsigned timeout_ms, int* distances_cm) {
-    air* a = ctx;
+/* Anchor side: initiates against the listening tag, returning ranges at this
+ * anchor's distance when the tag is listening with matching params. */
+static int anchor_initiate(void* ctx, const uwb_range_session* s,
+                           unsigned samples, unsigned timeout_ms,
+                           int* distances_cm) {
+    radio_ctx* rc = ctx;
+    air* a = rc->air;
     (void)timeout_ms;
     if (a->fail_initiate) return -1;
     pthread_mutex_lock(&a->lock);
-    int slot = -1;
-    for (int i = 0; i < UWB_LOCATE_MAX_ANCHORS; ++i)
-        if (a->in_use[i] && !memcmp(&a->params[i], s, sizeof(*s))) slot = i;
-    int dist = slot >= 0 ? a->distance_cm[slot] : 0;
-    int shortfall = slot >= 0 && slot == a->short_anchor;
+    int matched = a->tag_listening && !memcmp(&a->tag_params, s, sizeof(*s));
+    int dist = a->distance_cm[rc->index];
+    int shortfall = rc->index == a->short_anchor;
     pthread_mutex_unlock(&a->lock);
-    if (slot < 0) return 0;
+    if (!matched) return 0;
     unsigned n = shortfall ? samples - 1 : samples;
     for (unsigned i = 0; i < n; ++i) distances_cm[i] = dist + (int)(i % 3) - 1;
     return (int)n;
 }
-static int tag_stop(void* ctx) {
+static int anchor_stop(void* ctx) {
     (void)ctx;
     return 0;
 }
@@ -86,7 +90,7 @@ static void set_distances(const uwb_locate_config* c, double tx, double ty) {
 
 static void* run_tag(void* ctx) {
     endpoint* e = ctx;
-    uwb_range_radio radio = {&shared_air, NULL, tag_initiate, tag_stop};
+    uwb_range_radio radio = {&shared_air, tag_respond, NULL, tag_stop};
     e->rc = uwb_locate_run_tag(&e->session, &e->config, &radio, &e->result);
     if (e->rc < 0) shutdown(e->session.sock, SHUT_RDWR);
     return NULL;
@@ -100,8 +104,8 @@ static void* run_anchors(void* ctx) {
     const uwb_range_radio* radios[UWB_LOCATE_MAX_ANCHORS];
     for (int i = 0; i < e->config.n_anchors; ++i) {
         anchor_ctx[i] = (radio_ctx){&shared_air, i};
-        anchor_radio[i] = (uwb_range_radio){&anchor_ctx[i], anchor_respond, NULL,
-                                            anchor_stop};
+        anchor_radio[i] = (uwb_range_radio){&anchor_ctx[i], NULL,
+                                            anchor_initiate, anchor_stop};
         radios[i] = &anchor_radio[i];
     }
     e->rc = uwb_locate_run_anchors(&e->session, &e->config, radios, &e->result);
@@ -236,22 +240,23 @@ int main(void) {
     init(e, &c);
     set_distances(&c, 107, 41);
     exchange(e);
-    assert(e[0].rc == 1 && e[1].rc == 1); /* anchors take the tag's verdict */
-    assert(e[0].result.solved && e[0].result.local_pass);
-    assert(abs(e[0].result.x_cm - 107) <= 3 &&
-           abs(e[0].result.y_cm - 41) <= 3 && e[0].result.error_cm <= 15);
-    /* The anchor side reports the tag's authenticated position and verdict. */
-    assert(e[1].result.local_pass &&
-           e[1].result.x_cm == e[0].result.x_cm &&
-           e[1].result.error_cm == e[0].result.error_cm);
+    assert(e[0].rc == 1 && e[1].rc == 1);
+    /* The anchors (e[1]) measured, trilaterated and judged. */
+    assert(e[1].result.solved && e[1].result.local_pass);
+    assert(abs(e[1].result.x_cm - 107) <= 3 &&
+           abs(e[1].result.y_cm - 41) <= 3 && e[1].result.error_cm <= 15);
+    /* The tag (e[0]) takes the anchors' authenticated position and verdict. */
+    assert(e[0].result.local_pass &&
+           e[0].result.x_cm == e[1].result.x_cm &&
+           e[0].result.error_cm == e[1].result.error_cm);
 
     /* Tag far from the expected point: solved but out of tolerance. */
     init(e, &c);
     set_distances(&c, 10, 10);
     exchange(e);
     assert(e[0].rc == 0 && e[1].rc == 0);
-    assert(e[0].result.solved && !e[0].result.local_pass &&
-           e[0].result.error_cm > 15);
+    assert(e[1].result.solved && !e[1].result.local_pass &&
+           e[1].result.error_cm > 15);
 
     /* One anchor returns too few ranges: completed without a position. */
     init(e, &c);
@@ -259,8 +264,8 @@ int main(void) {
     shared_air.short_anchor = 1;
     exchange(e);
     assert(e[0].rc == 0 && e[1].rc == 0);
-    assert(!e[0].result.solved && !e[0].result.ranged[1] &&
-           e[0].result.ranged[0]);
+    assert(!e[1].result.solved && !e[1].result.ranged[1] &&
+           e[1].result.ranged[0]);
 
     /* Radio failures abort, and the peer is not left waiting. */
     init(e, &c);
