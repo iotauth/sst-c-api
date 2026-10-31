@@ -109,37 +109,62 @@ int execute_command_and_save_result(char* file_name, unsigned char* hash_value,
     return cid_len;
 }
 
+// Shared by encryption and decryption so all read failures close the stream.
+static unsigned char* read_file_contents(const char* path, int64_t* size) {
+    FILE* fin = fopen(path, "r");
+    if (fin == NULL) return NULL;
+    int64_t bufsize = file_size_return(fin);
+    if (bufsize < 0) {
+        SST_print_error("Failed file_size_return()");
+        fclose(fin);
+        return NULL;
+    }
+    unsigned char* file_buf = NULL;
+    file_buf = malloc(sizeof(char) * (bufsize + 1));
+    if (file_buf == NULL) {
+        fclose(fin);
+        return NULL;
+    }
+    if (get_file_content(fin, file_buf, bufsize) < 0) {
+        SST_print_error("Failed get_file_content()");
+        free(file_buf);
+        fclose(fin);
+        return NULL;
+    }
+    fclose(fin);
+    *size = bufsize;
+    return file_buf;
+}
+
 int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
                         char* my_file_path, unsigned char* hash_value,
                         estimate_time_t* estimate_time) {
     struct timeval encrypt_start, encrypt_end;
     gettimeofday(&encrypt_start, NULL);
-    FILE* fin = fopen(my_file_path, "r");
-    int64_t bufsize = file_size_return(fin);
-    if (bufsize < 0) {
-        SST_print_error("Failed file_size_return()");
-    }
-    unsigned char* file_buf = NULL;
-    file_buf = malloc(sizeof(char) * (bufsize + 1));
-    if (get_file_content(fin, file_buf, bufsize) < 0) {
-        SST_print_error("Failed get_file_content()");
-        free(file_buf);
-        return -1;
-    }
-    fclose(fin);
+    int64_t bufsize;
+    unsigned char* file_buf = read_file_contents(my_file_path, &bufsize);
+    if (file_buf == NULL) return -1;
 
     unsigned char iv[AES_128_CBC_IV_SIZE];
     int provider_len = sizeof(ctx->config.name);
     unsigned int encrypted_length =
         (((bufsize) / AES_128_CBC_IV_SIZE) + 1) * AES_128_CBC_IV_SIZE;
     unsigned char* encrypted = (unsigned char*)malloc(encrypted_length);
+    if (encrypted == NULL) {
+        free(file_buf);
+        return -1;
+    }
     if (generate_nonce(AES_128_CBC_IV_SIZE, iv) < 0) {
         SST_print_error("Failed generate_nonce().");
+        free(file_buf);
+        free(encrypted);
         return -1;
     }
     if (encrypt_AES(file_buf, bufsize, s_key->cipher_key, iv, s_key->enc_mode,
                     encrypted, &encrypted_length) < 0) {
         SST_print_error("Encryption failed!");
+        free(file_buf);
+        free(encrypted);
         return -1;
     }
     free(file_buf);
@@ -151,8 +176,17 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
 
     // File descriptor for the encrypted file.
     FILE* fenc = fopen(file_name_buffer, "w");
+    if (fenc == NULL) {
+        free(encrypted);
+        return -1;
+    }
     unsigned char* enc_save = (unsigned char*)malloc(
         encrypted_length + 1 + AES_128_CBC_IV_SIZE + 1 + provider_len);
+    if (enc_save == NULL) {
+        free(encrypted);
+        fclose(fenc);
+        return -1;
+    }
     enc_save[0] = provider_len;
     memcpy(enc_save + 1, ctx->config.name, provider_len);
     enc_save[provider_len + 1] = AES_128_CBC_IV_SIZE;
@@ -179,23 +213,16 @@ int file_encrypt_upload(session_key_t* s_key, SST_ctx_t* ctx,
 }
 
 int file_decrypt_save(session_key_t s_key, char* file_name) {
-    FILE* fin = fopen(file_name, "r");
-    int64_t bufsize = file_size_return(fin);
-    if (bufsize < 0) {
-        SST_print_error("Failed file_size_return()");
-    }
-    unsigned char* file_buf = NULL;
-    file_buf = malloc(sizeof(char) * (bufsize + 1));
-    if (get_file_content(fin, file_buf, bufsize) < 0) {
-        SST_print_error("Failed get_file_content()");
+    int64_t bufsize;
+    unsigned char* file_buf = read_file_contents(file_name, &bufsize);
+    if (file_buf == NULL) return -1;
+
+    if (bufsize < 2 + AES_128_CBC_IV_SIZE ||
+        file_buf[0] > bufsize - 2 - AES_128_CBC_IV_SIZE) {
         free(file_buf);
         return -1;
     }
-    fclose(fin);
-
     unsigned int owner_name_len = file_buf[0];
-    unsigned char owner_name[owner_name_len];
-    memcpy(owner_name, file_buf + 1, owner_name_len);
     unsigned char iv[AES_128_CBC_IV_SIZE];
     memcpy(iv, file_buf + 1 + owner_name_len + 1, AES_128_CBC_IV_SIZE);
 
@@ -204,10 +231,16 @@ int file_decrypt_save(session_key_t s_key, char* file_name) {
     unsigned int ret_length = (enc_length + AES_128_CBC_IV_SIZE) /
                               AES_128_CBC_IV_SIZE * AES_128_CBC_IV_SIZE;
     unsigned char* ret = (unsigned char*)malloc(ret_length);
+    if (ret == NULL) {
+        free(file_buf);
+        return -1;
+    }
     if (decrypt_AES(file_buf + 1 + AES_128_CBC_IV_SIZE + 1 + owner_name_len,
                     enc_length, s_key.cipher_key, iv, s_key.enc_mode, ret,
                     &ret_length) < 0) {
         SST_print_error("Error while decrypting.");
+        free(ret);
+        free(file_buf);
         return -1;
     }
     free(file_buf);
@@ -216,6 +249,10 @@ int file_decrypt_save(session_key_t s_key, char* file_name) {
     file_duplication_check(RESULT_FILE_NAME, TXT_FILE_EXTENSION,
                            &result_file_name[0]);
     FILE* fout = fopen(result_file_name, "w");
+    if (fout == NULL) {
+        free(ret);
+        return -1;
+    }
     fwrite(ret, 1, ret_length, fout);
     free(ret);
     fclose(fout);

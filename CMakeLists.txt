@@ -86,3 +86,13 @@ enable_testing()
 add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
 target_link_libraries(crypto_test PRIVATE sst-c-api)
 add_test(NAME crypto_test COMMAND crypto_test)
+
+add_executable(resource_cleanup_test tests/resource_cleanup_test.c)
+target_link_libraries(resource_cleanup_test PRIVATE sst-c-api)
+add_test(NAME resource_cleanup_test COMMAND resource_cleanup_test ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(resource_cleanup_test PROPERTIES TIMEOUT 15)
+
+add_executable(auth_request_test tests/auth_request_test.c)
+target_link_libraries(auth_request_test PRIVATE sst-c-api)
+add_test(NAME auth_request_test COMMAND auth_request_test)
+set_tests_properties(auth_request_test PROPERTIES TIMEOUT 15)

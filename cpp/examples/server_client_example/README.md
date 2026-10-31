@@ -12,26 +12,24 @@ working directory, so run the binaries from this directory (not from `build/`)
 as shown below.
 
 Below, `$SST_ROOT` is the root directory of
-[SST's main repository](https://github.com/iotauth/iotauth/). Generate the
-example credentials first (`examples/generateAll.sh`) and build the Auth
-server (`auth/README.md`).
+[SST's main repository](https://github.com/iotauth/iotauth/). Follow the
+[shared Auth setup](../../../examples/README.md#shared-auth-setup) to build Auth
+and generate credentials using the default graph.
 
 ## Build
 
-```
-$ cd $SST_ROOT/entity/c/cpp/examples/server_client_example
-$ mkdir build && cd build
-$ cmake ../
-$ make
-$ cd ..
+```sh
+cd "$SST_ROOT/entity/c/cpp/examples/server_client_example"
+cmake -S . -B build
+cmake --build build
 ```
 
 ## Start Auth
 
 In a terminal at `$SST_ROOT/auth/auth-server`:
 
-```
-$ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+```sh
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
 ```
 
 Keep it running for both examples below.
@@ -43,14 +41,14 @@ The client requests session keys from Auth, connects to the server twice
 
 In a terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example`:
 
-```
-$ ./build/entity_server ../../../examples/server_client_example/c_server.config
+```sh
+./build/entity_server ../../../examples/server_client_example/c_server.config
 ```
 
 In another terminal at the same directory:
 
-```
-$ ./build/entity_client ../../../examples/server_client_example/c_client.config
+```sh
+./build/entity_client ../../../examples/server_client_example/c_client.config
 ```
 
 Both programs print the messages they receive and exit when done.
@@ -63,7 +61,7 @@ from three threads sharing one `sst::SST_API` instance.
 
 In a terminal at `$SST_ROOT/entity/c/cpp/examples/server_client_example`:
 
-```
-$ ./build/threaded_get_target_id_client ../../../examples/server_client_example/c_client.config
-$ ./build/threaded_get_target_id_server ../../../examples/server_client_example/c_server.config
+```sh
+./build/threaded_get_target_id_client ../../../examples/server_client_example/c_client.config
+./build/threaded_get_target_id_server ../../../examples/server_client_example/c_server.config
 ```

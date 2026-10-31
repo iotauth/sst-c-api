@@ -1,5 +1,61 @@
 #include "block_common.h"
 
+// Produce a full plaintext block and carry any overflowing record forward.
+static unsigned int generate_plaintext_block(unsigned char* plaintext_block_buf,
+                                             unsigned char* temp_buf,
+                                             int* temp_buf_length) {
+    unsigned int total_block_size = 0;
+
+    if (*temp_buf_length != 0) {
+        memcpy(plaintext_block_buf, temp_buf, *temp_buf_length);
+        total_block_size += *temp_buf_length;
+        *temp_buf_length = 0;
+    }
+
+    // Fill one block, preserving a record that crosses its boundary.
+    while (total_block_size < MAX_PLAINTEXT_BLOCK_SIZE) {
+        // Create a random integer that is >= 56 and <= 144.
+        int plaintext_buf_length =
+            secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
+
+        if (plaintext_buf_length < MIN_KEY_VALUE_SIZE ||
+            plaintext_buf_length > MAX_KEY_VALUE_SIZE) {
+            SST_print_error_exit("Failed to choose a key-value size.");
+        }
+        unsigned char plaintext_buf[MAX_KEY_VALUE_SIZE];
+        if (generate_random_nonce(plaintext_buf_length, plaintext_buf) < 0) {
+            SST_print_error_exit("Failed to generate a key-value buffer.");
+        }
+
+        // If the block size exceeds MAX_PLAINTEXT_BLOCK_SIZE after
+        // adding the next block, it should be saved to the next block.
+        // The leftover space should be filled with zero padding.
+        if (total_block_size + plaintext_buf_length >
+            MAX_PLAINTEXT_BLOCK_SIZE) {
+            // Add zero padding to the end of the plaintext_block_buf.
+            bzero(plaintext_block_buf + total_block_size,
+                  MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
+            SST_print_log("Add zero paddings for the leftover %d bytes.",
+                          MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
+            // Now the total_block_size becomes the
+            // MAX_PLAINTEXT_BLOCK_SIZE.
+            total_block_size += MAX_PLAINTEXT_BLOCK_SIZE - total_block_size;
+
+            // Save the created random buffer to put it into the next
+            // block.
+            *temp_buf_length = plaintext_buf_length;
+            memcpy(temp_buf, plaintext_buf, *temp_buf_length);
+            break;
+        } else {
+            memcpy(plaintext_block_buf + total_block_size, plaintext_buf,
+                   plaintext_buf_length);
+            total_block_size += plaintext_buf_length;
+        }
+    }
+
+    return total_block_size;
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
@@ -62,52 +118,8 @@ int main(int argc, char* argv[]) {
             // The buffer that will contain multiple key_values and compose a
             // single block.
             unsigned char plaintext_block_buf[MAX_PLAINTEXT_BLOCK_SIZE];
-            unsigned int total_block_size = 0;
-
-            if (temp_buf_length != 0) {
-                memcpy(plaintext_block_buf, temp_buf, temp_buf_length);
-                total_block_size += temp_buf_length;
-            }
-
-            // Create random key value buffers.
-            while (total_block_size < MAX_PLAINTEXT_BLOCK_SIZE) {
-                // Create a random integer that is >= 56 and <= 144.
-                int plaintext_buf_length =
-                    secure_rand(MIN_KEY_VALUE_SIZE, MAX_KEY_VALUE_SIZE);
-
-                // This buffer contains a single key_value.
-                unsigned char
-                    plaintext_buf[plaintext_buf_length];  // Variable Length
-                                                          // Arrays work from
-                                                          // C99
-
-                // If the block size exceeds MAX_PLAINTEXT_BLOCK_SIZE after
-                // adding the next block, it should be saved to the next block.
-                // The leftover space should be filled with zero padding.
-                if (total_block_size + plaintext_buf_length >
-                    MAX_PLAINTEXT_BLOCK_SIZE) {
-                    // Add zero padding to the end of the plaintext_block_buf.
-                    bzero(plaintext_block_buf + total_block_size,
-                          MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
-                    SST_print_log(
-                        "Add zero paddings for the leftover %d bytes.",
-                        MAX_PLAINTEXT_BLOCK_SIZE - total_block_size);
-                    // Now the total_block_size becomes the
-                    // MAX_PLAINTEXT_BLOCK_SIZE.
-                    total_block_size +=
-                        MAX_PLAINTEXT_BLOCK_SIZE - total_block_size;
-
-                    // Save the created random buffer to put it into the next
-                    // block.
-                    temp_buf_length = plaintext_buf_length;
-                    memcpy(temp_buf, plaintext_buf, temp_buf_length);
-                    break;
-                } else {
-                    memcpy(plaintext_block_buf + total_block_size,
-                           plaintext_buf, plaintext_buf_length);
-                    total_block_size += plaintext_buf_length;
-                }
-            }
+            unsigned int total_block_size = generate_plaintext_block(
+                plaintext_block_buf, temp_buf, &temp_buf_length);
 
             // Save the plaintext block for future comparison.
             fwrite(plaintext_block_buf, total_block_size, 1, plaintext_fp);

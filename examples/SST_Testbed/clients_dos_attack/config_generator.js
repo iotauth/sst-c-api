@@ -14,8 +14,8 @@ if (args.length !== 1) {
   process.exit(1);
 }
 
-const count = parseInt(args[0], 10);
-if (isNaN(count) || count < 1) {
+const count = Number.parseInt(args[0], 10);
+if (Number.isNaN(count) || count < 1) {
   console.error('Error: <count> must be a positive integer.');
   process.exit(1);
 }
@@ -23,7 +23,7 @@ if (isNaN(count) || count < 1) {
 const original_config = '../../server_client_example/c_client.config';
 const out_dir = '../config';
 
-if (isNaN(count) || count < 1) {
+if (Number.isNaN(count) || count < 1) {
   console.error('Error: <count> must be a positive integer.');
   process.exit(1);
 }

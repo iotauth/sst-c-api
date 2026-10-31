@@ -170,8 +170,8 @@ SST_API::SST_API(const std::string& config_path)
 }
 
 void SST_API::load_permanent_distribution_key() {
-    if (std::strlen(config_.dist_cipher_key_path) == 0 ||
-        std::strlen(config_.dist_mac_key_path) == 0) {
+    if (config_.dist_cipher_key_path[0] == '\0' ||
+        config_.dist_mac_key_path[0] == '\0') {
         throw SST_Exception(
             "PermanentDistKeyMode is on, so both distKey.cipherkey.path and "
             "distkey.mackey.path must be set.",

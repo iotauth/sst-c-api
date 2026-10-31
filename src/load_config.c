@@ -89,285 +89,169 @@ int safe_config_value_copy(char* dest, const char* src, size_t dest_size) {
     }
 }
 
-int load_config(config_t* c, const char* path) {
-    FILE* fp = fopen(path, "r");
-    if (fp == NULL) {
-        // Print an error message based on the error code
-        if (errno == ENOENT) {
-            SST_print_error("SST Config file not found on path %s.", path);
-        } else if (errno == EACCES) {
-            SST_print_error("SST Config file permission denied on path %s.",
-                            path);
-        } else {
-            SST_print_error("SST Config file open failed on path %s.", path);
-        }
-        // Print the specific error message
-        SST_print_error("fopen() failed.");
+static int parse_encryption_mode(const char* value,
+                                 AES_encryption_mode_t* mode) {
+    if (strcmp(value, "AES_128_CBC") == 0)
+        *mode = AES_128_CBC;
+    else if (strcmp(value, "AES_128_CTR") == 0)
+        *mode = AES_128_CTR;
+    else if (strcmp(value, "AES_128_GCM") == 0)
+        *mode = AES_128_GCM;
+    else
+        return -1;
+    return 0;
+}
+
+static int parse_enabled(const char* value) {
+    if (strcmp(value, "on") == 0 || strcmp(value, "1") == 0) return 1;
+    if (strcmp(value, "off") == 0 || strcmp(value, "0") == 0) return 0;
+    SST_print_error("Expected on, off, 1, or 0.");
+    return -1;
+}
+
+static int parse_port(const char* value, int* port) {
+    *port = atoi(value);
+    if (*port < 0 || *port > 65535) {
+        SST_print_error("Invalid port number.");
         return -1;
     }
-    char buffer[MAX_CONFIG_BUF_SIZE] = {
-        0,
-    };
-    char* pline;
-    static const char delimiters[] = " \n";
-    unsigned short purpose_count = 0;  // Option for ipfs.
-    c->purpose_index = 0;              // Option for ipfs.
-    c->hmac_mode = USE_HMAC;           // Default with HMAC.
-    c->perm_dist_key_mode =
-        NO_PERMANENT_DIST_KEY;  // Default with not using permanent distribution
-                                // key.
-    c->dist_cipher_key_path[0] = '\0';
-    c->dist_mac_key_path[0] = '\0';
-    c->session_key_enc_mode =
-        AES_128_CBC;                     // Default session key encryption mode.
-    c->dist_key_enc_mode = AES_128_CBC;  // Default dist encryption mode.
-    SST_print_debug("-----SST configuration of %s.-----", path);
-    while (!feof(fp)) {
-        pline = fgets(buffer, MAX_CONFIG_BUF_SIZE, fp);
-        char* ptr = strtok(pline, "=");
-        while (ptr != NULL) {
-            config_type_t config = get_key_value(ptr);
-            if (config == UNKNOWN_CONFIG) {
-                SST_print_error("Unknown config type %s.", ptr);
-                return -1;
-            }
-            ptr = strtok(NULL, delimiters);
-            if (ptr == NULL) {
-                SST_print_error("Config value does not exist.");
-                return -1;
-            }
-            switch (config) {
-                case UNKNOWN_CONFIG:
-                    SST_print_error(
-                        "This line must not be reached. UNKNOWN_CONFIG");
-                    return -1;
-                    break;
-                case ENTITY_INFO_NAME:
-                    SST_print_debug("Name: %s", ptr);
-                    if (safe_config_value_copy(c->name, ptr, sizeof(c->name)) <
-                        0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() ENTITY_INFO_NAME");
-                        return -1;
-                    }
-                    break;
-                case ENTITY_INFO_PURPOSE:
-                    if (purpose_count <= 1) {
-                        SST_print_debug("Purpose #%d: %s", purpose_count + 1,
-                                        ptr);
-                        if (safe_config_value_copy(
-                                c->purpose[purpose_count], ptr,
-                                sizeof(c->purpose[purpose_count])) < -1) {
-                            SST_print_error(
-                                "Failed safe_config_value_copy() "
-                                "ENTITY_INFO_PURPOSE");
-                            return -1;
-                        }
-                        purpose_count += 1;
-                    } else {
-                        SST_print_debug("Error for wrong number of purpose.");
-                    }
-                    c->purpose_index = purpose_count - 1;
-                    break;
-                case ENTITY_INFO_NUMKEY:
-                    SST_print_debug("Numkey: %s", ptr);
-                    c->numkey = atoi((const char*)ptr);
-                    break;
-                case SESSION_KEY_ENCRYPTION_MODE:
-                    SST_print_debug("Session key encryption mode: %s", ptr);
-                    if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->session_key_enc_mode = AES_128_CBC;
-                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->session_key_enc_mode = AES_128_CTR;
-                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->session_key_enc_mode = AES_128_GCM;
-                    }
-                    break;
-                case HMAC_MODE:
-                    if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
-                        c->hmac_mode = NO_HMAC;
-                    } else if (strcmp(ptr, "on") == 0 ||
-                               strcmp(ptr, "1") == 0) {
-                        c->hmac_mode = USE_HMAC;
-                    } else {
-                        SST_print_error(
-                            "Wrong input for hmac_mode.\n Please type "
-                            "\"off\" or \"0\" to not use HMAC mode.\n Please "
-                            "type "
-                            "\"on\" or \"1\" to use HMAC mode.");
-                        return -1;
-                    }
-                    break;
-                case PERMANENT_DIST_KEY_MODE:
-                    if (strcmp(ptr, "off") == 0 || strcmp(ptr, "0") == 0) {
-                        c->perm_dist_key_mode = NO_PERMANENT_DIST_KEY;
-                    } else if (strcmp(ptr, "on") == 0 ||
-                               strcmp(ptr, "1") == 0) {
-                        c->perm_dist_key_mode = USE_PERMANENT_DIST_KEY;
-                    } else {
-                        SST_print_error(
-                            "Wrong input for use_permanent_dist_key.\n Please "
-                            "type "
-                            "\"off\" or \"0\" to not use permanent "
-                            "distribution key.\n Please "
-                            "type "
-                            "\"on\" or \"1\" to use permanent distribution "
-                            "key.");
-                        return -1;
-                    }
-                    break;
-                case AUTH_ID:
-                    SST_print_debug("Auth ID: %s", ptr);
-                    c->auth_id = atoi((const char*)ptr);
-                    break;
-                case AUTH_INFO_PUBKEY_PATH:
-                    SST_print_debug("Pubkey path of Auth: %s", ptr);
-                    if (safe_config_value_copy(c->auth_pubkey_path, ptr,
-                                               sizeof(c->auth_pubkey_path)) <
-                        0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "AUTH_INFO_PUBKEY_PATH");
-                        return -1;
-                    }
-                    break;
-                case ENTITY_INFO_PRIVKEY_PATH:
-                    SST_print_debug("Privkey path of Entity: %s", ptr);
-                    if (safe_config_value_copy(c->entity_privkey_path, ptr,
-                                               sizeof(c->entity_privkey_path)) <
-                        0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "ENTITY_INFO_PRIVKEY_PATH");
-                        return -1;
-                    }
-                    break;
-                case AUTH_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of Auth: %s", ptr);
-                    if (safe_config_value_copy(c->auth_ip_addr, ptr,
-                                               sizeof(c->auth_ip_addr)) < 0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "AUTH_INFO_IP_ADDRESS");
-                        return -1;
-                    }
-                    break;
-                case AUTH_INFO_PORT:
-                    c->auth_port_num = atoi(ptr);
-                    if (c->auth_port_num < 0 || c->auth_port_num > 65535) {
-                        SST_print_error("Error: Invalid Auth port number.");
-                        return -1;
-                    }
-                    break;
-                case ENTITY_SERVER_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of entity server: %s", ptr);
-                    if (safe_config_value_copy(
-                            c->entity_server_ip_addr, ptr,
-                            sizeof(c->entity_server_ip_addr)) < 0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "ENTITY_SERVER_INFO_IP_ADDRESS");
-                        return -1;
-                    }
-                    break;
-                case ENTITY_SERVER_INFO_PORT_NUMBER:
-                    SST_print_debug("Port number of entity server: %s", ptr);
-                    c->entity_server_port_num = atoi(ptr);
-                    if (c->entity_server_port_num < 0 ||
-                        c->entity_server_port_num > 65535) {
-                        SST_print_error("Error: Invalid server port number.");
-                        return -1;
-                    }
-                    break;
-                case NETWORK_PROTOCOL:
-                    SST_print_debug("Network Protocol: %s", ptr);
-                    if (safe_config_value_copy(c->network_protocol, ptr,
-                                               sizeof(c->network_protocol)) <
-                        0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() NETWORK_PROTOCOL");
-                        return -1;
-                    }
-                    break;
-                case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
-                    SST_print_debug("IP address of file system manager: %s",
-                                    ptr);
-                    if (safe_config_value_copy(
-                            c->file_system_manager_ip_addr, ptr,
-                            sizeof(c->file_system_manager_ip_addr)) < 0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS");
-                        return -1;
-                    }
-                    break;
-                case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
-                    c->file_system_manager_port_num = atoi(ptr);
-                    if (c->file_system_manager_port_num < 0 ||
-                        c->file_system_manager_port_num > 65535) {
-                        SST_print_error(
-                            "Error: Invalid file system manager port "
-                            "number.");
-                        return -1;
-                    }
-                    break;
-                case DIST_CIPHER_KEY_PATH:
-                    SST_print_debug(
-                        "Permanent Distribution Key Cipher Key Path: %s", ptr);
-                    if (safe_config_value_copy(
-                            c->dist_cipher_key_path, ptr,
-                            sizeof(c->dist_cipher_key_path)) < 0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "DIST_CIPHER_KEY_PATH");
-                        return -1;
-                    }
-                    break;
-                case DIST_MAC_KEY_PATH:
-                    SST_print_debug(
-                        "Permanent Distribution Key MAC Key Path: %s", ptr);
-                    if (safe_config_value_copy(c->dist_mac_key_path, ptr,
-                                               sizeof(c->dist_mac_key_path)) <
-                        0) {
-                        SST_print_error(
-                            "Failed safe_config_value_copy() "
-                            "DIST_MAC_KEY_PATH");
-                        return -1;
-                    }
-                    break;
-                case DIST_ENCRYPTION_MODE:
-                    SST_print_debug("Distribution key encryption mode: %s",
-                                    ptr);
-                    if (strcmp(ptr, "AES_128_CBC") == 0) {
-                        c->dist_key_enc_mode = AES_128_CBC;
-                    } else if (strcmp(ptr, "AES_128_CTR") == 0) {
-                        c->dist_key_enc_mode = AES_128_CTR;
-                    } else if (strcmp(ptr, "AES_128_GCM") == 0) {
-                        c->dist_key_enc_mode = AES_128_GCM;
-                    } else {
-                        SST_print_error(
-                            "Wrong input for distKey.encryptionMode.\n Please "
-                            "type "
-                            "\"AES_128_CBC\" or \"AES_128_CTR\" or "
-                            "\"AES_128_GCM\".");
-                        return -1;
-                    }
-                    break;
-            }
-            break;
-        }
-    }
-    fclose(fp);
+    return 0;
+}
 
-    if (c->perm_dist_key_mode == NO_PERMANENT_DIST_KEY) {
-        if (strlen(c->dist_cipher_key_path) > 0 ||
-            strlen(c->dist_mac_key_path) > 0) {
-            SST_print_error(
-                "PermanentDistKeyMode is turned off, but dist_key path(s) are "
-                "provided.");
+static int add_config_purpose(config_t* c, const char* value,
+                              unsigned short* count) {
+    if (*count >= 2) {
+        SST_print_debug("Error for wrong number of purpose.");
+        return 0;
+    }
+    if (safe_config_value_copy(c->purpose[*count], value,
+                               sizeof(c->purpose[*count])) < 0)
+        return -1;
+    c->purpose_index = (*count)++;
+    return 0;
+}
+
+static int parse_config_value(config_t* c, config_type_t type,
+                              const char* value,
+                              unsigned short* purpose_count) {
+    int enabled;
+    switch (type) {
+        case ENTITY_INFO_NAME:
+            return safe_config_value_copy(c->name, value, sizeof(c->name));
+        case ENTITY_INFO_PURPOSE:
+            return add_config_purpose(c, value, purpose_count);
+        case ENTITY_INFO_NUMKEY:
+            c->numkey = atoi(value);
+            return 0;
+        case SESSION_KEY_ENCRYPTION_MODE:
+            // Preserve the default for unrecognized session modes, as before.
+            (void)parse_encryption_mode(value, &c->session_key_enc_mode);
+            return 0;
+        case HMAC_MODE:
+            enabled = parse_enabled(value);
+            if (enabled < 0) return -1;
+            c->hmac_mode = enabled ? USE_HMAC : NO_HMAC;
+            return 0;
+        case PERMANENT_DIST_KEY_MODE:
+            enabled = parse_enabled(value);
+            if (enabled < 0) return -1;
+            c->perm_dist_key_mode =
+                enabled ? USE_PERMANENT_DIST_KEY : NO_PERMANENT_DIST_KEY;
+            return 0;
+        case AUTH_ID:
+            c->auth_id = atoi(value);
+            return 0;
+        case AUTH_INFO_PUBKEY_PATH:
+            return safe_config_value_copy(c->auth_pubkey_path, value,
+                                          sizeof(c->auth_pubkey_path));
+        case ENTITY_INFO_PRIVKEY_PATH:
+            return safe_config_value_copy(c->entity_privkey_path, value,
+                                          sizeof(c->entity_privkey_path));
+        case AUTH_INFO_IP_ADDRESS:
+            return safe_config_value_copy(c->auth_ip_addr, value,
+                                          sizeof(c->auth_ip_addr));
+        case AUTH_INFO_PORT:
+            return parse_port(value, &c->auth_port_num);
+        case ENTITY_SERVER_INFO_IP_ADDRESS:
+            return safe_config_value_copy(c->entity_server_ip_addr, value,
+                                          sizeof(c->entity_server_ip_addr));
+        case ENTITY_SERVER_INFO_PORT_NUMBER:
+            return parse_port(value, &c->entity_server_port_num);
+        case NETWORK_PROTOCOL:
+            return safe_config_value_copy(c->network_protocol, value,
+                                          sizeof(c->network_protocol));
+        case FILE_SYSTEM_MANAGER_INFO_IP_ADDRESS:
+            return safe_config_value_copy(
+                c->file_system_manager_ip_addr, value,
+                sizeof(c->file_system_manager_ip_addr));
+        case FILE_SYSTEM_MANAGER_INFO_PORT_NUMBER:
+            return parse_port(value, &c->file_system_manager_port_num);
+        case DIST_CIPHER_KEY_PATH:
+            return safe_config_value_copy(c->dist_cipher_key_path, value,
+                                          sizeof(c->dist_cipher_key_path));
+        case DIST_MAC_KEY_PATH:
+            return safe_config_value_copy(c->dist_mac_key_path, value,
+                                          sizeof(c->dist_mac_key_path));
+        case DIST_ENCRYPTION_MODE:
+            if (parse_encryption_mode(value, &c->dist_key_enc_mode) < 0) {
+                SST_print_error(
+                    "Invalid %s value '%s'. Supported modes: AES_128_CBC, "
+                    "AES_128_CTR, AES_128_GCM.",
+                    dist_encryption_mode_label, value);
+                return -1;
+            }
+            return 0;
+        case UNKNOWN_CONFIG:
+            return -1;
+    }
+    return -1;
+}
+
+// The caller owns the stream; parsing errors never bypass its fclose().
+static int parse_config_stream(config_t* c, FILE* stream) {
+    char buffer[MAX_CONFIG_BUF_SIZE];
+    unsigned short purpose_count = 0;
+    while (fgets(buffer, sizeof(buffer), stream) != NULL) {
+        char* key = strtok(buffer, "=");
+        if (key == NULL) continue;
+        config_type_t type = get_key_value(key);
+        if (type == UNKNOWN_CONFIG) {
+            SST_print_error("Unknown config type %s.", key);
             return -1;
         }
+        char* value = strtok(NULL, " \n");
+        if (value == NULL) {
+            SST_print_error("Config value does not exist.");
+            return -1;
+        }
+        if (parse_config_value(c, type, value, &purpose_count) < 0) return -1;
     }
+    return ferror(stream) ? -1 : 0;
+}
 
+int load_config(config_t* c, const char* path) {
+    FILE* stream = fopen(path, "r");
+    if (stream == NULL) {
+        SST_print_error("Cannot open SST config %s: %s.", path,
+                        strerror(errno));
+        return -1;
+    }
+    c->purpose_index = 0;
+    c->hmac_mode = USE_HMAC;
+    c->perm_dist_key_mode = NO_PERMANENT_DIST_KEY;
+    c->dist_cipher_key_path[0] = '\0';
+    c->dist_mac_key_path[0] = '\0';
+    c->session_key_enc_mode = AES_128_CBC;
+    c->dist_key_enc_mode = AES_128_CBC;
+    int result = parse_config_stream(c, stream);
+    fclose(stream);
+    if (result < 0) return -1;
+    if (c->perm_dist_key_mode == NO_PERMANENT_DIST_KEY &&
+        (c->dist_cipher_key_path[0] != '\0' ||
+         c->dist_mac_key_path[0] != '\0')) {
+        SST_print_error(
+            "PermanentDistKeyMode is off, but dist_key paths are provided.");
+        return -1;
+    }
     return 0;
 }

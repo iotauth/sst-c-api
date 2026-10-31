@@ -6,7 +6,7 @@ The reader loads the metadata, requests each file's session key by ID from Auth,
 
 ## Build and prepare
 
-Set `$SST_ROOT` to the main [SST repository](https://github.com/iotauth/iotauth). Generate credentials with `./generateAll.sh` in `$SST_ROOT/examples`, then build Auth with `mvn clean install` in `$SST_ROOT/auth/auth-server`.
+Set `$SST_ROOT` to the main [SST repository](https://github.com/iotauth/iotauth). Follow the [shared Auth setup](../README.md#shared-auth-setup) to build Auth and generate credentials using the default graph.
 
 ```sh
 cd "$SST_ROOT/entity/c/examples/file_block_encrypt_example"
@@ -18,7 +18,7 @@ In a separate terminal, leave Auth running:
 
 ```sh
 cd "$SST_ROOT/auth/auth-server"
-java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
 ```
 
 ## Write, then read

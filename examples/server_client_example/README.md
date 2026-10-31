@@ -1,7 +1,7 @@
 # SST C server/client examples
 
 Set `$SST_ROOT` to the absolute path of the main [SST repository](https://github.com/iotauth/iotauth), with this submodule checked out at `entity/c/`.
-Generate credentials first with `./generateAll.sh` from `$SST_ROOT/examples`, and build Auth with `mvn clean install` from `$SST_ROOT/auth/auth-server`.
+Follow the [shared Auth setup](../README.md#shared-auth-setup) to build Auth and generate credentials using the default graph.
 
 ## Build
 
@@ -20,7 +20,7 @@ In a separate terminal:
 
 ```sh
 cd "$SST_ROOT/auth/auth-server"
-java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
 ```
 
 Leave Auth running for the examples below.
@@ -54,7 +54,7 @@ From the same `build/` directory, run the client first to save the key IDs, then
 
 ## Example 3: permanent distribution keys
 
-The resource-constrained entities use permanent symmetric distribution keys instead of RSA credentials. Their graph entries must have `"usePermanentDistKey": true` when `generateAll.sh` runs. The checked-in `c_rc_client.config` and `c_rc_server.config` enable `PermanentDistKeyMode=on` and specify the distribution-key paths; verify these paths match the generated files, including filename case.
+The resource-constrained entities use permanent symmetric distribution keys instead of RSA credentials. Their graph entries must have `"usePermanentDistKey": true` when `generateAll.sh` runs. The checked-in `c_rc_client.config` and `c_rc_server.config` enable `PermanentDistKeyMode=on` and specify the distribution-key paths. Before running, change the `distkey.mackey.path` filenames from `Net1.RcClientMacKey.Key` and `Net1.RcServerMacKey.Key` to `Net1.RcClientMacKey.key` and `Net1.RcServerMacKey.key`, respectively, to match the generated filenames on case-sensitive filesystems.
 
 From `build/`, run the server and client in separate terminals:
 

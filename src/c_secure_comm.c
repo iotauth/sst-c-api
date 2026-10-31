@@ -5,14 +5,6 @@
 #include "c_common.h"
 #include "c_crypto.h"
 
-typedef enum {
-    INIT,
-    AUTH_HELLO_RECEIVED,
-    SESSION_KEY_RESP_RECEIVED,
-    SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED,
-    FINISHED,
-} send_state;
-
 // Parses the the reply message sending to Auth.
 // Concat entity, auth nonce and information such as sender
 // and purpose obtained from the config file.
@@ -36,6 +28,7 @@ static unsigned char* serialize_message_for_auth(unsigned char* entity_nonce,
     unsigned char* ret = (unsigned char*)malloc(
         NONCE_SIZE * 2 + NUMKEY_SIZE + sender_length + purpose_length +
         8 /* +8 for two var length ints */);
+    if (ret == NULL) return NULL;
 
     size_t offset = 0;
     memcpy(ret + offset, entity_nonce, NONCE_SIZE);
@@ -98,10 +91,16 @@ static unsigned char* encrypt_and_sign(unsigned char* buf, unsigned int buf_len,
         encrypted, encrypted_length, (EVP_PKEY*)ctx->priv_key, &sigret_length);
     if (sigret == NULL) {
         SST_print_error("Failed SHA256_sign().");
+        OPENSSL_free(encrypted);
         return NULL;
     }
     *message_length = sigret_length + encrypted_length;
     unsigned char* message = (unsigned char*)malloc(*message_length);
+    if (message == NULL) {
+        OPENSSL_free(encrypted);
+        OPENSSL_free(sigret);
+        return NULL;
+    }
     memcpy(message, encrypted, encrypted_length);
     memcpy(message + encrypted_length, sigret, sigret_length);
     OPENSSL_free(encrypted);
@@ -138,6 +137,10 @@ static unsigned char* serialize_session_key_req_with_distribution_key(
     unsigned int name_length = strlen(name);
     unsigned char length_buf[] = {name_length};
     unsigned char* ret = malloc(1 + name_length + temp_length);
+    if (ret == NULL) {
+        OPENSSL_free(temp);
+        return NULL;
+    }
     unsigned int offset = 0;
     memcpy(ret, length_buf, 1);
     offset += 1;
@@ -307,7 +310,7 @@ static int check_distribution_key_validity(distribution_key_t* dist_key) {
 }
 
 // Encrypt the message and send the request message to Auth.
-// @param serialized total message
+// @param serialized borrowed message; the caller owns and frees it
 // @param serialized_length length of message
 // @param ctx config struct obtained from load_config()
 // @param sock socket number
@@ -329,7 +332,6 @@ static int send_auth_request_message(unsigned char* serialized,
             SST_print_error("Failed encrypt_and_sign().");
             return -1;
         }
-        free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
@@ -340,11 +342,11 @@ static int send_auth_request_message(unsigned char* serialized,
                             &message_length);
         }
         int bytes_written = sst_write_to_socket(sock, message, message_length);
+        OPENSSL_free(enc);
         if (bytes_written < 0) {
             SST_print_error("Failed sst_write_to_socket().");
             return -1;
         }
-        OPENSSL_free(enc);
     } else {
         unsigned int enc_length;
         unsigned char* enc = serialize_session_key_req_with_distribution_key(
@@ -355,7 +357,6 @@ static int send_auth_request_message(unsigned char* serialized,
                 "Failed serialize_session_key_req_with_distribution_key().");
             return -1;
         }
-        free(serialized);
         unsigned char message[MAX_AUTH_COMM_LENGTH];
         unsigned int message_length;
         if (requestIndex) {
@@ -366,12 +367,11 @@ static int send_auth_request_message(unsigned char* serialized,
                             &message_length);
         }
         int bytes_written = sst_write_to_socket(sock, message, message_length);
+        OPENSSL_free(enc);
         if (bytes_written < 0) {
             SST_print_error("Failed sst_write_to_socket().");
             return -1;
         }
-
-        OPENSSL_free(enc);
     }
     return 0;
 }
@@ -391,8 +391,11 @@ int handle_AUTH_HELLO(unsigned char* data_buf, SST_ctx_t* ctx,
     unsigned char* serialized = serialize_message_for_auth(
         entity_nonce, auth_nonce, num_key, ctx->config.name, purpose,
         &serialized_length);
-    if (send_auth_request_message(serialized, serialized_length, ctx, sock,
-                                  requestIndex) < 0) {
+    if (serialized == NULL) return -1;
+    int result = send_auth_request_message(serialized, serialized_length, ctx,
+                                           sock, requestIndex);
+    free(serialized);
+    if (result < 0) {
         SST_print_error("Failed send_auth_request_message().");
         return -1;
     }
@@ -584,195 +587,127 @@ int decrypt_received_message(unsigned char* encrypted_data,
 
 session_key_list_t* send_session_key_request_check_protocol(
     SST_ctx_t* ctx, unsigned char* target_key_id) {
-    // TODO: check if needed
-    // Temporary code. need to load?
-    unsigned char target_session_key_cache[10];
-    unsigned int target_session_key_cache_length;
-    target_session_key_cache_length =
-        (unsigned char)sizeof("none") / sizeof(unsigned char) - 1;
-    memcpy(target_session_key_cache, "none", target_session_key_cache_length);
-    if (strcmp((const char*)ctx->config.network_protocol, "TCP") == 0) {  // TCP
-        session_key_list_t* s_key_list = send_session_key_req_via_TCP(ctx);
-        if (s_key_list == NULL) {
-            SST_print_error("Failed to send_session_key_req_via_TCP().");
-            return NULL;
-        }
-        SST_print_debug("Received %d keys.", ctx->config.numkey);
-
-        // SecureCommServer.js handleSessionKeyResp
-        //  if(){} //TODO: migration
-        //  if(){} //TODO: check received_dist_key null;
-        //  if(strncmp(callback_params.target_session_key_cache, "Clients",
-        //  callback_params.target_session_key_cache_length) == 0){}
-        if (strncmp((const char*)target_session_key_cache, "none",
-                    target_session_key_cache_length) == 0) {
-            if (strncmp((const char*)s_key_list->s_key[0].key_id,
-                        (const char*)target_key_id, SESSION_KEY_ID_SIZE) != 0) {
-                SST_print_error("Session key id is NOT as expected");
-                return NULL;
-            } else {
-                SST_print_debug("Session key id is as expected.");
-            }
-            return s_key_list;
-        }
-    } else if (strcmp((const char*)ctx->config.network_protocol, "UDP") == 0) {
-        // TODO:(Dongha Kim): Implement session key request via UDP.
-        // session_key_list_t *s_key_list = send_session_key_req_via_UDP(NULL);
-        // return s_key_list;
+    if (strcmp((const char*)ctx->config.network_protocol, "TCP") != 0) {
+        SST_print_error("Unsupported network protocol for key request.");
+        return NULL;
     }
-    SST_print_error("Invalid network protocol name.");
-    return NULL;
+    session_key_list_t* keys = send_session_key_req_via_TCP(ctx);
+    if (keys == NULL) return NULL;
+    if (keys->num_key < 1 || memcmp(keys->s_key[0].key_id, target_key_id,
+                                    SESSION_KEY_ID_SIZE) != 0) {
+        SST_print_error("Session key id is NOT as expected");
+        free_session_key_list_t(keys);
+        return NULL;
+    }
+    return keys;
+}
+
+// Decrypt and parse without taking ownership of the socket or result list.
+static int parse_auth_key_response(SST_ctx_t* ctx, unsigned char* data,
+                                   unsigned int length,
+                                   const unsigned char* entity_nonce,
+                                   session_key_list_t* keys) {
+    unsigned char* decrypted = NULL;
+    unsigned int decrypted_length;
+    if (symmetric_decrypt_authenticate(
+            data, length, ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
+            ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
+            AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, USE_HMAC,
+            &decrypted, &decrypted_length) < 0) {
+        SST_print_error("Failed to decrypt session key response.");
+        return -1;
+    }
+    unsigned char reply_nonce[NONCE_SIZE];
+    int result = parse_session_key_response(ctx, decrypted, decrypted_length,
+                                            reply_nonce, keys);
+    free(decrypted);
+    if (result < 0) return -1;
+    if (memcmp(reply_nonce, entity_nonce, NONCE_SIZE) != 0) {
+        SST_print_error("Auth nonce NOT verified.");
+        return -1;
+    }
+    return 0;
+}
+
+static void report_auth_alert(unsigned char code) {
+    switch (code) {
+        case INVALID_DISTRIBUTION_KEY:
+            SST_print_error("Invalid Distribution Key.");
+            break;
+        case INVALID_SESSION_KEY_REQ:
+            SST_print_error("Invalid Session Key Request.");
+            break;
+        case UNKNOWN_INTERNAL_ERROR:
+            SST_print_error("Unknown Internal Error.");
+            break;
+        default:
+            SST_print_error("Unknown Auth alert code.");
+            break;
+    }
+}
+
+static int receive_session_keys(SST_ctx_t* ctx, int sock,
+                                session_key_list_t* keys) {
+    unsigned char entity_nonce[NONCE_SIZE];
+    bool hello_received = false;
+    for (;;) {
+        unsigned char received[MAX_AUTH_COMM_LENGTH];
+        int received_length =
+            sst_read_from_socket(sock, received, sizeof(received));
+        if (received_length < 2) return -1;
+        unsigned char message_type;
+        unsigned int length = 0;
+        unsigned char* data = parse_received_message(received, received_length,
+                                                     &message_type, &length);
+        if (message_type == AUTH_ALERT) {
+            report_auth_alert(data[0]);
+            return -1;
+        }
+        if (length == 0 ||
+            length > (unsigned int)(received + received_length - data)) {
+            SST_print_error("Truncated Auth message.");
+            return -1;
+        }
+        if (!hello_received) {
+            if (message_type != AUTH_HELLO ||
+                length < AUTH_ID_LEN + NONCE_SIZE ||
+                handle_AUTH_HELLO(data, ctx, entity_nonce, sock,
+                                  ctx->config.numkey,
+                                  ctx->purpose_for_requesting_key, 1) < 0)
+                return -1;
+            hello_received = true;
+            continue;
+        }
+        if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
+            if (length <= RSA_KEY_SIZE * 2) return -1;
+            if (save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0) return -1;
+            data += RSA_KEY_SIZE * 2;
+            length -= RSA_KEY_SIZE * 2;
+        } else if (message_type != SESSION_KEY_RESP) {
+            SST_print_error("Unexpected Auth message type.");
+            return -1;
+        }
+        return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
+    }
 }
 
 session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
     int sock;
-    if (connect_as_client((const char*)ctx->config.auth_ip_addr,
-                          ctx->config.auth_port_num, &sock) < 0) {
+    if (connect_as_client(ctx->config.auth_ip_addr, ctx->config.auth_port_num,
+                          &sock) < 0) {
         SST_print_error("Failed connect_as_client().");
         return NULL;
     }
-
-    session_key_list_t* session_key_list = malloc(sizeof(session_key_list_t));
-
-    session_key_list->s_key = malloc(sizeof(session_key_t) * MAX_SESSION_KEY);
-
-    unsigned char entity_nonce[NONCE_SIZE];
-
-    int state = INIT;
-    while (state == INIT || state == AUTH_HELLO_RECEIVED) {
-        unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        int received_buf_length =
-            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-
-        if (received_buf_length <= 0) {
-            SST_print_error("Failed to sst_read_from_socket().");
-            return NULL;
-        }
-        unsigned char message_type;
-        unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
-            received_buf, received_buf_length, &message_type, &data_buf_length);
-        if (state == INIT && message_type == AUTH_HELLO) {
-            state = AUTH_HELLO_RECEIVED;
-            if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock,
-                                  ctx->config.numkey,
-                                  ctx->purpose_for_requesting_key, 1) < 0) {
-                return NULL;
-            }
-        } else if (state == AUTH_HELLO_RECEIVED &&
-                   message_type == SESSION_KEY_RESP) {
-            state = SESSION_KEY_RESP_RECEIVED;
-            SST_print_debug(
-                "Received session key response encrypted with distribution "
-                "key.");
-            unsigned int decrypted_length;
-            unsigned char* decrypted;
-            if (symmetric_decrypt_authenticate(
-                    data_buf, data_buf_length, ctx->dist_key.mac_key,
-                    ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
-                    ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    ctx->config.session_key_enc_mode, 0, &decrypted,
-                    &decrypted_length) < 0) {
-                SST_print_error(
-                    "Failed to symmetric_decrypt_authenticate() after "
-                    "receiving SESSION_KEY_RESP.");
-                return NULL;
-            }
-            unsigned char reply_nonce[NONCE_SIZE];
-            if (parse_session_key_response(ctx, decrypted, decrypted_length,
-                                           reply_nonce, session_key_list) < 0) {
-                SST_print_error("Failed to parse_session_key_response().");
-                return NULL;
-            }
-            free(decrypted);
-            SST_print_debug("Reply_nonce in sessionKeyResp: ");
-            print_buf_debug(reply_nonce, NONCE_SIZE);
-            if (strncmp((const char*)reply_nonce, (const char*)entity_nonce,
-                        NONCE_SIZE) != 0) {
-                SST_print_error("Auth nonce NOT verified.");
-                return NULL;
-            } else {
-                SST_print_debug("Auth nonce verified!");
-            }
-            close(sock);
-            state = FINISHED;
-            return session_key_list;
-
-        } else if (state == AUTH_HELLO_RECEIVED &&
-                   message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
-            state = SESSION_KEY_RESP_WITH_DIST_KEY_RECEIVED;
-            size_t key_size = RSA_KEY_SIZE;
-            unsigned int encrypted_session_key_length =
-                data_buf_length - (key_size * 2);
-            unsigned char encrypted_session_key[encrypted_session_key_length];
-            memcpy(encrypted_session_key, data_buf + key_size * 2,
-                   encrypted_session_key_length);
-            if (save_distribution_key(data_buf, ctx, key_size) < 0) {
-                SST_print_error("Failed save_distribution_key().");
-                return NULL;
-            }
-
-            // decrypt session_key with decrypted_dist_key_buf
-            unsigned int decrypted_session_key_response_length;
-            unsigned char* decrypted_session_key_response;
-            if (symmetric_decrypt_authenticate(
-                    encrypted_session_key, encrypted_session_key_length,
-                    ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
-                    ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, 0,
-                    &decrypted_session_key_response,
-                    &decrypted_session_key_response_length) < 0) {
-                SST_print_error(
-                    "Failed to symmetric_decrypt_authenticate() after "
-                    "receiving SESSION_KEY_RESP_WITH_DIST_KEY.");
-                return NULL;
-            }
-
-            // parse decrypted_session_key_response for nonce comparison &
-            // session_key.
-            unsigned char reply_nonce[NONCE_SIZE];
-            if (parse_session_key_response(
-                    ctx, decrypted_session_key_response,
-                    decrypted_session_key_response_length, reply_nonce,
-                    session_key_list) < 0) {
-                SST_print_error("Failed parse_session_key_response().");
-                return NULL;
-            }
-            free(decrypted_session_key_response);
-            SST_print_debug("Reply_nonce in sessionKeyResp: ");
-            print_buf_debug(reply_nonce, NONCE_SIZE);
-            if (strncmp((const char*)reply_nonce, (const char*)entity_nonce,
-                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                // & received entity's nonce.
-                SST_print_error("Auth nonce NOT verified.");
-                return NULL;
-            } else {
-                SST_print_debug("Auth nonce verified!");
-            }
-            close(sock);
-            state = FINISHED;
-            return session_key_list;
-        } else if (message_type == AUTH_ALERT) {
-            session_key_list->num_key = 0;
-            switch (data_buf[0]) {
-                case INVALID_DISTRIBUTION_KEY:
-                    SST_print_error("Invalid Distribution Key.");
-                    break;
-                case INVALID_SESSION_KEY_REQ:
-                    SST_print_error("Invalid Session Key Request.");
-                    break;
-                case UNKNOWN_INTERNAL_ERROR:
-                    SST_print_error("Unknown Internal Error.");
-                    break;
-                default:
-                    SST_print_error("Unknown Code.");
-                    break;
-            }
-            return NULL;
-        }
+    // This scope owns the connection and list on every error path.
+    session_key_list_t* keys = init_empty_session_key_list();
+    int result = -1;
+    if (keys != NULL) result = receive_session_keys(ctx, sock, keys);
+    close(sock);
+    if (result < 0) {
+        free_session_key_list_t(keys);
+        return NULL;
     }
-    // Should not come here.
-    return NULL;
+    return keys;
 }
 // TODO:(Dongha Kim): Implement session key request via UDP.
 // session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {

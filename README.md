@@ -7,18 +7,13 @@ This is a repository for the C and C++ APIs of **[SST (Secure Swarm Toolkit)](ht
 
 # Prerequisites
 
--   OpenSSL:
-    SST uses the APIs from OpenSSL for encryption and decryption. OpenSSL 3.0 and above is required to run SST.
-    -   On macOS, OpenSSL can be installed using `brew install openssl`.
-    -   The following environment variables need to be set before running `make`. The exact variable values can be found from the output of `brew install openssl`.
-    -   Add two lines below by using `vi ~/.zshrc`
-        -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
-        -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
-    -   Alternatively, point CMake at Homebrew's OpenSSL with `export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"`.
-
-    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation.
+-   OpenSSL 3.0 or later, including development headers and libraries.
+    On macOS with Homebrew, install `openssl@3` and, if CMake cannot find it,
+    set `export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"` before configuring.
+-   A POSIX environment (Linux or macOS) and a C compiler.
 -   CMake 3.19 or later.
--   For the C++ API, a C++17 compiler (clang or gcc).
+-   For the C++ API, a C++17 compiler (clang or gcc) and spdlog; see the
+    [C++ requirements](cpp/README.md#requirements) for dependency setup.
 
 # Repository Layout
 
@@ -26,7 +21,7 @@ This is a repository for the C and C++ APIs of **[SST (Secure Swarm Toolkit)](ht
 entity/c/
 ├── src/            # C API (c_api.h is the public header)
 ├── cpp/            # C++ API, its examples and tests (see cpp/README.md)
-├── examples/       # C examples (server/client, file block encryption, IPFS)
+├── examples/       # C API examples, including some callers written in C++
 ├── tests/          # C unit and integration tests
 ├── embedded/       # C API for embedded targets
 ├── cmake/          # CMake package config for the installed library
@@ -61,16 +56,19 @@ The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](h
 **session_key_list_t \*get_session_key(SST_ctx_t \*ctx, session_key_list_t \*existing_s_key_list)**
 
 -   Requests `entityInfo.number_key` session keys from Auth for the configured purpose.
--   When `existing_s_key_list` is `NULL`, returns a new list. Otherwise appends the received keys to the existing list and returns it.
+-   When `existing_s_key_list` is `NULL`, returns a new list. Otherwise appends the received keys to the existing list and returns it. If the list cannot accommodate the requested keys after discarding expired oldest entries, returns the existing list without contacting Auth.
 
 **session_key_list_t \*get_session_key_with_index(SST_ctx_t \*ctx, int purpose_index, session_key_list_t \*existing_s_key_list)**
 
--   Same as `get_session_key()` but uses the purpose at `purpose_index` (the config can hold two `entityInfo.purpose` entries).
+-   Same as `get_session_key()` but uses the purpose at `purpose_index` (0 or 1, for an entry present in the config). Without an explicit index, the C API uses the last `entityInfo.purpose` entry.
 
 **session_key_t \*get_session_key_by_ID(unsigned char \*target_session_key_id, SST_ctx_t \*ctx, session_key_list_t \*existing_s_key_list)**
 
 -   Returns the session key with the given 8-byte ID. If it is not in `existing_s_key_list`, requests it from Auth by ID and adds it to the list.
 -   Used by entity servers to obtain the key a client presents in its handshake.
+-   Requires an initialized, non-`NULL` list. The returned pointer refers to an entry owned by that list; do not free it separately or retain it across operations that overwrite or free the list.
+
+The C API does not internally serialize requests on a shared `SST_ctx_t`. Protect concurrent requests and shared key-list access with an application mutex. The C++ `SST_API` serializes Auth requests internally.
 
 ### Secure sessions
 
@@ -81,10 +79,12 @@ The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](h
 **SST_session_ctx_t \*secure_connect_to_server_with_socket(session_key_t \*s_key, int sock)**
 
 -   Runs the client side of the handshake over a socket the caller already connected with `connect()`.
+-   The caller remains responsible for closing the supplied socket, including when the handshake fails.
 
 **SST_session_ctx_t \*server_secure_comm_setup(SST_ctx_t \*ctx, int clnt_sock, session_key_list_t \*existing_s_key_list)**
 
 -   Runs the server side of the handshake on an accepted client socket. The session key is looked up in `existing_s_key_list` or fetched from Auth by ID.
+-   The caller remains responsible for closing `clnt_sock`, including when the handshake fails.
 
 **int send_secure_message(char \*msg, unsigned int msg_length, SST_session_ctx_t \*session_ctx)**
 
@@ -93,7 +93,7 @@ The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](h
 **int read_secure_message(unsigned char \*plaintext, SST_session_ctx_t \*session_ctx)**
 
 -   Reads one `SECURE_COMM_MSG` from the session's socket, verifies and decrypts it, and copies the plaintext into the caller's buffer, which must hold `MAX_SECURE_COMM_MSG_LENGTH` bytes.
--   Returns the plaintext length, 0 when the peer closed the connection, or -1 on failure.
+-   Returns the plaintext length, 0 for either an empty plaintext or peer closure, or -1 on failure.
 
 **void \*receive_thread_read_one_each(void \*session_ctx)**
 
@@ -109,7 +109,7 @@ pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx
 **int encrypt_buf_with_session_key(session_key_t \*s_key, unsigned char \*plaintext, unsigned int plaintext_length, unsigned char \*\*encrypted, unsigned int \*encrypted_length)**
 **int decrypt_buf_with_session_key(session_key_t \*s_key, unsigned char \*encrypted, unsigned int encrypted_length, unsigned char \*\*decrypted, unsigned int \*decrypted_length)**
 
--   Encrypt (and HMAC) or verify (and decrypt) a buffer with the session key.
+-   Encrypt or decrypt a buffer using the session key's cipher settings, adding or verifying an HMAC when enabled for that key.
 -   These allocate the result buffer, which the caller must `free()`.
 
 **int encrypt_buf_with_session_key_without_malloc(...)**
@@ -133,7 +133,7 @@ pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx
 
 **unsigned int convert_skid_buf_to_int(unsigned char \*buf, int byte_length)**
 
--   Converts a big-endian session key ID buffer to an integer.
+-   Converts a big-endian buffer to an `unsigned int`. For buffers wider than that type, only the low-order bytes are retained; this is not a full 64-bit session key ID conversion.
 
 **int generate_random_nonce(int length, unsigned char \*buf)**
 
@@ -157,16 +157,16 @@ pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx
 
 ## Compile
 
-For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
+For the rest of this document, set `$SST_ROOT` to the absolute path of [SST's main repository](https://github.com/iotauth/iotauth/), with this submodule at `entity/c/`.
 
-```
-$cd $SST_ROOT/entity/c
-$mkdir build && cd build
-$cmake ../
-$make
+```sh
+cd "$SST_ROOT/entity/c"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-Build with `cmake -DCMAKE_BUILD_TYPE=Debug ../` to enable `SST_print_debug()` output.
+This runs the three standalone C tests without Auth or IPFS. Debug builds enable `SST_print_debug()` and retain the assertions in the C crypto test. CI also runs the unit tests in Release mode. See [tests/README.md](./tests/README.md) for the separate Auth integration tests.
 
 ## Install the Static Library
 
@@ -191,7 +191,7 @@ The C++ API lives in [`cpp/`](./cpp/) and is documented in [`cpp/README.md`](./c
 |-------|----------|---------|
 | **Crypto** | `cpp/src/crypto.hpp/cpp` | Stateless primitives (`sst::Crypto`): RSA, AES, SHA-256, HMAC, with caller-provided output buffers |
 | **Network** | `cpp/src/net/sockets.hpp/cpp` | RAII POSIX socket wrappers |
-| **API** | `cpp/src/api.hpp/cpp`, `cpp/src/ipfs.hpp/cpp` | `sst::SST_API`, `sst::SessionKeyList`, `sst::SST_Session` and the `sst::ipfs` file sharing helpers |
+| **API** | `cpp/src/api.hpp`, `cpp/src/ipfs.hpp` | Public interfaces; implementations are split across configuration, Auth requests, handshakes, sessions, session keys and IPFS helpers |
 | **Logging** | `cpp/src/log/log_manager.hpp/cpp` | spdlog-based logger |
 
 The C concepts map to C++ classes as follows. Setup operations (construction, key requests, handshakes) throw `sst::SST_Exception` on failure; message and buffer operations return status codes. C sends return 0 on success; C++ sends return the number of framed bytes written. Both return -1 on failure.
@@ -217,12 +217,14 @@ C++ documentation:
 
 To build the C++ library and run its unit tests:
 
+```sh
+cd "$SST_ROOT/entity/c/cpp"
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
-$cd $SST_ROOT/entity/c/cpp
-$cmake -S . -B build
-$cmake --build build
-$ctest --test-dir build --output-on-failure
-```
+
+This runs six standalone C++ tests. They use local sockets and test doubles; no running Auth or IPFS daemon is needed.
 
 # For Developers
 
@@ -244,9 +246,9 @@ $ctest --test-dir build --output-on-failure
     ```
     Both commands operate on all `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, and `.hh` files, excluding the `build/` directory and `embedded/lib/`.
 
--   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the C++ unit tests and the same integration tests with the C++ API.
-    -   Both workflows build in Release mode, which compiles `assert()` out, so test checks must use an always-on check (see the `CHECK` macro in the C++ tests).
+-   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the C++ unit tests and C++ examples. Both cover Auth-backed server/client and IPFS communication; their block-encryption examples exercise different workflows.
+    -   Both unit-test jobs explicitly build in Release mode, which compiles `assert()` out. New test checks must use an always-on check (see the `CHECK` macros in the regression tests). The example integration builds do not currently set `CMAKE_BUILD_TYPE`.
     -   On pushes and pull requests to this repository, both jobs use the commit under test, and `ci.yml` also runs the entity integration tests of [iotauth](https://github.com/iotauth/iotauth) against it through their `sst-c-api-ref` input.
     -   The iotauth repository calls both workflows from its `sst-c-api-tests.yml` and `sst-c-api-cpp-tests.yml` with an `iotauth-ref` input. In that case the unit test jobs check out this repository's `main`, while the integration test jobs check out iotauth at `iotauth-ref` with its submodules, so they use the commit of this repository pinned by iotauth's `entity/c` submodule.
 
-*Last updated on October 26, 2026*
+*Last updated on October 30, 2026*

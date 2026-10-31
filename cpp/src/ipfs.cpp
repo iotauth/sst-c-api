@@ -6,6 +6,7 @@
 #include "ipfs.hpp"
 
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <sys/wait.h>
 #include <unistd.h>
 
@@ -62,6 +63,20 @@ void write_file(const std::string& path, const unsigned char* data,
     }
 }
 
+// Called after fork(): use only async-signal-safe operations in the child.
+void redirect_child_stdout(const char* stdout_file, const int pipefd[2]) {
+    int fd = pipefd[1];
+    if (stdout_file[0] != '\0') {
+        fd = ::open(stdout_file, O_WRONLY | O_CREAT | O_TRUNC, 0600);
+        if (fd < 0) ::_exit(127);
+        // Restrict files that existed before open() as well.
+        if (::fchmod(fd, S_IRUSR | S_IWUSR) < 0) ::_exit(127);
+    }
+    if (::dup2(fd, STDOUT_FILENO) < 0) ::_exit(127);
+    if (fd != STDOUT_FILENO) ::close(fd);
+    if (pipefd[0] >= 0 && pipefd[0] != STDOUT_FILENO) ::close(pipefd[0]);
+}
+
 // Runs `argv` directly (no shell). When `stdout_file` is empty the first
 // line of the command's output is returned; otherwise stdout is written to
 // that file, which is created or truncated.
@@ -78,6 +93,12 @@ std::string run_process(const std::vector<std::string>& argv,
     }
     LOG_INF << "Command: " << display;
 
+    std::vector<char*> args;
+    args.reserve(argv.size() + 1);
+    for (const std::string& arg : argv) {
+        args.push_back(const_cast<char*>(arg.c_str()));
+    }
+    args.push_back(nullptr);
     int pipefd[2] = {-1, -1};
     if (stdout_file.empty() && ::pipe(pipefd) < 0) {
         throw SST_Exception(
@@ -86,31 +107,17 @@ std::string run_process(const std::vector<std::string>& argv,
     }
     pid_t pid = ::fork();
     if (pid < 0) {
+        const int error = errno;
+        if (pipefd[0] >= 0) {
+            ::close(pipefd[0]);
+            ::close(pipefd[1]);
+        }
         throw SST_Exception(
-            "fork() failed: " + std::string(std::strerror(errno)),
+            "fork() failed: " + std::string(std::strerror(error)),
             SST_ErrorCode::Io);
     }
     if (pid == 0) {
-        // Child: route stdout, then exec. Only async-signal-safe calls here.
-        if (stdout_file.empty()) {
-            ::dup2(pipefd[1], STDOUT_FILENO);
-            ::close(pipefd[0]);
-            ::close(pipefd[1]);
-        } else {
-            int fd =
-                ::open(stdout_file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if (fd < 0) {
-                ::_exit(127);
-            }
-            ::dup2(fd, STDOUT_FILENO);
-            ::close(fd);
-        }
-        std::vector<char*> args;
-        args.reserve(argv.size() + 1);
-        for (const std::string& arg : argv) {
-            args.push_back(const_cast<char*>(arg.c_str()));
-        }
-        args.push_back(nullptr);
+        redirect_child_stdout(stdout_file.c_str(), pipefd);
         ::execvp(args[0], args.data());
         ::_exit(127);
     }

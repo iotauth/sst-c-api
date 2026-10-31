@@ -31,7 +31,7 @@ as a strongly-typed namespace rather than something to instantiate.
 The **Crypto** module uses caller-provided output buffers and fixed-size byte
 arrays for temporary data:
 
-- Every routine writes its result into a **caller-provided buffer**, which at
+- Operations producing encrypted, decrypted or hashed bytes write into a **caller-provided buffer**, which at
   the call site is typically a stack `std::array` sized via the
   `get_expected_encrypted_total_length()` /
   `get_expected_decrypted_maximum_length()` helpers.
@@ -49,7 +49,7 @@ arrays for temporary data:
 
 ## API Design
 
-`src/api.hpp` is a C++ port of the SST C API (`src/c_api.h`). It speaks the
+[`src/api.hpp`](src/api.hpp) is a C++ port of the SST C API ([`../src/c_api.h`](../src/c_api.h)). It speaks the
 same wire protocol, so a C++ entity interoperates with Auth and with C
 entities unchanged. The C concepts map to classes as follows:
 
@@ -93,6 +93,9 @@ keys. `at(index)` accesses active keys in oldest-to-newest order; `at_slot(slot)
 accesses an active storage slot returned by `find()` or `add()`. Both check
 bounds. The public `num_key`, `rear_idx`, and `s_key` fields remain for source
 compatibility; new code should use the accessors and `add()`/`append()`.
+When full, `add()` overwrites the oldest key. `addable(count)` may remove
+expired keys from the oldest end to make room, but leaves the list unchanged
+if enough space cannot be made without dropping an unexpired key.
 
 Key expiry is measured in Unix-epoch milliseconds using `system_clock`, matching
 Auth's serialized absolute expiry values. `steady_clock` has an unrelated epoch
@@ -102,6 +105,9 @@ A receiver blocked in `read_secure_message()` is released with
 `SST_Session::shutdown()`. Join that thread before destroying the session, whose
 destructor closes the socket. The C++ API currently has no session-key save/load
 methods equivalent to the C API.
+The C++ handshake methods also take ownership of caller-supplied sockets and
+close them on failure. This differs from the C API, where the caller closes
+supplied sockets.
 
 ## Message Classes
 
@@ -126,7 +132,7 @@ and MAC can exceed the C API's 1024-byte limit.
 | Java (Auth server) | C++ (entity) | Entity side |
 |--------------------|--------------|-------------|
 | `MessageType` | `message_type.hpp` | enum of message type bytes |
-| `IoTSPMessage` | `iotsp_message.hpp/cpp` | framing: `serialize()`, `read()`, `receive()` |
+| `IoTSPMessage` | `iotsp_message.hpp/cpp` | framing: `serialize()`, `read_result()`, `receive()`; legacy `read()` remains available |
 | `AuthHelloMessage` | `auth_hello_message.hpp/cpp` | parses Auth ID and nonce |
 | `AuthAlertCode`, `AuthAlertMessage` | `auth_alert_code.hpp`, `auth_alert_message.hpp/cpp` | parses the alert code |
 | `SessionKeyReqMessage` | `session_key_req_message.hpp/cpp` | builds and encrypts |
@@ -140,6 +146,13 @@ signature when the distribution key has expired). `EntityRespMessage` holds
 the handling shared by both responses (the optional encrypted distribution
 key and decryption with the distribution key). The messages are internal:
 `api.hpp` does not expose them.
+
+`IoTSPMessage::read_result()` distinguishes an empty payload from peer closure
+and reports framing errors through `SST_IOResult`. The legacy `read()` returns
+0 for both empty payloads and peer closure; `receive()` throws on closure or
+error. Handshake parsing checks the decrypted body length against the nonce
+fields required by its flags before copying them, including a reply nonce at
+its fixed offset.
 
 The config file format is the C API format (`entityInfo.name=...`); the
 earlier C++ key names (`name = ...`) are still accepted. Relative credential
@@ -177,6 +190,7 @@ cpp/
 └── tests/
     ├── api_test.cpp      # API unit tests (config, key lists, encryption)
     ├── crypto_test.cpp   # crypto unit tests
+    ├── ipfs_test.cpp     # IPFS process and file I/O with a fake CLI
     ├── message_test.cpp  # message classes vs. the Auth wire formats
     ├── socket_test.cpp   # socket unit tests
     ├── temporary_directory.hpp # private, automatically cleaned test directories
@@ -192,12 +206,9 @@ cpp/
 - spdlog, supplied as an installed CMake package, a local source tree, or fetched
   by CMake (the fallback requires Git and network access)
 
-SonarCloud automatic analysis is configured for C++17 in the repository's
-`.sonarcloud.properties`, matching CMake. Recommendations for newer facilities
-such as `std::span`, `std::jthread`, and `std::format` do not apply to this API.
-SonarCloud reads that file from the default branch; to use the same setting on
-a pull request before merging it, set `sonar.cfamily.reportingCppStandardOverride`
-to `c++17` in the project's analysis settings.
+CMake requires C++17. Keep static-analysis settings aligned with that standard;
+C++20 facilities such as `std::span`, `std::jthread`, and `std::format` are not
+available to this API.
 
 Four local `NOSONAR` comments retain existing public member signatures:
 `Connect()`, `Accept()`, `shutdown()`, and the `std::string` secure-send overload.
@@ -214,8 +225,9 @@ export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"
 
 ### Offline spdlog setup
 
-CMake first reuses an existing `spdlog::spdlog` target or finds an installed
-spdlog package. Set `-DSST_FETCH_SPDLOG=OFF` to disable its network fallback.
+CMake first reuses an existing `spdlog::spdlog` target, then uses an explicitly
+supplied source tree or looks for an installed spdlog package.
+Set `-DSST_FETCH_SPDLOG=OFF` to disable its network fallback.
 For an installed package outside the usual search paths:
 
 ```sh
@@ -236,6 +248,9 @@ spdlog v1.17.0.
 Run tests from a writable directory. Tests that generate credentials create a
 unique directory there with owner-only permissions and remove it on completion.
 CTest uses the build directory as the working directory.
+All six registered tests run without a real Auth server or IPFS daemon. Socket
+and protocol tests need permission to create local sockets; `ipfs_test` runs
+a fake `ipfs` executable in a temporary directory.
 
 From this `cpp/` directory:
 
@@ -253,6 +268,7 @@ Or run the test executables directly:
 ./build/api_test
 ./build/message_test
 ./build/protocol_test
+./build/ipfs_test
 ```
 
 A successful crypto test run ends with:
@@ -270,7 +286,9 @@ All C++ crypto tests passed.
 
 - `tests/api_test.cpp` exercises the high-level **API** layer without a
   server: config-file parsing (including error cases), session key list
-  bookkeeping, and session key encryption/decryption round trips.
+  bookkeeping (full-ring overwrite, wrapped indices, expired oldest keys,
+  failed capacity checks and self-append), and session key encryption/decryption
+  round trips.
 
 - `tests/socket_test.cpp` checks IPv4/IPv6 loopback connections, invalid
   addresses, descriptor ownership and duplication, and reads at peer closure.
@@ -279,12 +297,19 @@ All C++ crypto tests passed.
   format of its Java counterpart in the Auth server: framing, AUTH_HELLO and
   AUTH_ALERT parsing, request payloads under both distribution key and public
   key encryption, and response decryption with and without a new
-  distribution key.
+  distribution key. It also covers typed frame-read results, nonce sizes,
+  sender-name and key-count limits, and rejection of trailing response bytes.
 
 - `tests/protocol_test.cpp` uses a local Auth stand-in to verify public-key and
   distribution-key requests for both session keys and add-reader operations,
   key-ID lookups and cache hits, nonce/alert failures, responses larger than
-  1024 bytes, and the outer msgType versus encrypted handshake flags.
+  1024 bytes, and the outer msgType versus encrypted handshake flags. Malformed
+  handshakes cover all three stages, including empty frames, missing nonce
+  fields, and 9–16 byte bodies with the reply-nonce flag set.
+
+- `tests/ipfs_test.cpp` checks IPFS subprocess output and exit failures, literal
+  filenames passed as arguments, downloaded file contents and owner-only file
+  permissions using a fake CLI.
 
 - `examples/server_client_example` covers the Auth handshake, key
   distribution, session setup and encrypted message exchange end-to-end
@@ -295,13 +320,23 @@ Full docs: [C++ Guide](https://iotauth.github.io/docs/cpp-guide/) and
 The CMake project builds a static `sst-cpp-api` target; it currently has no
 install/package-export rules. Build examples from their own CMake directories.
 
+`auth_connect_test` is an optional integration target, excluded from the default
+build and CTest. After the [shared Auth setup](../examples/README.md#shared-auth-setup),
+build it with `cmake --build build --target auth_connect_test` from `cpp/`.
+Run it from the server/client example directory so the reused credential paths
+resolve correctly:
+
+```sh
+cd examples/server_client_example
+../../build/auth_connect_test ../../../examples/server_client_example/c_client.config
+```
+
 ## Usage example
 
 ```cpp
 #include "crypto.hpp"
 
 #include <array>
-#include <cstring>
 
 int main() {
     using sst::Crypto;
@@ -314,7 +349,7 @@ int main() {
         return 1;
     }
     const char msg[] = "Hello World!";
-    unsigned int msg_len = std::strlen(msg);
+    constexpr unsigned int msg_len = sizeof(msg) - 1;
     unsigned int capacity = Crypto::get_expected_encrypted_total_length(
         msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE,
         sst::AES_128_CBC, sst::USE_HMAC);

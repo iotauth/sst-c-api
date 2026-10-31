@@ -356,6 +356,59 @@ void test_session_key_list_addable() {
     std::printf("**** PASSED: test_session_key_list_addable.\n");
 }
 
+void test_session_key_list_wrapped_expiration() {
+    const auto capacity = static_cast<int>(sst::MAX_SESSION_KEY);
+    SessionKeyList list;
+    const auto check_order = [&list](uint64_t oldest_id, int count) {
+        CHECK(list.size() == count);
+        const SessionKeyList& read_only = list;
+        for (int i = 0; i < count; ++i) {
+            const uint64_t id = oldest_id + i;
+            CHECK(sst::convert_skid_buf_to_int(list.at(i).key_id,
+                                               sst::SESSION_KEY_ID_SIZE) == id);
+            const int slot = list.find(id);
+            CHECK(slot >= 0);
+            CHECK(&read_only.at(i) == &list.at_slot(slot));
+            CHECK(&list.at(i) == &read_only.at_slot(slot));
+        }
+    };
+
+    // Overflow the ring until its two oldest keys occupy the last and first
+    // storage slots. Expiration removal will have to cross that boundary.
+    for (int id = 0; id < 2 * capacity - 1; ++id) {
+        list.add(make_session_key(id, UINT64_MAX));
+    }
+    check_order(capacity - 1, capacity);
+    CHECK(list.rear_idx == capacity - 1);
+    CHECK(list.find(capacity - 1) == capacity - 1);
+    CHECK(list.find(capacity) == 0);
+    for (int id = 0; id < capacity - 1; ++id) {
+        CHECK(list.find(id) == -1);
+    }
+    list.at(0).abs_validity = 1;
+    list.at(1).abs_validity = 1;
+    list.at(3).abs_validity = 1;
+
+    // A live third key blocks the request, even with another expired key
+    // later in the ring. Failure must not discard the expired prefix.
+    CHECK(!list.addable(3));
+    check_order(capacity - 1, capacity);
+    CHECK(list.rear_idx == capacity - 1);
+
+    CHECK(list.addable(2));
+    check_order(capacity + 1, capacity - 2);
+    CHECK(list.find(capacity - 1) == -1);
+    CHECK(list.find(capacity) == -1);
+    CHECK(list.rear_idx == capacity - 1);
+
+    // Reuse both vacated slots, preserving oldest-to-newest indexed access.
+    CHECK(list.add(make_session_key(2 * capacity - 1, UINT64_MAX)) ==
+          capacity - 1);
+    CHECK(list.add(make_session_key(2 * capacity, UINT64_MAX)) == 0);
+    check_order(capacity + 1, capacity);
+    CHECK(list.rear_idx == 1);
+}
+
 // ---------------------------------------------------------------------------
 // Buffer encryption with a session key
 // ---------------------------------------------------------------------------
@@ -364,7 +417,7 @@ void test_encrypt_decrypt_buf_with_session_key() {
     std::printf("**** STARTING test_encrypt_decrypt_buf_with_session_key.\n");
     session_key_t key = make_session_key(42, UINT64_MAX);
     const char msg[] = "Hello from the SST C++ API";
-    const unsigned int msg_len = static_cast<unsigned int>(std::strlen(msg));
+    const unsigned int msg_len = sizeof(msg) - 1;
 
     unsigned int enc_cap = sst::Crypto::get_expected_encrypted_total_length(
         msg_len, sst::AES_128_IV_SIZE, sst::MAC_KEY_SHA256_SIZE, key.enc_mode,
@@ -622,6 +675,7 @@ int main() {
     test_session_key_list_add_find();
     test_session_key_list_append();
     test_session_key_list_addable();
+    test_session_key_list_wrapped_expiration();
     test_encrypt_decrypt_buf_with_session_key();
     test_convert_skid_buf_to_int();
     test_update_validity();

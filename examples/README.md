@@ -6,6 +6,40 @@ For the rest of this document, we use `$SST_ROOT` for the root directory of SST�
 
 The links below point to the build and run instructions for each example. This file gives a high-level overview and links into those examples.
 
+## Shared Auth setup
+
+Auth-backed examples require the main repository and its initialized submodules,
+the [C build prerequisites](../README.md#prerequisites), Java and Maven, and
+Node.js/npm for credential generation. CI uses JDK 17. Set `$SST_ROOT` in each
+terminal where you run the commands below.
+
+Build Auth from its parent Maven project so its library dependencies are built
+together, then generate the default example credentials and databases:
+
+```sh
+export SST_ROOT=/absolute/path/to/iotauth
+cd "$SST_ROOT"
+mvn -B package --file auth/pom.xml
+cd "$SST_ROOT/examples"
+./generateAll.sh -p asdf
+```
+
+`asdf` is the example password used in CI. Use the same password when generating
+credentials and starting Auth. IPFS examples need `-g configs/file_sharing.graph`
+on the generation command instead of the default graph; follow their READMEs.
+Restart Auth after regenerating its credentials or databases.
+
+Start Auth101 in a separate terminal and leave it running:
+
+```sh
+cd "$SST_ROOT/auth/auth-server"
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
+```
+
+Relative credential paths in entity configs are resolved from the **process
+working directory**, not the config file's directory. The example-specific
+instructions below use the working directories expected by their configs.
+
 ---
 
 ## 1. Server–Client Example
@@ -44,7 +78,7 @@ For compilation and step-by-step run instructions, see:
 
 An example focused on **block-based file encryption**, inspired by RocksDB-style block layouts:
 
-- Random key–value pairs are packed into fixed-size (32 KB) blocks.
+- Random byte buffers representing key–value entries are packed into fixed-size (32 KiB) blocks.
 - Remaining space in a block is zero-padded.
 - Each file uses a session key obtained via SST; all ten blocks in that file share the key.
 - Multiple encrypted blocks are written into files, along with metadata describing the session keys used.
@@ -61,7 +95,7 @@ For compilation and step-by-step run instructions, see:
 
 ## 4. SST Testbed
 
-A testbed to experiment attacks on SST.
+A testbed for experimenting with attacks on SST, using C++ programs that call the C API.
 
 - Uses Auth, example entities, and CSV-driven traffic patterns.
 - Includes:

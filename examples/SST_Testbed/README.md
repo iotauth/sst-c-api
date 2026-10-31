@@ -14,7 +14,7 @@ SST Testbed is an open-source, extensible platform for evaluating the security a
 
 The growing prevalence of IoT devices has introduced significant security challenges, as their constant connectivity and limited resources make them vulnerable to network-level attacks. SST Testbed addresses the lack of open-source security testbeds designed for constrained environments by providing a practical, reproducible environment for attack simulation and defense evaluation.
 
-SST Testbed builds upon the [Secure Swarm Toolkit (SST)](https://github.com/iotauth/iotauth) using the C API. SST introduces a local authorization entity, **Auth**, that acts as a Key Distribution Center (KDC), providing authentication and authorization services for connected devices.
+SST Testbed builds upon the [Secure Swarm Toolkit (SST)](https://github.com/iotauth/iotauth) using C++ programs that call the C API in `entity/c/src/`. The separate C++17 API in `entity/c/cpp/` is not used by this testbed. SST introduces a local authorization entity, **Auth**, that acts as a Key Distribution Center (KDC), providing authentication and authorization services for connected devices.
 
 ## Workflow
 
@@ -93,9 +93,9 @@ Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No ke
 # Prerequisites
 ### ***Auth***
 1. OpenSSL command line tools for creating certificates and keystores of Auths and example entities
-2. Java 11 or above
+2. JDK 17 (the version used by CI)
 3. [Maven CLI (command line interface)](http://maven.apache.org/ref/3.1.0/maven-embedder/cli.html) for building Auth from the command line
-4. Node.js for running example server and client entities
+4. Node.js/npm for credential and configuration generation
 ### `sst-c-api`
 1. OpenSSL 3.0 or above
 2. CMake 3.19 or above
@@ -103,7 +103,7 @@ Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No ke
 ### Debian/Ubuntu
 ```
 sudo apt-get update && sudo apt-get install -y \
-    openjdk-11-jdk \
+    openjdk-17-jdk \
     maven \
     nodejs \
     npm \
@@ -116,7 +116,7 @@ sudo apt-get update && sudo apt-get install -y \
 ---
 ### MacOS
 ```
-brew install openjdk@11 maven node openssl cmake pkg-config
+brew install openjdk@17 maven node openssl cmake pkg-config
 ```
 
 ## Verify versions
@@ -139,7 +139,10 @@ $ git submodule update --init
 
 ### Compilation of Auth
 
-Generate example credentials by running `./generateAll.sh` from `iotauth/examples`, then run `mvn clean install` from `iotauth/auth/auth-server`.
+Set `$SST_ROOT` to the absolute path of the main `iotauth` repository. Follow the
+[shared Auth setup](../README.md#shared-auth-setup) to build the parent Maven
+project and generate credentials using the default graph. The commands below
+use the same example password, `asdf`.
 
 ### Compile the SST_Testbed code
 
@@ -170,15 +173,16 @@ We clarify that all examples need the Auth, to distribute keys, so launching the
 However, for convenience, DoS attacks with multiple clients have it's own script to launch the Auth and clients.
 
 ### Running the Auth
-1. Go to `$ROOT/auth/auth-server/`
+After building and generating credentials as above, start Auth in a separate terminal:
 
-2. Build the executable jar file by running `mvn clean install`
-
-3. Run the jar file with the properties file for Auth101 with `java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`
+```sh
+cd "$SST_ROOT/auth/auth-server"
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
+```
 
 ## 1. Basic Messaging
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/basic_messages.csv` to have the client send custom messages to the server.
     - The format of the input CSV file for this example should be:
@@ -201,7 +205,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 ## 2. Attack Scenarios
 ## 2.1 Replay Attack
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/replay_attack.csv` to have the client send custom messages and replay attacks to the server,
     - The format of the input CSV file for this attack example should be:
@@ -225,7 +229,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 ## 2.2 Denial of Service (DoS) attack
 ## 2.2.1 DoS attack to Auth via session key requests (DoSK)
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_key.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -247,7 +251,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 ## 2.2.2 DoS attack to Server via message flooding (DoSM)
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_message.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -269,7 +273,7 @@ However, for convenience, DoS attacks with multiple clients have it's own script
 
 ## 2.2.3 DoS attack to Server and Auth via connection requests (DoSC)
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_connect.csv` to have the client send custom messages and DoS attacks to the server.
     - The format of the input CSV file for this attack example should be:
@@ -295,7 +299,7 @@ So, also make sure that the ***Auth*** executed before is terminated.
 
 ### Create New Graph for Auth Databases and Configuration Files for the Clients
 
-1. Go to `$ROOT/entity/c/examples/SST_Testbed/clients_dos_attack`
+1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/clients_dos_attack`
 
 2. *[Optional]* `chmod +x clients_dos_setup.sh`
 
@@ -304,7 +308,9 @@ So, also make sure that the ***Auth*** executed before is terminated.
     - *[Optional]* `<password>` is the password of the generated Auth.
     - e.g., `./clients_dos_setup.sh 3 -p asdf`
 
-4. Insert a password when prompted.
+4. If `-p` was omitted, supply the password when prompted. The setup script runs
+   `cleanAll.sh`, regenerates Auth databases and credentials for the custom graph,
+   and starts Auth; it replaces the earlier generated example setup.
 
 5. Run `./run_clients.sh <number-of-clients> <input-file>`
     - `<number-of-clients>` is the number of clients that should be created during this execution.
@@ -312,4 +318,6 @@ So, also make sure that the ***Auth*** executed before is terminated.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv `
 
-Each client will be launched in a unique terminal window and will simultaneously perform the attack specified in the input CSV file.
+`run_clients.sh` launches the server and clients in separate terminal windows
+when a supported GUI terminal is available, or as background processes in a
+headless environment. The clients perform the attack specified in the input CSV file.

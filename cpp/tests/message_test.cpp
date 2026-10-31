@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdio>
 #include <cstdlib>
@@ -435,8 +436,8 @@ void test_session_key_resp_message() {
     CHECK(keys.s_key[0].mac_key_size == 32 && keys.s_key[0].mac_key[0] == 0x22);
 
     // WITH_DIST_KEY: the encrypted distribution key comes first.
-    Bytes with_dist(512, 0x33);
-    with_dist.insert(with_dist.end(), enc.begin(), enc.end());
+    Bytes with_dist(512 + enc.size(), 0x33);
+    std::copy_n(enc.begin(), enc.size(), with_dist.begin() + 512);
     SessionKeyRespMessage resp2(
         IoTSPMessage(MessageType::SESSION_KEY_RESP_WITH_DIST_KEY, with_dist),
         256);
