@@ -67,12 +67,14 @@ static int read_esp_field(const char* dev, const char* prefix, double* out) {
 
 /* Generic target-local check: reads check `name` from the plan's
  * verificationPlan, confirms its selected method, reads the sensor value after
- * `prefix`, and requires value >= min (from parameter `param`).
+ * `prefix`, and requires value >= min (from parameter `param`). If the plan
+ * also carries `max_param`, it additionally requires value <= max.
  * @return 1 pass (or absent from the plan), 0 fail. */
 static int verify_esp_local(const char* challenge, const char* dev,
                             const char* name, const char* method,
-                            const char* param, const char* prefix,
-                            const char* label, long min_bound, long max_bound) {
+                            const char* param, const char* max_param,
+                            const char* prefix, const char* label,
+                            long min_bound, long max_bound) {
     plan_json j;
     char got_method[64] = {0};
     if (!challenge || plan_json_parse(challenge, &j)) {
@@ -100,6 +102,14 @@ static int verify_esp_local(const char* challenge, const char* dev,
         SST_print_error("%s: plan has no %s.", name, param);
         return 0;
     }
+    long max_val = 0;
+    int max_field = plan_json_field(&j, params, max_param);
+    int have_max = (max_field >= 0); /* upper bound is optional */
+    if (have_max &&
+        plan_json_int(&j, max_field, min_bound, max_bound, &max_val)) {
+        SST_print_error("%s: plan has invalid %s.", name, max_param);
+        return 0;
+    }
     uint64_t observed_us = 0;
     freshness_now_us(&observed_us);
     double value = 0.0;
@@ -108,25 +118,36 @@ static int verify_esp_local(const char* challenge, const char* dev,
                         name, dev);
         return 0;
     }
-    int pass = value >= (double)min_val;
-    SST_print_log(
-        "%s: method=%s %s=%.1f min=%ld dev=%s observed_at_us=%llu local=%s", name,
-        method, label, value, min_val, dev, (unsigned long long)observed_us,
-        pass ? "PASS" : "FAIL");
+    int pass = value >= (double)min_val &&
+               (!have_max || value <= (double)max_val);
+    if (have_max)
+        SST_print_log(
+            "%s: method=%s %s=%.1f min=%ld max=%ld dev=%s observed_at_us=%llu "
+            "local=%s",
+            name, method, label, value, min_val, max_val, dev,
+            (unsigned long long)observed_us, pass ? "PASS" : "FAIL");
+    else
+        SST_print_log(
+            "%s: method=%s %s=%.1f min=%ld dev=%s observed_at_us=%llu local=%s",
+            name, method, label, value, min_val, dev,
+            (unsigned long long)observed_us, pass ? "PASS" : "FAIL");
     return pass ? 1 : 0;
 }
 
-/* TEMPERATURE_CHECK (thermistor): value_c >= min_temperature_celsius. */
+/* TEMPERATURE_CHECK (thermistor): min_temperature_celsius <= value_c
+ * [<= max_temperature_celsius, when the plan carries it]. */
 static int verify_temperature_local(const char* challenge, const char* dev) {
     return verify_esp_local(challenge, dev, "TEMPERATURE_CHECK", "THERMOMETER",
-                            "min_temperature_celsius", "TEMP=", "temp_c", -120,
-                            1000);
+                            "min_temperature_celsius", "max_temperature_celsius",
+                            "TEMP=", "temp_c", -120, 1000);
 }
 
-/* HUMIDITY_CHECK (DHT11): value_pct >= min_humidity. */
+/* HUMIDITY_CHECK (DHT11): min_humidity <= value_pct
+ * [<= max_humidity, when the plan carries it]. */
 static int verify_humidity_local(const char* challenge, const char* dev) {
     return verify_esp_local(challenge, dev, "HUMIDITY_CHECK", "HUMIDITY",
-                            "min_humidity", "HUM=", "humidity_pct", 0, 100);
+                            "min_humidity", "max_humidity", "HUM=",
+                            "humidity_pct", 0, 100);
 }
 
 #endif
