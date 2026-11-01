@@ -16,6 +16,10 @@ SST_ctx_t* init_SST(const char* config_path) {
     // This is needed because, Lingua Franca uses the "atexit" handler, and
     // there are still messages to be sent after the atexit handler.
     SST_ctx_t* ctx = malloc(sizeof(SST_ctx_t));
+    if (ctx == NULL) {
+        return NULL;
+    }
+    ctx->verification_policy_json = NULL;
     if (load_config(&ctx->config, config_path) < 0) {
         SST_print_error("Failed to load_config()");
         return NULL;

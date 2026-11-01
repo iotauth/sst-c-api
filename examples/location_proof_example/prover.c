@@ -2,21 +2,34 @@
 #include <stdlib.h>
 
 #include "../../src/c_api.h"
+#include "multilateration.h"
 #include "protocol.h"
+#include "uwb_reader.h"
+
+#define ANCHOR_WIDTH_M 1.0668
+#define ANCHOR_HEIGHT_M 0.5842
+
+static void set_anchor_coordinates(
+    AnchorMeasurement measurements[UWB_ANCHOR_COUNT]) {
+    measurements[0].x = 0.0;
+    measurements[0].y = 0.0;
+
+    measurements[1].x = ANCHOR_WIDTH_M;
+    measurements[1].y = 0.0;
+
+    measurements[2].x = 0.0;
+    measurements[2].y = ANCHOR_HEIGHT_M;
+
+    measurements[3].x = ANCHOR_WIDTH_M;
+    measurements[3].y = ANCHOR_HEIGHT_M;
+}
 
 int main(int argc, char* argv[]) {
-    if (argc != 2 && argc != 4) {
-        SST_print_error_exit("Usage: %s <config_file_path> [x y]", argv[0]);
+    if (argc != 2) {
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
     const char* config_path = argv[1];
-    double x = 1.50;
-    double y = 0.50;
-
-    if (argc == 4) {
-        x = strtod(argv[2], NULL);
-        y = strtod(argv[3], NULL);
-    }
 
     SST_ctx_t* ctx = init_SST(config_path);
 
@@ -34,10 +47,6 @@ int main(int argc, char* argv[]) {
 
     printf("[PROVER] Received session key\n");
 
-    /*
-     * Establish secure SST connection
-     * with the Resource.
-     */
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
 
@@ -47,12 +56,6 @@ int main(int argc, char* argv[]) {
 
     printf("[PROVER] Secure connection established\n");
 
-    /*
-     * Build action request.
-     *
-     * The Robot requests a MOVE action.
-     * Location requirements are defined by the Resource policy.
-     */
     ActionRequest request = {.msg_type = MSG_ACTION_REQUEST,
                              .action = ACTION_MOVE};
 
@@ -65,9 +68,6 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("Failed send_secure_message().");
     }
 
-    /*
-     * Wait for the location request.
-     */
     uint8_t message_type;
 
     if (read_exact_message(session_ctx, &message_type, sizeof(message_type),
@@ -82,15 +82,56 @@ int main(int argc, char* argv[]) {
     printf("[PROVER] Resource requested location\n");
 
     /*
-     * Use the supplied prototype location.
-     * This will later be replaced by UWB multilateration.
+     * Open the UWB tag and collect one complete set
+     * of measurements from A1-A4.
      */
+    int uwb_fd = uwb_open();
+
+    if (uwb_fd < 0) {
+        SST_print_error_exit("Failed to open UWB device.");
+    }
+
+    printf("[PROVER] Collecting UWB measurements...\n");
+
+    AnchorMeasurement measurements[UWB_ANCHOR_COUNT];
+
+    if (!uwb_read_measurements(uwb_fd, measurements)) {
+        uwb_close(uwb_fd);
+        SST_print_error_exit("Failed to collect UWB measurements.");
+    }
+
+    uwb_close(uwb_fd);
+
+    /*
+     * uwb_read_measurements() provides anchor IDs and distances.
+     * Supply the known physical coordinates of the testbed.
+     */
+    set_anchor_coordinates(measurements);
+
+    printf("[PROVER] UWB measurements:\n");
+
+    for (int i = 0; i < UWB_ANCHOR_COUNT; i++) {
+        printf("  A%d: %.3f m\n", measurements[i].id,
+               measurements[i].distance);
+    }
+
+    /*
+     * Estimate the Robot's position using four-anchor
+     * least-squares multilateration.
+     */
+    Position position;
+
+    if (!multilaterate(measurements, UWB_ANCHOR_COUNT, &position)) {
+        SST_print_error_exit("Multilateration failed.");
+    }
+
+    printf("[PROVER] Estimated position: (%.3f, %.3f) m\n", position.x,
+           position.y);
 
     LocationResponse location_response = {
-        .msg_type = MSG_LOCATION_RESPONSE, .x = x, .y = y};
-
-    printf("[PROVER] Current position: (%.2f, %.2f)\n", location_response.x,
-           location_response.y);
+        .msg_type = MSG_LOCATION_RESPONSE,
+        .x = position.x,
+        .y = position.y};
 
     result = send_secure_message((char*)&location_response,
                                  sizeof(location_response), session_ctx);
@@ -111,15 +152,13 @@ int main(int argc, char* argv[]) {
     if (response.msg_type != MSG_ACTION_RESPONSE) {
         SST_print_error_exit("Unexpected message type.");
     }
+
     if (response.allowed) {
         printf("[PROVER] ACTION ALLOWED\n");
     } else {
         printf("[PROVER] ACTION DENIED\n");
     }
 
-    /*
-     * Cleanup.
-     */
     free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);

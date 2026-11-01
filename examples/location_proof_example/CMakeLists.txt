@@ -14,7 +14,9 @@ pkg_check_modules(CJSON REQUIRED IMPORTED_TARGET libcjson)
 add_executable(
     prover
     prover.c
-    protocol.c
+    protocol.c  
+    uwb_reader.c
+    multilateration.c
 )
 
 add_executable(
@@ -41,6 +43,7 @@ add_executable(
 target_link_libraries(
     prover
     sst-c-api
+    m
 )
 
 target_link_libraries(

@@ -113,6 +113,7 @@ typedef struct {
     void* priv_key;
     pthread_mutex_t mutex;
     char purpose_for_requesting_key[MAX_PURPOSE_LENGTH + 1];
+    char* verification_policy_json;
 } SST_ctx_t;
 
 // Load config file from path and save the information in ctx struct.

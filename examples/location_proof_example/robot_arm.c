@@ -15,34 +15,17 @@
 #define PORT_NUM 21100
 
 int main(int argc, char* argv[]) {
-    if (argc != 3) {
-        SST_print_error_exit(
-            "Usage: %s <config_file_path> <verification_policy_path>", argv[0]);
+    if (argc != 2) {
+        SST_print_error_exit("Usage: %s <config_file_path>", argv[0]);
     }
 
     const char* config_path = argv[1];
-    const char* policy_path = argv[2];
 
     SST_ctx_t* ctx = init_SST(config_path);
 
     if (ctx == NULL) {
         SST_print_error_exit("init_SST() failed.");
     }
-
-    char* verification_policy = load_verification_policy(policy_path);
-
-    if (verification_policy == NULL) {
-        SST_print_error_exit("Failed to load verification policy.");
-    }
-
-    VerificationPolicy policy;
-
-    if (parse_verification_policy(verification_policy, &policy) != 0) {
-        free_verification_policy_json(verification_policy);
-        SST_print_error_exit("Failed to parse verification policy.");
-    }
-
-    printf("[RESOURCE] Verification policy loaded\n");
 
     int serv_sock = socket(PF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1) {
@@ -83,6 +66,33 @@ int main(int argc, char* argv[]) {
 
     printf("[RESOURCE] TCP connection accepted\n");
 
+    session_key_list_t* s_key_list = init_empty_session_key_list();
+
+    SST_session_ctx_t* session_ctx =
+        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+
+    if (session_ctx == NULL) {
+        SST_print_error_exit("Failed server_secure_comm_setup().");
+    }
+
+    printf("[RESOURCE] Secure SST session established\n");
+
+    /*
+     * The verification policy is supplied by Auth together with the
+     * session-key response.
+     */
+    if (ctx->verification_policy_json == NULL) {
+        SST_print_error_exit("No verification policy received from Auth.");
+    }
+
+    VerificationPolicy policy;
+
+    if (parse_verification_policy(ctx->verification_policy_json, &policy) != 0) {
+        SST_print_error_exit("Failed to parse verification policy from Auth.");
+    }
+
+    printf("[RESOURCE] Verification policy received from Auth\n");
+
     printf(
         "[RESOURCE] Parsed verification policy:\n"
         "  Type: %s\n"
@@ -104,17 +114,6 @@ int main(int argc, char* argv[]) {
         policy.required_zone.name, policy.required_zone.x_min,
         policy.required_zone.x_max, policy.required_zone.y_min,
         policy.required_zone.y_max, policy.max_error_m);
-
-    session_key_list_t* s_key_list = init_empty_session_key_list();
-
-    SST_session_ctx_t* session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
-
-    if (session_ctx == NULL) {
-        SST_print_error_exit("Failed server_secure_comm_setup().");
-    }
-
-    printf("[RESOURCE] Secure SST session established\n");
 
     ActionRequest request;
 
@@ -143,7 +142,6 @@ int main(int argc, char* argv[]) {
 
         free_session_ctx(session_ctx);
         free_session_key_list_t(s_key_list);
-        free_verification_policy_json(verification_policy);
 
         close(clnt_sock);
         close(serv_sock);
@@ -185,8 +183,10 @@ int main(int argc, char* argv[]) {
 
     bool allowed = verify_position_against_policy(location_response.x,
                                                   location_response.y, &policy);
+
     ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
                                .allowed = allowed ? 1 : 0};
+
     if (allowed) {
         printf("[RESOURCE] Location verification successful at (%.2f, %.2f)\n",
                location_response.x, location_response.y);
@@ -208,7 +208,6 @@ int main(int argc, char* argv[]) {
 
     free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list);
-    free_verification_policy_json(verification_policy);
     close(clnt_sock);
     close(serv_sock);
     free_SST_ctx_t(ctx);
