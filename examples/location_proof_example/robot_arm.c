@@ -28,17 +28,20 @@ int main(int argc, char* argv[]) {
     }
 
     int serv_sock = socket(PF_INET, SOCK_STREAM, 0);
+
     if (serv_sock == -1) {
         SST_print_error_exit("socket() error in %s", __FILE__);
     }
 
     int on = 1;
+
     if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
         SST_print_error_exit("setsockopt() failed.");
     }
 
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
+
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
     serv_addr.sin_port = htons(PORT_NUM);
@@ -52,163 +55,162 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("listen() error in %s", __FILE__);
     }
 
-    printf("[RESOURCE] Waiting for connection on port %d...\n", PORT_NUM);
+    printf("[RESOURCE] Waiting for connections on port %d...\n", PORT_NUM);
 
-    struct sockaddr_in clnt_addr;
-    socklen_t clnt_addr_size = sizeof(clnt_addr);
+    int trial = 0;
 
-    int clnt_sock =
-        accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+    while (1) {
+        struct sockaddr_in clnt_addr;
+        socklen_t clnt_addr_size = sizeof(clnt_addr);
 
-    if (clnt_sock == -1) {
-        SST_print_error_exit("accept() error in %s", __FILE__);
-    }
+        int clnt_sock =
+            accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
 
-    printf("[RESOURCE] TCP connection accepted\n");
+        if (clnt_sock == -1) {
+            SST_print_error("accept() error.");
+            continue;
+        }
 
-    session_key_list_t* s_key_list = init_empty_session_key_list();
+        trial++;
 
-    SST_session_ctx_t* session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
+        printf("\n");
+        printf("========================================\n");
+        printf("[RESOURCE] TRIAL %d\n", trial);
+        printf("========================================\n");
 
-    if (session_ctx == NULL) {
-        SST_print_error_exit("Failed server_secure_comm_setup().");
-    }
+        session_key_list_t* s_key_list = init_empty_session_key_list();
 
-    printf("[RESOURCE] Secure SST session established\n");
+        if (s_key_list == NULL) {
+            close(clnt_sock);
+            continue;
+        }
 
-    /*
-     * The verification policy is supplied by Auth together with the
-     * session-key response.
-     */
-    if (ctx->verification_policy_json == NULL) {
-        SST_print_error_exit("No verification policy received from Auth.");
-    }
+        SST_session_ctx_t* session_ctx =
+            server_secure_comm_setup(ctx, clnt_sock, s_key_list);
 
-    VerificationPolicy policy;
+        if (session_ctx == NULL) {
+            SST_print_error("Failed server_secure_comm_setup().");
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
 
-    if (parse_verification_policy(ctx->verification_policy_json, &policy) != 0) {
-        SST_print_error_exit("Failed to parse verification policy from Auth.");
-    }
+        printf("[RESOURCE] Secure SST session established\n");
 
-    printf("[RESOURCE] Verification policy received from Auth\n");
+        if (ctx->verification_policy_json == NULL) {
+            SST_print_error("No verification policy received from Auth.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
 
-    printf(
-        "[RESOURCE] Parsed verification policy:\n"
-        "  Type: %s\n"
-        "  Method: %s\n"
-        "  Ranging method: %s\n"
-        "  Anchors: %d\n",
-        policy.type, policy.method, policy.ranging_method, policy.anchor_count);
+        VerificationPolicy policy;
 
-    for (int i = 0; i < policy.anchor_count; i++) {
-        printf("  Anchor %d: (%.2f, %.2f)\n", policy.anchors[i].id,
-               policy.anchors[i].x, policy.anchors[i].y);
-    }
+        if (parse_verification_policy(ctx->verification_policy_json, &policy) !=
+            0) {
+            SST_print_error("Failed to parse verification policy from Auth.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
 
-    printf(
-        "  Required zone: %s\n"
-        "  X bounds: %.2f - %.2f\n"
-        "  Y bounds: %.2f - %.2f\n"
-        "  Maximum error: %.2f m\n",
-        policy.required_zone.name, policy.required_zone.x_min,
-        policy.required_zone.x_max, policy.required_zone.y_min,
-        policy.required_zone.y_max, policy.max_error_m);
+        printf("[RESOURCE] Verification policy received from Auth\n");
 
-    ActionRequest request;
+        ActionRequest request;
 
-    if (read_exact_message(session_ctx, &request, sizeof(request),
-                           "ActionRequest") != 0) {
-        SST_print_error_exit("Failed to receive ActionRequest.");
-    }
+        if (read_exact_message(session_ctx, &request, sizeof(request),
+                               "ActionRequest") != 0) {
+            SST_print_error("Failed to receive ActionRequest.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
 
-    if (request.msg_type != MSG_ACTION_REQUEST) {
-        SST_print_error_exit("Unexpected message type.");
-    }
+        if (request.msg_type != MSG_ACTION_REQUEST) {
+            SST_print_error("Unexpected message type.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
 
-    /* Only ACTION_MOVE is currently supported. */
-    if (request.action != ACTION_MOVE) {
-        printf("[RESOURCE] Unsupported action: %u\n", request.action);
+        if (request.action != ACTION_MOVE) {
+            ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
+                                       .allowed = 0};
 
-        ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
-                                   .allowed = 0};
+            send_secure_message((char*)&response, sizeof(response),
+                                session_ctx);
 
-        int result = send_secure_message((char*)&response, sizeof(response),
-                                         session_ctx);
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
+
+        printf("[RESOURCE] MOVE request received\n");
+
+        uint8_t location_request = MSG_LOCATION_REQUEST;
+
+        int result = send_secure_message((char*)&location_request,
+                                         sizeof(location_request), session_ctx);
 
         if (result < 0) {
-            SST_print_error_exit("Failed send_secure_message().");
+            SST_print_error("Failed to send location request.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
+
+        LocationResponse location_response;
+
+        if (read_exact_message(session_ctx, &location_response,
+                               sizeof(location_response),
+                               "LocationResponse") != 0) {
+            SST_print_error("Failed to receive LocationResponse.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
+
+        if (location_response.msg_type != MSG_LOCATION_RESPONSE) {
+            SST_print_error("Unexpected message type.");
+            free_session_ctx(session_ctx);
+            free_session_key_list_t(s_key_list);
+            close(clnt_sock);
+            continue;
+        }
+
+        bool allowed =
+            verify_position_against_policy(location_response.x,
+                                           location_response.y, &policy);
+
+        ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
+                                   .allowed = allowed ? 1 : 0};
+
+        result =
+            send_secure_message((char*)&response, sizeof(response), session_ctx);
+
+        if (result < 0) {
+            SST_print_error("Failed send_secure_message().");
+        } else {
+            printf("[RESOURCE] Position: (%.3f, %.3f) -> %s\n",
+                   location_response.x, location_response.y,
+                   allowed ? "ALLOW" : "DENY");
         }
 
         free_session_ctx(session_ctx);
         free_session_key_list_t(s_key_list);
-
         close(clnt_sock);
-        close(serv_sock);
 
-        free_SST_ctx_t(ctx);
-
-        return EXIT_FAILURE;
+        printf("[RESOURCE] Trial %d complete\n", trial);
+        printf("[RESOURCE] Waiting for next connection...\n");
     }
 
-    printf("[RESOURCE] Received MOVE request\n");
-
-    uint8_t location_request = MSG_LOCATION_REQUEST;
-
-    int result = send_secure_message((char*)&location_request,
-                                     sizeof(location_request), session_ctx);
-
-    if (result < 0) {
-        SST_print_error_exit("Failed to send location request.");
-    }
-
-    printf("[RESOURCE] Location requested\n");
-
-    LocationResponse location_response;
-
-    if (read_exact_message(session_ctx, &location_response,
-                           sizeof(location_response),
-                           "LocationResponse") != 0) {
-        SST_print_error_exit("Failed to receive LocationResponse.");
-    }
-
-    if (location_response.msg_type != MSG_LOCATION_RESPONSE) {
-        SST_print_error_exit("Unexpected message type.");
-    }
-
-    printf(
-        "[RESOURCE] Robot claims position: "
-        "(%.2f, %.2f)\n",
-        location_response.x, location_response.y);
-
-    bool allowed = verify_position_against_policy(location_response.x,
-                                                  location_response.y, &policy);
-
-    ActionResponse response = {.msg_type = MSG_ACTION_RESPONSE,
-                               .allowed = allowed ? 1 : 0};
-
-    if (allowed) {
-        printf("[RESOURCE] Location verification successful at (%.2f, %.2f)\n",
-               location_response.x, location_response.y);
-        printf("[RESOURCE] Movement allowed\n");
-    } else {
-        printf("[RESOURCE] Location verification failed at (%.2f, %.2f)\n",
-               location_response.x, location_response.y);
-        printf("[RESOURCE] Movement denied\n");
-    }
-
-    result =
-        send_secure_message((char*)&response, sizeof(response), session_ctx);
-
-    if (result < 0) {
-        SST_print_error_exit("Failed send_secure_message().");
-    }
-
-    printf("[RESOURCE] Response sent\n");
-
-    free_session_ctx(session_ctx);
-    free_session_key_list_t(s_key_list);
-    close(clnt_sock);
     close(serv_sock);
     free_SST_ctx_t(ctx);
 
