@@ -40,18 +40,17 @@ int main(void) {
          * A1 (0.000, 0.000) -------- A2 (0.588, 0.000)
          */
 
-        measurements[0].x = 0.000;
-        measurements[0].y = 0.000;
+        measurements[0].x = 0.0000;
+        measurements[0].y = 0.0000;
 
-        measurements[1].x = 0.588;
-        measurements[1].y = 0.000;
+        measurements[1].x = 1.0160;
+        measurements[1].y = 0.0000;
 
-        measurements[2].x = 0.000;
-        measurements[2].y = 0.200;
+        measurements[2].x = 0.0000;
+        measurements[2].y = 0.5842;
 
-        measurements[3].x = 0.588;
-        measurements[3].y = 0.200;
-
+        measurements[3].x = 1.0160;
+        measurements[3].y = 0.5842;
         printf("UWB measurements:\n");
 
         for (int i = 0; i < UWB_ANCHOR_COUNT; i++) {

@@ -1,5 +1,5 @@
 /**
- * Interface for reading UWB ranging measurements over serial
+ * Interface for reading UWB ranging measurements over serial.
  */
 
 #ifndef UWB_READER_H
@@ -8,11 +8,14 @@
 #include <termios.h>
 
 #include "multilateration.h"
-// just for rpi for now
+
+/* Raspberry Pi UWB tag serial device. */
 #define UWB_SERIAL_DEVICE                                      \
     "/dev/serial/by-id/"                                       \
     "usb-Nordic_Semiconductor_nRF52_USB_Product_C0CD5133BBC8-" \
-    "if00" #define UWB_BAUD_RATE B115200
+    "if00"
+
+#define UWB_BAUD_RATE B115200
 #define UWB_ANCHOR_COUNT 4
 
 /**
@@ -30,8 +33,8 @@ int uwb_open(void);
  *
  * @return true when four measurements were successfully collected.
  */
-bool uwb_read_measurements(int fd,
-                           AnchorMeasurement measurements[UWB_ANCHOR_COUNT]);
+bool uwb_read_measurements(
+    int fd, AnchorMeasurement measurements[UWB_ANCHOR_COUNT]);
 
 void uwb_close(int fd);
 

@@ -64,9 +64,9 @@ static bool parse_measurement(const char *line,
     unsigned int anchor_id;
     int distance_cm;
 
-    const char *mac = strstr(line, "mac_address=0x");
-    const char *status = strstr(line, "status=\"SUCCESS\"");
-    const char *distance = strstr(line, "distance[cm]=");
+    const char* mac = strstr(line, "mac_address=0x");
+    const char* status = strstr(line, "status=\"SUCCESS\"");
+    const char* distance = strstr(line, "distance[cm]=");
 
     if (mac == NULL || status == NULL || distance == NULL) {
         return false;
