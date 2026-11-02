@@ -7,7 +7,7 @@
 
 // This file includes functions that uses the struct "session_key"
 
-#define MAX_AUTH_COMM_LENGTH 1024
+#define MAX_AUTH_COMM_LENGTH 4096
 
 #define IDLE 0
 #define HANDSHAKE_1_SENT 10

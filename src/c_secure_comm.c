@@ -249,8 +249,9 @@ static unsigned int parse_session_key(session_key_t* ret, unsigned char* buf) {
     return cur_idx;
 }
 
-// Separate the session key, nonce, and crypto spec from the message.
-// @param buf input buffer with session key, nonce, and crypto spec
+// Separate the session key, nonce, crypto spec, and verification policy
+// from the message.
+// @param buf input buffer with session key, nonce, crypto spec, and policy
 // @param buf_length length of buf
 // @param reply_nonce nonce to compare with
 // @param session_key_list session key list struct
@@ -260,6 +261,7 @@ static int parse_session_key_response(SST_ctx_t* ctx, unsigned char* buf,
                                       session_key_list_t* session_key_list) {
     memcpy(reply_nonce, buf, NONCE_SIZE);
     unsigned int buf_idx = NONCE_SIZE;
+
     unsigned int ret_length;
     unsigned char* ret =
         parse_string_param(buf, buf_length, buf_idx, &ret_length);
@@ -271,18 +273,53 @@ static int parse_session_key_response(SST_ctx_t* ctx, unsigned char* buf,
     //~~use ret~~
     free(ret);
     buf_idx += ret_length;
+
     unsigned int session_key_list_length =
         read_unsigned_int_BE(&buf[buf_idx], 4);
-
     buf_idx += 4;
+
     for (unsigned int i = 0; i < session_key_list_length; i++) {
-        buf = buf + buf_idx;
-        buf_idx = parse_session_key(&session_key_list->s_key[i], buf);
+        unsigned int key_length =
+            parse_session_key(&session_key_list->s_key[i], buf + buf_idx);
+        buf_idx += key_length;
         update_enc_mode_and_hmac_mode_to_session_key(
             ctx, &session_key_list->s_key[i]);
     }
     session_key_list->num_key = (int)session_key_list_length;
     session_key_list->rear_idx = session_key_list->num_key % MAX_SESSION_KEY;
+    // Parse verification policy sent by Auth.
+    if (buf_idx < buf_length) {
+        unsigned int policy_param_length;
+        unsigned char* policy =
+            parse_string_param(buf, buf_length, buf_idx, &policy_param_length);
+        if (policy == NULL) {
+            SST_print_error("Failed to parse verification policy.");
+            return -1;
+        }
+        unsigned int policy_length;
+        int var_len_int_buf_size;
+        var_length_int_to_num(buf + buf_idx, buf_length, &policy_length,
+                              &var_len_int_buf_size);
+        if (var_len_int_buf_size == 0) {
+            free(policy);
+            SST_print_error("Failed to parse verification policy length.");
+            return -1;
+        }
+
+        free(ctx->verification_policy_json);
+        ctx->verification_policy_json =
+            (char*)malloc(policy_length + 1);
+        if (ctx->verification_policy_json == NULL) {
+            free(policy);
+            return -1;
+        }
+        memcpy(ctx->verification_policy_json, policy, policy_length);
+        ctx->verification_policy_json[policy_length] = '\0';
+        free(policy);
+        SST_print_debug("Received verification policy: %s",
+                        ctx->verification_policy_json);
+    }
+
     return 0;
 }
 
