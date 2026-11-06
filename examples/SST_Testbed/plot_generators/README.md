@@ -59,6 +59,19 @@ Rows missing required columns are skipped.
 - Never overwrites existing files (auto-incremented names)
 - Produces a compact, clean figure suitable for reports
 
+## Tests
+
+With pandas and matplotlib installed, run from `entity/c/`:
+
+```sh
+MPLBACKEND=Agg python3 -m unittest discover -s examples/SST_Testbed/plot_generators -v
+```
+
+The tests cover prepared rows, raw-metrics aggregation, latency conversion,
+input paths/globs, inset axes and output filename collisions. CI runs them in
+an isolated Python environment. The plotter intentionally supports CSV paths
+chosen by the local caller, including files outside the working directory.
+
 ## Summary
 
 This script aggregates experimental results and visualizes how

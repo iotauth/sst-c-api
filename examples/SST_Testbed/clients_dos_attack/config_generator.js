@@ -29,7 +29,7 @@ function loadTemplate(templatePath) {
     return fs.readFileSync(templatePath, 'utf8').split(/\r?\n/);
   } catch (err) {
     console.error(
-      `Failed to read the template client config \"${templatePath}\": ${err.message}`
+      `Failed to read the template client config "${templatePath}": ${err.message}`
     );
     process.exit(1);
   }

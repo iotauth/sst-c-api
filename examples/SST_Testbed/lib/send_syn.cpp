@@ -14,8 +14,11 @@ extern "C" {
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
+#include <bit>
 #include <chrono>
 #include <random>
+#include <span>
 
 #include "metrics.hpp"
 
@@ -35,16 +38,23 @@ struct pseudo_header {
 } __attribute__((packed));
 
 // RFC 1071 16-bit one's complement checksum
-static uint16_t csum16(const void* data, size_t len) {
+static uint16_t csum16(std::span<const unsigned char> data) {
     uint32_t sum = 0;
-    const uint16_t* p = (const uint16_t*)data;
-    while (len > 1) {
-        sum += *p++;
-        len -= 2;
+    size_t offset = 0;
+    while (data.size() - offset >= sizeof(uint16_t)) {
+        uint16_t word;
+        memcpy(&word, data.data() + offset, sizeof(word));
+        sum += word;
+        offset += sizeof(word);
     }
-    if (len) sum += *(const uint8_t*)p;
+    if (offset < data.size()) sum += data[offset];
     while (sum >> 16) sum = (sum & 0xFFFF) + (sum >> 16);
-    return (uint16_t)(~sum);
+    return static_cast<uint16_t>(~sum);
+}
+
+template <typename T>
+static uint16_t checksum_object(const T& value) {
+    return csum16(std::bit_cast<std::array<unsigned char, sizeof(T)>>(value));
 }
 
 bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
@@ -52,17 +62,18 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
                                    MetricsRow* row) {
     // Build IPv4 + TCP SYN
     // Buffer for IP + TCP headers (no payload)
-    unsigned char packet[sizeof(struct ip) + sizeof(struct tcphdr)];
-    memset(packet, 0, sizeof(packet));
+    std::array<unsigned char, sizeof(ip) + sizeof(tcphdr)> packet{};
+    ip ipv4{};
+    tcphdr tcp{};
 
-    struct ip* iph = (struct ip*)packet;
-    struct tcphdr* tcph = (struct tcphdr*)(packet + sizeof(struct ip));
+    auto* iph = &ipv4;
+    auto* tcph = &tcp;
 
     // Fill IPv4 header (BSD layout)
     iph->ip_v = 4;
     iph->ip_hl = 5;
     iph->ip_tos = 0;
-    iph->ip_len = sizeof(packet);
+    iph->ip_len = packet.size();
     iph->ip_id = htons(0x1234);
     iph->ip_off = 0;
     iph->ip_ttl = 64;
@@ -88,36 +99,38 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
     tcph->th_urp = 0;
 
     // TCP checksum (pseudo header + TCP header [+ payload])
-    struct pseudo_header ph;
-    ph.saddr = *(uint32_t*)&iph->ip_src;
-    ph.daddr = *(uint32_t*)&iph->ip_dst;
+    struct pseudo_header ph{};
+    ph.saddr = iph->ip_src.s_addr;
+    ph.daddr = iph->ip_dst.s_addr;
     ph.zero = 0;
     ph.protocol = IPPROTO_TCP;
     ph.tcp_len = htons(sizeof(struct tcphdr));
 
-    unsigned char chkbuf[sizeof(ph) + sizeof(struct tcphdr)];
-    memcpy(chkbuf, &ph, sizeof(ph));
-    memcpy(chkbuf + sizeof(ph), tcph, sizeof(struct tcphdr));
-    tcph->th_sum = csum16(chkbuf, sizeof(chkbuf));
+    std::array<unsigned char, sizeof(ph) + sizeof(tcphdr)> chkbuf{};
+    memcpy(chkbuf.data(), &ph, sizeof(ph));
+    memcpy(chkbuf.data() + sizeof(ph), tcph, sizeof(struct tcphdr));
+    tcph->th_sum = csum16(chkbuf);
 
     // IP checksum (required when you provide your own IP header)
-    iph->ip_sum = csum16(iph, sizeof(struct ip));
+    iph->ip_sum = checksum_object(*iph);
 
     // Raw IP socket on macOS/BSD: use IPPROTO_RAW and set iph->ip_p to TCP
+    memcpy(packet.data(), iph, sizeof(*iph));
+    memcpy(packet.data() + sizeof(*iph), tcph, sizeof(*tcph));
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
     if (s < 0) {
         SST_print_error("socket() error");
         return false;
     }
 
-    int one = 1;
-    if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+    if (int one = 1;
+        setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         SST_print_error("setsockopt(IP_HDRINCL) error");
         close(s);
         return false;
     }
 
-    struct sockaddr_in dst;
+    struct sockaddr_in dst{};
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || \
     defined(__NetBSD__)
     dst.sin_len = sizeof(dst);  // macOS only
@@ -131,11 +144,12 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
         return false;
     }
 
+    auto destination = std::bit_cast<sockaddr>(dst);
     bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
         auto t0 = std::chrono::steady_clock::now();
-        ssize_t n = sendto(s, packet, sizeof(packet), 0, (struct sockaddr*)&dst,
-                           sizeof(dst));
+        ssize_t n = sendto(s, packet.data(), packet.size(), 0, &destination,
+                           sizeof(destination));
         auto t1 = std::chrono::steady_clock::now();
         long long dur_us =
             std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
@@ -184,12 +198,13 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     const size_t udp_len = sizeof(struct udphdr);
 
     // Fixed-size packet buffer
-    unsigned char packet[sizeof(struct ip) + sizeof(struct udphdr)];
-    memset(packet, 0, sizeof(packet));
+    std::array<unsigned char, sizeof(ip) + sizeof(udphdr)> packet{};
+    ip ipv4{};
+    udphdr udp{};
 
     // Layout: [IP][UDP]
-    struct ip* iph = (struct ip*)packet;
-    struct udphdr* udph = (struct udphdr*)(packet + ip_len);
+    auto* iph = &ipv4;
+    auto* udph = &udp;
 
     // Fill IPv4 header (BSD layout)
     iph->ip_v = 4;
@@ -221,21 +236,22 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     udph->uh_sum = 0;  // computed below
 
     // UDP checksum: pseudo header + UDP header
-    udp_pseudo_header ph;
-    ph.saddr = *(uint32_t*)&iph->ip_src;
-    ph.daddr = *(uint32_t*)&iph->ip_dst;
+    udp_pseudo_header ph{};
+    ph.saddr = iph->ip_src.s_addr;
+    ph.daddr = iph->ip_dst.s_addr;
     ph.zero = 0;
     ph.protocol = IPPROTO_UDP;
     ph.udp_len = htons((uint16_t)(udp_len + payload_len));
 
     // Build checksum buffer
-    unsigned char chkbuf[sizeof(udp_pseudo_header) + sizeof(struct udphdr) + 1];
+    std::array<unsigned char, sizeof(udp_pseudo_header) + sizeof(udphdr) + 1>
+        chkbuf{};
     size_t chklen = 0;
 
-    memcpy(chkbuf + chklen, &ph, sizeof(ph));
+    memcpy(chkbuf.data() + chklen, &ph, sizeof(ph));
     chklen += sizeof(ph);
 
-    memcpy(chkbuf + chklen, udph, udp_len);
+    memcpy(chkbuf.data() + chklen, udph, udp_len);
     chklen += udp_len;
 
     // Pad to even length for checksum
@@ -243,30 +259,31 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
         chkbuf[chklen++] = 0;
     }
 
-    udph->uh_sum = csum16(chkbuf, chklen);
+    udph->uh_sum = csum16(std::span(chkbuf).first(chklen));
     // In IPv4, UDP checksum of 0 means "no checksum", many stacks leave it 0.
     // Keep as is to force computed checksum.
 
     // IP checksum (required when IP_HDRINCL)
     iph->ip_sum = 0;
-    iph->ip_sum = csum16(iph, ip_len);
+    iph->ip_sum = checksum_object(*iph);
 
     // Raw socket
+    memcpy(packet.data(), iph, sizeof(*iph));
+    memcpy(packet.data() + sizeof(*iph), udph, sizeof(*udph));
     int s = socket(AF_INET, SOCK_RAW, IPPROTO_UDP);
     if (s < 0) {
         SST_print_error("socket() error");
         return false;
     }
 
-    int one = 1;
-    if (setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
+    if (int one = 1;
+        setsockopt(s, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
         SST_print_error("setsockopt(IP_HDRINCL) error");
         close(s);
         return false;
     }
 
-    struct sockaddr_in dst;
-    memset(&dst, 0, sizeof(dst));
+    struct sockaddr_in dst{};
 #if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || \
     defined(__NetBSD__)
     dst.sin_len = sizeof(dst);
@@ -279,11 +296,12 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
         return false;
     }
 
+    auto destination = std::bit_cast<sockaddr>(dst);
     bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
         auto t0 = std::chrono::steady_clock::now();
-        ssize_t n = sendto(s, packet, total_len, 0, (struct sockaddr*)&dst,
-                           sizeof(dst));
+        ssize_t n = sendto(s, packet.data(), total_len, 0, &destination,
+                           sizeof(destination));
         auto t1 = std::chrono::steady_clock::now();
         long long dur_us =
             std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
@@ -322,8 +340,7 @@ extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
     int s = socket(AF_INET, SOCK_DGRAM, 0);
     if (s < 0) return false;
 
-    struct sockaddr_in dst;
-    memset(&dst, 0, sizeof(dst));
+    struct sockaddr_in dst{};
     dst.sin_family = AF_INET;
     dst.sin_port = htons(dst_port);
     if (inet_pton(AF_INET, dst_ip, &dst.sin_addr) != 1) {
@@ -332,21 +349,23 @@ extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
     }
 
     // UDP connect: doesn't actually connect; just sets the default route/peer.
-    if (connect(s, (struct sockaddr*)&dst, sizeof(dst)) < 0) {
+    auto destination = std::bit_cast<sockaddr>(dst);
+    if (connect(s, &destination, sizeof(destination)) < 0) {
         close(s);
         return false;
     }
 
-    struct sockaddr_in local;
-    socklen_t len = sizeof(local);
-    if (getsockname(s, (struct sockaddr*)&local, &len) < 0) {
+    sockaddr address{};
+    if (socklen_t len = sizeof(address); getsockname(s, &address, &len) < 0) {
         close(s);
         return false;
     }
 
     close(s);
 
-    if (!inet_ntop(AF_INET, &local.sin_addr, out_ip, (socklen_t)out_ip_len)) {
+    auto local = std::bit_cast<sockaddr_in>(address);
+    if (!inet_ntop(AF_INET, &local.sin_addr, out_ip,
+                   static_cast<socklen_t>(out_ip_len))) {
         return false;
     }
 
@@ -358,12 +377,12 @@ extern "C" bool resolve_src_ip_or_default(const char* provided_src_ip,
                                           unsigned short dst_port,
                                           char* src_ip_buf, size_t ip_buf_len,
                                           const char** out_src_ip) {
-    if (out_src_ip == NULL || src_ip_buf == NULL) {
+    if (out_src_ip == nullptr || src_ip_buf == nullptr) {
         SST_print_error("resolve_src_ip_or_default() invalid input.");
         return false;
     }
 
-    if (provided_src_ip != NULL && provided_src_ip[0] != '\0') {
+    if (provided_src_ip != nullptr && provided_src_ip[0] != '\0') {
         *out_src_ip = provided_src_ip;
         return true;
     }

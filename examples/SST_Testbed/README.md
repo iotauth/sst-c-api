@@ -122,6 +122,8 @@ Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No ke
 ### `sst-c-api`
 1. OpenSSL 3.0 or above
 2. CMake 3.19 or above
+3. A C++20 compiler and standard library with `std::format` support. This
+   requirement applies to the Testbed; the separate C++ API remains C++17.
 ## Installation
 ### Debian/Ubuntu
 ```
@@ -177,6 +179,11 @@ use the same example password, `asdf`.
     - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.
 
 4. Run `make`
+
+Run `ctest --output-on-failure` from `build/` for the standalone regressions.
+`testbed_helpers_test` checks packet headers/checksums and metrics CSV output
+using intercepted socket calls; it does not send packets or need Auth.
+The [plotting regressions](plot_generators/README.md#tests) run separately in Python.
 
 # Running Examples
 We have multiple examples to run.

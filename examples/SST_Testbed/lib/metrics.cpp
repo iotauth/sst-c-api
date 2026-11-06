@@ -1,103 +1,95 @@
 #include "metrics.hpp"
 
+#include <chrono>
 #include <cmath>
-#include <ctime>
+#include <format>
 #include <fstream>
-#include <iomanip>
 #include <mutex>
 
-static std::mutex g_mu;
-static std::ofstream g_f;
-static bool g_open = false, g_header = false;
+namespace {
+struct MetricsFile {
+    std::mutex mutex;
+    std::ofstream stream;
+    bool header_written = false;
+};
 
-#include <chrono>
-#include <cstdint>
+MetricsFile& metrics_file() {
+    static MetricsFile file;
+    return file;
+}
 
-static inline long long epoch_us_now() {
+long long epoch_us_now() {
     return std::chrono::duration_cast<std::chrono::microseconds>(
                std::chrono::system_clock::now().time_since_epoch())
         .count();
 }
 
-// helper function for metrics_open_new_file()
-static bool file_exists(const std::string& path) {
-    std::ifstream p(path);
-    return p.good();
+bool file_exists(const std::string& path) {
+    std::ifstream file(path);
+    return file.good();
 }
 
-void metrics_open_new_file(const std::string& base) {
-    std::lock_guard<std::mutex> lk(g_mu);
-    if (g_open) return;
-
-    std::string name = base;
-    if (file_exists(name)) {
-        for (int i = 1;; ++i) {
-            std::string cand = name;
-            auto dot = cand.rfind('.');
-            if (dot == std::string::npos) {
-                cand += std::to_string(i);
-            } else {
-                cand =
-                    cand.substr(0, dot) + std::to_string(i) + cand.substr(dot);
-            }
-            if (!file_exists(cand)) {
-                name = cand;
-                break;
-            }
+std::string unused_filename(const std::string& base) {
+    if (!file_exists(base)) return base;
+    for (int index = 1;; ++index) {
+        std::string candidate;
+        if (auto dot = base.rfind('.'); dot == std::string::npos) {
+            candidate = std::format("{}{}", base, index);
+        } else {
+            candidate = std::format("{}{}{}", base.substr(0, dot), index,
+                                    base.substr(dot));
         }
+        if (!file_exists(candidate)) return candidate;
     }
-    g_f.open(name, std::ios::out | std::ios::app);
-    g_open = static_cast<bool>(g_f);
+}
+}  // namespace
+
+void metrics_open_new_file(const std::string& base) {
+    auto& file = metrics_file();
+    std::scoped_lock lock(file.mutex);
+    if (file.stream.is_open()) return;
+    file.stream.open(unused_filename(base), std::ios::out | std::ios::app);
 }
 
 void metrics_write_header_if_empty() {
-    std::lock_guard<std::mutex> lk(g_mu);
-    if (!g_open || g_header) return;
-    if (g_f.tellp() == 0) {
-        g_f << "exp_id,malicious_number,ts_start_us,ts_end_us,successes,"
-               "failures,"
-               "avg_us,min_us,max_us,duration_us,attempt_rate_per_s,success_"
-               "rate_per_s\n";
+    auto& file = metrics_file();
+    std::scoped_lock lock(file.mutex);
+    if (!file.stream.is_open() || file.header_written) return;
+    if (file.stream.tellp() == 0) {
+        file.stream
+            << "exp_id,malicious_number,ts_start_us,ts_end_us,successes,"
+               "failures,avg_us,min_us,max_us,duration_us,"
+               "attempt_rate_per_s,success_rate_per_s\n";
     }
-    g_header = true;
+    file.header_written = true;
 }
 
-MetricsRow metrics_begin_row(const std::string& exp_id) {
-    MetricsRow r;
-    r.exp_id = exp_id;
-    r.ts_start_us = epoch_us_now();
-    r.t0 = std::chrono::steady_clock::now();
-    return r;
+MetricsRow metrics_begin_row(std::string_view exp_id) {
+    MetricsRow row;
+    row.exp_id = exp_id;
+    row.ts_start_us = epoch_us_now();
+    row.t0 = std::chrono::steady_clock::now();
+    return row;
 }
 
-void metrics_end_row_and_write(MetricsRow& r) {
-    r.ts_end_us = epoch_us_now();
-    auto t1 = std::chrono::steady_clock::now();
+void metrics_end_row_and_write(MetricsRow& row) {
+    row.ts_end_us = epoch_us_now();
     double duration_s =
-        std::chrono::duration_cast<std::chrono::duration<double> >(t1 - r.t0)
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - row.t0)
             .count();
-    long long duration_us_ll =
-        static_cast<long long>(std::llround(duration_s * 1e6));
+    auto duration_us = std::llround(duration_s * 1e6);
+    auto attempts = row.successes + row.failures;
+    auto average_us = attempts ? std::llround(row.sum_us / attempts) : 0LL;
+    if (row.min_us == LONG_MAX) row.min_us = 0;
+    double attempt_rate = duration_s > 0 ? attempts / duration_s : 0.0;
+    double success_rate = duration_s > 0 ? row.successes / duration_s : 0.0;
 
-    long attempts = static_cast<long>(r.successes + r.failures);
-    long long avg_us_ll =
-        attempts ? static_cast<long long>(std::llround(r.sum_us / attempts))
-                 : 0;
-    if (r.min_us == LONG_MAX) {
-        r.min_us = 0;  // handle empty
-    }
-
-    double attempt_rate =
-        duration_s > 0 ? static_cast<double>(attempts) / duration_s : 0.0;
-    double success_rate =
-        duration_s > 0 ? static_cast<double>(r.successes) / duration_s : 0.0;
-
-    std::lock_guard<std::mutex> lk(g_mu);
-    if (!g_open) return;
-    g_f << r.exp_id << ',' << r.malicious_number << ',' << r.ts_start_us << ','
-        << r.ts_end_us << ',' << r.successes << ',' << r.failures << ','
-        << avg_us_ll << ',' << static_cast<long long>(r.min_us) << ','
-        << static_cast<long long>(r.max_us) << ',' << duration_us_ll << ','
-        << std::fixed << std::setprecision(3) << attempt_rate << ','
-        << success_rate << '\n';
+    auto& file = metrics_file();
+    std::scoped_lock lock(file.mutex);
+    if (!file.stream.is_open()) return;
+    file.stream << std::format("{},{},{},{},{},{},{},{},{},{},{:.3f},{:.3f}\n",
+                               row.exp_id, row.malicious_number,
+                               row.ts_start_us, row.ts_end_us, row.successes,
+                               row.failures, average_us, row.min_us, row.max_us,
+                               duration_us, attempt_rate, success_rate);
 }

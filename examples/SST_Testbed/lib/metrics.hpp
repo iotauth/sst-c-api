@@ -3,6 +3,7 @@
 #include <climits>
 #include <cstdint>
 #include <string>
+#include <string_view>
 
 struct MetricsRow {
     std::string exp_id;
@@ -10,11 +11,13 @@ struct MetricsRow {
     long long ts_start_us = 0;
     long long ts_end_us = 0;
 
-    uint64_t successes = 0, failures = 0;
+    uint64_t successes = 0;
+    uint64_t failures = 0;
 
     // Latency accumulators
     long double sum_us = 0.0L;
-    long min_us = LONG_MAX, max_us = 0;
+    long min_us = LONG_MAX;
+    long max_us = 0;
 
     // precise duration (steady clock)
     std::chrono::steady_clock::time_point t0;
@@ -24,7 +27,7 @@ void metrics_open_new_file(
     const std::string& base = "../metric_logs/client_metrics_log.csv");
 void metrics_write_header_if_empty();
 
-MetricsRow metrics_begin_row(const std::string& exp_id);
+MetricsRow metrics_begin_row(std::string_view exp_id);
 
 inline void metrics_add_sample(MetricsRow& r, long long dur_us, bool ok) {
     r.sum_us += static_cast<long double>(dur_us);

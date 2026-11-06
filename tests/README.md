@@ -94,7 +94,9 @@ block-encryption and IPFS examples. The shared-context test remains enabled
 despite the nondeterministic behavior described above; only the encryption
 benchmark command is commented out.
 
-CI also builds the SST Testbed and runs `testbed_udp_smoke_test.py` with Auth101
+CI also runs the Testbed's packet/metrics helper test and Python plotting
+regressions; see the [Testbed README](../examples/SST_Testbed/README.md#compile-the-sst_testbed-code).
+It builds the SST Testbed and runs `testbed_udp_smoke_test.py` with Auth101
 and the default credentials. It sends two ordinary messages from different UDP
 clients through one worker, separated by the worker's idle timeout, to verify
 that the worker can accept a new peer. No flood traffic or raw sockets are used.

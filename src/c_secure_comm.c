@@ -642,6 +642,22 @@ static void report_auth_alert(unsigned char code) {
     }
 }
 
+static int handle_session_key_reply(SST_ctx_t* ctx, unsigned char message_type,
+                                    unsigned char* data, unsigned int length,
+                                    unsigned char* entity_nonce,
+                                    session_key_list_t* keys) {
+    if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
+        if (length <= RSA_KEY_SIZE * 2) return -1;
+        if (save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0) return -1;
+        data += RSA_KEY_SIZE * 2;
+        length -= RSA_KEY_SIZE * 2;
+    } else if (message_type != SESSION_KEY_RESP) {
+        SST_print_error("Unexpected Auth message type.");
+        return -1;
+    }
+    return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
+}
+
 static int receive_session_keys(SST_ctx_t* ctx, int sock,
                                 session_key_list_t* keys, bool use_tcp) {
     unsigned char entity_nonce[NONCE_SIZE];
@@ -676,16 +692,8 @@ static int receive_session_keys(SST_ctx_t* ctx, int sock,
             hello_received = true;
             continue;
         }
-        if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
-            if (length <= RSA_KEY_SIZE * 2) return -1;
-            if (save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0) return -1;
-            data += RSA_KEY_SIZE * 2;
-            length -= RSA_KEY_SIZE * 2;
-        } else if (message_type != SESSION_KEY_RESP) {
-            SST_print_error("Unexpected Auth message type.");
-            return -1;
-        }
-        return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
+        return handle_session_key_reply(ctx, message_type, data, length,
+                                        entity_nonce, keys);
     }
 }
 

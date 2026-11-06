@@ -67,18 +67,19 @@ static int fake_close(int sock) {
     return 0;
 }
 
-static SST_session_ctx_t* fake_handshake(SST_ctx_t* ctx, int sock,
-                                         session_key_list_t* list) {
+static SST_session_ctx_t* fake_handshake(const SST_ctx_t* ctx, int sock,
+                                         const session_key_list_t* list) {
     CHECK(ctx == &context && sock == listener && list == &keys);
     return failure == HANDSHAKE ? NULL : &session;
 }
 
 static int fake_thread(pthread_t* thread, const pthread_attr_t* attributes,
                        void* (*entry)(void*), void* argument) {
-    (void)thread;
     CHECK(attributes == NULL && entry == receive_thread_read_one_each);
     CHECK(argument == &session);
-    return failure == THREAD ? EAGAIN : 0;
+    if (failure == THREAD) return EAGAIN;
+    *thread = pthread_self();
+    return 0;
 }
 
 // No worker is actually started; ignore the unused pthread_t value.
@@ -86,24 +87,24 @@ static int fake_thread(pthread_t* thread, const pthread_attr_t* attributes,
 #define fake_join(thread, result) ((void)++joined)
 #define fake_sleep(seconds) ((void)0)
 
-static int fake_send(char* message, unsigned int length,
-                     SST_session_ctx_t* ctx) {
+static int fake_send(const char* message, unsigned int length,
+                     const SST_session_ctx_t* ctx) {
     CHECK(ctx == &session && length == strlen(message));
     ++sends;
     return failure == SEND ? -1 : (int)length;
 }
 
-static void fake_free_context(SST_ctx_t* ctx) {
+static void fake_free_context(const SST_ctx_t* ctx) {
     CHECK(ctx == &context);
     ++contexts_freed;
 }
 
-static void fake_free_keys(session_key_list_t* list) {
+static void fake_free_keys(const session_key_list_t* list) {
     CHECK(list == NULL || list == &keys);
     if (list != NULL) ++keys_freed;
 }
 
-static void fake_free_session(SST_session_ctx_t* ctx) {
+static void fake_free_session(const SST_session_ctx_t* ctx) {
     CHECK(ctx == NULL || ctx == &session);
     if (ctx != NULL) ++sessions_freed;
 }

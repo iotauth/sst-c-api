@@ -58,7 +58,14 @@ jobs:
     - name: Build SST Testbed TCP and UDP programs
       run: |
         cmake -S examples/SST_Testbed -B examples/SST_Testbed/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
-        cmake --build examples/SST_Testbed/build --config ${{env.BUILD_TYPE}} --target server client
+        cmake --build examples/SST_Testbed/build --config ${{env.BUILD_TYPE}} --target server client testbed_helpers_test
+        ctest --test-dir examples/SST_Testbed/build -R testbed_helpers_test --output-on-failure
+
+    - name: Verify Testbed plotting
+      run: |
+        python3 -m venv "$RUNNER_TEMP/sst-plot-tests"
+        "$RUNNER_TEMP/sst-plot-tests/bin/pip" install pandas matplotlib
+        MPLBACKEND=Agg "$RUNNER_TEMP/sst-plot-tests/bin/python" -m unittest discover -s examples/SST_Testbed/plot_generators -v
 
   Integration-test:
     name: Integration-test

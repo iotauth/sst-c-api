@@ -68,7 +68,7 @@ import argparse
 import glob
 import os
 import sys
-from typing import List, Dict, Optional
+from typing import List, Dict
 import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib.ticker import ScalarFormatter, MaxNLocator
@@ -77,8 +77,11 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes  # For zoomed inset
 # Column names by mode
 REQ_TPUT_COLS = ["malicious_number", "attempt_rate_per_s"]
 REQ_LAT_COLS  = ["malicious_number", "avg_us"]
-SERIES_ORDER = ["Config#1", "Config#2", "Config#3"]
-SERIES_COLORS = {"Config#1": "tab:green", "Config#2": "tab:blue", "Config#3": "tab:orange"}
+CONFIG_1 = "Config#1"
+CONFIG_2 = "Config#2"
+CONFIG_3 = "Config#3"
+SERIES_ORDER = [CONFIG_1, CONFIG_2, CONFIG_3]
+SERIES_COLORS = {CONFIG_1: "tab:green", CONFIG_2: "tab:blue", CONFIG_3: "tab:orange"}
 
 
 def expand_inputs(inputs: List[str], recursive: bool) -> List[str]:
@@ -233,7 +236,7 @@ def ensure_pdf_suffix(path: str) -> str:
     return path
 
 
-def main():
+def make_parser():
     ap = argparse.ArgumentParser(description="Plot Throughput or Latency vs Number of Malicious Clients")
     mode_group = ap.add_mutually_exclusive_group(required=True)
     mode_group.add_argument("--throughput", action="store_true", help="Plot throughput (attempt_rate_per_s)")
@@ -258,75 +261,70 @@ def main():
     ap.add_argument("--inset", action="store_true", help="Draw a zoomed inset focusing on lower-y region")
     ap.add_argument("--inset-max", type=float, default=None, help="Maximum Y value for inset zoom (default auto)")
 
-    args = ap.parse_args()
+    return ap
 
-    mode = "throughput" if args.throughput else "latency"
-    raw_config_inputs = {
-        "Config#1": list(args.config1),
-        "Config#2": list(args.config2),
-        "Config#3": list(args.config3),
-    }
-    raw_mode = any(raw_config_inputs[label] for label in SERIES_ORDER)
 
+def collect_raw_points(raw_inputs, recursive, mode):
+    series = {label: [] for label in SERIES_ORDER}
     files_used = 0
+    for label in SERIES_ORDER:
+        files = expand_inputs(raw_inputs[label], recursive=recursive)
+        files_used += len(files)
+        for path in files:
+            series[label].extend(points_from_raw_metrics(path, mode, label))
+    if files_used == 0:
+        raise SystemExit("No raw metrics CSV files found.")
+    return series, files_used
+
+
+def collect_prepared_points(paths, recursive, mode):
+    files = expand_inputs(paths, recursive=recursive)
+    if not files:
+        raise SystemExit("No CSV files found.")
+    series = {label: [] for label in SERIES_ORDER}
+    for path in files:
+        for point in points_from_three_rows(path, mode):
+            series[point["label"]].append(point)
+    return series, len(files)
+
+
+def load_points(args, parser, mode):
+    raw_inputs = dict(zip(SERIES_ORDER, (args.config1, args.config2, args.config3)))
+    raw_mode = any(raw_inputs.values())
     if raw_mode:
         if args.inputs or args.glob_pat:
-            ap.error("Do not mix positional/--glob inputs with --config1/--config2/--config3 raw metrics inputs.")
-
-        series_points = {label: [] for label in SERIES_ORDER}
-        for label in SERIES_ORDER:
-            files = expand_inputs(raw_config_inputs[label], recursive=args.recursive)
-            files_used += len(files)
-            for f in files:
-                series_points[label].extend(points_from_raw_metrics(f, mode, label))
-        if files_used == 0:
-            raise SystemExit("No raw metrics CSV files found.")
+            parser.error("Do not mix positional/--glob inputs with --config1/--config2/--config3 raw metrics inputs.")
+        series, files_used = collect_raw_points(raw_inputs, args.recursive, mode)
     else:
         paths = list(args.inputs)
         if args.glob_pat:
             paths.append(args.glob_pat)
         if not paths:
-            ap.error("Provide prepared plotting CSVs or use --config1/--config2/--config3 for raw metrics.")
-
-        files = expand_inputs(paths, recursive=args.recursive)
-        files_used = len(files)
-        if not files:
-            raise SystemExit("No CSV files found.")
-
-        series_points = {label: [] for label in SERIES_ORDER}
-        for f in files:
-            pts = points_from_three_rows(f, mode)
-            for pt in pts:
-                label = pt["label"]
-                series_points[label].append(pt)
-
-    series_points = collapse_series_points(series_points)
-
-    # Check if all series are empty
-    if all(len(series_points[label]) == 0 for label in series_points):
+            parser.error("Provide prepared plotting CSVs or use --config1/--config2/--config3 for raw metrics.")
+        series, files_used = collect_prepared_points(paths, args.recursive, mode)
+    series = collapse_series_points(series)
+    if not any(series.values()):
         raise SystemExit("No usable data points from the provided CSVs.")
+    return series, files_used, raw_mode
 
-    # Always-compact sizing
-    w, h = args.figsize
-    w *= 0.8
-    h *= 0.8
 
-    plt.figure(figsize=(w, h))
-    ax = plt.gca()
-
-    # Plot each series if it has points
+def plot_series(ax, series_points, warn_empty=False):
     all_x_values = set()
     all_y_values = []
     for label in SERIES_ORDER:
         points = series_points[label]
         if not points:
-            print(f"[warn] No data points for {label}", file=sys.stderr)
+            if warn_empty:
+                print(f"[warn] No data points for {label}", file=sys.stderr)
             continue
         df = pd.DataFrame(points).sort_values("malicious_number").reset_index(drop=True)
-        plt.plot(df["malicious_number"], df["y"], marker="o", label=label, color=SERIES_COLORS[label])
+        ax.plot(df["malicious_number"], df["y"], marker="o", label=label, color=SERIES_COLORS[label])
         all_x_values.update(df["malicious_number"].unique())
         all_y_values.extend(df["y"].tolist())
+    return all_x_values, all_y_values
 
+
+def configure_axes(ax, args, mode, all_x_values):
     ax.set_xlabel("Number of Malicious Clients", fontsize=17)
 
     # Set x-ticks to sorted unique malicious_number across all points
@@ -364,35 +362,32 @@ def main():
 
     ax.grid(True, which='major', alpha=0.3)
 
-    # Draw zoomed inset if requested
-    if args.inset:
-        # Determine inset y max
-        inset_ymax = args.inset_max
-        if inset_ymax is None:
-            # Compute max of Config#2 and Config#3 series y values
-            c2_vals = [pt["y"] for pt in series_points["Config#2"]]
-            c3_vals = [pt["y"] for pt in series_points["Config#3"]]
-            max_c2_c3 = max(c2_vals + c3_vals) if (c2_vals or c3_vals) else None
-            global_max = max(all_y_values) if all_y_values else 1.0
-            if max_c2_c3 is not None:
-                inset_ymax = max_c2_c3 * 1.2
-            else:
-                inset_ymax = global_max * 0.2
 
-        ax_in = inset_axes(ax, width="45%", height="45%", loc="upper right", borderpad=1.0)
-        # Re-plot the same series in inset
-        for label in SERIES_ORDER:
-            points = series_points[label]
-            if not points:
-                continue
-            df = pd.DataFrame(points).sort_values("malicious_number").reset_index(drop=True)
-            ax_in.plot(df["malicious_number"], df["y"], marker="o", label=label, color=SERIES_COLORS[label])
-        ax_in.set_ylim(0, inset_ymax)
-        ax_in.set_xlim(ax.get_xlim())
-        ax_in.tick_params(labelsize=10)
-        ax_in.grid(True, alpha=0.2)
-        ax_in.set_title("zoom", fontsize=9)
 
+def inset_y_limit(requested_limit, series_points, all_y_values):
+    if requested_limit is not None:
+        return requested_limit
+    secondary = [point["y"] for label in (CONFIG_2, CONFIG_3)
+                 for point in series_points[label]]
+    if secondary:
+        return max(secondary) * 1.2
+    return (max(all_y_values) if all_y_values else 1.0) * 0.2
+
+
+def draw_inset(ax, args, series_points, all_y_values):
+    if not args.inset:
+        return
+    inset_ymax = inset_y_limit(args.inset_max, series_points, all_y_values)
+    ax_in = inset_axes(ax, width="45%", height="45%", loc="upper right", borderpad=1.0)
+    plot_series(ax_in, series_points)
+    ax_in.set_ylim(0, inset_ymax)
+    ax_in.set_xlim(ax.get_xlim())
+    ax_in.tick_params(labelsize=10)
+    ax_in.grid(True, alpha=0.2)
+    ax_in.set_title("zoom", fontsize=9)
+
+
+def order_legend(ax):
     # Force legend order: Config#1 → Config#2 → Config#3
     handles, labels = ax.get_legend_handles_labels()
     desired_order = SERIES_ORDER
@@ -401,15 +396,28 @@ def main():
     pairs.sort(key=lambda x: desired_order.index(x[1]))
     if pairs:
         ax.legend([h for h, _ in pairs], [l for _, l in pairs], fontsize=12)
-    plt.tight_layout()
 
+
+def main():
+    parser = make_parser()
+    args = parser.parse_args()
+    mode = "throughput" if args.throughput else "latency"
+    series_points, files_used, raw_mode = load_points(args, parser, mode)
+    width, height = args.figsize
+    figure, ax = plt.subplots(figsize=(width * 0.8, height * 0.8))
+    all_x_values, all_y_values = plot_series(ax, series_points, warn_empty=True)
+    configure_axes(ax, args, mode, all_x_values)
+    draw_inset(ax, args, series_points, all_y_values)
+    order_legend(ax)
+    figure.tight_layout()
     default_out = "throughput.pdf" if mode == "throughput" else "latency.pdf"
-    desired_out = ensure_pdf_suffix(args.out or default_out)
-    final_out = unique_path(desired_out)
-    plt.savefig(final_out, dpi=160)
-    total_points_used = sum(len(series_points[label]) for label in series_points)
+    final_out = unique_path(ensure_pdf_suffix(args.out or default_out))
+    figure.savefig(final_out, dpi=160)
+    plt.close(figure)
+    total_points_used = sum(len(points) for points in series_points.values())
     input_kind = "raw metrics" if raw_mode else "prepared"
     print(f"[ok] Mode={mode}. Used {total_points_used} plotted points from {files_used} {input_kind} files. Wrote {final_out}")
+
 
 if __name__ == "__main__":
     main()
