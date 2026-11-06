@@ -2,20 +2,21 @@ extern "C" {
 #include "../../../src/c_api.h"
 }
 
-#include "metrics.hpp"
-
 #include <arpa/inet.h>
-#include <chrono>
 #include <errno.h>
 #include <netinet/in.h>
-#include <netinet/ip.h> // struct ip (BSD)
-#include <netinet/tcp.h> // struct tcphdr (BSD)
-#include <netinet/udp.h> // struct udphdr
+#include <netinet/ip.h>   // struct ip (BSD)
+#include <netinet/tcp.h>  // struct tcphdr (BSD)
+#include <netinet/udp.h>  // struct udphdr
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+
+#include <chrono>
+
+#include "metrics.hpp"
 
 // Pseudo header for TCP checksum
 struct pseudo_header {
@@ -153,8 +154,7 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
     return all_sent;
 }
 
-extern "C" bool send_raw_syn_packets(const char* src_ip_str,
-                                     const char* dst_ip,
+extern "C" bool send_raw_syn_packets(const char* src_ip_str, const char* dst_ip,
                                      unsigned short dst_port, int repeat) {
     return send_raw_syn_packets_measured(src_ip_str, dst_ip, dst_port, repeat,
                                          nullptr);
@@ -164,8 +164,8 @@ extern "C" bool send_raw_syn_packets(const char* src_ip_str,
 struct udp_pseudo_header {
     uint32_t saddr;
     uint32_t daddr;
-    uint8_t  zero;
-    uint8_t  protocol;
+    uint8_t zero;
+    uint8_t protocol;
     uint16_t udp_len;
 } __attribute__((packed));
 
@@ -173,7 +173,7 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
                                    unsigned short dst_port, int repeat,
                                    MetricsRow* row) {
     const size_t payload_len = 0;
-    const size_t ip_len  = sizeof(struct ip);
+    const size_t ip_len = sizeof(struct ip);
     const size_t udp_len = sizeof(struct udphdr);
 
     // Fixed-size packet buffer
@@ -185,16 +185,16 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     struct udphdr* udph = (struct udphdr*)(packet + ip_len);
 
     // Fill IPv4 header (BSD layout)
-    iph->ip_v   = 4;
-    iph->ip_hl  = 5;
+    iph->ip_v = 4;
+    iph->ip_hl = 5;
     iph->ip_tos = 0;
 
     const size_t total_len = ip_len + udp_len + payload_len;
     iph->ip_len = (uint16_t)total_len;
-    iph->ip_id  = htons(0x1234);
+    iph->ip_id = htons(0x1234);
     iph->ip_off = 0;
     iph->ip_ttl = 64;
-    iph->ip_p   = IPPROTO_UDP;
+    iph->ip_p = IPPROTO_UDP;
 
     if (inet_pton(AF_INET, src_ip_str, &iph->ip_src) != 1) {
         SST_print_error("src ip error");
@@ -210,8 +210,8 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
 
     udph->uh_sport = htons(src_port);
     udph->uh_dport = htons(dst_port);
-    udph->uh_ulen  = htons((uint16_t)(udp_len + payload_len));
-    udph->uh_sum   = 0; // computed below
+    udph->uh_ulen = htons((uint16_t)(udp_len + payload_len));
+    udph->uh_sum = 0;  // computed below
 
     // UDP checksum: pseudo header + UDP header
     udp_pseudo_header ph;
@@ -222,8 +222,7 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     ph.udp_len = htons((uint16_t)(udp_len + payload_len));
 
     // Build checksum buffer
-    unsigned char
-        chkbuf[sizeof(udp_pseudo_header) + sizeof(struct udphdr) + 1];
+    unsigned char chkbuf[sizeof(udp_pseudo_header) + sizeof(struct udphdr) + 1];
     size_t chklen = 0;
 
     memcpy(chkbuf + chklen, &ph, sizeof(ph));
@@ -261,7 +260,8 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
 
     struct sockaddr_in dst;
     memset(&dst, 0, sizeof(dst));
-#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__NetBSD__)
     dst.sin_len = sizeof(dst);
 #endif
     dst.sin_family = AF_INET;
@@ -275,7 +275,8 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     bool all_sent = true;
     for (int i = 0; i < repeat; ++i) {
         auto t0 = std::chrono::steady_clock::now();
-        ssize_t n = sendto(s, packet, total_len, 0, (struct sockaddr*)&dst, sizeof(dst));
+        ssize_t n = sendto(s, packet, total_len, 0, (struct sockaddr*)&dst,
+                           sizeof(dst));
         auto t1 = std::chrono::steady_clock::now();
         long long dur_us =
             std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
@@ -303,8 +304,7 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     return all_sent;
 }
 
-extern "C" bool send_raw_udp_packets(const char* src_ip_str,
-                                     const char* dst_ip,
+extern "C" bool send_raw_udp_packets(const char* src_ip_str, const char* dst_ip,
                                      unsigned short dst_port, int repeat) {
     return send_raw_udp_packets_measured(src_ip_str, dst_ip, dst_port, repeat,
                                          nullptr);
@@ -346,9 +346,11 @@ extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
     return true;
 }
 
-extern "C" bool resolve_src_ip_or_default(
-    const char* provided_src_ip, const char* dst_ip, unsigned short dst_port,
-    char* src_ip_buf, size_t ip_buf_len, const char** out_src_ip) {
+extern "C" bool resolve_src_ip_or_default(const char* provided_src_ip,
+                                          const char* dst_ip,
+                                          unsigned short dst_port,
+                                          char* src_ip_buf, size_t ip_buf_len,
+                                          const char** out_src_ip) {
     if (out_src_ip == NULL || src_ip_buf == NULL) {
         SST_print_error("resolve_src_ip_or_default() invalid input.");
         return false;

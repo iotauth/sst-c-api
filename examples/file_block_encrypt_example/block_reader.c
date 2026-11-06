@@ -80,7 +80,6 @@ int main(int argc, char* argv[]) {
                     encrypted_file_metadata[i].block_metadata[j].length,
                     &decrypted, &decrypted_length) < 0) {
                 SST_print_error_exit("Decryption failed!");
-                break;
             }
 
             // Compare original buffer and reopened buffer.

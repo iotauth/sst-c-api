@@ -24,10 +24,12 @@ bool send_raw_syn_packets(const char* src_ip_str, const char* dst_ip,
 bool send_raw_udp_packets(const char* src_ip_str, const char* dst_ip,
                           unsigned short dst_port, int repeat);
 
-// Helper function to get the default source IP address for a given destination IP and port.
+// Helper function to get the default source IP address for a given destination
+// IP and port.
 // @param dst_ip: Destination IP address in string format.
 // @param dst_port: Destination port number.
-// @param out_ip: Buffer to store the resulting source IP address in string format.
+// @param out_ip: Buffer to store the resulting source IP address in string
+// format.
 // @param out_ip_len: Length of the output buffer.
 // @return true on success, false on error.
 bool get_src_ip(const char* dst_ip, unsigned short dst_port, char* out_ip,
@@ -45,15 +47,15 @@ bool get_src_ip(const char* dst_ip, unsigned short dst_port, char* out_ip,
 // @return true on success, false on failure.
 bool resolve_src_ip_or_default(const char* provided_src_ip, const char* dst_ip,
                                unsigned short dst_port, char* src_ip_buf,
-                               size_t ip_buf_len,
-                               const char** out_src_ip);
+                               size_t ip_buf_len, const char** out_src_ip);
 
 #ifdef __cplusplus
 }
 
 // Measured variants used by the client metrics path.
-// These functions perform the same syn/udp attacks but also record latency and success/failure
-// metrics in the provided MetricsRow struct. If row is nullptr, no metrics are recorded.
+// These functions perform the same syn/udp attacks but also record latency and
+// success/failure metrics in the provided MetricsRow struct. If row is nullptr,
+// no metrics are recorded.
 // @param src_ip_str: Source IP address in string format (e.g., "192.168.1.1").
 // @param dst_ip: Destination IP address in string format.
 // @param dst_port: Destination port number.

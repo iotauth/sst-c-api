@@ -52,8 +52,8 @@ void AES_test_common(AES_encryption_mode_t mode) {
                     &decrypted_length) < 0) {
         SST_print_error_exit("Failed decrypt_AES().");
     }
-    printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-           decrypted);
+    printf("Decrypted Length: %u, Decrypted: %.*s\n", decrypted_length,
+           (int)decrypted_length, decrypted);
     assert(decrypted_length == strlen(plaintext));
     assert(strncmp((const char*)decrypted, (const char*)plaintext,
                    decrypted_length) == 0);
@@ -115,8 +115,8 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             encrypted, encrypted_length, mac_key, MAC_KEY_SHA256_SIZE,
             cipher_key, AES_128_KEY_SIZE_IN_BYTES, AES_128_CBC_IV_SIZE,
             enc_mode, hmac_mode, &decrypted, &decrypted_length);
-        printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-               decrypted);
+        printf("Decrypted Length: %u, Decrypted: %.*s\n", decrypted_length,
+               (int)decrypted_length, decrypted);
         assert(s == 0);
         assert(decrypted_length == strlen(plaintext));
         assert(strncmp((const char*)decrypted, (const char*)plaintext,
@@ -149,8 +149,8 @@ void symmetric_encrypt_decrypt_authenticate_common(char enc_mode,
             cipher_key, AES_128_KEY_SIZE_IN_BYTES, AES_128_IV_SIZE, enc_mode,
             hmac_mode, &decrypted_stack[0], &decrypted_length);
         decrypted = &decrypted_stack[0];
-        printf("Decrypted Length: %d, Decrypted: %s\n", decrypted_length,
-               decrypted);
+        printf("Decrypted Length: %u, Decrypted: %.*s\n", decrypted_length,
+               (int)decrypted_length, decrypted);
         assert(s == 0);
         assert(decrypted_length == strlen(plaintext));
         assert(strncmp((const char*)decrypted, (const char*)plaintext,

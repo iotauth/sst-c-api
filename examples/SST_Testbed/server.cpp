@@ -10,16 +10,14 @@ extern "C" {
 #include "../../src/c_api.h"
 }
 
-volatile int active_clients = 0;
+int active_clients = 0;  // All accesses are protected by count_mutex.
 volatile sig_atomic_t stop_server = 0;
 pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
 const int UDP_IDLE_TIMEOUT_SEC = 10;
 const int UDP_DEFAULT_WORKER_COUNT = 16;
 const int UDP_MAX_WORKER_COUNT = 105;
 
-static void handle_shutdown_signal(int) {
-    stop_server = 1;
-}
+static void handle_shutdown_signal(int) { stop_server = 1; }
 
 static bool parse_udp_worker_count(const char* value, int* worker_count) {
     char* endptr = NULL;
@@ -40,6 +38,53 @@ struct ThreadArgs {
     bool use_udp;
     bool close_socket;
 };
+
+static int make_udp_worker_socket(int port) {
+    int sock = socket(PF_INET, SOCK_DGRAM, 0);
+    if (sock < 0) return -1;
+    int on = 1;
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
+        close(sock);
+        return -1;
+    }
+#ifdef SO_REUSEPORT
+    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0) {
+        close(sock);
+        return -1;
+    }
+#else
+    SST_print_error("SO_REUSEPORT is required for UDP workers.");
+    close(sock);
+    return -1;
+#endif
+    struct sockaddr_in address = {};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    address.sin_port = htons(port);
+    struct timeval timeout = {};
+    timeout.tv_sec = UDP_IDLE_TIMEOUT_SEC;
+    if (bind(sock, reinterpret_cast<struct sockaddr*>(&address),
+             sizeof(address)) < 0 ||
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) <
+            0) {
+        close(sock);
+        return -1;
+    }
+    return sock;
+}
+
+static bool release_udp_peer(int& sock, int port) {
+    // The C API connects the worker to one sender. Replace it with a fresh
+    // listener to clear that peer filter on both Linux and BSD/macOS.
+    int listener = make_udp_worker_socket(port);
+    if (listener < 0) {
+        SST_print_error("Failed to reset UDP worker: %s", strerror(errno));
+        return false;
+    }
+    close(sock);
+    sock = listener;
+    return true;
+}
 
 // For pthread_create()
 void* receive_and_print_messages(void* thread_args) {
@@ -88,6 +133,9 @@ void* receive_and_print_messages(void* thread_args) {
             free_session_key_list_t(s_key_list);
             if (use_udp) {
                 // Keep serving other UDP clients on this worker.
+                if (!release_udp_peer(clnt_sock,
+                                      ctx->config.entity_server_port_num))
+                    break;
                 continue;
             }
             break;
@@ -130,6 +178,8 @@ void* receive_and_print_messages(void* thread_args) {
         if (!use_udp) {
             break;
         }
+        if (!release_udp_peer(clnt_sock, ctx->config.entity_server_port_num))
+            break;
     }
 
     if (close_socket && close(clnt_sock) < 0) {
@@ -176,8 +226,9 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    bool use_tcp = std::strcmp((const char*)ctx->config.network_protocol, "TCP") == 0;
-    
+    bool use_tcp =
+        std::strcmp((const char*)ctx->config.network_protocol, "TCP") == 0;
+
     if (use_tcp && workers_requested) {
         SST_print_error("--workers is only valid with a UDP server config.");
         free_SST_ctx_t(ctx);
@@ -264,8 +315,8 @@ int main(int argc, char* argv[]) {
 
             struct sockaddr_in clnt_addr;
             socklen_t clnt_addr_size = sizeof(clnt_addr);
-            int clnt_sock =
-                accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
+            int clnt_sock = accept(serv_sock, (struct sockaddr*)&clnt_addr,
+                                   &clnt_addr_size);
             if (clnt_sock < 0) {
                 SST_print_error("accept() error");
                 continue;
@@ -285,7 +336,8 @@ int main(int argc, char* argv[]) {
             args->close_socket = true;
 
             pthread_t t;
-            int err = pthread_create(&t, NULL, receive_and_print_messages, args);
+            int err =
+                pthread_create(&t, NULL, receive_and_print_messages, args);
             if (err != 0) {
                 SST_print_error("pthread_create() error");
 
@@ -314,7 +366,8 @@ int main(int argc, char* argv[]) {
     } else {
         // UDP server: create a worker pool.
         // Each worker has its own UDP socket bound to the same port with
-        // SO_REUSEPORT, allowing concurrent sessions without changing session_ctx.
+        // SO_REUSEPORT, allowing concurrent sessions without changing
+        // session_ctx.
         int worker_count = udp_worker_count;
         if (close(serv_sock) < 0) {
             SST_print_error("close() error");
@@ -332,47 +385,10 @@ int main(int argc, char* argv[]) {
         pthread_mutex_unlock(&count_mutex);
 
         for (int i = 0; i < worker_count; ++i) {
-            int udp_sock = socket(PF_INET, SOCK_DGRAM, 0);
+            int udp_sock = make_udp_worker_socket(port_num);
             if (udp_sock < 0) {
-                SST_print_error("UDP worker socket() error");
-                continue;
-            }
-
-            int worker_on = 1;
-            if (setsockopt(udp_sock, SOL_SOCKET, SO_REUSEADDR, &worker_on,
-                           sizeof(worker_on)) < 0) {
-                SST_print_error("UDP worker SO_REUSEADDR error");
-                close(udp_sock);
-                continue;
-            }
-#ifdef SO_REUSEPORT
-            if (setsockopt(udp_sock, SOL_SOCKET, SO_REUSEPORT, &worker_on,
-                           sizeof(worker_on)) < 0) {
-                SST_print_error("UDP worker SO_REUSEPORT error");
-                close(udp_sock);
-                continue;
-            }
-#else
-            SST_print_error("SO_REUSEPORT not available; cannot run concurrent UDP workers.");
-            close(udp_sock);
-            break;
-#endif
-
-            if (bind(udp_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) <
-                0) {
-                SST_print_error("UDP worker bind() error");
-                close(udp_sock);
-                continue;
-            }
-
-            // Prevent workers from blocking forever inside UDP handshake reads.
-            struct timeval rcv_to;
-            rcv_to.tv_sec = UDP_IDLE_TIMEOUT_SEC;
-            rcv_to.tv_usec = 0;
-            if (setsockopt(udp_sock, SOL_SOCKET, SO_RCVTIMEO, &rcv_to,
-                           sizeof(rcv_to)) < 0) {
-                SST_print_error("UDP worker SO_RCVTIMEO error");
-                close(udp_sock);
+                SST_print_error("Failed to create UDP worker: %s",
+                                strerror(errno));
                 continue;
             }
 
@@ -383,7 +399,8 @@ int main(int argc, char* argv[]) {
             args->close_socket = true;
 
             pthread_t t;
-            int err = pthread_create(&t, NULL, receive_and_print_messages, args);
+            int err =
+                pthread_create(&t, NULL, receive_and_print_messages, args);
             if (err != 0) {
                 SST_print_error("pthread_create() error");
                 close(udp_sock);
@@ -403,6 +420,10 @@ int main(int argc, char* argv[]) {
             free_SST_ctx_t(ctx);
             return EXIT_FAILURE;
         }
+
+        SST_print_log("UDP server ready on port %d (%zu workers).", port_num,
+                      workers.size());
+        fflush(stdout);
 
         for (size_t i = 0; i < workers.size(); ++i) {
             pthread_join(workers[i], NULL);

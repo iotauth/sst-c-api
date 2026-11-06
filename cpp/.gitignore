@@ -1,0 +1,15 @@
+*.o
+*.a
+*.so
+**/build/**
+**/build_test/**
+**/build-clang/**
+**/Testing/**
+**/CMakeCache.txt
+**/cmake_install.cmake
+**/CMakeFiles/
+**/Makefile
+.vscode
+.DS_Store
+# Session key ID metadata files written by threaded_get_target_id_client.
+s_key_id*.dat
