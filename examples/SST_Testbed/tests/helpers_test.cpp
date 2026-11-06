@@ -11,6 +11,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
+#include <format>
+#include <iostream>
 #include <random>
 #include <source_location>
 #include <span>
@@ -28,9 +30,9 @@ extern "C" {
 static void check(bool condition, std::source_location location =
                                       std::source_location::current()) {
     if (condition) return;
-    std::fprintf(stderr, "%s:%u: check failed in %s\n", location.file_name(),
-                 static_cast<unsigned>(location.line()),
-                 location.function_name());
+    std::cerr << std::format("{}:{}: check failed in {}\n",
+                             location.file_name(), location.line(),
+                             location.function_name());
     std::abort();
 }
 

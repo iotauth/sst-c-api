@@ -18,9 +18,9 @@
 
 enum failure { NONE, INIT, ALLOCATE, SOCKET, BIND, HANDSHAKE, THREAD, SEND };
 static enum failure failure;
-static SST_ctx_t context;
-static session_key_list_t keys;
-static SST_session_ctx_t session;
+static SST_ctx_t* context;
+static session_key_list_t* keys;
+static SST_session_ctx_t* session;
 static int closes;
 static int contexts_freed;
 static int keys_freed;
@@ -32,11 +32,19 @@ static const int listener = 42;
 
 static SST_ctx_t* fake_init(const char* path) {
     CHECK(strcmp(path, "udp.config") == 0);
-    return failure == INIT ? NULL : &context;
+    if (failure == INIT) return NULL;
+    context = calloc(1, sizeof(*context));
+    CHECK(context != NULL);
+    strcpy(context->config.network_protocol, "UDP");
+    context->config.entity_server_port_num = 23456;
+    return context;
 }
 
 static session_key_list_t* fake_keys(void) {
-    return failure == ALLOCATE ? NULL : &keys;
+    if (failure == ALLOCATE) return NULL;
+    keys = calloc(1, sizeof(*keys));
+    CHECK(keys != NULL);
+    return keys;
 }
 
 static int fake_socket(int domain, int type, int protocol) {
@@ -69,14 +77,17 @@ static int fake_close(int sock) {
 
 static SST_session_ctx_t* fake_handshake(const SST_ctx_t* ctx, int sock,
                                          const session_key_list_t* list) {
-    CHECK(ctx == &context && sock == listener && list == &keys);
-    return failure == HANDSHAKE ? NULL : &session;
+    CHECK(ctx == context && sock == listener && list == keys);
+    if (failure == HANDSHAKE) return NULL;
+    session = calloc(1, sizeof(*session));
+    CHECK(session != NULL);
+    return session;
 }
 
 static int fake_thread(pthread_t* thread, const pthread_attr_t* attributes,
                        void* (*entry)(void*), void* argument) {
     CHECK(attributes == NULL && entry == receive_thread_read_one_each);
-    CHECK(argument == &session);
+    CHECK(argument == session);
     if (failure == THREAD) return EAGAIN;
     *thread = pthread_self();
     return 0;
@@ -89,33 +100,36 @@ static int fake_thread(pthread_t* thread, const pthread_attr_t* attributes,
 
 static int fake_send(const char* message, unsigned int length,
                      const SST_session_ctx_t* ctx) {
-    CHECK(ctx == &session && length == strlen(message));
+    CHECK(ctx == session && length == strlen(message));
     ++sends;
     return failure == SEND ? -1 : (int)length;
 }
 
 static void fake_free_context(SST_ctx_t* ctx) {
-    CHECK(ctx == &context);
+    CHECK(ctx != NULL && ctx == context);
+    free(ctx);
+    context = NULL;
     ++contexts_freed;
 }
 
 static void fake_free_keys(session_key_list_t* list) {
-    CHECK(list == NULL || list == &keys);
-    if (list != NULL) ++keys_freed;
+    CHECK(list == keys);
+    if (list == NULL) return;
+    free(list);
+    keys = NULL;
+    ++keys_freed;
 }
 
 static void fake_free_session(SST_session_ctx_t* ctx) {
-    CHECK(ctx == NULL || ctx == &session);
-    if (ctx != NULL) ++sessions_freed;
+    CHECK(ctx == session);
+    if (ctx == NULL) return;
+    free(ctx);
+    session = NULL;
+    ++sessions_freed;
 }
 
-// Match the C API's mutable cleanup signatures in the included example.
-static void (*const free_context_callback)(SST_ctx_t*) = &fake_free_context;
-static void (*const free_keys_callback)(session_key_list_t*) = &fake_free_keys;
-static void (*const free_session_callback)(SST_session_ctx_t*) =
-    &fake_free_session;
-
 // Exercise the example's ownership paths without Auth, threads or network I/O.
+// Fixtures own heap storage so cleanup checks also exercise real deallocation.
 #define main udp_server_main
 #define init_SST fake_init
 #define init_empty_session_key_list fake_keys
@@ -128,9 +142,9 @@ static void (*const free_session_callback)(SST_session_ctx_t*) =
 #define pthread_join fake_join
 #define sleep fake_sleep
 #define send_secure_message fake_send
-#define free_SST_ctx_t free_context_callback
-#define free_session_key_list_t free_keys_callback
-#define free_session_ctx free_session_callback
+#define free_SST_ctx_t fake_free_context
+#define free_session_key_list_t fake_free_keys
+#define free_session_ctx fake_free_session
 #include "../examples/server_client_example/entity_server_udp.c"
 #undef main
 
@@ -138,8 +152,6 @@ int main(void) {
     char program[] = "entity_server_udp";
     char config[] = "udp.config";
     char* argv[] = {program, config, NULL};
-    strcpy(context.config.network_protocol, "UDP");
-    context.config.entity_server_port_num = 23456;
     for (int scenario = NONE; scenario <= SEND; ++scenario) {
         failure = (enum failure)scenario;
         closes = 0;
@@ -152,6 +164,7 @@ int main(void) {
         errno = 0;
         CHECK(udp_server_main(2, argv) ==
               (failure == NONE ? EXIT_SUCCESS : EXIT_FAILURE));
+        CHECK(context == NULL && keys == NULL && session == NULL);
         CHECK(contexts_freed == (failure != INIT));
         CHECK(keys_freed == (failure != INIT && failure != ALLOCATE));
         CHECK(closes == (failure == NONE || failure >= BIND));
