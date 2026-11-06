@@ -166,7 +166,7 @@ cmake --build build
 ctest --test-dir build --output-on-failure
 ```
 
-This runs the four standalone C tests without a running Auth server or IPFS daemon. The transport test uses a local Auth stand-in over TCP and UDP loopback sockets. Debug builds enable `SST_print_debug()` and retain the assertions in the C crypto test. CI also runs the unit tests in Release mode. See [tests/README.md](./tests/README.md) for the separate Auth integration tests.
+This runs the five standalone C tests without a running Auth server or IPFS daemon. The transport test uses a local Auth stand-in over TCP and UDP loopback sockets. Debug builds enable `SST_print_debug()` and retain the assertions in the C crypto test. CI also runs the unit tests in Release mode. See [tests/README.md](./tests/README.md) for the separate Auth integration tests.
 
 ## Install the Static Library
 

@@ -15,8 +15,15 @@ extern "C" {
 #include <unistd.h>
 
 #include <chrono>
+#include <random>
 
 #include "metrics.hpp"
+
+static unsigned short random_source_port() {
+    std::random_device random;
+    std::uniform_int_distribution<unsigned short> ports(40000, 59999);
+    return ports(random);
+}
 
 // Pseudo header for TCP checksum
 struct pseudo_header {
@@ -70,7 +77,7 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
     }
 
     // Fill TCP header (BSD layout uses th_offx2)
-    tcph->th_sport = htons(40000 + (rand() % 20000));
+    tcph->th_sport = htons(random_source_port());
     tcph->th_dport = htons(dst_port);
     tcph->th_seq = htonl(0xABCDEFFF);
     tcph->th_ack = htonl(0);
@@ -206,7 +213,7 @@ bool send_raw_udp_packets_measured(const char* src_ip_str, const char* dst_ip,
     }
 
     // Fill UDP header
-    uint16_t src_port = (uint16_t)(40000 + (rand() % 20000));
+    uint16_t src_port = random_source_port();
 
     udph->uh_sport = htons(src_port);
     udph->uh_dport = htons(dst_port);

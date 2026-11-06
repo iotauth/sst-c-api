@@ -101,3 +101,8 @@ add_executable(auth_transport_test tests/auth_transport_test.c)
 target_link_libraries(auth_transport_test PRIVATE sst-c-api)
 add_test(NAME auth_transport_test COMMAND auth_transport_test)
 set_tests_properties(auth_transport_test PROPERTIES TIMEOUT 15)
+
+add_executable(udp_server_cleanup_test tests/udp_server_cleanup_test.c)
+target_link_libraries(udp_server_cleanup_test PRIVATE sst-c-api)
+add_test(NAME udp_server_cleanup_test COMMAND udp_server_cleanup_test)
+set_tests_properties(udp_server_cleanup_test PROPERTIES TIMEOUT 15)

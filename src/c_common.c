@@ -545,7 +545,7 @@ int sst_read_from_socket(int socket, unsigned char* buf,
         }
         return length_read;
     } else if (type == SOCK_DGRAM) {  // use udp
-        struct sockaddr_in from;
+        struct sockaddr_in from = {0};
         socklen_t fromlen = sizeof(from);
         length_read = (int)recvfrom(socket, buf, buf_length, 0,
                                     (struct sockaddr*)&from, &fromlen);
@@ -558,10 +558,12 @@ int sst_read_from_socket(int socket, unsigned char* buf,
             return -1;
         } else if (length_read == 0) {
             // 0-length datagram
-            char ipstr[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &from.sin_addr, ipstr, sizeof(ipstr));
-            SST_print_debug("UDP recvfrom: 0-byte datagram from %s:%u", ipstr,
-                            ntohs(from.sin_port));
+            char ipstr[INET_ADDRSTRLEN] = {0};
+            if (inet_ntop(AF_INET, &from.sin_addr, ipstr, sizeof(ipstr)) !=
+                NULL) {
+                SST_print_debug("UDP recvfrom: 0-byte datagram from %s:%u",
+                                ipstr, ntohs(from.sin_port));
+            }
         }
 
         connect(socket, (struct sockaddr*)&from, fromlen);

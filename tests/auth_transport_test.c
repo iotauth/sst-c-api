@@ -43,7 +43,7 @@ static void send_frame(int sock, unsigned char type, unsigned char* body,
 }
 
 static void* serve_auth(void* opaque) {
-    struct auth_fixture* fixture = opaque;
+    const struct auth_fixture* fixture = opaque;
     int sock = fixture->socket;
     if (fixture->use_tcp) {
         sock = accept(fixture->socket, NULL, NULL);

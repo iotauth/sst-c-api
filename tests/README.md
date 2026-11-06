@@ -6,7 +6,7 @@ The separate C++ API tests are documented in [cpp/README.md](../cpp/README.md#bu
 
 ## Standalone tests
 
-Configure from `entity/c/` to build the C library and its four standalone tests:
+Configure from `entity/c/` to build the C library and its five standalone tests:
 
 ```sh
 cd "$SST_ROOT/entity/c"
@@ -26,6 +26,7 @@ CI also runs this suite in Release mode.
 | `resource_cleanup_test` | `resource_cleanup_test.c` | Invalid configs, descriptor cleanup, binary file reads, integer decoding and handshake failure paths |
 | `auth_request_test` | `auth_request_test.c` | Session-key and add-reader requests over local socket pairs, public-key and distribution-key encryption, and write failures |
 | `auth_transport_test` | `auth_transport_test.c` | TCP/UDP Auth exchanges over loopback, UDP kickoff and empty datagrams, rejected key IDs/nonces, truncated replies, alerts and descriptor cleanup |
+| `udp_server_cleanup_test` | `udp_server_cleanup_test.c` | UDP example socket and session ownership on initialization, allocation, socket, bind, handshake, thread and send failures |
 
 The transport test binds local loopback sockets and needs permission to do so.
 

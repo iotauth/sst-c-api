@@ -1,11 +1,20 @@
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../../src/c_api.h"
+
+static void wait_before_reply(void) {
+    struct timespec delay = {.tv_sec = 0, .tv_nsec = 100000000};
+    while (nanosleep(&delay, &delay) < 0 && errno == EINTR) {
+        // Resume the remaining delay after a signal.
+    }
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -63,14 +72,14 @@ int main(int argc, char* argv[]) {
 
         // Keep replies below the Python example's one-second timeout, while
         // spacing frames for the legacy Node example's receive handler.
-        usleep(100000);
+        wait_before_reply();
         int msg = send_secure_message("Hello client", strlen("Hello client"),
                                       session_ctx);
 
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
-        usleep(100000);
+        wait_before_reply();
         msg = send_secure_message("Hello client - second message",
                                   strlen("Hello client - second message"),
                                   session_ctx);
@@ -103,13 +112,13 @@ int main(int argc, char* argv[]) {
                    (void*)session_ctx2);
 
     int msg;
-    usleep(100000);
+    wait_before_reply();
     msg = send_secure_message("Hello client 2", strlen("Hello client 2"),
                               session_ctx2);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
-    usleep(100000);
+    wait_before_reply();
     msg = send_secure_message("Hello client 2 - second message",
                               strlen("Hello client 2 - second message"),
                               session_ctx2);

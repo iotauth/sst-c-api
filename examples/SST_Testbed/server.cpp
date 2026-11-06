@@ -3,6 +3,7 @@
 
 #include <cerrno>   // errno, EPIPE
 #include <csignal>  // sig_atomic_t
+#include <cstdio>   // fflush, stdout
 #include <cstdlib>  // free, EXIT_FAILURE
 #include <cstring>  // memset
 #include <vector>
@@ -423,7 +424,7 @@ int main(int argc, char* argv[]) {
 
         SST_print_log("UDP server ready on port %d (%zu workers).", port_num,
                       workers.size());
-        fflush(stdout);
+        std::fflush(stdout);
 
         for (size_t i = 0; i < workers.size(); ++i) {
             pthread_join(workers[i], NULL);
