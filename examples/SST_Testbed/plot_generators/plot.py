@@ -85,15 +85,19 @@ SERIES_COLORS = {CONFIG_1: "tab:green", CONFIG_2: "tab:blue", CONFIG_3: "tab:ora
 
 
 def expand_inputs(inputs: List[str], recursive: bool) -> List[str]:
+    # S8707 assumes an agent or HTTP input boundary. This standalone CLI lets
+    # its local caller select arbitrary CSV paths, including absolute paths
+    # and parent directories. The two suppressions below cover that behavior;
+    # reassess them if this function is exposed through an agent or service.
     files: List[str] = []
     for path in inputs:
         if any(ch in path for ch in "*?[]"):
-            files.extend(sorted(glob.glob(path, recursive=recursive)))
+            files.extend(sorted(glob.glob(path, recursive=recursive)))  # NOSONAR(S8707)
             continue
         if os.path.isdir(path):
             pattern = "**/*.csv" if recursive else "*.csv"
             search = os.path.join(path, pattern)
-            files.extend(sorted(glob.glob(search, recursive=recursive)))
+            files.extend(sorted(glob.glob(search, recursive=recursive)))  # NOSONAR(S8707)
         elif os.path.isfile(path):
             files.append(path)
         else:
