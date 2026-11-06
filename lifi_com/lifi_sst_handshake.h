@@ -38,8 +38,13 @@ SST_session_ctx_t* secure_connect_to_server_via_lifi(session_key_t* s_key);
 // @param existing_s_key_list Session key cache, as in
 // server_secure_comm_setup().
 // @return Connected session_ctx, or NULL on failure.
+// on_first_contact (may be NULL) is invoked once the moment the peer's
+// handshake1 transmission is first detected (first start-of-frame sync) -- the
+// own-channel analogue of a TCP accept return, for benchmark handshake timing.
+// cb_ctx is passed opaquely to it.
 SST_session_ctx_t* server_secure_comm_setup_via_lifi(
-    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list);
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list,
+    void (*on_first_contact)(void*), void* cb_ctx);
 
 // Runs the LiFi CO_LOCATION check (physical_com/hk.h) over the GPIO wiring
 // above. Invoke only after the authenticated SST handshake; initiator = the

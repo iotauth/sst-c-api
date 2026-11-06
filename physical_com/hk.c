@@ -61,17 +61,47 @@ static unsigned char bit_at(const unsigned char* p, unsigned i) {
     return (p[i / 8] >> (i % 8)) & 1;
 }
 static int recv_bit(const hk_io* io, unsigned char* bit, uint32_t* end) {
-    return io->recv_bit(io->ctx, bit, end) || *bit > 1 ? -1 : 0;
+    int rc = io->recv_bit(io->ctx, bit, end);
+    if (rc) return rc == HK_RECV_GLITCH ? HK_RECV_GLITCH : -1;
+    return *bit > 1 ? -1 : 0;
 }
 static int score(const hk_io* io, const hk_config* c, hk_result* r, unsigned i,
                  uint32_t sent, unsigned char expected) {
     unsigned char bit;
     uint32_t received;
-    if (recv_bit(io, &bit, &received)) return -1;
+    int rc = recv_bit(io, &bit, &received);
+    if (rc) {
+        /* A glitch (edge consumed, lock-step still aligned) fails just this
+         * round and the run continues. Auth's provisioned success_threshold
+         * (alpha, via hk_required) tolerates a bounded number of bad rounds.
+         * EXPERIMENTAL (2026-11-03, dongha): a structural loss (no edge within
+         * the window) is also recorded as a completed, incorrect, untimely
+         * round rather than immediately aborting -- it returns 1 so the caller
+         * can bound the number tolerated by (rounds - required). A single
+         * dropped optical bit on an honest link no longer kills the whole run;
+         * a relay that loses most bits still falls below the threshold. */
+        r->rtt_us[i] = c->max_delay_us + 1;
+        r->correct[i] = 0;
+        r->completed++;
+        return rc == HK_RECV_GLITCH ? 0 : 1;
+    }
     r->rtt_us[i] = received - sent;
     r->correct[i] = bit == expected;
     r->successes += r->correct[i] && r->rtt_us[i] <= c->max_delay_us;
     r->completed++;
+    return 0;
+}
+
+/* Receive the peer's challenge bit. Returns 0 when lock-step stays aligned (a
+ * clean bit or a glitch, whose edge was consumed), or 1 on a tolerated
+ * structural loss (no edge) -- treated as challenge 0 so this side still answers
+ * and the round count stays in step; the caller bounds how many it tolerates.
+ * EXPERIMENTAL (2026-11-03): a structural loss here no longer aborts. */
+static int recv_challenge(const hk_io* io, unsigned char* pc) {
+    uint32_t ignored;
+    int crc = recv_bit(io, pc, &ignored);
+    if (crc == HK_RECV_GLITCH) { *pc = 0; return 0; }
+    if (crc) { *pc = 0; return 1; }
     return 0;
 }
 
@@ -114,6 +144,12 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
         !io->recv_control || !io->send_bit || !io->recv_bit || !io->pause_us)
         return -1;
     r->required = hk_required(c);
+    /* EXPERIMENTAL: tolerate up to (rounds - required) structural losses as
+     * failed rounds before aborting -- once that many are lost, passing is
+     * impossible anyway. Keeps an honest link with rare drops alive; a relay
+     * that drops most bits still exhausts this and/or fails the threshold. */
+    unsigned losses = 0;
+    const unsigned loss_bound = c->rounds > r->required ? c->rounds - r->required : 0;
 
     if (initiator) {
         unsigned char init_msg[HK_INIT_SIZE], ready_msg[HK_READY_SIZE];
@@ -148,9 +184,15 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
         challenge = bit_at(challenges, 0);
         if (io->send_bit(io->ctx, challenge, &sent)) goto done;
         for (unsigned i = 0; i < c->rounds; ++i) {
-            if (score(io, c, r, i, sent, bit_at(reg[1][challenge], i)) ||
-                recv_bit(io, &peer_challenge, &ignored) ||
-                io->send_bit(io->ctx, bit_at(reg[0][peer_challenge], i),
+            int crc, sc;
+            sc = score(io, c, r, i, sent, bit_at(reg[1][challenge], i));
+            if (sc < 0 || (sc > 0 && ++losses > loss_bound)) goto done;
+            /* A glitched or lost challenge keeps the lock-step aligned (guess 0
+             * and answer so the round count stays in step); a structural loss
+             * is tolerated up to loss_bound rather than aborting. */
+            crc = recv_challenge(io, &peer_challenge);
+            if (crc > 0 && ++losses > loss_bound) goto done;
+            if (io->send_bit(io->ctx, bit_at(reg[0][peer_challenge], i),
                              &ignored))
                 goto done;
             if (i + 1 < c->rounds) {
@@ -194,15 +236,18 @@ int hk_run(const session_key_t* key, const hk_medium* medium,
             goto done;
 
         for (unsigned i = 0; i < c->rounds; ++i) {
-            if (recv_bit(io, &peer_challenge, &ignored) ||
-                io->send_bit(io->ctx, bit_at(reg[1][peer_challenge], i),
+            int crc = recv_challenge(io, &peer_challenge);
+            if (crc > 0 && ++losses > loss_bound) goto done;
+            if (io->send_bit(io->ctx, bit_at(reg[1][peer_challenge], i),
                              &ignored))
                 goto done;
             io->pause_us(io->ctx, medium->inter_bit_us);
             challenge = bit_at(challenges, i);
-            if (io->send_bit(io->ctx, challenge, &sent) ||
-                score(io, c, r, i, sent, bit_at(reg[0][challenge], i)))
-                goto done;
+            if (io->send_bit(io->ctx, challenge, &sent)) goto done;
+            {
+                int sc = score(io, c, r, i, sent, bit_at(reg[0][challenge], i));
+                if (sc < 0 || (sc > 0 && ++losses > loss_bound)) goto done;
+            }
         }
     }
     if (freshness_now_us(&r->collection_completed_us)) goto done;

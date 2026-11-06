@@ -67,6 +67,14 @@ static int accept_tcp_connection(int port, int* serv_sock) {
     return clnt_sock;
 }
 
+/* First-contact callback for the own-channel transports (IR/LiFi/Bluetooth):
+ * marks the locker's peer-handshake start when the peer is first detected, so
+ * its handshake interval excludes the idle wait -- matching the TCP branch. */
+static void bench_mark_first_contact(void* b) {
+    benchmark_trace* bt = (benchmark_trace*)b;
+    bench_mark(bt, &bt->peer_handshake_start_us);
+}
+
 int main(int argc, char* argv[]) {
     const int PORT_NUM = 21100;
     physical_options opts;
@@ -144,7 +152,10 @@ int main(int argc, char* argv[]) {
 #endif
     } else if (strcmp(comm_type, "ir") == 0) {
 #ifdef HAVE_IR_TRANSPORT
-        session_ctx = server_secure_comm_setup_via_ir(ctx, s_key_list);
+        bench_stage(&bench, "peer_handshake");
+        session_ctx = server_secure_comm_setup_via_ir(
+            ctx, s_key_list, bench_mark_first_contact, &bench);
+        bench_mark(&bench, &bench.peer_handshake_end_us);
         if (session_ctx == NULL) {
             SST_print_error_exit("Failed server_secure_comm_setup_via_ir().");
         }
@@ -158,7 +169,10 @@ int main(int argc, char* argv[]) {
 #endif
     } else if (strcmp(comm_type, "lifi") == 0) {
 #ifdef HAVE_LIFI_TRANSPORT
-        session_ctx = server_secure_comm_setup_via_lifi(ctx, s_key_list);
+        bench_stage(&bench, "peer_handshake");
+        session_ctx = server_secure_comm_setup_via_lifi(
+            ctx, s_key_list, bench_mark_first_contact, &bench);
+        bench_mark(&bench, &bench.peer_handshake_end_us);
         if (session_ctx == NULL) {
             SST_print_error_exit("Failed server_secure_comm_setup_via_lifi().");
         }
@@ -172,7 +186,10 @@ int main(int argc, char* argv[]) {
 #endif
     } else if (strcmp(comm_type, "bluetooth") == 0) {
 #ifdef HAVE_BT_TRANSPORT
-        session_ctx = server_secure_comm_setup_via_bt(ctx, s_key_list);
+        bench_stage(&bench, "peer_handshake");
+        session_ctx = server_secure_comm_setup_via_bt(
+            ctx, s_key_list, bench_mark_first_contact, &bench);
+        bench_mark(&bench, &bench.peer_handshake_end_us);
         if (session_ctx == NULL) {
             SST_print_error_exit("Failed server_secure_comm_setup_via_bt().");
         }

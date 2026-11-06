@@ -50,9 +50,16 @@ typedef struct {
 } hk_result;
 
 /* All IO callbacks return 0 on success, -1 on timeout/framing/IO failure.
- * Bits are serialized response first, then a new challenge. Timestamps use
- * the same monotonic microsecond clock (uint32 wrap is intentional).
- * recv_bit timestamps completion of decoding, NOT the leading edge. */
+ * recv_bit may also return HK_RECV_GLITCH when it saw and consumed a leading
+ * edge but the symbol was unusable (overlong/too-short/glitch): the lock-step
+ * stays aligned, so hk_run counts the round as failed and continues rather
+ * than aborting (the success_threshold tolerates a bounded number). A plain
+ * -1 (no edge within the window, EOF, framing) is a structural loss and still
+ * aborts the run. Bits are serialized response first, then a new challenge.
+ * Timestamps use the same monotonic microsecond clock (uint32 wrap is
+ * intentional). recv_bit timestamps completion of decoding, NOT the leading
+ * edge. */
+#define HK_RECV_GLITCH (-2)
 typedef struct {
     void* ctx;
     int (*send_control)(void*, const unsigned char*, unsigned);

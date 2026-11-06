@@ -213,9 +213,11 @@ static int next_edge(int* level, uint32_t* tick, int forever,
 // is dropped and decoding resumes once light returns. @return decoded byte
 // length (>0) on success, 0 on timeout, -1 on a framing error.
 static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
-                       double timeout_sec) {
+                       double timeout_sec, void (*on_first)(void*),
+                       void* on_first_ctx) {
     int forever = timeout_sec <= 0;
     uint32_t deadline = gpioTick() + (uint32_t)(timeout_sec * 1000000.0);
+    int first_fired = 0;  /* fire on_first once, at the first start-of-frame sync */
     int have_sync = 0, byte_val = 0, bit_count = 0;
     int expected_len = -1, received_bytes = 0, reported_dark = 0;
     int dark = 0, result = 0;
@@ -272,6 +274,12 @@ static int lifi_rx_buf(unsigned char* out_buf, int out_buf_size,
         uint32_t pulse_width = tick - fell;
 
         if (pulse_width > LIFI_SYNC_THRESHOLD_US) {
+            /* First sync = the peer has begun transmitting handshake1: the
+             * locker's "first contact", analogous to a TCP accept return. */
+            if (on_first && !first_fired) {
+                on_first(on_first_ctx);
+                first_fired = 1;
+            }
             have_sync = 1;
             byte_val = 0;
             bit_count = 0;
@@ -370,7 +378,7 @@ SST_session_ctx_t* secure_connect_to_server_via_lifi(session_key_t* s_key) {
             lifi_deinit();
             return NULL;
         }
-        hs2_length = lifi_rx_buf(hs2, sizeof(hs2), HS2_TIMEOUT_SEC);
+        hs2_length = lifi_rx_buf(hs2, sizeof(hs2), HS2_TIMEOUT_SEC, NULL, NULL);
         if (hs2_length > 0) {
             break;
         } else if (hs2_length < 0) {
@@ -415,7 +423,8 @@ SST_session_ctx_t* secure_connect_to_server_via_lifi(session_key_t* s_key) {
 }
 
 SST_session_ctx_t* server_secure_comm_setup_via_lifi(
-    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list) {
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list,
+    void (*on_first_contact)(void*), void* cb_ctx) {
     if (lifi_init() < 0) {
         return NULL;
     }
@@ -426,7 +435,7 @@ SST_session_ctx_t* server_secure_comm_setup_via_lifi(
     SST_print_log(
         "LiFi handshake: listening for handshake1 (Ctrl+C to stop)...");
     while (hs1_length <= 0) {
-        hs1_length = lifi_rx_buf(hs1, sizeof(hs1), 0);
+        hs1_length = lifi_rx_buf(hs1, sizeof(hs1), 0, on_first_contact, cb_ctx);
         if (hs1_length < 0) {
             lifi_deinit();
             return NULL;
@@ -471,7 +480,7 @@ SST_session_ctx_t* server_secure_comm_setup_via_lifi(
     free(hs2);
 
     unsigned char hs3[256];
-    int hs3_length = lifi_rx_buf(hs3, sizeof(hs3), 15.0);
+    int hs3_length = lifi_rx_buf(hs3, sizeof(hs3), 15.0, NULL, NULL);
     if (hs3_length <= 0) {
         SST_print_error("LiFi handshake: no handshake3 received.");
         lifi_deinit();
@@ -522,7 +531,7 @@ static int hk_send_control(void* ctx, const unsigned char* p, unsigned n) {
 }
 static int hk_recv_control(void* ctx, unsigned char* p, unsigned n) {
     (void)ctx;
-    return lifi_rx_buf(p, (int)n, 60.0) == (int)n ? 0 : -1;
+    return lifi_rx_buf(p, (int)n, 60.0, NULL, NULL) == (int)n ? 0 : -1;
 }
 static int hk_send_bit(void* ctx, unsigned char bit, uint32_t* end) {
     (void)ctx;
@@ -543,14 +552,16 @@ static int hk_recv_bit(void* ctx, unsigned char* bit, uint32_t* end) {
     }
     uint32_t pulse = gpioTick();
     while (gpioRead(rx_gpio) == 0) {
-        /* Longer than a sync marker is not a bit: peer LED lost, or a
-         * merged symbol. Abort the run rather than guess. */
-        if ((uint32_t)(gpioTick() - pulse) > LIFI_SYNC_THRESHOLD_US) return -1;
+        /* Longer than a sync marker is not a bit: a merged symbol or glitch.
+         * The edge was consumed, so this round can fail without desyncing. */
+        if ((uint32_t)(gpioTick() - pulse) > LIFI_SYNC_THRESHOLD_US)
+            return HK_RECV_GLITCH;
     }
     *end = gpioTick();
     uint32_t width = *end - pulse;
-    /* Reject glitches, rather than treating every dip as a bit. */
-    if (width < LIFI_MIN_WIDTH_US) return -1;
+    /* Reject glitches, rather than treating every dip as a bit. The edge was
+     * consumed, so this is a glitched round, not a loss. */
+    if (width < LIFI_MIN_WIDTH_US) return HK_RECV_GLITCH;
     *bit = width < LIFI_BIT_THRESHOLD_US ? 0 : 1;
     return 0;
 }

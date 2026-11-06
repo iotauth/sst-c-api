@@ -25,8 +25,13 @@ SST_session_ctx_t* secure_connect_to_server_via_bt(session_key_t* s_key,
 // @param ctx SST context, used to fetch the session key by ID from Auth.
 // @param existing_s_key_list Session key cache, as in
 // server_secure_comm_setup().
+// @param on_first_contact Optional callback (may be NULL) invoked once right
+// after the L2CAP accept returns (first contact with the peer) -- mirrors the
+// TCP accept-return mark, for benchmark handshake timing. @param cb_ctx Opaque
+// argument passed to on_first_contact.
 // @return Connected session_ctx, or NULL on failure.
 SST_session_ctx_t* server_secure_comm_setup_via_bt(
-    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list);
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list,
+    void (*on_first_contact)(void*), void* cb_ctx);
 
 #endif  // BT_SST_HANDSHAKE_H

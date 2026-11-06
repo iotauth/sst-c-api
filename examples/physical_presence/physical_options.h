@@ -61,7 +61,7 @@ static void physical_options_usage(const char* program, int robot) {
         "[--mic <alsa_device>] [--spk <alsa_device>] %s"
         "[--require-ir-hk | --require-lifi-hk | --require-ultrasound-echo "
         "| --require-ambient-audio | --require-ble-rssi | --require-wifi-rssi "
-        "| --require-uwb | --require-uwb-position] "
+        "| --require-uwb | --require-uwb-position | --require-qr] "
         "[--uwb-dev <serial_port>] "
         "[--uwb-anchor-dev <serial_port> (locker, repeatable)] "
         "[--temp-dev <serial_port> (locker)] "
@@ -101,7 +101,8 @@ static void physical_options_parse(int argc, char* argv[], int robot,
                          {"--require-ble-rssi", "BLE_RSSI"},
                          {"--require-wifi-rssi", "WIFI_RSSI"},
                          {"--require-uwb", "UWB"},
-                         {"--require-uwb-position", "UWB_POSITION"}};
+                         {"--require-uwb-position", "UWB_POSITION"},
+                         {"--require-qr", "QR"}};
     memset(o, 0, sizeof(*o));
     o->comm_type = "tcp";
     o->lifi_tx_gpio = 23;
@@ -350,12 +351,20 @@ static int physical_wifi_measure_setup_locker(physical_options* o,
         return -1;
     }
     memset(cfg.password, 0, sizeof(cfg.password));
-    SST_print_log("WIFI RSSI: starting measurement AP (ssid=%s) via %s",
-                  cfg.ssid, o->wifi_link_script);
-    if (wifi_measure_link_up(o->wifi_link_script, 1, o->wifi_link_minutes,
-                             o->wifi_creds_file)) {
-        SST_print_error("WIFI RSSI: failed to start the measurement AP.");
-        return -1;
+    /* Relay experiment: a pre-standing measurement AP (brought up out of band so
+     * the relay station stays associated across trials) is reused instead of
+     * being torn down and rebuilt each run. Unset in normal operation. */
+    if (getenv("PHYS_WIFI_REUSE_AP")) {
+        SST_print_log("WIFI RSSI: reusing pre-standing measurement AP "
+                      "(PHYS_WIFI_REUSE_AP set); not restarting it.");
+    } else {
+        SST_print_log("WIFI RSSI: starting measurement AP (ssid=%s) via %s",
+                      cfg.ssid, o->wifi_link_script);
+        if (wifi_measure_link_up(o->wifi_link_script, 1, o->wifi_link_minutes,
+                                 o->wifi_creds_file)) {
+            SST_print_error("WIFI RSSI: failed to start the measurement AP.");
+            return -1;
+        }
     }
     int serv = -1;
     if (wifi_measure_listen(o->co.wifi_iface, cfg.port, &serv)) {

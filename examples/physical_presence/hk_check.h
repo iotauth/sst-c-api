@@ -10,12 +10,14 @@
 #include "../../physical_com/freshness.h"
 #include "../../physical_com/hk.h"
 #include "../../physical_com/rssi_check.h"
+#include "../../physical_com/session_ctl.h"
 #include "../../ultrasonic_com/ultrasonic_echo.h"
 #include "../../uwb_com/uwb_cli_dev.h"
 #include "../../uwb_com/uwb_locate.h"
 #include "../../wifi_com/wifi_rssi.h"
 #include "../../wifi_com/wifi_timing.h"
 #include "benchmark.h"
+#include "qr_io.h"
 #ifdef HAVE_BT_TRANSPORT
 #include "../../bluetooth_com/bt_adv_radio.h"
 #endif
@@ -110,6 +112,9 @@ typedef union {
     ble_adv_rssi_config ble;
     uwb_range_config uwb;
     uwb_locate_config locate; /* UWB_POSITION */
+    struct {
+        unsigned timeout_ms; /* how long the robot waits for the challenge */
+    } qr;
 } co_location_config;
 
 static const char* run_result_name(int rc) {
@@ -741,6 +746,115 @@ static int verify_uwb_position(SST_session_ctx_t* session, int initiator,
     return rc;
 }
 
+/* QR-code cooperative proximity. A SEPARATE relay experiment from the timing
+ * mechanisms: it has no response deadline, so it does not resist a code
+ * forwarded to a distant display -- that is the point the experiment makes.
+ * The locker binds a fresh challenge to the current session: it sends the
+ * challenge over the authenticated SST session and shows it as a QR on its
+ * framebuffer; the robot reads the expected challenge from the session, scans
+ * the QR with its camera, and accepts only when the decoded payload equals it.
+ * The robot's observation interval (scan start to validation) is the
+ * "challenge transmission to QR validation" latency. */
+#define PHYS_QR_PREFIX {'Q', 'R', 'C'}
+#define PHYS_QR_HEX_LEN 16 /* 8 random bytes, hex-encoded */
+static int verify_qr(SST_session_ctx_t* session, int initiator,
+                     const co_location_options* o, const co_location_config* c,
+                     physical_evidence* ev) {
+    static const unsigned char prefix[] = PHYS_QR_PREFIX;
+    unsigned timeout_ms = c->qr.timeout_ms ? c->qr.timeout_ms : 20000;
+    if (session->sock < 0) {
+        SST_print_error("QR: needs the TCP SST session; use --comm_type tcp.");
+        return -1;
+    }
+    if (!initiator) {
+        /* Locker (responder): receive the robot's fresh nonce and display it as
+         * a QR. Because the nonce is unknown until the robot sends it, the locker
+         * cannot pre-render it -- the display paint (and any relay propagation)
+         * therefore fall INSIDE the robot's timed round-trip below. */
+        session_ctl_timeout saved;
+        if (session_ctl_timeout_set(session->sock, timeout_ms, &saved)) return -1;
+        unsigned char msg[sizeof(prefix) + PHYS_QR_HEX_LEN];
+        int rc = session_ctl_recv(session, prefix, sizeof(prefix), msg,
+                                  sizeof(msg), "qr nonce");
+        session_ctl_timeout_restore(session->sock, &saved);
+        if (rc) {
+            SST_print_error("QR: no nonce from the robot.");
+            return -1;
+        }
+        char hex[PHYS_QR_HEX_LEN + 1];
+        memcpy(hex, msg + sizeof(prefix), PHYS_QR_HEX_LEN);
+        hex[PHYS_QR_HEX_LEN] = '\0';
+        uint64_t t0 = 0, t1 = 0;
+        freshness_now_us(&t0);
+        if (qr_display_entity_id(hex)) {
+            SST_print_error("QR: failed to display the nonce.");
+            return -1;
+        }
+        freshness_now_us(&t1);
+        SST_print_log("QR: displayed robot nonce %s", hex);
+        set_evidence(ev, 1, t0, t1);
+        return 1;
+    }
+    /* Robot (initiator): generate a fresh nonce, send it to the locker, then time
+     * how long until that exact code appears on the display in front of the
+     * camera (challenge-response round-trip). The locker cannot pre-paint an
+     * unknown nonce, so the display render + any relay propagation are measured. */
+    unsigned char rnd[PHYS_QR_HEX_LEN / 2];
+    FILE* u = fopen("/dev/urandom", "rb");
+    if (!u || fread(rnd, 1, sizeof(rnd), u) != sizeof(rnd)) {
+        if (u) fclose(u);
+        SST_print_error("QR: could not read /dev/urandom.");
+        return -1;
+    }
+    fclose(u);
+    char expected[PHYS_QR_HEX_LEN + 1];
+    for (unsigned i = 0; i < sizeof(rnd); ++i)
+        snprintf(expected + i * 2, 3, "%02x", rnd[i]);
+    unsigned char msg[sizeof(prefix) + PHYS_QR_HEX_LEN];
+    memcpy(msg, prefix, sizeof(prefix));
+    memcpy(msg + sizeof(prefix), expected, PHYS_QR_HEX_LEN);
+    uint64_t t0 = 0, t1 = 0;
+    freshness_now_us(&t0);
+    if (session_ctl_send(session, msg, sizeof(msg))) {
+        SST_print_error("QR: failed to send the session nonce.");
+        return -1;
+    }
+    char scanned[128] = {0};
+    /* Continuous-stream scan: one warm rpicam-vid stream decodes frames until the
+     * displayed code equals the session challenge or the plan timeout elapses
+     * (qr_stream_scan.py). This avoids rpicam-jpeg's per-attempt camera start-up
+     * (~0.6-1.9 s each), so when the code must be waited for -- e.g. a relay that
+     * re-renders it on another display adds propagation latency -- the measured
+     * interval tracks the display's update latency, not repeated camera restarts.
+     * The helper lives beside this entity (cwd is .../physical_presence/build). */
+    char cmd[256];
+    snprintf(cmd, sizeof(cmd),
+             "python3 ../qr_stream_scan.py %s %u 2>/dev/null", expected, timeout_ms);
+    int match = 0, scan_rc = -1;
+    FILE* sp = popen(cmd, "r");
+    if (sp) {
+        size_t got = fread(scanned, 1, sizeof(scanned) - 1, sp);
+        scanned[got] = '\0';
+        while (got && (scanned[got - 1] == '\n' || scanned[got - 1] == '\r' ||
+                       scanned[got - 1] == ' '))
+            scanned[--got] = '\0';
+        int rc = pclose(sp);
+        scan_rc = got > 0 ? 0 : -1;
+        match = (rc == 0) && !strcmp(scanned, expected);
+    }
+    freshness_now_us(&t1);
+    SST_print_log("QR: expected=%s scanned=%s match=%d", expected,
+                  scan_rc == 0 ? scanned : "(none)", match);
+    set_evidence(ev, match ? 1 : 0, t0, t1);
+    size_t off = 0;
+    obs_add(o, &off,
+            "{\"mechanism\": \"QR\", \"role\": \"requester\", \"match\": %d, "
+            "\"scan_us\": %llu, \"challenge\": \"%s\", \"scanned\": \"%s\"}",
+            match, (unsigned long long)(t1 - t0), expected,
+            scan_rc == 0 ? scanned : "");
+    return match ? 1 : 0;
+}
+
 /* Every cooperative method an endpoint can run: the physical requirement it
  * verifies (e.g. "PROXIMITY"), its method id, how to read its settings from the
  * plan (1 selected, 0 absent/DUMMY, -1 malformed or another method of the same
@@ -781,6 +895,18 @@ static int select_uwb(const char* plan, co_location_config* c) {
 }
 static int select_uwb_position(const char* plan, co_location_config* c) {
     return uwb_locate_plan_config(plan, &c->locate);
+}
+static int select_qr(const char* plan, co_location_config* c) {
+    plan_json j;
+    int params;
+    int rc = plan_check(plan, "PROXIMITY", "QR", "MUTUAL", &j, &params);
+    if (rc != 1) return rc;
+    long timeout = 20000; /* default if the plan omits timeout_ms */
+    if (params >= 0 && j.t[params].type == '{')
+        plan_json_int(&j, plan_json_field(&j, params, "timeout_ms"), 1, 120000,
+                      &timeout);
+    c->qr.timeout_ms = (unsigned)timeout;
+    return 1;
 }
 static int run_ir(SST_session_ctx_t* s, int initiator,
                   const co_location_options* o, const co_location_config* c,
@@ -824,6 +950,11 @@ static int run_uwb_position(SST_session_ctx_t* s, int initiator,
                             const co_location_config* c, physical_evidence* ev) {
     return verify_uwb_position(s, initiator, o, &c->locate, ev);
 }
+static int run_qr(SST_session_ctx_t* s, int initiator,
+                  const co_location_options* o, const co_location_config* c,
+                  physical_evidence* ev) {
+    return verify_qr(s, initiator, o, c, ev);
+}
 
 /* Candidate methods grouped by physical requirement. Methods of the same
  * requirement are alternatives (Auth selects one); different requirements are
@@ -835,6 +966,7 @@ static const co_location_method COOPERATIVE_METHODS[] = {
     {"PROXIMITY", "BLE_RSSI", select_ble, run_ble},
     {"PROXIMITY", "WIFI_RSSI", select_wifi, run_wifi},
     {"PROXIMITY", "UWB", select_uwb, run_uwb},
+    {"PROXIMITY", "QR", select_qr, run_qr},
     {"POSITION_IN_REGION", "UWB_POSITION", select_uwb_position, run_uwb_position},
     {"SHARED_ACOUSTIC_ENVIRONMENT", "AMBIENT_AUDIO", select_ambient,
      run_ambient},

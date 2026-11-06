@@ -29,6 +29,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "bt_link.h"
@@ -110,14 +111,25 @@ int main(int argc, char** argv) {
     int ble = -1, tcp = -1;
     if (!strcmp(mode, "near-locker")) {
         if (!locker) { fprintf(stderr, "near-locker needs --locker BDADDR\n"); return 1; }
-        printf("LOG: near-locker connecting BLE to locker %s...\n", locker);
-        ble = bt_link_connect(locker, psm);
-        if (ble < 0) return 1;
+        /* The integrated locker advertises its L2CAP link only after its TCP
+         * handshake and RSSI sampling, so retry until that window opens. */
+        printf("LOG: near-locker connecting BLE to locker %s (retrying)...\n", locker);
+        for (int attempt = 0; attempt < 120 && ble < 0; ++attempt) {
+            ble = bt_link_connect(locker, psm);
+            if (ble < 0) { struct timespec ts = {0, 500000000}; nanosleep(&ts, NULL); }
+        }
+        if (ble < 0) { fprintf(stderr, "near-locker: BLE connect to locker failed\n"); return 1; }
         printf("LOG: near-locker BLE connected; waiting for Relay1 on TCP\n");
         tcp = tcp_listen_accept(port);
     } else if (!strcmp(mode, "near-robot")) {
         if (!relay2) { fprintf(stderr, "near-robot needs --relay2 IP\n"); return 1; }
-        tcp = tcp_connect(relay2, port);
+        /* Relay2 starts its TCP listen only after it connects BLE to the locker,
+         * so retry the backhaul connection until that listen is up. */
+        printf("LOG: near-robot connecting TCP to relay2 %s:%u (retrying)...\n", relay2, port);
+        for (int attempt = 0; attempt < 120 && tcp < 0; ++attempt) {
+            tcp = tcp_connect(relay2, port);
+            if (tcp < 0) { struct timespec ts = {0, 500000000}; nanosleep(&ts, NULL); }
+        }
         if (tcp < 0) return 1;
         printf("LOG: near-robot advertising BLE for the robot...\n");
         ble = bt_link_accept(psm);

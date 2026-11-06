@@ -29,12 +29,19 @@ SST_session_ctx_t* secure_connect_to_server_via_bt(session_key_t* s_key,
 }
 
 SST_session_ctx_t* server_secure_comm_setup_via_bt(
-    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list) {
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list,
+    void (*on_first_contact)(void*), void* cb_ctx) {
     SST_print_log("Bluetooth handshake: advertising, waiting for a peer...");
     int sock = bt_link_accept(BT_LINK_DEFAULT_PSM);
     if (sock < 0) {
         SST_print_error("Bluetooth handshake: no peer connected.");
         return NULL;
+    }
+    /* L2CAP accept returned: first contact with the peer. Mirrors the TCP
+     * branch, which times its handshake from accept return (excludes the idle
+     * wait for the peer to connect). */
+    if (on_first_contact) {
+        on_first_contact(cb_ctx);
     }
     SST_session_ctx_t* session_ctx =
         server_secure_comm_setup(ctx, sock, existing_s_key_list);

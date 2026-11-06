@@ -139,9 +139,11 @@ static int ir_tx_buf(const unsigned char* buf, int len) {
 // length (>0) on success, 0 on timeout waiting for a sync marker, -1 on a
 // framing error.
 static int ir_rx_buf(unsigned char* out_buf, int out_buf_size,
-                     double timeout_sec) {
+                     double timeout_sec, void (*on_first)(void*),
+                     void* on_first_ctx) {
     uint32_t loop_start = gpioTick();
 
+    int first_fired = 0;  /* fire on_first once, at the first start-of-frame sync */
     int have_sync = 0;
     int byte_val = 0, bit_count = 0;
     int expected_len = -1, received_bytes = 0;
@@ -164,6 +166,12 @@ static int ir_rx_buf(unsigned char* out_buf, int out_buf_size,
         uint32_t pulse_width = gpioTick() - rx_start_tick;
 
         if (pulse_width > IR_SYNC_THRESHOLD_US) {
+            /* First sync = the peer has begun transmitting handshake1: the
+             * locker's "first contact", analogous to a TCP accept return. */
+            if (on_first && !first_fired) {
+                on_first(on_first_ctx);
+                first_fired = 1;
+            }
             have_sync = 1;
             byte_val = 0;
             bit_count = 0;
@@ -233,7 +241,7 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key) {
             ir_deinit();
             return NULL;
         }
-        hs2_length = ir_rx_buf(hs2, sizeof(hs2), HS2_TIMEOUT_SEC);
+        hs2_length = ir_rx_buf(hs2, sizeof(hs2), HS2_TIMEOUT_SEC, NULL, NULL);
         if (hs2_length > 0) {
             break;
         } else if (hs2_length < 0) {
@@ -283,7 +291,8 @@ SST_session_ctx_t* secure_connect_to_server_via_ir(session_key_t* s_key) {
 }
 
 SST_session_ctx_t* server_secure_comm_setup_via_ir(
-    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list) {
+    SST_ctx_t* ctx, session_key_list_t* existing_s_key_list,
+    void (*on_first_contact)(void*), void* cb_ctx) {
     if (ir_init() < 0) {
         return NULL;
     }
@@ -292,7 +301,7 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
     int hs1_length = 0;
     SST_print_log("IR handshake: listening for handshake1 (Ctrl+C to stop)...");
     while (hs1_length <= 0) {
-        hs1_length = ir_rx_buf(hs1, sizeof(hs1), 0);
+        hs1_length = ir_rx_buf(hs1, sizeof(hs1), 0, on_first_contact, cb_ctx);
         if (hs1_length < 0) {
             ir_deinit();
             return NULL;
@@ -339,7 +348,7 @@ SST_session_ctx_t* server_secure_comm_setup_via_ir(
     // Same headroom reasoning as HS2_TIMEOUT_SEC in
     // secure_connect_to_server_via_ir(): an ~80-byte handshake3 alone takes
     // ~32s to transmit at this bit rate.
-    int hs3_length = ir_rx_buf(hs3, sizeof(hs3), 60.0);
+    int hs3_length = ir_rx_buf(hs3, sizeof(hs3), 60.0, NULL, NULL);
     if (hs3_length <= 0) {
         SST_print_error("IR handshake: no handshake3 received.");
         ir_deinit();
@@ -396,7 +405,7 @@ static int hk_send_control(void* ctx, const unsigned char* p, unsigned n) {
 }
 static int hk_recv_control(void* ctx, unsigned char* p, unsigned n) {
     (void)ctx;
-    return ir_rx_buf(p, (int)n, 120.0) == (int)n ? 0 : -1;
+    return ir_rx_buf(p, (int)n, 120.0, NULL, NULL) == (int)n ? 0 : -1;
 }
 static int hk_send_bit(void* ctx, unsigned char bit, uint32_t* end) {
     (void)ctx;
@@ -417,13 +426,15 @@ static int hk_recv_bit(void* ctx, unsigned char* bit, uint32_t* end) {
     }
     uint32_t pulse = gpioTick();
     while (gpioRead(IR_RX_GPIO) == IR_ACTIVE_LEVEL) {
-        if ((uint32_t)(gpioTick() - pulse) > 1200) return -1;
+        /* Edge seen but the burst never ends: a glitch, not a clean bit. The
+         * edge is consumed, so the round can fail without desyncing. */
+        if ((uint32_t)(gpioTick() - pulse) > 1200) return HK_RECV_GLITCH;
     }
     *end = gpioTick();
     uint32_t width = *end - pulse;
     /* Reject glitches/overlong symbols, rather than treating every pulse as a
-     * bit. */
-    if (width < 150 || width > 900) return -1;
+     * bit. The edge was consumed, so this is a glitched round, not a loss. */
+    if (width < 150 || width > 900) return HK_RECV_GLITCH;
     *bit = width < IR_BIT_THRESHOLD_US ? 0 : 1;
     return 0;
 }
