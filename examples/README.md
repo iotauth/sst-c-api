@@ -4,7 +4,41 @@ This directory contains several example programs that demonstrate how to use the
 
 For the rest of this document, we use `$SST_ROOT` for the root directory of SST’s main repository (`iotauth`), and this repository (`sst-c-api`) is assumed to be checked out as a submodule under `$SST_ROOT/entity/c`.
 
-Each subdirectory here has its own `README.md` with detailed build and run instructions. This file gives a high-level overview and links into those examples.
+The links below point to the build and run instructions for each example. This file gives a high-level overview and links into those examples.
+
+## Shared Auth setup
+
+Auth-backed examples require the main repository and its initialized submodules,
+the [C build prerequisites](../README.md#prerequisites), Java and Maven, and
+Node.js/npm for credential generation. CI uses JDK 17. Set `$SST_ROOT` in each
+terminal where you run the commands below.
+
+Build Auth from its parent Maven project so its library dependencies are built
+together, then generate the default example credentials and databases:
+
+```sh
+export SST_ROOT=/absolute/path/to/iotauth
+cd "$SST_ROOT"
+mvn -B package --file auth/pom.xml
+cd "$SST_ROOT/examples"
+./generateAll.sh -p asdf
+```
+
+`asdf` is the example password used in CI. Use the same password when generating
+credentials and starting Auth. IPFS examples need `-g configs/file_sharing.graph`
+on the generation command instead of the default graph; follow their READMEs.
+Restart Auth after regenerating its credentials or databases.
+
+Start Auth101 in a separate terminal and leave it running:
+
+```sh
+cd "$SST_ROOT/auth/auth-server"
+java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties --password=asdf
+```
+
+Relative credential paths in entity configs are resolved from the **process
+working directory**, not the config file's directory. The example-specific
+instructions below use the working directories expected by their configs.
 
 ---
 
@@ -28,14 +62,15 @@ Examples that integrate SST with [IPFS](https://ipfs.tech/) to realize a secure 
 
 - `entity_uploader` encrypts a file with an SST session key and uploads it to IPFS.
 - `entity_downloader` obtains the file hash and session key information from a file system manager, retrieves the encrypted file from IPFS, and decrypts it using SST.
-- Includes both C and C++ entity implementations.
+- Includes C entities and older C++ examples that call the C API.
+- The separate C++17 API examples live under [`../cpp/examples/ipfs_examples/`](../cpp/examples/ipfs_examples/README.md).
 
 For compilation and step-by-step run instructions, see:
 
 - Higher-level description in the main SST repo:  
-  [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/master/examples/file_sharing)
+  [`$SST_ROOT/examples/file_sharing/README.md`](https://github.com/iotauth/iotauth/tree/main/examples/file_sharing)
 - C example: [`ipfs_examples/c/README.md`](./ipfs_examples/c/README.md)  
-- C++ example: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)  
+- C++ example using the C API: [`ipfs_examples/cpp/README.md`](./ipfs_examples/cpp/README.md)
 
 ---
 
@@ -43,9 +78,9 @@ For compilation and step-by-step run instructions, see:
 
 An example focused on **block-based file encryption**, inspired by RocksDB-style block layouts:
 
-- Random key–value pairs are packed into fixed-size (32 KB) blocks.
+- Random byte buffers representing key–value entries are packed into fixed-size (32 KiB) blocks.
 - Remaining space in a block is zero-padded.
-- Each block is encrypted with a session key obtained via SST.
+- Each file uses a session key obtained via SST; all ten blocks in that file share the key.
 - Multiple encrypted blocks are written into files, along with metadata describing the session keys used.
 - A separate reader:
   - Loads metadata.
@@ -60,7 +95,7 @@ For compilation and step-by-step run instructions, see:
 
 ## 4. SST Testbed
 
-A testbed to experiment attacks on SST.
+A testbed for experimenting with attacks on SST, using C++ programs that call the C API.
 
 - Uses Auth, example entities, and CSV-driven traffic patterns.
 - Includes:

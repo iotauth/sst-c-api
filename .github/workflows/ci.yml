@@ -4,15 +4,27 @@ name: Unit & Integration tests
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "main" ]
+  workflow_call:
+    inputs:
+      iotauth-ref:
+        description: 'iotauth ref for integration test (overrides iotauth-ref.txt)'
+        required: false
+        type: string
 
 env:
   # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
   BUILD_TYPE: Release
 
 jobs:
+  iotauth-integration-test:
+    if: ${{ inputs.iotauth-ref == '' }}
+    uses: iotauth/iotauth/.github/workflows/integration-test.yml@main
+    with:
+      sst-c-api-ref: ${{ github.sha }}
+
   Unit-Test:
     name: Unit Test
     # The CMake configure and build commands are platform agnostic and should work equally well on Windows or Mac.
@@ -22,6 +34,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
+        ref: ${{ inputs.iotauth-ref != '' && 'main' || (github.event.pull_request.head.sha || github.sha) }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
 
@@ -40,13 +55,23 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
 
+    - name: Build SST Testbed TCP and UDP programs
+      run: |
+        cmake -S examples/SST_Testbed -B examples/SST_Testbed/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake --build examples/SST_Testbed/build --config ${{env.BUILD_TYPE}} --target server client
+
   Integration-test:
     name: Integration-test
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Check out sst-c-api
+      if: ${{ inputs.iotauth-ref == '' }}
+      uses: actions/checkout@v4
+      with:
+        repository: iotauth/sst-c-api
     - name: Read branch name from iotauth-ref.txt
+      if: ${{ inputs.iotauth-ref == '' }}
       id: read_ref
       run: |
         ref=$(head -n 1 iotauth-ref.txt)
@@ -57,14 +82,14 @@ jobs:
       with:
         repository: iotauth/iotauth
         submodules: true
-        ref: ${{ steps.read_ref.outputs.ref }}
+        ref: ${{ inputs.iotauth-ref || steps.read_ref.outputs.ref }}
     - name: Check out specific ref of sst-c-api
+      if: ${{ inputs.iotauth-ref == '' }}
       uses: actions/checkout@v4
       with:
         repository: iotauth/sst-c-api
         path: entity/c
-        ref: ${{ github.ref }}
-      if: ${{ github.ref}}
+        ref: ${{ github.event.pull_request.head.sha || github.sha }}
     - name: Install openssl
       run: sudo apt-get update && sudo apt-get install -y openssl
     - name: Set up JDK 17
@@ -112,6 +137,13 @@ jobs:
         # ./encrypt_buf_with_session_key_without_malloc_execution_time_test ../test_configs/client.config
         ./multi_thread_get_session_key_test ../test_configs/client.config
 
+    - name: Verify UDP testbed worker reuse
+      working-directory: entity/c
+      run: |
+        cmake -S examples/SST_Testbed -B examples/SST_Testbed/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake --build examples/SST_Testbed/build --target server client
+        python3 tests/testbed_udp_smoke_test.py --build-dir examples/SST_Testbed/build
+
     - name: Stop auth server
       working-directory: auth/auth-server
       run: |
@@ -123,8 +155,20 @@ jobs:
 
     - name: Install IPFS
       run: |
-        wget https://dist.ipfs.tech/kubo/v0.36.0/kubo_v0.36.0_linux-amd64.tar.gz
-        tar -xvzf kubo_v0.36.0_linux-amd64.tar.gz
+        KUBO_VERSION=v0.36.0
+        KUBO_TAR=kubo_${KUBO_VERSION}_linux-amd64.tar.gz
+        # dist.ipfs.tech is sometimes unreachable from GitHub runners, so try GitHub Releases first.
+        for base in https://github.com/ipfs/kubo/releases/download/${KUBO_VERSION} https://dist.ipfs.tech/kubo/${KUBO_VERSION}; do
+          if curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 -o "$KUBO_TAR" "$base/$KUBO_TAR" &&
+             curl -fsSL --retry 3 --retry-all-errors --connect-timeout 20 -o "$KUBO_TAR.sha512" "$base/$KUBO_TAR.sha512"; then
+            break
+          fi
+          echo "Download from $base failed, trying next mirror."
+          rm -f "$KUBO_TAR" "$KUBO_TAR.sha512"
+        done
+        test -f "$KUBO_TAR"
+        echo "$(cut -d' ' -f1 "$KUBO_TAR.sha512")  $KUBO_TAR" | sha512sum -c -
+        tar -xvzf "$KUBO_TAR"
         cd kubo
         sudo bash install.sh
         ipfs init
@@ -169,13 +213,17 @@ jobs:
         else
           echo "No python.pid file found"
         fi    
-
+    - name: Install Python dependencies for the iotauth SDK
+      run: |
+        pip install --only-binary :all: cryptography==50.0.0
     - name: Run the secure python file system manager.
       working-directory: examples/file_sharing
+      env:
+        PYTHONPATH: ${{ github.workspace }}/entity/python
       run: |
-        pip3 install pycryptodome
         nohup python3 secure_file_system_manager.py file_system_manager.config -p asdf &
         echo $! > secure_python.pid  # Save the PID
+        sleep 5  # Wait for the server to start and bind to port 22100
 
     - name: Run the secure ipfs examples.
       working-directory: entity/c/examples/ipfs_examples/c/build

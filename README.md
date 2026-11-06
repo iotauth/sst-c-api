@@ -1,155 +1,254 @@
 # Overview
 ---
-This is a repository for C API of **[SST (Secure Swarm Toolkit)](https://github.com/iotauth/iotauth)** as a submodule.
+This is a repository for the C and C++ APIs of **[SST (Secure Swarm Toolkit)](https://github.com/iotauth/iotauth)** as a submodule.
+
+- The **C API** (`src/`) is the reference implementation of the SST entity protocol.
+- The **C++ API** (`cpp/`) is a port of the C API to modern C++ (RAII, exceptions, caller-provided crypto buffers). It speaks the same wire protocol, so C and C++ entities interoperate with each other and with Auth. See [C++ API](#c-api-1) below.
 
 # Prerequisites
 
--   OpenSSL:
-    SST uses the APIs from OpenSSL for encryption and decryption. OpenSSL 3.0 above is required to run SST.
-    -   On Max OS X, OpenSSL can be installed using `brew install openssl`.
-    -   Following environment variables need to be set before running `make`. The exact variable values can be found from the output of `brew install openssl`.
-    -   add two lines below by using `vi ~/.zshrc`
-        -   `export LDFLAGS="-L/opt/homebrew/opt/openssl@3/lib"`
-        -   `export CPPFLAGS="-I/opt/homebrew/opt/openssl@3/include"`
+-   OpenSSL 3.0 or later, including development headers and libraries.
+    On macOS with Homebrew, install `openssl@3` and, if CMake cannot find it,
+    set `export OPENSSL_ROOT_DIR="$(brew --prefix openssl@3)"` before configuring.
+-   A POSIX environment (Linux or macOS) and a C compiler.
+-   CMake 3.19 or later.
+-   For the C++ API, a C++17 compiler (clang or gcc) and spdlog; see the
+    [C++ requirements](cpp/README.md#requirements) for dependency setup.
 
-    - For Linux users, check [here](https://linuxhint.com/install-openssl-3-from-source/) for installation. 
+# Repository Layout
 
-# Code Hiearchy
+```
+entity/c/
+├── src/            # C API (c_api.h is the public header)
+├── cpp/            # C++ API, its examples and tests (see cpp/README.md)
+├── examples/       # C API examples, including some callers written in C++
+├── tests/          # C unit and integration tests
+├── embedded/       # C API for embedded targets
+├── cmake/          # CMake package config for the installed library
+└── .github/        # CI workflows for the C (ci.yml) and C++ (ci-cpp.yml) APIs
+```
+
+# C API
+
+## Code Hierarchy
 
 c_common -> c_crypto -> c_secure_comm -> c_api -> entity_client, entity_server
 
 &emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp;&emsp; load_config --&uarr;
 
-# C API
+`ipfs.h` builds on `c_api.h` and adds the file sharing helpers used by the IPFS examples.
 
-**SST_ctx_t \* init_SST()**
+## Functions
 
--   `init_SST()` is a function to load the config file, public and private keys, and store the distribution key.
--   It initializes important settings, at once.
--   Returns struct SST_ctx_t
+The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](https://iotauth.github.io/docs/c-guide) and [C API Reference](https://iotauth.github.io/docs/c-api-reference) for configuration and usage. Unless noted otherwise, functions that return a pointer return `NULL` on failure, and functions that return `int` return 0 on success and -1 on failure.
 
+### Context and session keys
+
+**SST_ctx_t \*init_SST(const char \*config_path)**
+
+-   Loads the config file, the entity's private key and Auth's public key (or the permanent distribution key when `PermanentDistKeyMode=on`).
+-   Returns the `SST_ctx_t` used by all other functions.
 
 **session_key_list_t \*init_empty_session_key_list(void)**
-- `init_empty_session_key_list` initializes anempty session_key_list.
-- Mallocs session_key_list_t and the session_key_t as much as the MAX_SESSION_KEY.
 
-**session_key_list_t \* get_session_key()**
+-   Allocates an empty session key list with room for `MAX_SESSION_KEY` keys.
 
--   `get_session_key()` is a function to get secure session key from Auth.
--   Input is the struct config returned from the `init_SST()`, and the existing session key list. It can be NULL, if there were no list.
--   Returns struct session_key_list_t.
+**session_key_list_t \*get_session_key(SST_ctx_t \*ctx, session_key_list_t \*existing_s_key_list)**
 
-**SST_session_ctx_t *secure_connect_to_server(session_key_t *s_key, SST_ctx_t *ctx)**
+-   Requests `entityInfo.number_key` session keys from Auth for the configured purpose.
+-   When `existing_s_key_list` is `NULL`, returns a new list. Otherwise appends the received keys to the existing list and returns it. If the list cannot accommodate the requested keys after discarding expired oldest entries, returns the existing list without contacting Auth.
 
--   `secure_connect_to_server()` is a function that establishes a secure connection with the entity server in the struct config.
--   Input is the session key received from `get_session_key()` and struct config returned from `load_config()`.
--   Returns struct SST_session_ctx_t
+**session_key_list_t \*get_session_key_with_index(SST_ctx_t \*ctx, int purpose_index, session_key_list_t \*existing_s_key_list)**
 
-**SST_session_ctx_t *secure_connect_to_server_with_socket(session_key_t *s_key, int sock)**
-- `secure_connect_to_server_with_socket` is a function that establishes a secure connection **using the connected socket with the target server**.
-- Input is the session key received from `get_session_key()` and socket connected using `connect()`.
+-   Same as `get_session_key()` but uses the purpose at `purpose_index` (0 or 1, for an entry present in the config). Without an explicit index, the C API uses the last `entityInfo.purpose` entry.
 
-**SST_session_ctx_t \* server_secure_comm_setup()**
+**session_key_t \*get_session_key_by_ID(unsigned char \*target_session_key_id, SST_ctx_t \*ctx, session_key_list_t \*existing_s_key_list)**
 
--   `server_secure_comm_setup()` is a function that the server continues to wait for the entity client and, if the client tries to connect, proceeds with a secure connection.
--   Input is the struct config.
--   Returns struct SST_session_ctx_t
+-   Returns the session key with the given 8-byte ID. If it is not in `existing_s_key_list`, requests it from Auth by ID and adds it to the list.
+-   Used by entity servers to obtain the key a client presents in its handshake.
+-   Requires an initialized, non-`NULL` list. The returned pointer refers to an entry owned by that list; do not free it separately or retain it across operations that overwrite or free the list.
 
-**void \*receive_thread_read_one_each()**
+The C API does not internally serialize requests on a shared `SST_ctx_t`. Protect concurrent requests and shared key-list access with an application mutex. The C++ `SST_API` serializes Auth requests internally.
 
--   Creates a thread to receive SECURE_COMM messages and prints the received messages.
--   Usage:
+### Secure sessions
+
+**SST_session_ctx_t \*secure_connect_to_server(session_key_t \*s_key, SST_ctx_t \*ctx)**
+
+-   Connects to the entity server from the config and runs the session key handshake as the client.
+
+**SST_session_ctx_t \*secure_connect_to_server_with_socket(session_key_t \*s_key, int sock)**
+
+-   Runs the client side of the handshake over a socket the caller already connected with `connect()`.
+-   The caller remains responsible for closing the supplied socket, including when the handshake fails.
+
+**SST_session_ctx_t \*server_secure_comm_setup(SST_ctx_t \*ctx, int clnt_sock, session_key_list_t \*existing_s_key_list)**
+
+-   Runs the server side of the handshake on an accepted client socket. The session key is looked up in `existing_s_key_list` or fetched from Auth by ID.
+-   The caller remains responsible for closing `clnt_sock`, including when the handshake fails.
+
+**int send_secure_message(char \*msg, unsigned int msg_length, SST_session_ctx_t \*session_ctx)**
+
+-   Encrypts `msg` with the session key and sends it as a `SECURE_COMM_MSG`. `msg_length` must not exceed `MAX_PAYLOAD_LENGTH`.
+
+**int read_secure_message(unsigned char \*plaintext, SST_session_ctx_t \*session_ctx)**
+
+-   Reads one `SECURE_COMM_MSG` from the session's socket, verifies and decrypts it, and copies the plaintext into the caller's buffer, which must hold `MAX_SECURE_COMM_MSG_LENGTH` bytes.
+-   Returns the plaintext length, 0 for either an empty plaintext or peer closure, or -1 on failure.
+
+**void \*receive_thread_read_one_each(void \*session_ctx)**
+
+-   Thread body that calls `read_secure_message()` in a loop and logs the received messages. Usage:
 
 ```
 pthread_t thread;
-pthread_create(&thread, NULL, &receive_thread_read_one_each, (void \*)session_ctx);
+pthread_create(&thread, NULL, &receive_thread_read_one_each, (void *)session_ctx);
 ```
 
-**int read_secure_message(unsigned char *buf, unsigned int buf_length, unsigned char *plaintext, SST_session_ctx_t *session_ctx)**
+### Encryption with a session key
 
-- `read_secure_message` checks the message header if it is a `SECURE_COMM_MSG`, and fills the buffer with the received decrypted message.
-- Input is the pointer of the user declared buffer, and the given buffer's length (not the received message).
-- Returns the length of the decrypted message.
+**int encrypt_buf_with_session_key(session_key_t \*s_key, unsigned char \*plaintext, unsigned int plaintext_length, unsigned char \*\*encrypted, unsigned int \*encrypted_length)**
+**int decrypt_buf_with_session_key(session_key_t \*s_key, unsigned char \*encrypted, unsigned int encrypted_length, unsigned char \*\*decrypted, unsigned int \*decrypted_length)**
 
-**int send_secure_message()**
+-   Encrypt or decrypt a buffer using the session key's cipher settings, adding or verifying an HMAC when enabled for that key.
+-   These allocate the result buffer, which the caller must `free()`.
 
--   `send_secure_message()` is a function that sends a message with secure communication to the server by encrypting it with the session key.
-- It recursively `write()`s until it sends the total message length.
-- Input includes message, length of message, and session_ctx struct.
-- Returns the bytes written if success, and -1 if failure.
+**int encrypt_buf_with_session_key_without_malloc(...)**
+**int decrypt_buf_with_session_key_without_malloc(...)**
 
-The four functions below are for encrypting and decrypting buffers with the session key.
+-   Same as above but write into a caller-provided buffer. Size it with `get_expected_encrypted_total_length()` / `get_expected_decrypted_maximum_length()` from `c_crypto.h`.
 
-**int encrypt_buf_with_session_key()**
-**int decrypt_buf_with_session_key()**
-- These functions encrypt/decrypt the given plaintext/ciphertext with the given session key.
-- It mallocs a buffer for the encrypted/decrypted result, and returns the double pointer of the encrypted/decrypted buffer.
-- Returns 0 if success, 1 if failure.
+### Saving and loading session keys
 
-**int encrypt_buf_with_session_key_without_malloc()**
-**int decrypt_buf_with_session_key_without_malloc()**
-- These two functions encrypt/decrypt the given plaintext/ciphertext with the given session key.
-- Unlike the function above, they do not allocate memory, the user should provide the buffer with enough length.
-- Returns 0 if success, 1 if failure.
+**int save_session_key_list(session_key_list_t \*session_key_list, const char \*file_path)**
+**int load_session_key_list(session_key_list_t \*session_key_list, const char \*file_path)**
 
-The four functions below are for saving and the `session_key_list_t`,
-**int save_session_key_list()**
-**int load_session_key_list()**
-- These two functions save/load the `session_key_list` to the `session_key_list_t` pointer.
-- Before loading, `init_empty_session_key_list()` can be used to provide an empty session key list.
-- Input includes the `session_key_list` to save/load, abd the file_path to save/load.
+-   Save or load a session key list to or from a file. Before loading, use `init_empty_session_key_list()` to provide the destination list.
 
-**int save_session_key_list_with_password()**
-**int load_session_key_list_with_password()**
-- These functions additionally get a password and salt as a `char *`, to encrypt/decrypt the `session_key_list`. 
+**int save_session_key_list_with_password(session_key_list_t \*session_key_list, const char \*file_path, const char \*password, unsigned int password_len, const char \*salt, unsigned int salt_len)**
+**int load_session_key_list_with_password(...)**
 
+-   Same, but the file is additionally encrypted with a key derived from the password and salt.
 
-**void free_session_key_list_t()**
+### Utilities
 
--   `free_session_key_list_t()` is a function that frees the memory assigned to the config_t. It frees the memory assigned by the asymmetric key paths.
+**unsigned int convert_skid_buf_to_int(unsigned char \*buf, int byte_length)**
 
-**void free_SST_ctx_t()**
+-   Converts a big-endian buffer to an `unsigned int`. For buffers wider than that type, only the low-order bytes are retained; this is not a full 64-bit session key ID conversion.
 
--   `free_SST_ctx_t()` is a function that frees the memory assigned to the loaded SST_ctx. It recursively frees the memory assigned by SST_ctx.
+**int generate_random_nonce(int length, unsigned char \*buf)**
 
-# Compile
+-   Fills `buf` with `length` cryptographically secure random bytes.
 
-For the rest of this document, we use $SST_ROOT for the root directory of [SST's main repository](https://github.com/iotauth/iotauth/).
+**int secure_rand(int min, int max)**
 
+-   Returns a cryptographically secure random integer in `[min, max]`, or -1 on failure.
 
-```
-$cd $SST_ROOT/entity/c
-$mkdir build && cd build
-$cmake ../
-$make
-```
+**void SST_print_debug / SST_print_log / SST_print_error / SST_print_error_exit(const char \*fmt, ...)**
 
-# Compile as Shared Library
-The command below will install the shared library under `usr/local/lib/`, and `c_api.h` will be included in `usr/local/lib/include/sst-c-api/c_api.h`.
+-   printf-style logging helpers. `SST_print_debug()` only prints when built with `-DCMAKE_BUILD_TYPE=Debug`. `SST_print_error_exit()` prints the error and exits the process.
 
-```
-$mkdir build && cd build
-$cmake ../
-$make
-$sudo make install
+### Freeing
+
+**void free_session_key_list_t(session_key_list_t \*session_key_list)**
+**void free_session_ctx(SST_session_ctx_t \*session_ctx)**
+**void free_SST_ctx_t(SST_ctx_t \*ctx)**
+
+-   Free the memory owned by a session key list, a session context, or the SST context (including the loaded keys). `free_session_ctx()` does not close the socket.
+
+## Compile
+
+For the rest of this document, set `$SST_ROOT` to the absolute path of [SST's main repository](https://github.com/iotauth/iotauth/), with this submodule at `entity/c/`.
+
+```sh
+cd "$SST_ROOT/entity/c"
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug
+cmake --build build
+ctest --test-dir build --output-on-failure
 ```
 
-# Examples
+This runs the four standalone C tests without a running Auth server or IPFS daemon. The transport test uses a local Auth stand-in over TCP and UDP loopback sockets. Debug builds enable `SST_print_debug()` and retain the assertions in the C crypto test. CI also runs the unit tests in Release mode. See [tests/README.md](./tests/README.md) for the separate Auth integration tests.
 
-To run examples, please checkout the [`examples/`](./examples/README.md) directory.
+## Install the Static Library
+
+The current CMake target is a static library. The commands below install `libsst-c-api.a` under `/usr/local/lib/` and `c_api.h` as `/usr/local/include/sst-c-api/c_api.h`. The install rules currently copy only the public header; lower-level headers such as `c_crypto.h` remain in `src/`. The repository examples build directly against the source tree. Run from `entity/c/`:
+
+```
+cmake -S . -B build
+cmake --build build
+sudo cmake --install build
+```
+
+## Examples and Tests
+
+-   C examples: see the [`examples/`](./examples/README.md) directory (server/client, file block encryption, IPFS file sharing).
+-   C tests: see [`tests/`](./tests/README.md).
+
+# C++ API
+
+The C++ API lives in [`cpp/`](./cpp/) and is documented in [`cpp/README.md`](./cpp/README.md). It is organized in four layers:
+
+| Layer | Location | Purpose |
+|-------|----------|---------|
+| **Crypto** | `cpp/src/crypto.hpp/cpp` | Stateless primitives (`sst::Crypto`): RSA, AES, SHA-256, HMAC, with caller-provided output buffers |
+| **Network** | `cpp/src/net/sockets.hpp/cpp` | RAII POSIX socket wrappers |
+| **API** | `cpp/src/api.hpp`, `cpp/src/ipfs.hpp` | Public interfaces; implementations are split across configuration, Auth requests, handshakes, sessions, session keys and IPFS helpers |
+| **Logging** | `cpp/src/log/log_manager.hpp/cpp` | spdlog-based logger |
+
+The C concepts map to C++ classes as follows. Setup operations (construction, key requests, handshakes) throw `sst::SST_Exception` on failure; message and buffer operations return status codes. C sends return 0 on success; C++ sends return the number of framed bytes written. Both return -1 on failure.
+
+| C API | C++ API |
+|-------|---------|
+| `SST_ctx_t`, `init_SST()` | `sst::SST_API` (constructor loads the config and keys) |
+| `get_session_key()`, `get_session_key_with_index()`, `get_session_key_by_ID()` | `SST_API::get_session_key()`, `get_session_key_with_index()`, `get_session_key_by_ID()` |
+| `secure_connect_to_server()`, `server_secure_comm_setup()` | `SST_API::secure_connect_to_server()`, `server_secure_comm_setup()` |
+| `session_key_list_t` | `sst::SessionKeyList` |
+| `SST_session_ctx_t`, `send_secure_message()`, `read_secure_message()` | `sst::SST_Session` (owns the socket) with `send_secure_message()`, `read_secure_message()` |
+| `ipfs.h` | `sst::ipfs` in `cpp/src/ipfs.hpp` |
+
+Both APIs accept the C properties format and resolve relative credential paths from the process working directory. Follow the example-specific working directories below. C++ sessions close their socket automatically; C callers must close the socket before freeing the session context.
+
+C++ documentation:
+
+-   [C++ Guide](https://iotauth.github.io/docs/cpp-guide) and [C++ API Reference](https://iotauth.github.io/docs/cpp-api-reference).
+-   [`cpp/README.md`](./cpp/README.md): design, layout, build and test instructions, full C-to-C++ mapping.
+-   [`cpp/examples/server_client_example/README.md`](./cpp/examples/server_client_example/README.md): secure server/client example and session keys by ID.
+-   [`cpp/examples/ipfs_examples/README.md`](./cpp/examples/ipfs_examples/README.md): IPFS file sharing with the plain and secure file system managers.
+-   [`cpp/README.md#build-and-run-the-tests`](./cpp/README.md#build-and-run-the-tests): current C++ unit-test commands. Use the server/client example above for an end-to-end Auth handshake.
+
+To build the C++ library and run its unit tests:
+
+```sh
+cd "$SST_ROOT/entity/c/cpp"
+cmake -S . -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+This runs six standalone C++ tests. They use local sockets and test doubles; no running Auth or IPFS daemon is needed.
 
 # For Developers
 
--   For C language indentation, we use the Google style.
+-   For C and C++ indentation, we use the Google style.
     -   To enable the Google style indentation in VSCode, follow the instructions below. ([Source](https://stackoverflow.com/questions/46111834/format-curly-braces-on-same-line-in-c-vscode))
-        1. Go Preferences -> Settings
+        1. Go to Preferences -> Settings
         2. Search for `C_Cpp.clang_format_fallbackStyle`
         3. Click Edit, Copy to Settings
         4. Change from `"Visual Studio"` to `"{ BasedOnStyle: Google, IndentWidth: 4 }"`
-    -   To format the code, follow instructions in this [page](https://code.visualstudio.com/docs/editor/codebasics#_formatting).
+    -   To format the code, follow the instructions on this [page](https://code.visualstudio.com/docs/editor/codebasics#_formatting).
 
-# TODOs
+-   To format all C/C++ source files in the repository using the project's clang-format style, run:
+    ```
+    make format
+    ```
+-   To check formatting without modifying files (exits with an error if any file is not properly formatted), run:
+    ```
+    make format-check
+    ```
+    Both commands operate on all `.c`, `.h`, `.cpp`, `.hpp`, `.cc`, and `.hh` files, excluding the `build/` directory and `embedded/lib/`.
 
--   Implement an additional API function for extracting session key from cached session keys.
+-   CI: [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) runs the C unit and integration tests, and [`.github/workflows/ci-cpp.yml`](./.github/workflows/ci-cpp.yml) runs the C++ unit tests and C++ examples. Both cover Auth-backed server/client and IPFS communication; their block-encryption examples exercise different workflows.
+    -   Both unit-test jobs explicitly build in Release mode, which compiles `assert()` out. New test checks must use an always-on check (see the `CHECK` macros in the regression tests). The example integration builds do not currently set `CMAKE_BUILD_TYPE`.
+    -   On pushes and pull requests to this repository, both jobs use the commit under test, and `ci.yml` also runs the entity integration tests of [iotauth](https://github.com/iotauth/iotauth) against it through their `sst-c-api-ref` input.
+    -   The iotauth repository calls both workflows from its `sst-c-api-tests.yml` and `sst-c-api-cpp-tests.yml` with an `iotauth-ref` input. In that case the unit test jobs check out this repository's `main`, while the integration test jobs check out iotauth at `iotauth-ref` with its submodules, so they use the commit of this repository pinned by iotauth's `entity/c` submodule.
 
-*Last updated on December 5, 2025*
+*Last updated on October 30, 2026*

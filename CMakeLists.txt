@@ -8,12 +8,12 @@ find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(sst-c-api STATIC
-  ${CMAKE_CURRENT_LIST_DIR}/c_api.c
-  ${CMAKE_CURRENT_LIST_DIR}/c_common.c
-  ${CMAKE_CURRENT_LIST_DIR}/c_crypto.c
-  ${CMAKE_CURRENT_LIST_DIR}/c_secure_comm.c
-  ${CMAKE_CURRENT_LIST_DIR}/load_config.c
-  ${CMAKE_CURRENT_LIST_DIR}/ipfs.c)
+  ${CMAKE_CURRENT_LIST_DIR}/src/c_api.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/c_common.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/c_crypto.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/c_secure_comm.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/load_config.c
+  ${CMAKE_CURRENT_LIST_DIR}/src/ipfs.c)
 
 set_target_properties(sst-c-api PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
@@ -78,7 +78,7 @@ install(
 )
 
 # Install headers
-install(FILES c_api.h DESTINATION include/sst-c-api)
+install(FILES src/c_api.h DESTINATION include/sst-c-api)
 
 # Build unit tests
 enable_testing()
@@ -86,3 +86,18 @@ enable_testing()
 add_executable(crypto_test ${CMAKE_CURRENT_SOURCE_DIR}/tests/c_crypto_test.c)
 target_link_libraries(crypto_test PRIVATE sst-c-api)
 add_test(NAME crypto_test COMMAND crypto_test)
+
+add_executable(resource_cleanup_test tests/resource_cleanup_test.c)
+target_link_libraries(resource_cleanup_test PRIVATE sst-c-api)
+add_test(NAME resource_cleanup_test COMMAND resource_cleanup_test ${CMAKE_CURRENT_BINARY_DIR})
+set_tests_properties(resource_cleanup_test PROPERTIES TIMEOUT 15)
+
+add_executable(auth_request_test tests/auth_request_test.c)
+target_link_libraries(auth_request_test PRIVATE sst-c-api)
+add_test(NAME auth_request_test COMMAND auth_request_test)
+set_tests_properties(auth_request_test PROPERTIES TIMEOUT 15)
+
+add_executable(auth_transport_test tests/auth_transport_test.c)
+target_link_libraries(auth_transport_test PRIVATE sst-c-api)
+add_test(NAME auth_transport_test COMMAND auth_transport_test)
+set_tests_properties(auth_transport_test PROPERTIES TIMEOUT 15)

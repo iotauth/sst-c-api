@@ -1,6 +1,6 @@
 extern "C" {
-#include "../../../c_crypto.h"
-#include "../../../ipfs.h"
+#include "../../../src/c_crypto.h"
+#include "../../../src/ipfs.h"
 }
 
 #include <unistd.h>
@@ -53,7 +53,6 @@ int main(int argc, char* argv[]) {
         SST_print_error_exit("init_SST() failed.");
     }
     session_key_list_t* s_key_list = init_empty_session_key_list();
-    ctx->config.purpose_index = 0;
     std::vector<char> file_name(BUFF_SIZE);
     std::vector<unsigned char> received_skey_id(SESSION_KEY_ID_SIZE);
     estimate_time_t estimate_time[5];
@@ -107,8 +106,7 @@ int main(int argc, char* argv[]) {
     // Compute the hash
     std::vector<unsigned char> hash_of_file(SHA256_DIGEST_LENGTH);
     unsigned int hash_length = 0;
-    if (digest_message_SHA_256(reinterpret_cast<unsigned char*>(&file_data[0]),
-                               filesize, hash_of_file.data(),
+    if (digest_message_SHA_256(file_data.data(), filesize, hash_of_file.data(),
                                &hash_length) < 0) {
         SST_print_error_exit("Failed digest_message_SHA_256().");
     }
