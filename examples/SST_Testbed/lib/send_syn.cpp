@@ -349,8 +349,8 @@ extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
     }
 
     // UDP connect: doesn't actually connect; just sets the default route/peer.
-    auto destination = std::bit_cast<sockaddr>(dst);
-    if (connect(s, &destination, sizeof(destination)) < 0) {
+    if (auto destination = std::bit_cast<sockaddr>(dst);
+        connect(s, &destination, sizeof(destination)) < 0) {
         close(s);
         return false;
     }
@@ -363,8 +363,8 @@ extern "C" bool get_src_ip(const char* dst_ip, unsigned short dst_port,
 
     close(s);
 
-    auto local = std::bit_cast<sockaddr_in>(address);
-    if (!inet_ntop(AF_INET, &local.sin_addr, out_ip,
+    if (auto local = std::bit_cast<sockaddr_in>(address);
+        !inet_ntop(AF_INET, &local.sin_addr, out_ip,
                    static_cast<socklen_t>(out_ip_len))) {
         return false;
     }

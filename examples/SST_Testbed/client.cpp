@@ -24,31 +24,31 @@ enum class AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSS, DOSU };
 enum class AttackTarget { TARGET_NONE, TARGET_AUTH, TARGET_SERVER };
 
 static AttackType parseAttackType(std::string_view s) {
-    if (s == "REPLAY" || s == "Replay" || s == "replay")
-        return AttackType::REPLAY;
+    using enum AttackType;
+    if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
-        return AttackType::DOSK;
+        return DOSK;
     if (s == "DOSC" || s == "DoSC" || s == "DosC" || s == "Dosc" ||
         s == "dosC" || s == "dosc")
-        return AttackType::DOSC;
+        return DOSC;
     if (s == "DOSM" || s == "DoSM" || s == "DosM" || s == "Dosm" ||
         s == "dosM" || s == "dosm")
-        return AttackType::DOSM;
+        return DOSM;
     if (s == "DOSS" || s == "DoSS" || s == "DosS" || s == "Doss" || s == "doss")
-        return AttackType::DOSS;
+        return DOSS;
     if (s == "DOSU" || s == "DoSU" || s == "DosU" || s == "Dosu" ||
         s == "dosU" || s == "dosu")
-        return AttackType::DOSU;
-    return AttackType::NONE;
+        return DOSU;
+    return NONE;
 }
 
 static AttackTarget parseAttackTarget(std::string_view s) {
-    if (s == "auth" || s == "Auth" || s == "a" || s == "A")
-        return AttackTarget::TARGET_AUTH;
+    using enum AttackTarget;
+    if (s == "auth" || s == "Auth" || s == "a" || s == "A") return TARGET_AUTH;
     if (s == "server" || s == "Server" || s == "s" || s == "S")
-        return AttackTarget::TARGET_SERVER;
-    return AttackTarget::TARGET_NONE;
+        return TARGET_SERVER;
+    return TARGET_NONE;
 }
 
 struct SessionCloser {
@@ -101,7 +101,7 @@ static void run_dosk(const std::string& attack_param, bool metrics,
         auto requested_keys =
             std::unique_ptr<session_key_list_t,
                             decltype(&free_session_key_list_t)>(
-                get_session_key(ctx, nullptr), free_session_key_list_t);
+                get_session_key(ctx, nullptr), &free_session_key_list_t);
         auto t1 = std::chrono::steady_clock::now();
 
         long dur_us =
@@ -145,7 +145,7 @@ static void run_dosc(const std::string& attack_param, bool metrics,
         auto requested_keys =
             std::unique_ptr<session_key_list_t,
                             decltype(&free_session_key_list_t)>(
-                get_session_key(ctx, nullptr), free_session_key_list_t);
+                get_session_key(ctx, nullptr), &free_session_key_list_t);
         if (requested_keys == nullptr) {
             SST_print_error(
                 "Client failed to get session key in DOS "
@@ -331,16 +331,16 @@ struct ScenarioStep {
     std::string target;
 };
 
-static ScenarioStep parse_step(const std::string& line) {
+static ScenarioStep parse_step(std::string_view line) {
     // The optional fifth field consumes the rest of the line, as before.
     std::array<std::string, 5> fields;
     size_t start = 0;
     for (size_t field = 0; field < fields.size() - 1; ++field) {
         size_t comma = line.find(',', start);
-        fields[field] =
-            line.substr(start, comma == std::string::npos ? std::string::npos
-                                                          : comma - start);
-        if (comma == std::string::npos) {
+        fields[field] = line.substr(start, comma == std::string_view::npos
+                                               ? std::string_view::npos
+                                               : comma - start);
+        if (comma == std::string_view::npos) {
             start = line.size();
             break;
         }
@@ -415,33 +415,34 @@ int main(int argc, char* argv[]) {
         }
 
         switch (step.type) {
-            case AttackType::REPLAY:
+            using enum AttackType;
+            case REPLAY:
                 run_replay(attack_param, session_ctx);
                 break;
 
-            case AttackType::DOSK:
+            case DOSK:
                 run_dosk(attack_param, metrics, ctx);
                 break;
 
-            case AttackType::DOSC:
+            case DOSC:
                 run_dosc(attack_param, metrics, ctx, attack_sessions);
                 break;
 
-            case AttackType::DOSM:
+            case DOSM:
                 run_dosm(attack_param, metrics, message, session_ctx);
                 break;
 
-            case AttackType::DOSS:
+            case DOSS:
                 run_raw_packets(attack_param, attack_target, metrics, src_ip,
                                 ctx, true);
                 break;
 
-            case AttackType::DOSU:
+            case DOSU:
                 run_raw_packets(attack_param, attack_target, metrics, src_ip,
                                 ctx, false);
                 break;
 
-            case AttackType::NONE:
+            case NONE:
             default:
                 break;
         }

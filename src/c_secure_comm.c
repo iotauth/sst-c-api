@@ -644,7 +644,7 @@ static void report_auth_alert(unsigned char code) {
 
 static int handle_session_key_reply(SST_ctx_t* ctx, unsigned char message_type,
                                     unsigned char* data, unsigned int length,
-                                    unsigned char* entity_nonce,
+                                    const unsigned char* entity_nonce,
                                     session_key_list_t* keys) {
     if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
         if (length <= RSA_KEY_SIZE * 2) return -1;

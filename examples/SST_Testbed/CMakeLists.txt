@@ -17,4 +17,5 @@ foreach(prog server client testbed_helpers_test)
 endforeach()
 
 enable_testing()
-add_test(NAME testbed_helpers_test COMMAND testbed_helpers_test)
+add_test(NAME testbed_helpers_test
+         COMMAND testbed_helpers_test "${CMAKE_CURRENT_BINARY_DIR}")

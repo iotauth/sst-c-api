@@ -85,8 +85,9 @@ class PlotTest(unittest.TestCase):
     def test_reject_mixed_input_modes(self):
         path = self.write_csv("one.csv", "1,2,3\n")
         args = plot.make_parser().parse_args(["--throughput", str(path), "--config1", str(path)])
+        parser = plot.make_parser()
         with self.assertRaises(SystemExit):
-            plot.load_points(args, plot.make_parser(), "throughput")
+            plot.load_points(args, parser, "throughput")
 
 
 if __name__ == "__main__":

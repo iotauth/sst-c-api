@@ -94,20 +94,26 @@ static int fake_send(const char* message, unsigned int length,
     return failure == SEND ? -1 : (int)length;
 }
 
-static void fake_free_context(const SST_ctx_t* ctx) {
+static void fake_free_context(SST_ctx_t* ctx) {
     CHECK(ctx == &context);
     ++contexts_freed;
 }
 
-static void fake_free_keys(const session_key_list_t* list) {
+static void fake_free_keys(session_key_list_t* list) {
     CHECK(list == NULL || list == &keys);
     if (list != NULL) ++keys_freed;
 }
 
-static void fake_free_session(const SST_session_ctx_t* ctx) {
+static void fake_free_session(SST_session_ctx_t* ctx) {
     CHECK(ctx == NULL || ctx == &session);
     if (ctx != NULL) ++sessions_freed;
 }
+
+// Match the C API's mutable cleanup signatures in the included example.
+static void (*const free_context_callback)(SST_ctx_t*) = &fake_free_context;
+static void (*const free_keys_callback)(session_key_list_t*) = &fake_free_keys;
+static void (*const free_session_callback)(SST_session_ctx_t*) =
+    &fake_free_session;
 
 // Exercise the example's ownership paths without Auth, threads or network I/O.
 #define main udp_server_main
@@ -122,9 +128,9 @@ static void fake_free_session(const SST_session_ctx_t* ctx) {
 #define pthread_join fake_join
 #define sleep fake_sleep
 #define send_secure_message fake_send
-#define free_SST_ctx_t fake_free_context
-#define free_session_key_list_t fake_free_keys
-#define free_session_ctx fake_free_session
+#define free_SST_ctx_t free_context_callback
+#define free_session_key_list_t free_keys_callback
+#define free_session_ctx free_session_callback
 #include "../examples/server_client_example/entity_server_udp.c"
 #undef main
 

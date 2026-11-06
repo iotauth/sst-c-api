@@ -29,7 +29,7 @@ const int UDP_MAX_WORKER_COUNT = 105;
 static void handle_shutdown_signal(int) { stop_server = 1; }
 
 struct ServerState {
-    explicit ServerState(SST_ctx_t* context) : ctx(context, free_SST_ctx_t) {}
+    explicit ServerState(SST_ctx_t* context) : ctx(context, &free_SST_ctx_t) {}
     std::unique_ptr<SST_ctx_t, decltype(&free_SST_ctx_t)> ctx;
     std::mutex mutex;
     int active_clients = 0;
@@ -66,8 +66,8 @@ static int bind_ipv4(int sock, int port) {
 
 static bool configure_udp_worker(int sock) {
 #ifdef SO_REUSEPORT
-    int on = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0)
+    if (int on = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0)
         return false;
 #else
     SST_print_error("SO_REUSEPORT is required for UDP workers.");
@@ -82,8 +82,8 @@ static bool configure_udp_worker(int sock) {
 static int make_listener(int port, bool use_udp) {
     int sock = socket(AF_INET, use_udp ? SOCK_DGRAM : SOCK_STREAM, 0);
     if (sock < 0) return -1;
-    int on = 1;
-    if (setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ||
+    if (int on = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ||
         (use_udp && !configure_udp_worker(sock)) || bind_ipv4(sock, port) < 0) {
         close(sock);
         return -1;
@@ -152,14 +152,14 @@ static void exchange_messages(SST_session_ctx_t* session) {
 static void serve_session(SST_ctx_t* ctx, int sock) {
     auto keys =
         std::unique_ptr<session_key_list_t, decltype(&free_session_key_list_t)>(
-            init_empty_session_key_list(), free_session_key_list_t);
+            init_empty_session_key_list(), &free_session_key_list_t);
     if (!keys) {
         SST_print_error("Failed to allocate session key list.");
         return;
     }
     auto session =
         std::unique_ptr<SST_session_ctx_t, decltype(&free_session_ctx)>(
-            server_secure_comm_setup(ctx, sock, keys.get()), free_session_ctx);
+            server_secure_comm_setup(ctx, sock, keys.get()), &free_session_ctx);
     if (!session) {
         errno = 0;
         SST_print_error("There is no session key.");
@@ -180,16 +180,16 @@ static void serve_worker(const std::shared_ptr<ServerState>& state, int sock,
     finish_worker(*state, use_udp);
 }
 
-static std::optional<std::thread> start_worker(
+static std::optional<std::jthread> start_worker(
     const std::shared_ptr<ServerState>& state, int sock, bool use_udp) {
     {
         std::scoped_lock lock(state->mutex);
         ++state->active_clients;
     }
     try {
-        // std::thread owns a copy of state, keeping the C context alive until
+        // std::jthread owns a copy of state, keeping the C context alive until
         // the worker finishes, including detached TCP workers during shutdown.
-        return std::thread(serve_worker, state, sock, use_udp);
+        return std::jthread(&serve_worker, state, sock, use_udp);
     } catch (const std::system_error& error) {
         SST_print_error("Failed to start worker: %s", error.what());
         close(sock);
@@ -226,7 +226,7 @@ static int run_tcp_server(const std::shared_ptr<ServerState>& state, int port) {
 
 static int run_udp_server(const std::shared_ptr<ServerState>& state, int port,
                           int worker_count) {
-    std::vector<std::thread> workers;
+    std::vector<std::jthread> workers;
     workers.reserve(worker_count);
     for (int i = 0; i < worker_count; ++i) {
         int sock = make_listener(port, true);

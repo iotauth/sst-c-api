@@ -183,6 +183,8 @@ use the same example password, `asdf`.
 Run `ctest --output-on-failure` from `build/` for the standalone regressions.
 `testbed_helpers_test` checks packet headers/checksums and metrics CSV output
 using intercepted socket calls; it does not send packets or need Auth.
+CTest places its temporary metrics files in a private directory under the
+Testbed build directory and the test removes that directory when it passes.
 The [plotting regressions](plot_generators/README.md#tests) run separately in Python.
 
 # Running Examples
