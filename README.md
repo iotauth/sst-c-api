@@ -70,6 +70,13 @@ The public header is [`src/c_api.h`](./src/c_api.h). See the website [C Guide](h
 
 The C API does not internally serialize requests on a shared `SST_ctx_t`. Protect concurrent requests and shared key-list access with an application mutex. The C++ `SST_API` serializes Auth requests internally.
 
+UDP Auth key and add-reader requests send `ENTITY_HELLO` before receiving
+`AUTH_HELLO`. A five-second deadline covers the exchange; empty datagrams do not
+reset it. Missing replies return failure without automatic retries. UDP add-reader support
+also requires an Auth version that dispatches `ADD_READER_REQ` and
+`ADD_READER_REQ_IN_PUB_ENC` on its UDP listener. Older Auth versions ignore those
+requests, which now fail at the deadline rather than waiting indefinitely.
+
 ### Secure sessions
 
 **SST_session_ctx_t \*secure_connect_to_server(session_key_t \*s_key, SST_ctx_t \*ctx)**

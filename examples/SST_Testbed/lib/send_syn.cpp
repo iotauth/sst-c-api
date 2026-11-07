@@ -146,6 +146,8 @@ bool send_raw_syn_packets_measured(const char* src_ip_str, const char* dst_ip,
 
     auto destination = std::bit_cast<sockaddr>(dst);
     bool all_sent = true;
+    // This workload repeats one SYN (same tuple and sequence number).
+    // Packet count does not measure distinct pending TCP connections.
     for (int i = 0; i < repeat; ++i) {
         auto t0 = std::chrono::steady_clock::now();
         ssize_t n = sendto(s, packet.data(), packet.size(), 0, &destination,

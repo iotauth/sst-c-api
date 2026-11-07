@@ -1,3 +1,6 @@
+#include "src/auth_transport.h"
+
+#include <errno.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -8,6 +11,7 @@
 #include "src/c_common.h"
 #include "src/c_crypto.h"
 #include "src/c_secure_comm.h"
+#include "src/ipfs.h"
 
 #define CHECK(condition)                                                    \
     do {                                                                    \
@@ -17,11 +21,21 @@
         }                                                                   \
     } while (0)
 
-enum response_kind { VALID_KEYS, WRONG_KEY_ID, WRONG_NONCE, TRUNCATED, ALERT };
+enum response_kind {
+    VALID_KEYS,
+    WRONG_KEY_ID,
+    WRONG_NONCE,
+    TRUNCATED,
+    ALERT,
+    SILENT_HELLO,
+    SILENT_REPLY,
+    SHORT_REPLY
+};
 
 struct auth_fixture {
     int socket;
     int use_tcp;
+    int add_reader;
     enum response_kind response;
     // The server owns a copy so it never races with the client context.
     distribution_key_t key;
@@ -59,6 +73,7 @@ static void* serve_auth(void* opaque) {
     CHECK(setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout,
                      sizeof(timeout)) == 0);
 
+    if (fixture->response == SILENT_HELLO) return NULL;
     if (fixture->response == TRUNCATED) {
         const unsigned char truncated[] = {AUTH_HELLO, AUTH_ID_LEN + NONCE_SIZE,
                                            0};
@@ -78,7 +93,9 @@ static void* serve_auth(void* opaque) {
         unsigned char request[MAX_AUTH_COMM_LENGTH];
         int length = read_header_return_data_buf_pointer(sock, &type, request,
                                                          sizeof(request));
-        CHECK(length > 0 && type == SESSION_KEY_REQ);
+        CHECK(length > 0 &&
+              type == (fixture->add_reader ? ADD_READER_REQ : SESSION_KEY_REQ));
+        if (fixture->response == SILENT_REPLY) return NULL;
         unsigned int prefix_length = 1 + request[0];
         CHECK(prefix_length < (unsigned int)length);
         unsigned char* plaintext = NULL;
@@ -118,6 +135,8 @@ static void* serve_auth(void* opaque) {
         memset(response + offset, 0x22, MAC_KEY_SIZE);
         offset += MAC_KEY_SIZE;
 
+        if (fixture->add_reader) offset = NONCE_SIZE;
+        if (fixture->response == SHORT_REPLY) offset = NONCE_SIZE - 1;
         unsigned char* encrypted = NULL;
         unsigned int encrypted_length;
         CHECK(symmetric_encrypt_authenticate(
@@ -125,14 +144,17 @@ static void* serve_auth(void* opaque) {
                   fixture->key.mac_key_size, fixture->key.cipher_key,
                   fixture->key.cipher_key_size, AES_128_CBC_IV_SIZE,
                   AES_128_CBC, USE_HMAC, &encrypted, &encrypted_length) == 0);
-        send_frame(sock, SESSION_KEY_RESP, encrypted, encrypted_length);
+        send_frame(sock,
+                   fixture->add_reader ? ADD_READER_RESP : SESSION_KEY_RESP,
+                   encrypted, encrypted_length);
         free(encrypted);
     }
     if (fixture->use_tcp) CHECK(close(sock) == 0);
     return NULL;
 }
 
-static void check_exchange(int use_tcp, enum response_kind response) {
+static void check_exchange(int use_tcp, int add_reader,
+                           enum response_kind response) {
     int before = next_descriptor();
     int listener = socket(AF_INET, use_tcp ? SOCK_STREAM : SOCK_DGRAM, 0);
     CHECK(listener >= 0);
@@ -159,16 +181,25 @@ static void check_exchange(int use_tcp, enum response_kind response) {
     ctx.dist_key.cipher_key_size = CIPHER_KEY_SIZE;
     ctx.dist_key.mac_key_size = MAC_KEY_SIZE;
     ctx.dist_key.enc_mode = AES_128_CBC;
-    struct auth_fixture fixture = {listener, use_tcp, response, ctx.dist_key};
+    struct auth_fixture fixture = {listener, use_tcp, add_reader, response,
+                                   ctx.dist_key};
     pthread_t thread;
     CHECK(pthread_create(&thread, NULL, serve_auth, &fixture) == 0);
     unsigned char id[SESSION_KEY_ID_SIZE] = {0};
     id[SESSION_KEY_ID_SIZE - 1] = 42;
-    session_key_list_t* keys =
-        send_session_key_request_check_protocol(&ctx, id);
+    session_key_list_t* keys = NULL;
+    int reader_result = -1;
+    if (add_reader) {
+        char reader[] = "{\"AddReader\":\"net1.reader\"}";
+        reader_result = send_add_reader_req_via_TCP(&ctx, reader);
+    } else {
+        keys = send_session_key_request_check_protocol(&ctx, id);
+    }
     CHECK(pthread_join(thread, NULL) == 0);
     CHECK(close(listener) == 0);
-    if (response == VALID_KEYS) {
+    if (add_reader) {
+        CHECK(reader_result == (response == VALID_KEYS ? 0 : -1));
+    } else if (response == VALID_KEYS) {
         CHECK(keys != NULL && keys->num_key == 1);
         CHECK(memcmp(keys->s_key[0].key_id, id, sizeof(id)) == 0);
         CHECK(keys->s_key[0].cipher_key_size == CIPHER_KEY_SIZE);
@@ -180,11 +211,48 @@ static void check_exchange(int use_tcp, enum response_kind response) {
     CHECK(next_descriptor() == before);
 }
 
+static void check_deadline_with_empty_datagrams(void) {
+    int listener = socket(AF_INET, SOCK_DGRAM, 0);
+    CHECK(listener >= 0);
+    struct sockaddr_in address = {0};
+    address.sin_family = AF_INET;
+    address.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    CHECK(bind(listener, (struct sockaddr*)&address, sizeof(address)) == 0);
+    socklen_t length = sizeof(address);
+    CHECK(getsockname(listener, (struct sockaddr*)&address, &length) == 0);
+    sst_auth_connection_t connection;
+    CHECK(sst_auth_open(&connection, "127.0.0.1", ntohs(address.sin_port),
+                        "UDP", SST_AUTH_TIMEOUT_MS) == 0);
+    unsigned char buf[2];
+    CHECK(sst_read_from_socket(listener, buf, sizeof(buf)) == 1);
+    CHECK(buf[0] == ENTITY_HELLO);
+    for (int i = 0; i < 8; ++i) CHECK(send(listener, "", 0, 0) == 0);
+    CHECK(send(listener, "x", 1, 0) == 1);
+    CHECK(sst_auth_read(&connection, buf, sizeof(buf)) == 1 && buf[0] == 'x');
+    // An expired exchange must fail even with another datagram already queued.
+    connection.deadline_ms = 0;
+    CHECK(send(listener, "x", 1, 0) == 1);
+    CHECK(sst_auth_read(&connection, buf, sizeof(buf)) < 0);
+    CHECK(errno == ETIMEDOUT);
+    CHECK(close(connection.sock) == 0);
+    CHECK(close(listener) == 0);
+}
+
 int main(void) {
     for (int use_tcp = 0; use_tcp <= 1; ++use_tcp) {
         for (int response = VALID_KEYS; response <= ALERT; ++response)
-            check_exchange(use_tcp, (enum response_kind)response);
+            check_exchange(use_tcp, 0, (enum response_kind)response);
+        check_exchange(use_tcp, 1, VALID_KEYS);
+        check_exchange(use_tcp, 1, WRONG_NONCE);
+        check_exchange(use_tcp, 1, SHORT_REPLY);
+        check_exchange(use_tcp, 1, TRUNCATED);
+        check_exchange(use_tcp, 1, ALERT);
     }
+    for (int add_reader = 0; add_reader <= 1; ++add_reader) {
+        check_exchange(0, add_reader, SILENT_HELLO);
+        check_exchange(0, add_reader, SILENT_REPLY);
+    }
+    check_deadline_with_empty_datagrams();
     puts("TCP and UDP Auth transport regression tests passed.");
     return 0;
 }

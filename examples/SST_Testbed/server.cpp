@@ -32,6 +32,7 @@ struct ServerState {
     explicit ServerState(SST_ctx_t* context) : ctx(context, &free_SST_ctx_t) {}
     std::unique_ptr<SST_ctx_t, decltype(&free_SST_ctx_t)> ctx;
     std::mutex mutex;
+    std::mutex auth_mutex;
     int active_clients = 0;
     std::atomic<bool> finished = false;
 };
@@ -149,7 +150,24 @@ static void exchange_messages(SST_session_ctx_t* session) {
     }
 }
 
-static void serve_session(SST_ctx_t* ctx, int sock) {
+static bool set_receive_timeout(int sock, int seconds) {
+    timeval timeout{};
+    timeout.tv_sec = seconds;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                      sizeof(timeout)) == 0;
+}
+
+static SST_session_ctx_t* setup_session(ServerState& state, int sock,
+                                        session_key_list_t* keys) {
+    // The C handshake mutates the request purpose and distribution key. Keep
+    // the complete exchange exclusive, including failure paths and rotation.
+    std::scoped_lock lock(state.auth_mutex);
+    return server_secure_comm_setup(state.ctx.get(), sock, keys);
+}
+
+static void serve_session(ServerState& state, int sock, bool use_udp) {
+    // Bound a stalled TCP handshake while it owns the shared Auth context.
+    if (!use_udp && !set_receive_timeout(sock, UDP_IDLE_TIMEOUT_SEC)) return;
     auto keys =
         std::unique_ptr<session_key_list_t, decltype(&free_session_key_list_t)>(
             init_empty_session_key_list(), &free_session_key_list_t);
@@ -159,7 +177,8 @@ static void serve_session(SST_ctx_t* ctx, int sock) {
     }
     auto session =
         std::unique_ptr<SST_session_ctx_t, decltype(&free_session_ctx)>(
-            server_secure_comm_setup(ctx, sock, keys.get()), &free_session_ctx);
+            setup_session(state, sock, keys.get()), &free_session_ctx);
+    if (!use_udp && !set_receive_timeout(sock, 0)) return;
     if (!session) {
         errno = 0;
         SST_print_error("There is no session key.");
@@ -173,7 +192,7 @@ static void serve_worker(const std::shared_ptr<ServerState>& state, int sock,
                          bool use_udp) {
     do {
         if (stop_server || (use_udp && !wait_for_udp_peer(sock))) break;
-        serve_session(state->ctx.get(), sock);
+        serve_session(*state, sock, use_udp);
     } while (use_udp && !stop_server &&
              release_udp_peer(sock, state->ctx->config.entity_server_port_num));
     if (close(sock) < 0) SST_print_error("close() error");

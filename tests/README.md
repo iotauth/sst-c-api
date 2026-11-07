@@ -105,3 +105,10 @@ After building `examples/SST_Testbed/build`, run it from `entity/c/` with:
 ```sh
 python3 tests/testbed_udp_smoke_test.py --build-dir examples/SST_Testbed/build
 ```
+
+The Auth transport fixture also checks TCP/UDP add-reader responses, binary
+nonce validation, empty datagrams, and missing UDP replies at both exchange
+stages. UDP Auth exchanges have a five-second total deadline; the timeout cases
+make this test take about twenty seconds. It needs no running Auth or IPFS daemon.
+The UDP Testbed integration also runs with `--concurrent` to exercise two clients
+and two workers sharing one Auth context.

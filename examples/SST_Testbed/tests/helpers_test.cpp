@@ -26,21 +26,14 @@ extern "C" {
 
 // Include the implementations to exercise their private byte/CSV helpers.
 #include "../lib/metrics.cpp"
-
-static void check(bool condition, std::source_location location =
-                                      std::source_location::current()) {
-    if (condition) return;
-    std::cerr << std::format("{}:{}: check failed in {}\n",
-                             location.file_name(), location.line(),
-                             location.function_name());
-    std::abort();
-}
+#include "check.hpp"
 
 enum class PacketFailure { none, socket, option, send };
 
 struct PacketCapture {
     PacketFailure failure = PacketFailure::none;
     std::vector<unsigned char> bytes;
+    std::vector<std::vector<unsigned char>> packets;
     int closes = 0;
 };
 
@@ -71,6 +64,7 @@ static ssize_t fake_sendto(int sock, const unsigned char* bytes, size_t length,
     check(address.sin_family == AF_INET && ntohs(address.sin_port) == 21902);
     if (capture().failure == PacketFailure::send) return -1;
     capture().bytes.assign(bytes, bytes + length);
+    capture().packets.push_back(capture().bytes);
     return static_cast<ssize_t>(length);
 }
 
@@ -90,9 +84,46 @@ static int fake_close(int sock) {
 #undef sendto
 #undef close
 
+struct MessageCapture {
+    int sends = 0;
+    int reads = 0;
+    bool fail_read = false;
+    bool fail_send = false;
+};
+
+static MessageCapture& message_capture() {
+    static MessageCapture result;
+    return result;
+}
+
+static int fake_send_message(const char* message, unsigned int length,
+                             SST_session_ctx_t* session) {
+    check(message != nullptr && length > 0);
+    // Model backpressure: another send requires draining the previous reply.
+    check(message_capture().sends == message_capture().reads);
+    ++message_capture().sends;
+    if (message_capture().fail_send) return -1;
+    ++session->sent_seq_num;
+    return static_cast<int>(length);
+}
+
+static int fake_read_message(unsigned char* message,
+                             SST_session_ctx_t* session) {
+    check(message_capture().reads < message_capture().sends);
+    ++message_capture().reads;
+    if (message_capture().fail_read) return -1;
+    message[0] = 'H';
+    ++session->received_seq_num;
+    return 1;
+}
+
+#define send_secure_message fake_send_message
+#define read_secure_message fake_read_message
 #define main testbed_client_main
 #include "../client.cpp"
 #undef main
+#undef send_secure_message
+#undef read_secure_message
 
 static void check_packet(int protocol) {
     capture() = {};
@@ -124,6 +155,29 @@ static void check_packet(int protocol) {
     checksum[11] = static_cast<unsigned char>(transport.size());
     std::memcpy(checksum.data() + 12, transport.data(), transport.size());
     check(csum16(checksum) == 0);
+}
+
+static void check_syn_retransmissions() {
+    capture() = {};
+    check(send_raw_syn_packets("127.0.0.2", "127.0.0.1", 21902, 3));
+    check(capture().packets.size() == 3);
+    for (const auto& packet : capture().packets)
+        check(packet == capture().packets.front());
+}
+
+static void check_reply_drain() {
+    SST_session_ctx_t session{};
+    message_capture() = {};
+    run_dosm("3", false, "hello", &session);
+    check(message_capture().sends == 3 && message_capture().reads == 3);
+    message_capture() = {};
+    message_capture().fail_read = true;
+    run_dosm("3", false, "hello", &session);
+    check(message_capture().sends == 1 && message_capture().reads == 1);
+    message_capture() = {};
+    message_capture().fail_send = true;
+    run_dosm("3", false, "hello", &session);
+    check(message_capture().sends == 1 && message_capture().reads == 0);
 }
 
 static void check_packet_failures() {
@@ -230,6 +284,8 @@ int main(int argc, char* argv[]) {
     check_packet(IPPROTO_TCP);
     check_packet(IPPROTO_UDP);
     check_packet_failures();
+    check_syn_retransmissions();
+    check_reply_drain();
     check_metrics(argv[1]);
     check_scenario_parsing();
     std::puts("Testbed packet and metrics regressions passed.");

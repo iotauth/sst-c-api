@@ -75,9 +75,14 @@ Clients repeatedly connect to the server, consuming its CPU and memory for sessi
 
 ![DoSC — Clients repeatedly connecting to the server, indirectly triggering excessive session key requests to Auth](images/fig4_ddos_connect.png)
 
-### DoS / DDoS via SYN Flooding
+### SYN retransmission workload (DoSS)
 
-Unlike the attacks above, a SYN flood requires no authentication. The attacker sends a large number of TCP SYN packets without completing the handshake, filling the target's connection table with half-open entries. A botnet can amplify this into a DDoS by distributing SYN streams across many sources.
+Each DoSS step sends the same TCP SYN repeatedly, with one source port and
+sequence number. It measures a retransmission workload. Increasing the packet
+count does not create distinct TCP connections and does not establish that the
+server's SYN backlog was exhausted. A distinct-connection experiment needs a
+separate workload and server-side connection-state measurements; the current
+DoSS mode does not implement that experiment.
 
 ## Experimental Setup and Results
 
@@ -107,7 +112,7 @@ Latency increases up to **9.6x** and throughput decreases up to **98.8%**. With 
 ![DDoS Connect Attack — Latency and Throughput](images/fig8_connect_results.png)
 
 ### DDoS SYN Flood Results
-Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No key-request failures were observed.
+Latency increased up to **6.0x** and throughput decreased up to **82.7%**. No key-request failures were observed. These latency and throughput measurements do not establish SYN-backlog exhaustion.
 
 ![DDoS SYN Flood — Latency and Throughput](images/fig9_syn_flood_results.png)
 
@@ -171,6 +176,8 @@ use the same example password, `asdf`.
 
 ### Compile the SST_Testbed code
 
+Python 3 is required for the launcher regression test.
+
 1. Go to `iotauth/entity/c/examples/SST_Testbed/`
 
 2. Run `mkdir build && cd build`
@@ -182,7 +189,11 @@ use the same example password, `asdf`.
 
 Run `ctest --output-on-failure` from `build/` for the standalone regressions.
 `testbed_helpers_test` checks packet headers/checksums and metrics CSV output
-using intercepted socket calls; it does not send packets or need Auth.
+using intercepted socket calls; it does not send packets or need Auth. It also
+checks SYN retransmission identity and reply consumption with metrics disabled.
+`testbed_server_context_test` checks that concurrent handshakes serialize shared
+Auth mutations. `testbed_launcher_test` validates protocol selection in dry-run
+mode without starting clients or invoking sudo.
 CTest places its temporary metrics files in a private directory under the
 Testbed build directory and the test removes that directory when it passes.
 The [plotting regressions](plot_generators/README.md#tests) run separately in Python.
@@ -333,7 +344,7 @@ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleA
 
 5. Run the client in another terminal with `./client ../config/client.config ../csv_files/dos_attack_connect.csv`
 
-## 2.2.4 DoS attack to Auth or Server via SYN Flooding (DoSS)
+## 2.2.4 SYN retransmission workload to Auth or Server (DoSS)
 1. Go to `$SST_ROOT/entity/c/examples/SST_Testbed/`
 
 2. *[Optional]* Customize `csv_files/dos_attack_syn.csv` to have the client send custom messages and a custom number of SYN packets to Auth or Server.
@@ -342,7 +353,7 @@ java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleA
         - The first value is the amount of time spent sleeping (in milliseconds).
         - The second value is the message.
         - The third value is the attack type, "DoSS" in this example (case insensitive).
-        - The fourth value is the number SYN packets that will be sent.
+        - The fourth value counts retransmissions of the same SYN packet, not distinct connection attempts.
         - The fifth value is the target (Auth or Server).
     ```
     <sleep_time1>,<message1>,DoSS,<number_of_syn_packets>,Auth
@@ -405,7 +416,7 @@ So, also make sure that the ***Auth*** executed before is terminated.
     - UDP: `../build/server ../config/server_udp.config`
         - UDP uses workers to accept multiple clients. Server launches 16 workers by default but `--workers` can be used to specify the number of workers. It accepts values from 1 through 105 (i.e. `--workers 63`).
 
-6. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip]`
+6. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip] [--protocol TCP|UDP] [--dry-run]`
     - `<number_of_clients>` is the number of clients that should be created during this execution.
     - `<input_file>` is the input CSV file that the program should read for this execution.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
@@ -419,3 +430,20 @@ So, also make sure that the ***Auth*** executed before is terminated.
 GUI terminal is available, or as background processes in a headless environment.
 Start the server manually as shown above, and stop it with `Ctrl+C` when the
 experiment finishes.
+
+The launcher selects UDP for scenarios containing DoSU and TCP for DoSS,
+independently of the CSV filename. Scenarios containing neither use TCP by
+default; `--protocol UDP` selects UDP for ordinary messaging or other compatible
+steps. Mixed DoSS/DoSU scenarios and explicit protocol conflicts are rejected
+before clients start. `--dry-run` validates the scenario and shows the launch
+commands without starting clients or requesting sudo.
+
+The server serializes handshakes sharing its Auth context so the request purpose
+and distribution key stay consistent. TCP handshake reads and UDP worker reads
+have a ten-second inactivity timeout. Once established, TCP messaging restores
+blocking reads. Every message reply is consumed whether or not `-metrics` is
+selected; DoSM therefore uses request/reply exchanges in both modes.
+
+UDP key and add-reader requests send the Auth kickoff and share a five-second
+exchange deadline across both replies. Empty datagrams do not extend it. A lost
+reply returns an error; requests are not automatically retried.

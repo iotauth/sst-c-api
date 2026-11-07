@@ -209,31 +209,22 @@ static void run_dosm(const std::string& attack_param, bool metrics,
 
         int msg =
             send_secure_message(message.data(), message.length(), session_ctx);
-        if (msg < 0) {
-            SST_print_error("Failed send_secure_message().");
-            if (metrics) {
-                auto t1 = std::chrono::steady_clock::now();
-                auto dur_us =
-                    std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
-                        .count();
-                metrics_add_sample(row, dur_us, false);
-            }
-            break;
-        }
-
+        // Replies are part of the protocol even when metrics are disabled.
+        int ret = msg < 0
+                      ? -1
+                      : read_secure_message(received_buf.data(), session_ctx);
         if (metrics) {
-            int ret = read_secure_message(received_buf.data(), session_ctx);
-            auto t1 = std::chrono::steady_clock::now();
-            auto dur_us =
-                std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
-                    .count();
+            auto dur_us = std::chrono::duration_cast<std::chrono::microseconds>(
+                              std::chrono::steady_clock::now() - t0)
+                              .count();
             metrics_add_sample(row, dur_us, ret > 0);
-            if (ret <= 0) {
-                SST_print_error(ret < 0 ? "Failed to read secure message."
-                                       : "Connection closed");
-                break;
-            }
         }
+        if (msg < 0)
+            SST_print_error("Failed send_secure_message().");
+        else if (ret <= 0)
+            SST_print_error(ret < 0 ? "Failed to read secure message."
+                                    : "Connection closed");
+        if (ret <= 0) break;
     }
 
     if (metrics) {
@@ -414,11 +405,10 @@ int main(int argc, char* argv[]) {
             0)
             SST_print_error_exit("Failed send_secure_message().");
 
-        if (metrics) {
-            std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> response{};
-            if (read_secure_message(response.data(), session_ctx) <= 0)
-                SST_print_error_exit("Failed to receive the scenario message reply.");
-        }
+        std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> response{};
+        if (read_secure_message(response.data(), session_ctx) <= 0)
+            SST_print_error_exit(
+                "Failed to receive the scenario message reply.");
 
         switch (step.type) {
             using enum AttackType;

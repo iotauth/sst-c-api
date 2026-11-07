@@ -3,6 +3,7 @@
 #include <sys/time.h>
 #include <unistd.h>
 
+#include "auth_transport.h"
 #include "c_common.h"
 #include "c_crypto.h"
 #include "c_secure_comm.h"
@@ -413,99 +414,80 @@ void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str,
     SST_print_log("Success for downloading %s.", file_name);
 }
 
-int send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
-    int sock;
-    bool use_tcp =
-        get_network_protocol_type((const char*)ctx->config.network_protocol);
-
-    if (connect_as_client((const char*)ctx->config.auth_ip_addr,
-                          ctx->config.auth_port_num, &sock, use_tcp) < 0) {
-        SST_print_error("Failed connect_as_client().");
+static int check_add_reader_reply(SST_ctx_t* ctx, unsigned char type,
+                                  unsigned char* data, unsigned int length,
+                                  const unsigned char* nonce) {
+    if (type == ADD_READER_RESP_WITH_DIST_KEY) {
+        if (length <= RSA_KEY_SIZE * 2 ||
+            save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0)
+            return -1;
+        data += RSA_KEY_SIZE * 2;
+        length -= RSA_KEY_SIZE * 2;
+    } else if (type != ADD_READER_RESP) {
+        SST_print_error("Unexpected add-reader response type: %u", type);
         return -1;
     }
-    unsigned char entity_nonce[NONCE_SIZE];
+    unsigned char* decrypted = NULL;
+    unsigned int decrypted_length;
+    if (symmetric_decrypt_authenticate(
+            data, length, ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
+            ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
+            AES_128_CBC_IV_SIZE, ctx->dist_key.enc_mode, USE_HMAC, &decrypted,
+            &decrypted_length) < 0)
+        return -1;
+    int result = decrypted_length == NONCE_SIZE &&
+                         memcmp(decrypted, nonce, NONCE_SIZE) == 0
+                     ? 0
+                     : -1;
+    free(decrypted);
+    if (result < 0) SST_print_error("Auth nonce NOT verified.");
+    return result;
+}
+
+static int receive_add_reader_reply(SST_ctx_t* ctx, char* add_reader,
+                                    const sst_auth_connection_t* connection) {
+    unsigned char nonce[NONCE_SIZE];
+    bool hello_received = false;
     for (;;) {
-        unsigned char received_buf[MAX_AUTH_COMM_LENGTH];
-        int received_buf_length =
-            sst_read_from_socket(sock, received_buf, sizeof(received_buf));
-        if (received_buf_length <= 0) {
-            SST_print_error("Socket read error in sst_read_from_socket().");
+        unsigned char received[MAX_AUTH_COMM_LENGTH];
+        int received_length =
+            sst_auth_read(connection, received, sizeof(received));
+        if (received_length < 2) return -1;
+        unsigned char type;
+        unsigned int length = 0;
+        unsigned char* data =
+            parse_received_message(received, received_length, &type, &length);
+        if (type == AUTH_ALERT) {
+            SST_print_error("Auth rejected add-reader request (alert %u).",
+                            data[0]);
             return -1;
         }
-        unsigned char message_type;
-        unsigned int data_buf_length;
-        unsigned char* data_buf = parse_received_message(
-            received_buf, received_buf_length, &message_type, &data_buf_length);
-        if (message_type == AUTH_HELLO) {
-            if (handle_AUTH_HELLO(data_buf, ctx, entity_nonce, sock, 0,
-                                  add_reader, 0) < 0) {
-                SST_print_error("AUTH_HELLO handling failed.");
+        if (length == 0 ||
+            length > (unsigned int)(received + received_length - data))
+            return -1;
+        if (!hello_received) {
+            if (type != AUTH_HELLO || length < AUTH_ID_LEN + NONCE_SIZE ||
+                handle_AUTH_HELLO(data, ctx, nonce, connection->sock, 0,
+                                  add_reader, 0) < 0)
                 return -1;
-            }
-        } else if (message_type == ADD_READER_RESP_WITH_DIST_KEY) {
-            size_t key_size = RSA_KEY_SIZE;
-            unsigned int encrypted_entity_nonce_length =
-                data_buf_length - (key_size * 2);
-            unsigned char encrypted_entity_nonce[encrypted_entity_nonce_length];
-            memcpy(encrypted_entity_nonce, data_buf + key_size * 2,
-                   encrypted_entity_nonce_length);
-            if (save_distribution_key(data_buf, ctx, key_size) < 0) {
-                SST_print_error("Failed save_distribution_key().");
-                return -1;
-            }
-            unsigned int decrypted_entity_nonce_length;
-            unsigned char* decrypted_entity_nonce = NULL;
-            if (symmetric_decrypt_authenticate(
-                    encrypted_entity_nonce, encrypted_entity_nonce_length,
-                    ctx->dist_key.mac_key, ctx->dist_key.mac_key_size,
-                    ctx->dist_key.cipher_key, ctx->dist_key.cipher_key_size,
-                    AES_128_CBC_IV_SIZE, ctx->config.session_key_enc_mode, 0,
-                    &decrypted_entity_nonce,
-                    &decrypted_entity_nonce_length) < 0) {
-                SST_print_error(
-                    "Error during decryption after receiving "
-                    "ADD_READER_RESP_WITH_DIST_KEY.");
-                return -1;
-            }
-            if (strncmp((const char*)decrypted_entity_nonce,
-                        (const char*)entity_nonce,
-                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                                             // & received entity's nonce.
-                SST_print_error("Auth nonce NOT verified");
-                return -1;
-            } else {
-                SST_print_debug("Auth nonce verified!");
-            }
-            SST_print_log("Add a file reader to the database.");
-            close(sock);
-            break;
-        } else if (message_type == ADD_READER_RESP) {
-            unsigned int decrypted_entity_nonce_length;
-            unsigned char* decrypted_entity_nonce = NULL;
-            if (symmetric_decrypt_authenticate(
-                    data_buf, data_buf_length, ctx->dist_key.mac_key,
-                    ctx->dist_key.mac_key_size, ctx->dist_key.cipher_key,
-                    ctx->dist_key.cipher_key_size, AES_128_CBC_IV_SIZE,
-                    AES_128_CBC, 0, &decrypted_entity_nonce,
-                    &decrypted_entity_nonce_length) < 0) {
-                SST_print_error(
-                    "Error during decryption after receiving "
-                    "ADD_READER_RESP.");
-                return -1;
-            }
-            if (strncmp((const char*)decrypted_entity_nonce,
-                        (const char*)entity_nonce,
-                        NONCE_SIZE) != 0) {  // compare generated entity's nonce
-                                             // & received entity's nonce.
-                SST_print_error("Auth nonce NOT verified");
-                return -1;
-            } else {
-                SST_print_debug("Auth nonce verified!");
-            }
-            SST_print_log("Add a file reader to the database.");
-            close(sock);
-            break;
+            hello_received = true;
+            continue;
         }
+        return check_add_reader_reply(ctx, type, data, length, nonce);
     }
-    return 0;
+}
+
+int send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader) {
+    // Keep the historical API name; the configured transport may be TCP or UDP.
+    sst_auth_connection_t connection;
+    if (sst_auth_open(&connection, ctx->config.auth_ip_addr,
+                      ctx->config.auth_port_num, ctx->config.network_protocol,
+                      SST_AUTH_TIMEOUT_MS) < 0) {
+        SST_print_error("Failed to start Auth add-reader request.");
+        return -1;
+    }
+    int result = receive_add_reader_reply(ctx, add_reader, &connection);
+    close(connection.sock);
+    if (result == 0) SST_print_log("Add a file reader to the database.");
+    return result;
 }

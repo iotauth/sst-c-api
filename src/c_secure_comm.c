@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include "auth_transport.h"
 #include "c_common.h"
 #include "c_crypto.h"
 
@@ -658,16 +659,15 @@ static int handle_session_key_reply(SST_ctx_t* ctx, unsigned char message_type,
     return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
 }
 
-static int receive_session_keys(SST_ctx_t* ctx, int sock,
-                                session_key_list_t* keys, bool use_tcp) {
+static int receive_session_keys(SST_ctx_t* ctx,
+                                const sst_auth_connection_t* connection,
+                                session_key_list_t* keys) {
     unsigned char entity_nonce[NONCE_SIZE];
     bool hello_received = false;
     for (;;) {
         unsigned char received[MAX_AUTH_COMM_LENGTH];
         int received_length =
-            sst_read_from_socket(sock, received, sizeof(received));
-        // Empty UDP datagrams do not signal peer closure.
-        if (!use_tcp && received_length == 0) continue;
+            sst_auth_read(connection, received, sizeof(received));
         if (received_length < 2) return -1;
         unsigned char message_type;
         unsigned int length = 0;
@@ -685,7 +685,7 @@ static int receive_session_keys(SST_ctx_t* ctx, int sock,
         if (!hello_received) {
             if (message_type != AUTH_HELLO ||
                 length < AUTH_ID_LEN + NONCE_SIZE ||
-                handle_AUTH_HELLO(data, ctx, entity_nonce, sock,
+                handle_AUTH_HELLO(data, ctx, entity_nonce, connection->sock,
                                   ctx->config.numkey,
                                   ctx->purpose_for_requesting_key, 1) < 0)
                 return -1;
@@ -702,31 +702,17 @@ bool get_network_protocol_type(const char* network_protocol_str) {
 }
 
 session_key_list_t* send_session_key_req(SST_ctx_t* ctx) {
-    bool use_tcp = get_network_protocol_type(ctx->config.network_protocol);
-    if (!use_tcp && strcmp(ctx->config.network_protocol, "UDP") != 0) {
-        SST_print_error("Unsupported network protocol for key request.");
+    sst_auth_connection_t connection;
+    if (sst_auth_open(&connection, ctx->config.auth_ip_addr,
+                      ctx->config.auth_port_num, ctx->config.network_protocol,
+                      SST_AUTH_TIMEOUT_MS) < 0) {
+        SST_print_error("Failed to start Auth key request.");
         return NULL;
     }
-    int sock;
-    if (connect_as_client(ctx->config.auth_ip_addr, ctx->config.auth_port_num,
-                          &sock, use_tcp) < 0) {
-        SST_print_error("Failed connect_as_client().");
-        return NULL;
-    }
-    // UDP Auth waits for a one-byte ENTITY_HELLO before sending AUTH_HELLO.
-    if (!use_tcp) {
-        const unsigned char hello = ENTITY_HELLO;
-        if (sst_write_to_socket(sock, &hello, sizeof(hello)) != sizeof(hello)) {
-            SST_print_error("Failed to send ENTITY_HELLO kickoff.");
-            close(sock);
-            return NULL;
-        }
-    }
-    // This scope owns the connection and list on every error path.
     session_key_list_t* keys = init_empty_session_key_list();
     int result = -1;
-    if (keys != NULL) result = receive_session_keys(ctx, sock, keys, use_tcp);
-    close(sock);
+    if (keys != NULL) result = receive_session_keys(ctx, &connection, keys);
+    close(connection.sock);
     if (result < 0) {
         free_session_key_list_t(keys);
         return NULL;
