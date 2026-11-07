@@ -130,7 +130,7 @@ static void exchange_messages(SST_session_ctx_t* session) {
     std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> received{};
     std::string reply = "Hello";
     int count = 1;
-    for (;;) {
+    while (!stop_server) {
         int length = read_secure_message(received.data(), session);
         if (length <= 0) {
             SST_print_error(length < 0 ? "Failed to read secure message."

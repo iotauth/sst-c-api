@@ -293,9 +293,20 @@ static int read_udp_payload(int socket, unsigned char* message_type,
 
     // Decode varlen payload length directly from the datagram buffer.
     unsigned int payload_len = 0;  // decoded payload length
-    var_length_int_to_num(received_buf + MESSAGE_TYPE_SIZE,
-                          (unsigned int)received_buf_length - MESSAGE_TYPE_SIZE,
-                          &payload_len, &var_length_buf_size_checked);
+    for (unsigned int i = 0;
+         i < 5 && i + MESSAGE_TYPE_SIZE < (unsigned int)received_buf_length;
+         ++i) {
+        unsigned char byte = received_buf[MESSAGE_TYPE_SIZE + i];
+        if (i == 4 && (byte & 0xf0) != 0) {
+            SST_print_error("UDP payload length overflows a 32-bit integer.");
+            return -1;
+        }
+        payload_len |= (unsigned int)(byte & 0x7f) << (7 * i);
+        if ((byte & 0x80) == 0) {
+            var_length_buf_size_checked = (int)i + 1;
+            break;
+        }
+    }
 
     // Validate that we actually found a terminating varlen byte
     if (var_length_buf_size_checked <= 0) {

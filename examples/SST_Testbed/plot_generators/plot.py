@@ -140,9 +140,11 @@ def points_from_three_rows(csv_path: str, mode: str) -> List[Dict[str, float]]:
 
     points = []
     for i, label in enumerate(labels):
-        if i >= len(df_clean):
+        if i >= len(df):
             continue
-        row = df_clean.iloc[i]
+        row = df.iloc[i]
+        if row[required].isna().any():
+            continue
         try:
             x = float(row["malicious_number"])
             if mode == "throughput":

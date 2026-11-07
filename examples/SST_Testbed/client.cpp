@@ -150,7 +150,7 @@ static void run_dosc(const std::string& attack_param, bool metrics,
             SST_print_error(
                 "Client failed to get session key in DOS "
                 "Connect attack.");
-            continue;
+            break;
         }
         SST_print_log("Connecting to server: %d of %d\n", i + 1, repeat);
 
@@ -210,25 +210,29 @@ static void run_dosm(const std::string& attack_param, bool metrics,
         int msg =
             send_secure_message(message.data(), message.length(), session_ctx);
         if (msg < 0) {
-            SST_print_error_exit("Failed send_secure_message().");
+            SST_print_error("Failed send_secure_message().");
+            if (metrics) {
+                auto t1 = std::chrono::steady_clock::now();
+                auto dur_us =
+                    std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
+                        .count();
+                metrics_add_sample(row, dur_us, false);
+            }
+            break;
         }
 
         if (metrics) {
-            if (int ret = read_secure_message(received_buf.data(), session_ctx);
-                ret < 0) {
-                SST_print_error("Failed to read secure message.");
-                continue;
-            } else if (ret == 0) {
-                SST_print_error("Connection closed");
-                continue;
-            }
-
+            int ret = read_secure_message(received_buf.data(), session_ctx);
             auto t1 = std::chrono::steady_clock::now();
-
-            long dur_us =
+            auto dur_us =
                 std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0)
                     .count();
-            metrics_add_sample(row, dur_us, msg >= 0);
+            metrics_add_sample(row, dur_us, ret > 0);
+            if (ret <= 0) {
+                SST_print_error(ret < 0 ? "Failed to read secure message."
+                                       : "Connection closed");
+                break;
+            }
         }
     }
 
@@ -411,7 +415,9 @@ int main(int argc, char* argv[]) {
             SST_print_error_exit("Failed send_secure_message().");
 
         if (metrics) {
-            sleep(10);
+            std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> response{};
+            if (read_secure_message(response.data(), session_ctx) <= 0)
+                SST_print_error_exit("Failed to receive the scenario message reply.");
         }
 
         switch (step.type) {
