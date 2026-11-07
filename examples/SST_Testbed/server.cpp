@@ -1,209 +1,308 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-#include <csignal>  // sig_atomic_t
-#include <cstring>  // memset
-#include <fstream>
-#include <iostream>
+#include <array>
+#include <atomic>
+#include <bit>
+#include <cerrno>
+#include <csignal>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
+#include <system_error>
+#include <thread>
+#include <vector>
 
 extern "C" {
 #include "../../src/c_api.h"
 }
 
-int active_clients = 0;  // All accesses are protected by count_mutex.
 volatile sig_atomic_t stop_server = 0;
-pthread_mutex_t count_mutex = PTHREAD_MUTEX_INITIALIZER;
+const int UDP_IDLE_TIMEOUT_SEC = 10;
+const int UDP_DEFAULT_WORKER_COUNT = 16;
+const int UDP_MAX_WORKER_COUNT = 105;
 
-// Struct for arguments for each thread
-struct ThreadArgs {
-    int client_sock;
-    SST_ctx_t* ctx;
+static void handle_shutdown_signal(int) { stop_server = 1; }
+
+struct ServerState {
+    explicit ServerState(SST_ctx_t* context) : ctx(context, &free_SST_ctx_t) {}
+    std::unique_ptr<SST_ctx_t, decltype(&free_SST_ctx_t)> ctx;
+    std::mutex mutex;
+    std::mutex auth_mutex;
+    int active_clients = 0;
+    std::atomic<bool> finished = false;
 };
 
-// For pthread_create()
-void* receive_and_print_messages(void* thread_args) {
-    ThreadArgs* args = static_cast<ThreadArgs*>(thread_args);
-    int clnt_sock = args->client_sock;
-    SST_ctx_t* ctx = args->ctx;
-    session_key_list_t* s_key_list = init_empty_session_key_list();
-    delete args;  // no longer needed
+static void finish_worker(ServerState& state, bool use_udp) {
+    std::scoped_lock lock(state.mutex);
+    --state.active_clients;
+    if (!use_udp && state.active_clients == 0) state.finished = true;
+}
 
-    SST_session_ctx_t* session_ctx =
-        server_secure_comm_setup(ctx, clnt_sock, s_key_list);
-    if (session_ctx == NULL) {
-        std::cerr << "There is no session key.\n" << std::endl;
-        close(clnt_sock);
-        free_session_key_list_t(s_key_list);
+static bool parse_udp_worker_count(const char* value, int* worker_count) {
+    char* endptr = nullptr;
+    errno = 0;
+    long parsed = std::strtol(value, &endptr, 10);
+    if (errno != 0 || endptr == value || *endptr != '\0' || parsed < 1 ||
+        parsed > UDP_MAX_WORKER_COUNT)
+        return false;
+    *worker_count = static_cast<int>(parsed);
+    return true;
+}
 
-        // Decrement active client count on failure path
-        pthread_mutex_lock(&count_mutex);
-        active_clients--;
-        // If this was the last (or only) client, tell main to stop
-        if (active_clients == 0) stop_server = 1;
-        pthread_mutex_unlock(&count_mutex);
+static int bind_ipv4(int sock, int port) {
+    sockaddr_in ipv4{};
+    ipv4.sin_family = AF_INET;
+    ipv4.sin_addr.s_addr = htonl(INADDR_ANY);
+    ipv4.sin_port = htons(port);
+    // POSIX IPv4 socket addresses have the same size as sockaddr. Copying the
+    // representation avoids accessing a sockaddr_in through an unrelated type.
+    auto address = std::bit_cast<sockaddr>(ipv4);
+    return bind(sock, &address, sizeof(address));
+}
 
-        return NULL;
+static bool configure_udp_worker(int sock) {
+#ifdef SO_REUSEPORT
+    if (int on = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on)) < 0)
+        return false;
+#else
+    SST_print_error("SO_REUSEPORT is required for UDP workers.");
+    return false;
+#endif
+    timeval timeout{};
+    timeout.tv_sec = UDP_IDLE_TIMEOUT_SEC;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                      sizeof(timeout)) == 0;
+}
+
+static int make_listener(int port, bool use_udp) {
+    int sock = socket(AF_INET, use_udp ? SOCK_DGRAM : SOCK_STREAM, 0);
+    if (sock < 0) return -1;
+    if (int on = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0 ||
+        (use_udp && !configure_udp_worker(sock)) || bind_ipv4(sock, port) < 0) {
+        close(sock);
+        return -1;
     }
+    return sock;
+}
 
-    unsigned char received_buf[MAX_SECURE_COMM_MSG_LENGTH];
-    // Receive messages from client
-    for (;;) {
-        int ret = read_secure_message(received_buf, session_ctx);
-        if (ret < 0) {
-            std::cerr << "Failed to read secure message." << std::endl;
-            break;
-        } else if (ret == 0) {
-            std::cerr << "Connection closed" << std::endl;
-            break;
+static bool release_udp_peer(int& sock, int port) {
+    // The C API connects the worker to one sender. A fresh listener clears
+    // that peer filter on both Linux and BSD/macOS.
+    int listener = make_listener(port, true);
+    if (listener < 0) {
+        SST_print_error("Failed to reset UDP worker: %s", strerror(errno));
+        return false;
+    }
+    close(sock);
+    sock = listener;
+    return true;
+}
+
+static int poll_socket(int sock, int timeout_ms) {
+    fd_set readable;
+    FD_ZERO(&readable);
+    FD_SET(sock, &readable);
+    timeval timeout{};
+    timeout.tv_sec = timeout_ms / 1000;
+    timeout.tv_usec = (timeout_ms % 1000) * 1000;
+    int ready = select(sock + 1, &readable, nullptr, nullptr, &timeout);
+    if (ready < 0 && errno == EINTR) return 0;
+    if (ready < 0) SST_print_error("select() error");
+    return ready;
+}
+
+static bool wait_for_udp_peer(int sock) {
+    while (!stop_server) {
+        int ready = poll_socket(sock, UDP_IDLE_TIMEOUT_SEC * 1000);
+        if (ready < 0) return false;
+        if (ready > 0) return true;
+    }
+    return false;
+}
+
+static void exchange_messages(SST_session_ctx_t* session) {
+    std::array<unsigned char, MAX_SECURE_COMM_MSG_LENGTH> received{};
+    std::string reply = "Hello";
+    int count = 1;
+    while (!stop_server) {
+        int length = read_secure_message(received.data(), session);
+        if (length <= 0) {
+            SST_print_error(length < 0 ? "Failed to read secure message."
+                                       : "Connection closed");
+            return;
         }
-        // Process the received_buf message
-        std::cout << "Received message from socket: " << clnt_sock << ": ";
-        std::cout.write(reinterpret_cast<const char*>(received_buf), ret);
-        std::cout << std::endl;
+        std::string message(received.begin(), received.begin() + length);
+        SST_print_log("Received message %d from socket: %d: %.*s", count++,
+                      session->sock, length, message.c_str());
+        if (send_secure_message(reply.data(), reply.size(), session) < 0) {
+            SST_print_error(errno == EPIPE ? "Failed send_secure_message(): "
+                                             "client disconnected (EPIPE)."
+                                           : "Failed send_secure_message().");
+            return;
+        }
     }
+}
 
-    std::cout << "Client " << clnt_sock << " disconnected.\n";
-    if (close(clnt_sock) < 0) {
-        std::cerr << "close() error" << std::endl;
-        return NULL;
+static bool set_receive_timeout(int sock, int seconds) {
+    timeval timeout{};
+    timeout.tv_sec = seconds;
+    return setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout,
+                      sizeof(timeout)) == 0;
+}
+
+static SST_session_ctx_t* setup_session(ServerState& state, int sock,
+                                        session_key_list_t* keys) {
+    // The C handshake mutates the request purpose and distribution key. Keep
+    // the complete exchange exclusive, including failure paths and rotation.
+    std::scoped_lock lock(state.auth_mutex);
+    return server_secure_comm_setup(state.ctx.get(), sock, keys);
+}
+
+static void serve_session(ServerState& state, int sock, bool use_udp) {
+    // Bound a stalled TCP handshake while it owns the shared Auth context.
+    if (!use_udp && !set_receive_timeout(sock, UDP_IDLE_TIMEOUT_SEC)) return;
+    auto keys =
+        std::unique_ptr<session_key_list_t, decltype(&free_session_key_list_t)>(
+            init_empty_session_key_list(), &free_session_key_list_t);
+    if (!keys) {
+        SST_print_error("Failed to allocate session key list.");
+        return;
     }
-    free(session_ctx);
+    auto session =
+        std::unique_ptr<SST_session_ctx_t, decltype(&free_session_ctx)>(
+            setup_session(state, sock, keys.get()), &free_session_ctx);
+    if (!use_udp && !set_receive_timeout(sock, 0)) return;
+    if (!session) {
+        errno = 0;
+        SST_print_error("There is no session key.");
+        return;
+    }
+    exchange_messages(session.get());
+    SST_print_log("Client %d disconnected.", sock);
+}
 
-    // Once the thread has finished, decrement the number of active clients
-    // Use a mutex to protect the counter
-    pthread_mutex_lock(&count_mutex);
-    --active_clients;
-    if (active_clients == 0)
-        stop_server = 1;  // If this was the last client, tell main to stop
-    pthread_mutex_unlock(&count_mutex);
+static void serve_worker(const std::shared_ptr<ServerState>& state, int sock,
+                         bool use_udp) {
+    do {
+        if (stop_server || (use_udp && !wait_for_udp_peer(sock))) break;
+        serve_session(*state, sock, use_udp);
+    } while (use_udp && !stop_server &&
+             release_udp_peer(sock, state->ctx->config.entity_server_port_num));
+    if (close(sock) < 0) SST_print_error("close() error");
+    finish_worker(*state, use_udp);
+}
 
-    return NULL;
+static std::optional<std::jthread> start_worker(
+    const std::shared_ptr<ServerState>& state, int sock, bool use_udp) {
+    {
+        std::scoped_lock lock(state->mutex);
+        ++state->active_clients;
+    }
+    try {
+        // std::jthread owns a copy of state, keeping the C context alive until
+        // the worker finishes, including detached TCP workers during shutdown.
+        return std::jthread(&serve_worker, state, sock, use_udp);
+    } catch (const std::system_error& error) {
+        SST_print_error("Failed to start worker: %s", error.what());
+        close(sock);
+        finish_worker(*state, use_udp);
+        return std::nullopt;
+    }
+}
+
+static int run_tcp_server(const std::shared_ptr<ServerState>& state, int port) {
+    int listener = make_listener(port, false);
+    if (listener < 0) {
+        SST_print_error("Failed to create TCP listener.");
+        return EXIT_FAILURE;
+    }
+    if (listen(listener, 5) < 0) {
+        SST_print_error("listen() error");
+        close(listener);
+        return EXIT_FAILURE;
+    }
+    while (!stop_server && !state->finished) {
+        int ready = poll_socket(listener, 100);
+        if (stop_server || state->finished) break;
+        if (ready <= 0) continue;
+        int client = accept(listener, nullptr, nullptr);
+        if (client < 0) {
+            SST_print_error("accept() error");
+            continue;
+        }
+        SST_print_log("New client: socket %d", client);
+        if (auto worker = start_worker(state, client, false)) worker->detach();
+    }
+    return close(listener) == 0 ? EXIT_SUCCESS : EXIT_FAILURE;
+}
+
+static int run_udp_server(const std::shared_ptr<ServerState>& state, int port,
+                          int worker_count) {
+    std::vector<std::jthread> workers;
+    workers.reserve(worker_count);
+    for (int i = 0; i < worker_count; ++i) {
+        int sock = make_listener(port, true);
+        if (sock < 0) {
+            SST_print_error("Failed to create UDP worker: %s", strerror(errno));
+            continue;
+        }
+        if (auto worker = start_worker(state, sock, true))
+            workers.push_back(std::move(*worker));
+    }
+    if (workers.empty()) {
+        SST_print_error("No UDP workers started.");
+        return EXIT_FAILURE;
+    }
+    SST_print_log("UDP server ready on port %d (%zu workers).", port,
+                  workers.size());
+    std::fflush(stdout);
+    for (auto& worker : workers) worker.join();
+    return EXIT_SUCCESS;
 }
 
 int main(int argc, char* argv[]) {
-    if (argc != 2) {
-        std::cerr << "Usage: " << argv[0] << " <config_path>" << std::endl;
+    if (argc != 2 && argc != 4) {
+        SST_print_error("Usage: %s <config_path> [--workers 1-%d]", argv[0],
+                        UDP_MAX_WORKER_COUNT);
         return EXIT_FAILURE;
     }
-
-    // Initialize the sockets
-    int serv_sock;
-    const int PORT_NUM = 21100;
-
-    struct sockaddr_in serv_addr;
-    serv_sock = socket(PF_INET, SOCK_STREAM, 0);
-    if (serv_sock < 0) {
-        std::cerr << "socket() error" << std::endl;
+    int worker_count = UDP_DEFAULT_WORKER_COUNT;
+    bool workers_requested = argc == 4;
+    if (workers_requested &&
+        (std::strcmp(argv[2], "--workers") != 0 ||
+         !parse_udp_worker_count(argv[3], &worker_count))) {
+        SST_print_error("Usage: %s <config_path> [--workers 1-%d]", argv[0],
+                        UDP_MAX_WORKER_COUNT);
         return EXIT_FAILURE;
     }
-
-    int on = 1;
-    if (setsockopt(serv_sock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on)) < 0) {
-        std::cerr << "socket option set error\n" << std::endl;
+    signal(SIGPIPE, SIG_IGN);
+    signal(SIGINT, handle_shutdown_signal);
+    auto state = std::make_shared<ServerState>(init_SST(argv[1]));
+    if (!state->ctx) {
+        SST_print_error("Failed init_SST().");
         return EXIT_FAILURE;
     }
-
-    memset(&serv_addr, 0, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    serv_addr.sin_port = htons(PORT_NUM);
-
-    if (bind(serv_sock, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0) {
-        std::cerr << "bind() error" << std::endl;
+    bool use_tcp = std::strcmp(state->ctx->config.network_protocol, "TCP") == 0;
+    if (use_tcp && workers_requested) {
+        SST_print_error("--workers is only valid with a UDP server config.");
         return EXIT_FAILURE;
     }
-
-    if (listen(serv_sock, 5) < 0) {
-        std::cerr << "listen() error" << std::endl;
+    int port = state->ctx->config.entity_server_port_num;
+    if (port < 1 || port > 65535) {
+        SST_print_error("Invalid entity.server.port.number in config: %d",
+                        port);
         return EXIT_FAILURE;
     }
-
-    SST_ctx_t* ctx = init_SST(argv[1]);
-    session_key_list_t* s_key_list = init_empty_session_key_list();
-
-    // Accept incoming client connections
-    // Run until all clients are done
-    while (!stop_server) {
-        // rfds with select() watches the sets/sockets and tells when a
-        // descriptor is ready (ready means the listening socket has an incoming
-        // connection)
-        fd_set rfds;
-        FD_ZERO(&rfds);
-        FD_SET(serv_sock, &rfds);
-
-        // Using a timeout with select() allows us to periodically check
-        // stop_server instead of blocking forever in accept()
-        struct timeval tv;
-        tv.tv_sec = 0;
-        tv.tv_usec = 100000;  // 100 ms timeout
-
-        // ready will be > 0 if there is an incoming connection
-        int ready = select(serv_sock + 1, &rfds, NULL, NULL, &tv);
-        if (ready < 0) {
-            if (errno == EINTR) continue;  // Interrupted by signal; retry
-            std::cerr << "select() error" << std::endl;
-            continue;
-        }
-        if (stop_server) {
-            break;  // all clients are done; exit loop
-        }
-
-        if (ready == 0) {
-            // timeout: no incoming connection; loop to re-check stop_server
-            continue;
-        }
-
-        struct sockaddr_in clnt_addr;
-        socklen_t clnt_addr_size = sizeof(clnt_addr);
-        int clnt_sock =
-            accept(serv_sock, (struct sockaddr*)&clnt_addr, &clnt_addr_size);
-        if (clnt_sock < 0) {
-            std::cerr << "accept() error" << std::endl;
-            continue;
-        }
-        std::cout << "New client: socket " << clnt_sock << std::endl;
-
-        // Update the number of active clients
-        // Use a mutex to protect the counter
-        pthread_mutex_lock(&count_mutex);
-        active_clients++;
-        pthread_mutex_unlock(&count_mutex);
-
-        ThreadArgs* args = new ThreadArgs;
-        args->client_sock = clnt_sock;
-        args->ctx = ctx;
-
-        pthread_t t;
-        if (pthread_create(&t, NULL, receive_and_print_messages, args) != 0) {
-            std::cerr << "pthread_create() error" << std::endl;
-
-            // Thread creation failed, so decrement active_clients
-            pthread_mutex_lock(&count_mutex);
-            active_clients--;
-            if (active_clients == 0) {
-                stop_server =
-                    1;  // If this was the last client, tell main to stop
-            }
-            pthread_mutex_unlock(&count_mutex);
-
-            if (close(clnt_sock) < 0) {
-                std::cerr << "close() error" << std::endl;
-                return EXIT_FAILURE;
-            }
-
-            delete args;
-            continue;
-        }
-        pthread_detach(t);
-    }
-
-    std::cout << "Successfully finished communication." << std::endl;
-
-    if (close(serv_sock) < 0) {
-        std::cerr << "close() error" << std::endl;
-        return EXIT_FAILURE;
-    }
-
-    free_SST_ctx_t(ctx);
-    free_session_key_list_t(s_key_list);
+    int result = use_tcp ? run_tcp_server(state, port)
+                         : run_udp_server(state, port, worker_count);
+    if (result == EXIT_SUCCESS)
+        SST_print_log("Successfully finished communication.");
+    return result;
 }

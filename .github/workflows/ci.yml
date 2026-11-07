@@ -55,6 +55,18 @@ jobs:
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: ctest -C ${{env.BUILD_TYPE}}
 
+    - name: Build SST Testbed TCP and UDP programs
+      run: |
+        cmake -S examples/SST_Testbed -B examples/SST_Testbed/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake --build examples/SST_Testbed/build --config ${{env.BUILD_TYPE}} --target server client testbed_helpers_test
+        ctest --test-dir examples/SST_Testbed/build -R testbed_helpers_test --output-on-failure
+
+    - name: Verify Testbed plotting
+      run: |
+        python3 -m venv "$RUNNER_TEMP/sst-plot-tests"
+        "$RUNNER_TEMP/sst-plot-tests/bin/pip" install pandas matplotlib
+        MPLBACKEND=Agg "$RUNNER_TEMP/sst-plot-tests/bin/python" -m unittest discover -s examples/SST_Testbed/plot_generators -v
+
   Integration-test:
     name: Integration-test
     runs-on: ubuntu-latest
@@ -131,6 +143,13 @@ jobs:
         ./save_load_session_key_list_with_password_test ../test_configs/client.config
         # ./encrypt_buf_with_session_key_without_malloc_execution_time_test ../test_configs/client.config
         ./multi_thread_get_session_key_test ../test_configs/client.config
+
+    - name: Verify UDP testbed worker reuse
+      working-directory: entity/c
+      run: |
+        cmake -S examples/SST_Testbed -B examples/SST_Testbed/build -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}}
+        cmake --build examples/SST_Testbed/build --target server client
+        python3 tests/testbed_udp_smoke_test.py --build-dir examples/SST_Testbed/build
 
     - name: Stop auth server
       working-directory: auth/auth-server

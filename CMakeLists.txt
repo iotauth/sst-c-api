@@ -8,6 +8,7 @@ find_package(OpenSSL REQUIRED)
 find_package(Threads REQUIRED)
 
 add_library(sst-c-api STATIC
+  ${CMAKE_CURRENT_LIST_DIR}/src/auth_transport.c
   ${CMAKE_CURRENT_LIST_DIR}/src/c_api.c
   ${CMAKE_CURRENT_LIST_DIR}/src/c_common.c
   ${CMAKE_CURRENT_LIST_DIR}/src/c_crypto.c
@@ -96,3 +97,13 @@ add_executable(auth_request_test tests/auth_request_test.c)
 target_link_libraries(auth_request_test PRIVATE sst-c-api)
 add_test(NAME auth_request_test COMMAND auth_request_test)
 set_tests_properties(auth_request_test PROPERTIES TIMEOUT 15)
+
+add_executable(auth_transport_test tests/auth_transport_test.c)
+target_link_libraries(auth_transport_test PRIVATE sst-c-api)
+add_test(NAME auth_transport_test COMMAND auth_transport_test)
+set_tests_properties(auth_transport_test PROPERTIES TIMEOUT 45)
+
+add_executable(udp_server_cleanup_test tests/udp_server_cleanup_test.c)
+target_link_libraries(udp_server_cleanup_test PRIVATE sst-c-api)
+add_test(NAME udp_server_cleanup_test COMMAND udp_server_cleanup_test)
+set_tests_properties(udp_server_cleanup_test PROPERTIES TIMEOUT 15)
