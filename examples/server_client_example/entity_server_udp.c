@@ -17,17 +17,17 @@ int main(int argc, char* argv[]) {
 
     struct sockaddr_in serv_addr, clnt_addr;
     socklen_t clnt_addr_size;
-    
+
     int listenfd;
     struct sockaddr_in servaddr;
     bzero(&servaddr, sizeof(servaddr));
 
     // Create a UDP Socket
-    listenfd = socket(AF_INET, SOCK_DGRAM, 0);        
+    listenfd = socket(AF_INET, SOCK_DGRAM, 0);
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(atoi(PORT_NUM));
-    servaddr.sin_family = AF_INET; 
- 
+    servaddr.sin_family = AF_INET;
+
     // bind server address to socket descriptor
     bind(listenfd, (struct sockaddr*)&servaddr, sizeof(servaddr));
 
@@ -47,7 +47,7 @@ int main(int argc, char* argv[]) {
                        (void*)session_ctx);
         sleep(1);
 
-        //receive the datagram
+        // receive the datagram
         int msg = send_secure_message("Hello client", strlen("Hello client"),
                                       session_ctx);
 
@@ -69,7 +69,7 @@ int main(int argc, char* argv[]) {
         free_session_ctx(session_ctx);
         printf("Finished first communication\n");
     }
-    
+
     free_session_key_list_t(s_key_list);
     close(clnt_sock);
     close(serv_sock);

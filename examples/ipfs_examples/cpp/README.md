@@ -1,62 +1,48 @@
-# How to Run Example
+# C++ IPFS example using the C API
+
+These older C++ programs link `sst-c-api`. For the separate C++17 API based on `sst::SST_API` and `sst::ipfs`, use the [C++ API IPFS examples](../../../cpp/examples/ipfs_examples/README.md).
+
+Here `$SST_ROOT` means the main `iotauth` repository root, with this submodule at `entity/c/`.
 
 ## Prerequisites
 
-## Clone repository & Update submodule
+Use CMake 3.19 or newer, a C++ compiler, and OpenSSL 3 development headers. This example builds the static C library directly from the source tree; no system-wide installation is needed.
+
+Follow the [C IPFS prerequisites](../c/README.md#prerequisites) to build Auth,
+generate the file-sharing credentials, start Auth and IPFS, and create the
+`plain_text` input file. Start the plain file system manager in a separate
+terminal:
+
+```sh
+cd "$SST_ROOT/examples/file_sharing"
+python3 file_system_manager.py
 ```
-$ git clone https://github.com/iotauth/iotauth.git
-$ cd iotauth
-$ git submodule update --init
+
+## Build
+
+```sh
+cd "$SST_ROOT/entity/c/examples/ipfs_examples/cpp"
+cmake -S . -B build
+cmake --build build
 ```
 
-## Installation of SST as Shared Library
-Please see the instructions [here](https://github.com/iotauth/sst-c-api?tab=readme-ov-file#compile-as-shared-library).
-
-### Create Example Auth Databases
-
-1. Go to directory `$ROOT/examples`.
-
-2. Run `./generateAll.sh -g configs/file_sharing.graph`.
-
-3. Run `./cleanAll.sh` if there are any errors or if you want a clean copy.
-
-### Run IPFS
-
-1. [Install IPFS](https://docs.ipfs.tech/install/command-line/#install-official-binary-distributions). Also run `ipfs init` on the first time starting ipfs.
-
-2. Run `ipfs daemon`.
-
-### Run Example Auth
-
-1. Go to `$ROOT/auth/auth-server/`.
-
-2. Build the executable jar file by running `mvn clean install`.
-
-3. Run the jar file with the properties file for Auth101 with `java -jar target/auth-server-jar-with-dependencies.jar -p ../properties/exampleAuth101.properties`.
-
-### Run Example File System Manager
-
-1. Go to `$ROOT/examples/file_sharing/`.
-
-2. Run `python3 file_system_manager.py`.
+Use `-DCMAKE_BUILD_TYPE=Debug` during configuration to enable C API debug logging.
 
 ## Run the Example Entities
 
-1. Go to `$ROOT/entity/c/examples/ipfs_examples/` and create a `plain_text` file.
-    - Enter any text into the file and save.
+Run from `cpp/build/` so the config files' relative credential paths resolve:
 
-2. Run `cd cpp`.
+```sh
+cd "$SST_ROOT/entity/c/examples/ipfs_examples/cpp/build"
+./uploader ../../uploader.config ../../plain_text ../../addReader.txt
+```
 
-3. Run `mkdir build && cd build`.
-    - If you get `mkdir: build: File exists` then run `rm -rf build`.
+When the uploader prints `Waiting for client to connect...`, run the downloader
+in another terminal:
 
-4. Run `cmake ..`.
-    - Run `cmake -DCMAKE_BUILD_TYPE=Debug ..` for debugging mode.
+```sh
+cd "$SST_ROOT/entity/c/examples/ipfs_examples/cpp/build"
+./downloader ../../downloader.config
+```
 
-5. Run `make`.
-
-6. Run `./uploader ../../uploader.config ../../plain_text ../../addReader.txt`.
-
-7. Once `Waiting for client to connect...` is printed in the Terminal, run the downloader in another terminal with `./downloader ../../downloader.config`.
-
-8. Once downloader finishes running, uploader resumes. Once the hashes are compared at the end, uploader has finished running.
+After the downloader finishes, the uploader resumes and compares file hashes.

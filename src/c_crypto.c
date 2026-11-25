@@ -27,16 +27,19 @@ EVP_PKEY* load_auth_public_key(const char* path) {
             "Loading auth_pub_key_path failed");
     }
     X509* cert = PEM_read_X509(pemFile, NULL, NULL, NULL);
+    fclose(pemFile);
+    if (cert == NULL) {
+        return print_crypto_error_return_NULL("Certificate parsing failed");
+    }
     EVP_PKEY* pub_key = X509_get_pubkey(cert);
+    X509_free(cert);
     if (pub_key == NULL) {
         return print_crypto_error_return_NULL("public key getting fail");
     }
-    int id = EVP_PKEY_id(pub_key);
-    if (id != EVP_PKEY_RSA) {
+    if (EVP_PKEY_id(pub_key) != EVP_PKEY_RSA) {
+        EVP_PKEY_free(pub_key);
         return print_crypto_error_return_NULL("is not RSA Encryption file");
     }
-    fclose(pemFile);
-    X509_free(cert);
     return pub_key;
 }
 

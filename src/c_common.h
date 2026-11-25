@@ -1,9 +1,9 @@
 #ifndef C_COMMON_H
 #define C_COMMON_H
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
 
 // Message Type //
 #define AUTH_HELLO 0
@@ -179,7 +179,8 @@ void make_sender_buf(unsigned char* payload, unsigned int payload_length,
 // @param ip_addr IP address of server
 // @param port_num port number to connect IP address
 // @param sock socket number
-int connect_as_client(const char* ip_addr, int port_num, int* sock, bool use_tcp);
+int connect_as_client(const char* ip_addr, int port_num, int* sock,
+                      bool use_tcp);
 
 // Serializes a buffer based on the nonce type such as nonce and reply nonce.
 // @param nonce a nonce made by yourself
@@ -208,7 +209,7 @@ int mod(int a, int b);
 // @param sock socket to check
 // @param type_out output socket type
 // @return 0 for success, -1 for fail
-int get_socket_type(int sock, int *type_out);
+int get_socket_type(int sock, int* type_out);
 
 // Reads data from a socket into a buffer.
 // This function reads up to `buf_length` bytes from the specified socket into

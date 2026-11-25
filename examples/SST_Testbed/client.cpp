@@ -2,13 +2,13 @@ extern "C" {
 #include "../../src/c_api.h"
 }
 
+#include <sys/socket.h>
 #include <unistd.h>
 
-#include <chrono>
 #include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <fstream>
-#include <sys/socket.h>
 #include <thread>
 
 #include "lib/metrics.hpp"
@@ -18,8 +18,7 @@ enum AttackType { NONE, REPLAY, DOSK, DOSC, DOSM, DOSS, DOSU };
 enum AttackTarget { TARGET_NONE, TARGET_AUTH, TARGET_SERVER };
 
 static AttackType parseAttackType(const std::string& s) {
-    if (s == "REPLAY" || s == "Replay" || s == "replay")
-        return REPLAY;
+    if (s == "REPLAY" || s == "Replay" || s == "replay") return REPLAY;
     if (s == "DOSK" || s == "DoSK" || s == "DosK" || s == "Dosk" ||
         s == "dosK" || s == "dosk")
         return DOSK;
@@ -29,8 +28,7 @@ static AttackType parseAttackType(const std::string& s) {
     if (s == "DOSM" || s == "DoSM" || s == "DosM" || s == "Dosm" ||
         s == "dosM" || s == "dosm")
         return DOSM;
-    if (s == "DOSS" || s == "DoSS" || s == "DosS" || s == "Doss" ||
-        s == "doss")
+    if (s == "DOSS" || s == "DoSS" || s == "DosS" || s == "Doss" || s == "doss")
         return DOSS;
     if (s == "DOSU" || s == "DoSU" || s == "DosU" || s == "Dosu" ||
         s == "dosU" || s == "dosu")
@@ -39,8 +37,7 @@ static AttackType parseAttackType(const std::string& s) {
 }
 
 static AttackTarget parseAttackTarget(const std::string& s) {
-    if (s == "auth" || s == "Auth" || s == "a" || s == "A")
-        return TARGET_AUTH;
+    if (s == "auth" || s == "Auth" || s == "a" || s == "A") return TARGET_AUTH;
     if (s == "server" || s == "Server" || s == "s" || s == "S")
         return TARGET_SERVER;
     return TARGET_NONE;
@@ -49,8 +46,9 @@ static AttackTarget parseAttackTarget(const std::string& s) {
 int main(int argc, char* argv[]) {
     // allow: ./client <config_path> <csv_file_path> [-metrics] [src_ip]
     if (argc < 3 || argc > 5) {
-        SST_print_error("Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
-                        argv[0]);
+        SST_print_error(
+            "Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
+            argv[0]);
         return EXIT_FAILURE;
     }
 
@@ -104,7 +102,8 @@ int main(int argc, char* argv[]) {
     SST_session_ctx_t* session_ctx =
         secure_connect_to_server(&s_key_list->s_key[0], ctx);
     if (session_ctx == NULL) {
-        SST_print_error("Client failed to establish secure session with server.");
+        SST_print_error(
+            "Client failed to establish secure session with server.");
         free_session_key_list_t(s_key_list);
         free_SST_ctx_t(ctx);
         return EXIT_FAILURE;
@@ -123,9 +122,9 @@ int main(int argc, char* argv[]) {
         size_t comma1 = line.find(',');
         size_t comma2 = line.find(',', comma1 + 1);
         size_t comma3 = line.find(',', comma2 + 1);
-        size_t comma4 =
-            (comma3 != std::string::npos) ? line.find(',', comma3 + 1)
-                                          : std::string::npos;
+        size_t comma4 = (comma3 != std::string::npos)
+                            ? line.find(',', comma3 + 1)
+                            : std::string::npos;
 
         // Sleep for the specified time
         std::string sleep_time_str = line.substr(0, comma1);
@@ -230,8 +229,9 @@ int main(int argc, char* argv[]) {
                     }
 
                     if (s_key_list == NULL) {
-                        SST_print_error("Client failed to get session key in DOS "
-                                     "Key attack.");
+                        SST_print_error(
+                            "Client failed to get session key in DOS "
+                            "Key attack.");
                         break;
                     }
                 }
@@ -260,8 +260,9 @@ int main(int argc, char* argv[]) {
                 for (int i = 0; i < repeat; ++i) {
                     s_key_list = get_session_key(ctx, NULL);
                     if (s_key_list == NULL) {
-                        SST_print_error("Client failed to get session key in DOS "
-                                     "Connect attack.");
+                        SST_print_error(
+                            "Client failed to get session key in DOS "
+                            "Connect attack.");
                         i--;
                         continue;
                     }
@@ -284,8 +285,9 @@ int main(int argc, char* argv[]) {
                     }
 
                     if (session_ctx[i] == NULL) {
-                        SST_print_error("Client failed to connect to server in DOS "
-                                     "Connect attack.");
+                        SST_print_error(
+                            "Client failed to connect to server in DOS "
+                            "Connect attack.");
                         continue;
                     }
                 }
@@ -315,7 +317,8 @@ int main(int argc, char* argv[]) {
                     SST_print_log("Sending message: %s (%d of %d)\n",
                                   message.c_str(), i + 1, repeat);
 
-                    // Track how long it takes to send the message and get a response
+                    // Track how long it takes to send the message and get a
+                    // response
                     auto t0 = std::chrono::steady_clock::now();
 
                     int msg =
@@ -339,9 +342,9 @@ int main(int argc, char* argv[]) {
 
                         auto t1 = std::chrono::steady_clock::now();
 
-                        long dur_us =
-                        std::chrono::duration_cast<std::chrono::microseconds>(t1
-                        - t0).count();
+                        long dur_us = std::chrono::duration_cast<
+                                          std::chrono::microseconds>(t1 - t0)
+                                          .count();
                         metrics_add_sample(row, dur_us, msg >= 0);
                     }
                 }
@@ -367,8 +370,7 @@ int main(int argc, char* argv[]) {
 
                 if (attack_target.empty()) {
                     errno = 0;
-                    SST_print_error(
-                        "DOSS requires a 5th CSV column target.");
+                    SST_print_error("DOSS requires a 5th CSV column target.");
                     break;
                 }
 
@@ -380,23 +382,24 @@ int main(int argc, char* argv[]) {
 
                 if (target == TARGET_AUTH) {
                     dst_ip_str = ctx->config.auth_ip_addr;
-                    dst_port = static_cast<unsigned short>(ctx->config.auth_port_num);
+                    dst_port =
+                        static_cast<unsigned short>(ctx->config.auth_port_num);
                 } else if (target == TARGET_SERVER) {
                     dst_ip_str = ctx->config.entity_server_ip_addr;
-                    dst_port = static_cast<unsigned short>(ctx->config.entity_server_port_num);
+                    dst_port = static_cast<unsigned short>(
+                        ctx->config.entity_server_port_num);
                 } else {
                     errno = 0;
-                    SST_print_error(
-                        "Invalid DOSS target '%s'.", attack_target.c_str());
+                    SST_print_error("Invalid DOSS target '%s'.",
+                                    attack_target.c_str());
                     break;
                 }
 
                 char default_src_ip[INET_ADDRSTRLEN];
                 const char* src_ip_to_use = NULL;
-                if (!resolve_src_ip_or_default(src_ip, dst_ip_str, dst_port,
-                                               default_src_ip,
-                                               sizeof(default_src_ip),
-                                               &src_ip_to_use)) {
+                if (!resolve_src_ip_or_default(
+                        src_ip, dst_ip_str, dst_port, default_src_ip,
+                        sizeof(default_src_ip), &src_ip_to_use)) {
                     break;
                 }
 
@@ -408,18 +411,17 @@ int main(int argc, char* argv[]) {
                     metrics_write_header_if_empty();
                     MetricsRow row = metrics_begin_row(exp_id);
                     send_raw_syn_packets_measured(
-                        src_ip_to_use, // spoofed source IP
-                        dst_ip_str, // destination IP
-                        dst_port, // destination port
-                        repeat, // number of packets
+                        src_ip_to_use,  // spoofed source IP
+                        dst_ip_str,     // destination IP
+                        dst_port,       // destination port
+                        repeat,         // number of packets
                         &row);
                     metrics_end_row_and_write(row);
                 } else {
-                    send_raw_syn_packets(
-                        src_ip_to_use, // spoofed source IP
-                        dst_ip_str, // destination IP
-                        dst_port, // destination port
-                        repeat // number of packets
+                    send_raw_syn_packets(src_ip_to_use,  // spoofed source IP
+                                         dst_ip_str,     // destination IP
+                                         dst_port,       // destination port
+                                         repeat          // number of packets
                     );
                 }
             } break;
@@ -439,8 +441,7 @@ int main(int argc, char* argv[]) {
 
                 if (attack_target.empty()) {
                     errno = 0;
-                    SST_print_error(
-                        "DOSU requires a 5th CSV column target.");
+                    SST_print_error("DOSU requires a 5th CSV column target.");
                     break;
                 }
 
@@ -452,12 +453,12 @@ int main(int argc, char* argv[]) {
                     dst_port = static_cast<uint16_t>(ctx->config.auth_port_num);
                 } else if (target == TARGET_SERVER) {
                     dst_ip_str = ctx->config.entity_server_ip_addr;
-                    dst_port =
-                        static_cast<uint16_t>(ctx->config.entity_server_port_num);
+                    dst_port = static_cast<uint16_t>(
+                        ctx->config.entity_server_port_num);
                 } else {
                     errno = 0;
-                    SST_print_error(
-                        "Invalid DOSU target '%s'.", attack_target.c_str());
+                    SST_print_error("Invalid DOSU target '%s'.",
+                                    attack_target.c_str());
                     break;
                 }
 
@@ -465,10 +466,9 @@ int main(int argc, char* argv[]) {
 
                 char default_src_ip[INET_ADDRSTRLEN];
                 const char* src_ip_to_use = NULL;
-                if (!resolve_src_ip_or_default(src_ip, dst_ip_str, dst_port,
-                                               default_src_ip,
-                                               sizeof(default_src_ip),
-                                               &src_ip_to_use)) {
+                if (!resolve_src_ip_or_default(
+                        src_ip, dst_ip_str, dst_port, default_src_ip,
+                        sizeof(default_src_ip), &src_ip_to_use)) {
                     break;
                 }
 
@@ -479,18 +479,17 @@ int main(int argc, char* argv[]) {
                     metrics_write_header_if_empty();
                     MetricsRow row = metrics_begin_row(exp_id);
                     send_raw_udp_packets_measured(
-                        src_ip_to_use, // spoofed source IP
-                        dst_ip_str, // destination IP
-                        dst_port, // destination port
-                        repeat, // number of packets
+                        src_ip_to_use,  // spoofed source IP
+                        dst_ip_str,     // destination IP
+                        dst_port,       // destination port
+                        repeat,         // number of packets
                         &row);
                     metrics_end_row_and_write(row);
                 } else {
-                    send_raw_udp_packets(
-                        src_ip_to_use, // spoofed source IP
-                        dst_ip_str, // destination IP
-                        dst_port, // destination port
-                        repeat // number of packets
+                    send_raw_udp_packets(src_ip_to_use,  // spoofed source IP
+                                         dst_ip_str,     // destination IP
+                                         dst_port,       // destination port
+                                         repeat          // number of packets
                     );
                 }
             } break;
