@@ -207,6 +207,8 @@ We have multiple examples to run.
         - **2.2.1** to Auth via session key requests (DoSK)
         - **2.2.2** to server via sending messages (DoSM)
         - **2.2.3** to server, and indirectly to Auth via connection requests (DoSC)
+        - **2.2.4** to Auth or server via SYN flooding (DoSS)
+        - **2.2.5** to Auth or server via UDP flooding (DoSU)
     - **2.3** Denial of Service (DoS) attacks with multiple clients
         - **2.3.1** DDoSK
         - **2.3.2** DDoSM
