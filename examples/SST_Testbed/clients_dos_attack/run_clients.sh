@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 
 # run_clients.sh
-# Usage: ./run_clients.sh <number-of-clients> <csv-file> [-metrics] [source-ip] [--protocol TCP|UDP] [--dry-run]
+# Usage: ./run_clients.sh <number-of-clients> <csv-file> [-metrics] [--protocol TCP|UDP] [--dry-run]
 
-OS=$(uname)
 SUDO_KEEPALIVE_PID=""
 
 start_sudo_session() {
@@ -29,41 +28,19 @@ stop_sudo_session() {
   fi
 }
 
-launch_terminal() {
+launch_client() {
   local cmd="$1"
   local use_sudo="$2" # "yes" or "no"
 
-  if [[ "$OS" == "Darwin" && "$use_sudo" == "yes" ]]; then
+  if [[ "$use_sudo" == "yes" ]]; then
     sudo -n bash -lc "$cmd" &
-    return
-  fi
-
-  if [[ "$OS" == "Darwin" ]]; then
-    osascript -e "tell application \"Terminal\" to do script \"$cmd\""
-  elif command -v gnome-terminal &> /dev/null; then
-    if [[ "$use_sudo" == "yes" ]]; then
-      gnome-terminal -- bash -c "sudo -n bash -lc \"$cmd\"; exec bash" &
-    else
-      gnome-terminal -- bash -c "$cmd; exec bash" &
-    fi
-  elif command -v xterm &> /dev/null; then
-    if [[ "$use_sudo" == "yes" ]]; then
-      xterm -hold -e "sudo -n bash -lc \"$cmd\"" &
-    else
-      xterm -hold -e "$cmd" &
-    fi
   else
-    echo "No GUI terminal found; running headless: $cmd"
-    if [[ "$use_sudo" == "yes" ]]; then
-      sudo -n bash -lc "$cmd" &
-    else
-      eval "$cmd &"
-    fi
+    bash -lc "$cmd" &
   fi
 }
 
 usage() {
-  echo "Usage: $0 <number-of-clients> <csv-file> [-metrics] [source-ip] [--protocol TCP|UDP] [--dry-run]" >&2
+  echo "Usage: $0 <number-of-clients> <csv-file> [-metrics] [--protocol TCP|UDP] [--dry-run]" >&2
 }
 
 if [[ $# -lt 2 ]]; then
@@ -75,7 +52,6 @@ COUNT="$1"
 CSV="$2"
 shift 2
 METRICS_FLAG=""
-SRC_IP=""
 PROTOCOL_PROFILE=""
 DRY_RUN="no"
 if [[ ! "$COUNT" =~ ^[1-9][0-9]*$ || ! -f "$CSV" || ! -r "$CSV" ]]; then
@@ -106,13 +82,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     --dry-run) DRY_RUN="yes" ;;
     -*) usage; exit 1 ;;
-    *)
-      if [[ -n "$SRC_IP" ]]; then
-        usage
-        exit 1
-      fi
-      SRC_IP="$1"
-      ;;
+    *) usage; exit 1 ;;
   esac
   shift
 done
@@ -164,9 +134,7 @@ fi
 # Decide whether to use sudo.
 # Raw socket attacks (DOSS/DOSU) require elevated privileges.
 USE_SUDO="no"
-if [[ -n "$SRC_IP" ]]; then
-  USE_SUDO="yes"
-elif [[ "$SCENARIO_PROTOCOL" != ANY ]]; then
+if [[ "$SCENARIO_PROTOCOL" != ANY ]]; then
   USE_SUDO="yes"
 fi
 
@@ -189,15 +157,11 @@ for (( i=0; i<COUNT; i++ )); do
   if [[ -n "$METRICS_FLAG" ]]; then
     SHCMD+=" '$METRICS_FLAG'"
   fi
-  if [[ -n "$SRC_IP" ]]; then
-    SHCMD+=" '$SRC_IP'"
-  fi
-
   if [[ "$DRY_RUN" == "yes" ]]; then
     printf 'Would launch (%s): %s\n' "$PROTOCOL_PROFILE" "$SHCMD"
     continue
   fi
-  launch_terminal "$SHCMD" "$USE_SUDO"
+  launch_client "$SHCMD" "$USE_SUDO"
   if [[ "$LAUNCH_STAGGER_SEC" != "0" ]]; then
     sleep "$LAUNCH_STAGGER_SEC"
   fi

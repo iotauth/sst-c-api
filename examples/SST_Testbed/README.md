@@ -416,20 +416,17 @@ So, also make sure that the ***Auth*** executed before is terminated.
     - UDP: `../build/server ../config/server_udp.config`
         - UDP uses workers to accept multiple clients. Server launches 16 workers by default but `--workers` can be used to specify the number of workers. It accepts values from 1 through 105 (i.e. `--workers 63`).
 
-6. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [source-ip] [--protocol TCP|UDP] [--dry-run]`
+6. Run `./run_clients.sh <number_of_clients> <input_file> [-metrics] [--protocol TCP|UDP] [--dry-run]`
     - `<number_of_clients>` is the number of clients that should be created during this execution.
     - `<input_file>` is the input CSV file that the program should read for this execution.
         - The format of the file should match the corresponding format for each attack type given above because the attacks are the same, only that there are now multiple clients doing the attack simultaneously now.
         - `[-metrics]` is optional. If provided, each client writes metrics to `SST_Testbed/metric_logs/`.
-        - `[source-ip]` is optional. If provided, it is forwarded to each client after `-metrics`, matching the client's expected argument order.
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv`
         - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics`
-        - e.g., `./run_clients.sh 3 ../csv_files/dos_attack_connect.csv -metrics 192.168.1.10`
 
-`run_clients.sh` launches clients in separate terminal windows when a supported
-GUI terminal is available, or as background processes in a headless environment.
-Start the server manually as shown above, and stop it with `Ctrl+C` when the
-experiment finishes.
+`run_clients.sh` launches clients as background processes in the terminal where
+it was started, so all client output appears in that terminal. Start the server
+manually as shown above, and stop it with `Ctrl+C` when the experiment finishes.
 
 The launcher selects UDP for scenarios containing DoSU and TCP for DoSS,
 independently of the CSV filename. Scenarios containing neither use TCP by

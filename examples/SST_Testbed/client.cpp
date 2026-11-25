@@ -350,7 +350,7 @@ int main(int argc, char* argv[]) {
     ClientOptions options;
     if (!parse_options(argc, argv, options)) {
         SST_print_error(
-            "Usage: %s <config_path> <csv_file_path> [-metrics] [src_ip]",
+            "Usage: %s <config_path> <csv_file_path> [-metrics]",
             argv[0]);
         return EXIT_FAILURE;
     }
