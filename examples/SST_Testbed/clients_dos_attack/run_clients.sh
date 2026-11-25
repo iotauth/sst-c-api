@@ -7,6 +7,11 @@ OS=$(uname)
 SUDO_KEEPALIVE_PID=""
 
 start_sudo_session() {
+  # The caller already has the privileges required by raw socket attacks.
+  if [[ "$EUID" -eq 0 ]]; then
+    return
+  fi
+
   # Ask once for sudo credentials.
   if ! sudo -v; then
     echo "Failed to authenticate with sudo."
@@ -34,7 +39,11 @@ launch_terminal() {
   local use_sudo="$2" # "yes" or "no"
 
   if [[ "$OS" == "Darwin" && "$use_sudo" == "yes" ]]; then
-    sudo -n bash -lc "$cmd" &
+    if [[ "$EUID" -eq 0 ]]; then
+      bash -lc "$cmd" &
+    else
+      sudo -n bash -lc "$cmd" &
+    fi
     return
   fi
 
@@ -42,20 +51,32 @@ launch_terminal() {
     osascript -e "tell application \"Terminal\" to do script \"$cmd\""
   elif command -v gnome-terminal &> /dev/null; then
     if [[ "$use_sudo" == "yes" ]]; then
-      gnome-terminal -- bash -c "sudo -n bash -lc \"$cmd\"; exec bash" &
+      if [[ "$EUID" -eq 0 ]]; then
+        gnome-terminal -- bash -c "$cmd; exec bash" &
+      else
+        gnome-terminal -- bash -c "sudo -n bash -lc \"$cmd\"; exec bash" &
+      fi
     else
       gnome-terminal -- bash -c "$cmd; exec bash" &
     fi
   elif command -v xterm &> /dev/null; then
     if [[ "$use_sudo" == "yes" ]]; then
-      xterm -hold -e "sudo -n bash -lc \"$cmd\"" &
+      if [[ "$EUID" -eq 0 ]]; then
+        xterm -hold -e "$cmd" &
+      else
+        xterm -hold -e "sudo -n bash -lc \"$cmd\"" &
+      fi
     else
       xterm -hold -e "$cmd" &
     fi
   else
     echo "No GUI terminal found; running headless: $cmd"
     if [[ "$use_sudo" == "yes" ]]; then
-      sudo -n bash -lc "$cmd" &
+      if [[ "$EUID" -eq 0 ]]; then
+        bash -lc "$cmd" &
+      else
+        sudo -n bash -lc "$cmd" &
+      fi
     else
       eval "$cmd &"
     fi
