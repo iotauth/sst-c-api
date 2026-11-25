@@ -1,0 +1,44 @@
+#pragma once
+#include <chrono>
+#include <climits>
+#include <cstdint>
+#include <string>
+#include <string_view>
+
+struct MetricsRow {
+    std::string exp_id;
+    std::string malicious_number;
+    long long ts_start_us = 0;
+    long long ts_end_us = 0;
+
+    uint64_t successes = 0;
+    uint64_t failures = 0;
+
+    // Latency accumulators
+    long double sum_us = 0.0L;
+    long min_us = LONG_MAX;
+    long max_us = 0;
+
+    // precise duration (steady clock)
+    std::chrono::steady_clock::time_point t0;
+};
+
+void metrics_open_new_file(
+    const std::string& base = "../metric_logs/client_metrics_log.csv");
+void metrics_write_header_if_empty();
+
+MetricsRow metrics_begin_row(std::string_view exp_id);
+
+inline void metrics_add_sample(MetricsRow& r, long long dur_us, bool ok) {
+    r.sum_us += static_cast<long double>(dur_us);
+    if (dur_us < r.min_us) r.min_us = dur_us;
+    if (dur_us > r.max_us) r.max_us = dur_us;
+    if (ok)
+        ++r.successes;
+    else
+        ++r.failures;
+}
+
+// Writes a CSV row with:
+// exp_id,malicious_number,ts_start,ts_end,successes,failures,avg_us,min_us,max_us,duration_us,attempt_rate_per_s,success_rate_per_s
+void metrics_end_row_and_write(MetricsRow& r);

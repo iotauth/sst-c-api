@@ -110,11 +110,12 @@ int receive_data_and_download_file(unsigned char* skey_id_in_str,
 void download_file(unsigned char* received_buf, unsigned char* skey_id_in_str,
                    char* file_name);
 
-// Send the request for adding the reader to Auth.
+// Send the request for adding the reader to Auth over the configured transport.
+// The historical name is retained for compatibility. UDP has a five-second
+// exchange deadline; no automatic retry is performed.
 // @param ctx config struct obtained from load_config()
-// @param add_reader_path path to the file including a list of readers to be
-// added
+// @param add_reader JSON request identifying the reader to add
 // @return 0 for success, -1 for fail
-int send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader_path);
+int send_add_reader_req_via_TCP(SST_ctx_t* ctx, char* add_reader);
 
 #endif

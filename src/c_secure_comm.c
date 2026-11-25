@@ -2,6 +2,7 @@
 
 #include <unistd.h>
 
+#include "auth_transport.h"
 #include "c_common.h"
 #include "c_crypto.h"
 
@@ -587,11 +588,7 @@ int decrypt_received_message(unsigned char* encrypted_data,
 
 session_key_list_t* send_session_key_request_check_protocol(
     SST_ctx_t* ctx, unsigned char* target_key_id) {
-    if (strcmp((const char*)ctx->config.network_protocol, "TCP") != 0) {
-        SST_print_error("Unsupported network protocol for key request.");
-        return NULL;
-    }
-    session_key_list_t* keys = send_session_key_req_via_TCP(ctx);
+    session_key_list_t* keys = send_session_key_req(ctx);
     if (keys == NULL) return NULL;
     if (keys->num_key < 1 || memcmp(keys->s_key[0].key_id, target_key_id,
                                     SESSION_KEY_ID_SIZE) != 0) {
@@ -646,14 +643,31 @@ static void report_auth_alert(unsigned char code) {
     }
 }
 
-static int receive_session_keys(SST_ctx_t* ctx, int sock,
+static int handle_session_key_reply(SST_ctx_t* ctx, unsigned char message_type,
+                                    unsigned char* data, unsigned int length,
+                                    const unsigned char* entity_nonce,
+                                    session_key_list_t* keys) {
+    if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
+        if (length <= RSA_KEY_SIZE * 2) return -1;
+        if (save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0) return -1;
+        data += RSA_KEY_SIZE * 2;
+        length -= RSA_KEY_SIZE * 2;
+    } else if (message_type != SESSION_KEY_RESP) {
+        SST_print_error("Unexpected Auth message type.");
+        return -1;
+    }
+    return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
+}
+
+static int receive_session_keys(SST_ctx_t* ctx,
+                                const sst_auth_connection_t* connection,
                                 session_key_list_t* keys) {
     unsigned char entity_nonce[NONCE_SIZE];
     bool hello_received = false;
     for (;;) {
         unsigned char received[MAX_AUTH_COMM_LENGTH];
         int received_length =
-            sst_read_from_socket(sock, received, sizeof(received));
+            sst_auth_read(connection, received, sizeof(received));
         if (received_length < 2) return -1;
         unsigned char message_type;
         unsigned int length = 0;
@@ -671,50 +685,40 @@ static int receive_session_keys(SST_ctx_t* ctx, int sock,
         if (!hello_received) {
             if (message_type != AUTH_HELLO ||
                 length < AUTH_ID_LEN + NONCE_SIZE ||
-                handle_AUTH_HELLO(data, ctx, entity_nonce, sock,
+                handle_AUTH_HELLO(data, ctx, entity_nonce, connection->sock,
                                   ctx->config.numkey,
                                   ctx->purpose_for_requesting_key, 1) < 0)
                 return -1;
             hello_received = true;
             continue;
         }
-        if (message_type == SESSION_KEY_RESP_WITH_DIST_KEY) {
-            if (length <= RSA_KEY_SIZE * 2) return -1;
-            if (save_distribution_key(data, ctx, RSA_KEY_SIZE) < 0) return -1;
-            data += RSA_KEY_SIZE * 2;
-            length -= RSA_KEY_SIZE * 2;
-        } else if (message_type != SESSION_KEY_RESP) {
-            SST_print_error("Unexpected Auth message type.");
-            return -1;
-        }
-        return parse_auth_key_response(ctx, data, length, entity_nonce, keys);
+        return handle_session_key_reply(ctx, message_type, data, length,
+                                        entity_nonce, keys);
     }
 }
 
-session_key_list_t* send_session_key_req_via_TCP(SST_ctx_t* ctx) {
-    int sock;
-    if (connect_as_client(ctx->config.auth_ip_addr, ctx->config.auth_port_num,
-                          &sock) < 0) {
-        SST_print_error("Failed connect_as_client().");
+bool get_network_protocol_type(const char* network_protocol_str) {
+    return strcmp(network_protocol_str, "TCP") == 0;
+}
+
+session_key_list_t* send_session_key_req(SST_ctx_t* ctx) {
+    sst_auth_connection_t connection;
+    if (sst_auth_open(&connection, ctx->config.auth_ip_addr,
+                      ctx->config.auth_port_num, ctx->config.network_protocol,
+                      SST_AUTH_TIMEOUT_MS) < 0) {
+        SST_print_error("Failed to start Auth key request.");
         return NULL;
     }
-    // This scope owns the connection and list on every error path.
     session_key_list_t* keys = init_empty_session_key_list();
     int result = -1;
-    if (keys != NULL) result = receive_session_keys(ctx, sock, keys);
-    close(sock);
+    if (keys != NULL) result = receive_session_keys(ctx, &connection, keys);
+    close(connection.sock);
     if (result < 0) {
         free_session_key_list_t(keys);
         return NULL;
     }
     return keys;
 }
-// TODO:(Dongha Kim): Implement session key request via UDP.
-// session_key_list_t *send_session_key_req_via_UDP(SST_ctx_t *ctx) {
-//     session_key_list_t *s_key_list;
-//     return s_key_list;
-//     SST_print_error("This function is not implemented yet.");
-// }
 
 unsigned char* check_handshake1_send_handshake2(
     unsigned char* received_buf, unsigned int received_buf_length,

@@ -1,11 +1,20 @@
+#include <errno.h>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "../../src/c_api.h"
+
+static void wait_before_reply(void) {
+    struct timespec delay = {.tv_sec = 0, .tv_nsec = 100000000};
+    while (nanosleep(&delay, &delay) < 0 && errno == EINTR) {
+        // Resume the remaining delay after a signal.
+    }
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 2) {
@@ -60,22 +69,25 @@ int main(int argc, char* argv[]) {
         pthread_t thread;
         pthread_create(&thread, NULL, &receive_thread_read_one_each,
                        (void*)session_ctx);
-        sleep(1);
 
+        // Keep replies below the Python example's one-second timeout, while
+        // spacing frames for the legacy Node example's receive handler.
+        wait_before_reply();
         int msg = send_secure_message("Hello client", strlen("Hello client"),
                                       session_ctx);
 
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
-        sleep(1);
+        wait_before_reply();
         msg = send_secure_message("Hello client - second message",
                                   strlen("Hello client - second message"),
                                   session_ctx);
         if (msg < 0) {
             SST_print_error_exit("Failed send_secure_message().");
         }
-        sleep(2);
+        // Leave time to receive both messages from the C example client.
+        sleep(4);
         pthread_cancel(thread);
         pthread_join(thread,
                      NULL);  // Needs to wait until the thread is joined.
@@ -98,24 +110,22 @@ int main(int argc, char* argv[]) {
     pthread_t thread2;
     pthread_create(&thread2, NULL, &receive_thread_read_one_each,
                    (void*)session_ctx2);
-    sleep(1);
 
     int msg;
+    wait_before_reply();
     msg = send_secure_message("Hello client 2", strlen("Hello client 2"),
                               session_ctx2);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
-    sleep(1);
+    wait_before_reply();
     msg = send_secure_message("Hello client 2 - second message",
                               strlen("Hello client 2 - second message"),
                               session_ctx2);
     if (msg < 0) {
         SST_print_error_exit("Failed send_secure_message().");
     }
-    sleep(1);
-
-    sleep(3);
+    sleep(6);
     pthread_cancel(thread2);
     pthread_join(thread2, NULL);  // Needs to wait until the thread is joined.
     free_session_ctx(session_ctx2);

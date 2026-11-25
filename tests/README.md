@@ -6,7 +6,7 @@ The separate C++ API tests are documented in [cpp/README.md](../cpp/README.md#bu
 
 ## Standalone tests
 
-Configure from `entity/c/` to build the C library and its three standalone tests:
+Configure from `entity/c/` to build the C library and its five standalone tests:
 
 ```sh
 cd "$SST_ROOT/entity/c"
@@ -25,6 +25,10 @@ CI also runs this suite in Release mode.
 | `crypto_test` | `c_crypto_test.c` | C crypto primitives |
 | `resource_cleanup_test` | `resource_cleanup_test.c` | Invalid configs, descriptor cleanup, binary file reads, integer decoding and handshake failure paths |
 | `auth_request_test` | `auth_request_test.c` | Session-key and add-reader requests over local socket pairs, public-key and distribution-key encryption, and write failures |
+| `auth_transport_test` | `auth_transport_test.c` | TCP/UDP Auth exchanges over loopback, UDP kickoff and empty datagrams, rejected key IDs/nonces, truncated replies, alerts and descriptor cleanup |
+| `udp_server_cleanup_test` | `udp_server_cleanup_test.c` | UDP example socket and session ownership on initialization, allocation, socket, bind, handshake, thread and send failures |
+
+The transport test binds local loopback sockets and needs permission to do so.
 
 CTest supplies a writable build-directory argument to `resource_cleanup_test`;
 the test creates and removes its own private directory there. To run it directly
@@ -89,3 +93,22 @@ test and `multi_thread_get_session_key_test`, alongside the server/client,
 block-encryption and IPFS examples. The shared-context test remains enabled
 despite the nondeterministic behavior described above; only the encryption
 benchmark command is commented out.
+
+CI also runs the Testbed's packet/metrics helper test and Python plotting
+regressions; see the [Testbed README](../examples/SST_Testbed/README.md#compile-the-sst_testbed-code).
+It builds the SST Testbed and runs `testbed_udp_smoke_test.py` with Auth101
+and the default credentials. It sends two ordinary messages from different UDP
+clients through one worker, separated by the worker's idle timeout, to verify
+that the worker can accept a new peer. No flood traffic or raw sockets are used.
+After building `examples/SST_Testbed/build`, run it from `entity/c/` with:
+
+```sh
+python3 tests/testbed_udp_smoke_test.py --build-dir examples/SST_Testbed/build
+```
+
+The Auth transport fixture also checks TCP/UDP add-reader responses, binary
+nonce validation, empty datagrams, and missing UDP replies at both exchange
+stages. UDP Auth exchanges have a five-second total deadline; the timeout cases
+make this test take about twenty seconds. It needs no running Auth or IPFS daemon.
+The UDP Testbed integration also runs with `--concurrent` to exercise two clients
+and two workers sharing one Auth context.

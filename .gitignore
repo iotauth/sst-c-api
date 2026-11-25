@@ -12,5 +12,6 @@ entity_server
 !/Makefile
 embedded/receiver/config/*
 .DS_Store
+examples/SST_Testbed/config_clones
 .claude
 cpp/build-clean
